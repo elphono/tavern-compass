@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace BronzebeardHud.GameState.Tests;
 
 public class LogReplayTests
@@ -61,5 +63,55 @@ public class LogReplayTests
 
         // Turn may be 0 (local player identified post-replay) or >= 1
         Assert.True(snap.Turn >= 0, $"Expected Turn >= 0, got {snap.Turn}");
+    }
+
+    [Fact]
+    public void FullGameTimeline_PhasesProgressCorrectly()
+    {
+        var engine = new GameStateEngine();
+        var phases = new List<(GamePhase Phase, uint Turn)>();
+        var lastPhase = GamePhase.NotStarted;
+
+        var fixtures = new[] {
+            "game_start.txt", "hero_select.txt",
+            "first_shopping.txt", "opponents_appear.txt"
+        };
+
+        foreach (var fixture in fixtures)
+        {
+            var lines = LogReplayHelper.ParseFixture(fixture);
+            foreach (var line in lines)
+            {
+                engine.Process(line);
+                var snap = engine.Snapshot();
+                if (snap.Phase == GamePhase.HeroSelect && lastPhase != GamePhase.HeroSelect)
+                    engine.IdentifyLocalPlayer();
+
+                if (snap.Phase != lastPhase)
+                {
+                    phases.Add((snap.Phase, snap.Turn));
+                    lastPhase = snap.Phase;
+                }
+            }
+        }
+
+        Assert.Contains(phases, p => p.Phase == GamePhase.HeroSelect);
+        Assert.Contains(phases, p => p.Phase == GamePhase.Shopping);
+        Assert.True(phases[0].Phase == GamePhase.HeroSelect,
+            $"First transition should be HeroSelect, got {phases[0].Phase}");
+    }
+
+    [Fact]
+    public void FullGameTimeline_PlayerHeroSetAfterSelection()
+    {
+        var engine = LogReplayHelper.ReplayFixtures(
+            "game_start.txt", "hero_select.txt", "first_shopping.txt");
+        engine.IdentifyLocalPlayer();
+        var snap = engine.Snapshot();
+
+        Assert.False(string.IsNullOrEmpty(snap.Player.HeroCardId),
+            "Player hero should be set after hero selection");
+        Assert.True(snap.Player.TavernTier >= 1,
+            $"Tavern tier should be >= 1, got {snap.Player.TavernTier}");
     }
 }
