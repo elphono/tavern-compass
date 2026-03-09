@@ -13,11 +13,18 @@ public class MainViewModel : INotifyPropertyChanged
     public MainViewModel()
     {
         // When a card image finishes downloading, bump version to trigger re-render
-        CardImageCache.Instance.ImageLoaded += _ =>
+        try
         {
-            _imageVersion++;
-            OnPropertyChanged(nameof(ImageVersion));
-        };
+            CardImageCache.Instance.ImageLoaded += _ =>
+            {
+                _imageVersion++;
+                OnPropertyChanged(nameof(ImageVersion));
+            };
+        }
+        catch
+        {
+            // CardImageCache may not be available in test environments without Avalonia
+        }
     }
 
     public int ImageVersion => _imageVersion;

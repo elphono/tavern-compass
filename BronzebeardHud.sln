@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BronzebeardHud.GameState.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BronzebeardHud.LogParser.Tests", "tests\BronzebeardHud.LogParser.Tests\BronzebeardHud.LogParser.Tests.csproj", "{0498CE4C-0FB1-4546-A2A5-473CA2AE2F2E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BronzebeardHud.App.Tests", "tests\BronzebeardHud.App.Tests\BronzebeardHud.App.Tests.csproj", "{23D2F63F-9AE0-4B52-B9C9-9F41E3F29D0E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -46,6 +48,10 @@ Global
 		{0498CE4C-0FB1-4546-A2A5-473CA2AE2F2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0498CE4C-0FB1-4546-A2A5-473CA2AE2F2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0498CE4C-0FB1-4546-A2A5-473CA2AE2F2E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23D2F63F-9AE0-4B52-B9C9-9F41E3F29D0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23D2F63F-9AE0-4B52-B9C9-9F41E3F29D0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23D2F63F-9AE0-4B52-B9C9-9F41E3F29D0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23D2F63F-9AE0-4B52-B9C9-9F41E3F29D0E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{4C8E8220-2D5A-4007-BCBE-91F5CF2B3AA3} = {A6F591AC-3DCF-44CB-853E-F1AD9BB87FA3}
@@ -53,5 +59,6 @@ Global
 		{CEE51C80-3976-4E71-A5F2-688FFDCF87E2} = {A6F591AC-3DCF-44CB-853E-F1AD9BB87FA3}
 		{3EB7D3C5-9458-4577-902D-A22FBAA31FB9} = {CD101CFE-60A2-4BAC-8499-CE69037A31CB}
 		{0498CE4C-0FB1-4546-A2A5-473CA2AE2F2E} = {CD101CFE-60A2-4BAC-8499-CE69037A31CB}
+		{23D2F63F-9AE0-4B52-B9C9-9F41E3F29D0E} = {CD101CFE-60A2-4BAC-8499-CE69037A31CB}
 	EndGlobalSection
 EndGlobal
