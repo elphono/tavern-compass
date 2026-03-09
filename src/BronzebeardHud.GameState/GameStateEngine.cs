@@ -1,7 +1,10 @@
+using System;
+
 namespace BronzebeardHud.GameState;
 
 public class GameStateEngine
 {
+    public bool DebugLogging { get; set; }
     private readonly EntityRegistry _entities = new();
     private readonly EntityResolver _resolver = new();
     private GamePhase _phase = GamePhase.NotStarted;
@@ -33,6 +36,7 @@ public class GameStateEngine
         switch (line.Packet)
         {
             case RawPacket.CreateGame:
+                if (DebugLogging) Console.WriteLine("[Engine] CreateGame");
                 Reset();
                 break;
 
@@ -42,6 +46,7 @@ public class GameStateEngine
                 _resolver.SetGameEntity(ge.EntityId);
                 _activeEntityId = ge.EntityId;
                 _activeEntityIndent = line.Indent;
+                if (DebugLogging) Console.WriteLine($"[Engine] GameEntity id={ge.EntityId}");
                 break;
 
             case RawPacket.PlayerEntity pe:
@@ -91,14 +96,18 @@ public class GameStateEngine
                 break;
 
             case RawPacket.TagChange tc:
+                if (DebugLogging && tc.Tag == "STEP")
+                    Console.WriteLine($"[Engine] STEP TagChange: entity={tc.Entity.Kind} resolved={_resolver.Resolve(tc.Entity)} gameEntityId={_gameEntityId} value={tc.Value}");
                 if (_resolver.Resolve(tc.Entity) is { } tcId)
                 {
                     _entities.SetTag(tcId, tc.Tag, tc.Value);
 
                     if (tcId == _gameEntityId && tc.Tag == "STEP")
                     {
-                        if (GamePhaseHelper.FromStep(tc.Value) is { } newPhase)
-                            _phase = newPhase;
+                        var newPhase = GamePhaseHelper.FromStep(tc.Value);
+                        if (DebugLogging) Console.WriteLine($"[Engine] STEP={tc.Value} -> phase={newPhase}");
+                        if (newPhase is { } p)
+                            _phase = p;
                     }
 
                     if (tcId == _localPlayerEntityId && tc.Tag == "TURN"

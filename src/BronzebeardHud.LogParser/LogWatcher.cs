@@ -22,7 +22,7 @@ public class LogWatcher
     {
         var lexer = new Lexer();
         string? currentPath = null;
-        long readPos = 0;
+        int lineIndex = 0;
 
         try
         {
@@ -35,26 +35,38 @@ public class LogWatcher
 
                 if (currentPath != latest)
                 {
+                    Console.WriteLine($"[LogWatcher] New session: {latest}");
                     if (currentPath != null)
                     {
                         await writer.WriteAsync(new WatcherEvent.SessionChanged(), ct);
                     }
                     currentPath = latest;
-                    readPos = FindLastCreateGame(latest);
+                    lineIndex = FindLastCreateGameLine(latest);
+                    Console.WriteLine($"[LogWatcher] Starting at line {lineIndex}");
                 }
 
-                using var stream = new FileStream(currentPath, FileMode.Open,
-                    FileAccess.Read, FileShare.ReadWrite);
-                stream.Seek(readPos, SeekOrigin.Begin);
-                using var reader = new StreamReader(stream);
-
-                while (reader.ReadLine() is { } line)
+                List<string> allLines;
+                try
                 {
-                    readPos = stream.Position;
+                    allLines = ReadAllLinesShared(currentPath);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[LogWatcher] Read error: {ex.Message}");
+                    continue;
+                }
+
+                for (int i = lineIndex; i < allLines.Count; i++)
+                {
+                    var line = allLines[i];
                     if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    if (i == lineIndex)
+                        Console.WriteLine($"[LogWatcher] First line: {line[..Math.Min(line.Length, 120)]}");
 
                     if (line.Contains("CREATE_GAME") && line.Contains("GameState"))
                     {
+                        Console.WriteLine("[LogWatcher] CREATE_GAME detected");
                         await writer.WriteAsync(new WatcherEvent.SessionChanged(), ct);
                     }
 
@@ -64,6 +76,8 @@ public class LogWatcher
                         await writer.WriteAsync(new WatcherEvent.Line(logLine), ct);
                     }
                 }
+
+                lineIndex = allLines.Count;
             }
         }
         catch (OperationCanceledException) { }
@@ -71,6 +85,19 @@ public class LogWatcher
         {
             writer.Complete();
         }
+    }
+
+    /// <summary>
+    /// Read all lines from a file that may be open for writing by another process.
+    /// </summary>
+    private static List<string> ReadAllLinesShared(string path)
+    {
+        var lines = new List<string>();
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        while (reader.ReadLine() is { } line)
+            lines.Add(line);
+        return lines;
     }
 
     private string? FindLatestPowerLog()
@@ -86,25 +113,20 @@ public class LogWatcher
         return File.Exists(powerLog) ? powerLog : null;
     }
 
-    private static long FindLastCreateGame(string path)
+    private static int FindLastCreateGameLine(string path)
     {
         try
         {
-            using var stream = new FileStream(path, FileMode.Open,
-                FileAccess.Read, FileShare.ReadWrite);
-            using var reader = new StreamReader(stream);
+            var lines = ReadAllLinesShared(path);
+            int lastLine = 0;
 
-            long lastOffset = 0;
-            long currentOffset = 0;
-
-            while (reader.ReadLine() is { } line)
+            for (int i = 0; i < lines.Count; i++)
             {
-                if (line.Contains("CREATE_GAME") && line.Contains("GameState"))
-                    lastOffset = currentOffset;
-                currentOffset = stream.Position;
+                if (lines[i].Contains("CREATE_GAME") && lines[i].Contains("GameState"))
+                    lastLine = i;
             }
 
-            return lastOffset;
+            return lastLine;
         }
         catch
         {

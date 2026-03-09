@@ -21,26 +21,44 @@ public partial class MainWindow : Window
         var service = new GameStateService(viewModel, LogPaths.DefaultLogsDir());
         _ = service.RunAsync(CancellationToken.None);
 
-        // HS window tracking timer (Windows only — on Linux/WSL, just stay visible)
         if (OperatingSystem.IsWindows())
         {
-            var hsService = new HsWindowService();
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-            timer.Tick += (_, _) =>
+            // Apply Win32 overlay styles once the window has a native handle
+            Opened += (_, _) =>
             {
-                var rect = hsService.GetHsWindowRect();
-                if (rect != null)
-                {
-                    Position = new Avalonia.PixelPoint(rect.X + rect.Width, rect.Y);
-                    Height = rect.Height;
-                }
-
-                if (!hsService.IsHsForeground())
-                    Hide();
-                else
-                    Show();
+                var platformHandle = TryGetPlatformHandle();
+                if (platformHandle != null)
+                    HsWindowService.ApplyOverlayExStyle(platformHandle.Handle);
             };
-            timer.Start();
         }
+
+        // HS window tracking timer — works on both Windows (P/Invoke) and WSL (helper exe)
+        var hsService = new HsWindowService { OverlayWindowTitle = Title };
+        var pollInterval = OperatingSystem.IsWindows()
+            ? TimeSpan.FromMilliseconds(250)
+            : TimeSpan.FromMilliseconds(500); // WSL helper is ~90ms, so 500ms is fine
+        var timer = new DispatcherTimer { Interval = pollInterval };
+        timer.Tick += (_, _) =>
+        {
+            var rect = hsService.GetHsWindowRect();
+            if (rect != null)
+            {
+                // Position on the right side of the HS window, inside it
+                var overlayWidth = (int)Width;
+                Position = new Avalonia.PixelPoint(rect.X + rect.Width - overlayWidth, rect.Y);
+                Height = rect.Height;
+                if (!IsVisible) Show();
+            }
+            else
+            {
+                // HS not running or minimized — hide overlay
+                if (IsVisible) Hide();
+            }
+
+            // Re-assert topmost (Avalonia property, reinforced by Win32 on WSL via helper)
+            Topmost = false;
+            Topmost = true;
+        };
+        timer.Start();
     }
 }

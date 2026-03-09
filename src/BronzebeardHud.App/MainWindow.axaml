@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:BronzebeardHud.App.ViewModels"
+        xmlns:conv="using:BronzebeardHud.App.Converters"
         x:Class="BronzebeardHud.App.MainWindow"
         x:DataType="vm:MainViewModel"
         x:CompileBindings="False"
@@ -14,24 +15,109 @@
         ShowInTaskbar="False"
         TransparencyLevelHint="Transparent">
 
-    <StackPanel Margin="12">
-        <TextBlock Text="{Binding PhaseText}"
-                   FontSize="16" FontWeight="Bold"
-                   Foreground="White"
-                   Margin="0,0,0,8"/>
+    <Window.Resources>
+        <conv:CardImageConverter x:Key="CardImage"/>
+    </Window.Resources>
 
-        <!-- Hero Info - visible during Shopping, Combat, GameOver -->
-        <StackPanel IsVisible="False"
-                    Name="HeroPanel">
-            <TextBlock FontSize="14" Foreground="White">
-                <Run Text="{Binding State.Player.HeroCardId}"/>
-            </TextBlock>
-            <TextBlock FontSize="12" Foreground="LightGray">
-                <Run Text="HP: "/><Run Text="{Binding State.Player.Health}"/>
-                <Run Text=" | Armor: "/><Run Text="{Binding State.Player.Armor}"/>
-                <Run Text=" | Tier: "/><Run Text="{Binding State.Player.TavernTier}"/>
-                <Run Text=" | Gold: "/><Run Text="{Binding State.Player.Gold}"/>
-            </TextBlock>
+    <ScrollViewer>
+        <StackPanel Margin="12">
+            <TextBlock Text="{Binding PhaseText}"
+                       FontSize="16" FontWeight="Bold"
+                       Foreground="White"
+                       Margin="0,0,0,8"/>
+
+            <!-- Hero Info -->
+            <StackPanel IsVisible="{Binding IsInGame}"
+                        Name="HeroPanel">
+                <TextBlock FontSize="14" Foreground="White">
+                    <Run Text="{Binding State.Player.HeroCardId}"/>
+                </TextBlock>
+                <TextBlock FontSize="12" Foreground="LightGray">
+                    <Run Text="HP: "/><Run Text="{Binding State.Player.Health}"/>
+                    <Run Text=" | Armor: "/><Run Text="{Binding State.Player.Armor}"/>
+                    <Run Text=" | Tier: "/><Run Text="{Binding State.Player.TavernTier}"/>
+                    <Run Text=" | Gold: "/><Run Text="{Binding State.Player.Gold}"/>
+                </TextBlock>
+
+                <!-- Board -->
+                <TextBlock Text="Board" FontSize="13" FontWeight="SemiBold"
+                           Foreground="#FFD700" Margin="0,10,0,4"/>
+                <ItemsControl ItemsSource="{Binding State.Player.Board}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#40FFFFFF" CornerRadius="4"
+                                    Padding="4,2" Margin="0,2">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Image Source="{Binding CardId, Converter={StaticResource CardImage}}"
+                                           Height="32" Stretch="Uniform"/>
+                                    <TextBlock FontSize="11" Foreground="White"
+                                               VerticalAlignment="Center">
+                                        <Run Text="{Binding CardId}"/>
+                                        <Run Text="  "/>
+                                        <Run Text="{Binding Attack}" Foreground="#FF6666"/>
+                                        <Run Text="/"/>
+                                        <Run Text="{Binding Health}" Foreground="#66FF66"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Shop (Shopping phase only) -->
+                <TextBlock Text="Shop" FontSize="13" FontWeight="SemiBold"
+                           Foreground="#87CEEB" Margin="0,10,0,4"
+                           IsVisible="{Binding IsShopping}"/>
+                <ItemsControl ItemsSource="{Binding State.Player.Shop}"
+                              IsVisible="{Binding IsShopping}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#40004080" CornerRadius="4"
+                                    Padding="4,2" Margin="0,2">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Image Source="{Binding CardId, Converter={StaticResource CardImage}}"
+                                           Height="32" Stretch="Uniform"/>
+                                    <TextBlock FontSize="11" Foreground="White"
+                                               VerticalAlignment="Center">
+                                        <Run Text="{Binding CardId}"/>
+                                        <Run Text="  "/>
+                                        <Run Text="{Binding Attack}" Foreground="#FF6666"/>
+                                        <Run Text="/"/>
+                                        <Run Text="{Binding Health}" Foreground="#66FF66"/>
+                                        <Run Text="  T"/>
+                                        <Run Text="{Binding Tier}" Foreground="#FFD700"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Opponents -->
+                <TextBlock Text="Opponents" FontSize="13" FontWeight="SemiBold"
+                           Foreground="#FF8C00" Margin="0,10,0,4"/>
+                <ItemsControl ItemsSource="{Binding State.Opponents}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="#40800000" CornerRadius="4"
+                                    Padding="4,2" Margin="0,2">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Image Source="{Binding HeroCardId, Converter={StaticResource CardImage}}"
+                                           Height="32" Stretch="Uniform"/>
+                                    <TextBlock FontSize="11" Foreground="White"
+                                               VerticalAlignment="Center">
+                                        <Run Text="{Binding HeroCardId}"/>
+                                        <Run Text="  HP: "/>
+                                        <Run Text="{Binding Health}" Foreground="#66FF66"/>
+                                        <Run Text="  T"/>
+                                        <Run Text="{Binding TavernTier}" Foreground="#FFD700"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </StackPanel>
-    </StackPanel>
+    </ScrollViewer>
 </Window>

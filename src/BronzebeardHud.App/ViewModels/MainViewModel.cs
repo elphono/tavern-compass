@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using BronzebeardHud.App.Services;
 using BronzebeardHud.GameState;
 
 namespace BronzebeardHud.App.ViewModels;
@@ -7,12 +8,28 @@ namespace BronzebeardHud.App.ViewModels;
 public class MainViewModel : INotifyPropertyChanged
 {
     private GameStateSnapshot _state = new();
+    private int _imageVersion;
+
+    public MainViewModel()
+    {
+        // When a card image finishes downloading, bump version to trigger re-render
+        CardImageCache.Instance.ImageLoaded += _ =>
+        {
+            _imageVersion++;
+            OnPropertyChanged(nameof(ImageVersion));
+        };
+    }
+
+    public int ImageVersion => _imageVersion;
 
     public GameStateSnapshot State
     {
         get => _state;
-        set { _state = value; OnPropertyChanged(); OnPropertyChanged(nameof(PhaseText)); }
+        set { _state = value; OnPropertyChanged(); OnPropertyChanged(nameof(PhaseText)); OnPropertyChanged(nameof(IsInGame)); OnPropertyChanged(nameof(IsShopping)); }
     }
+
+    public bool IsInGame => State.Phase is GamePhase.Shopping or GamePhase.Combat or GamePhase.GameOver;
+    public bool IsShopping => State.Phase == GamePhase.Shopping;
 
     public string PhaseText => State.Phase switch
     {
