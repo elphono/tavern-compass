@@ -24,6 +24,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\BronzebeardHud.GameState\BronzebeardHud.GameState.csproj" />
+    <ProjectReference Include="..\..\src\BronzebeardHud.LogParser\BronzebeardHud.LogParser.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Fixtures\*.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

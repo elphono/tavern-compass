@@ -1,0 +1,249 @@
+D 09:54:15.1887537 GameState.DebugPrintPowerList() - Count=22
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_READY 
+D 09:54:15.1887537 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Murozond EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.1887537 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NUM_TURNS_IN_PLAY value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Player#1234 tag=NUM_TURNS_IN_PLAY value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Murozond tag=NUM_TURNS_IN_PLAY value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() -     TAG_CHANGE Entity=[entityName=Murozond id=46 zone=PLAY zonePos=0 cardId=TB_BaconShopBob_SKIN_BD player=10] tag=NUM_TURNS_IN_PLAY value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() -     TAG_CHANGE Entity=[entityName=Faelin de Zin-Azshari id=86 zone=PLAY zonePos=0 cardId=BG22_HERO_201_SKIN_F player=2] tag=NUM_TURNS_IN_PLAY value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() -     TAG_CHANGE Entity=[entityName=Plans d’expédition id=197 zone=PLAY zonePos=0 cardId=BG22_HERO_201p player=2] tag=NUM_TURNS_IN_PLAY value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NEXT_STEP value=MAIN_START_TRIGGERS 
+D 09:54:15.1887537 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.1887537 GameState.DebugPrintPower() - FULL_ENTITY - Creating ID=213 CardID=TB_BaconShop_HP_080
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=CONTROLLER value=10
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=CARDTYPE value=HERO_POWER
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=TRIGGER_VISUAL value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=ZONE value=SETASIDE
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=ENTITY_ID value=213
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=CREATOR value=212
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=REVEALED value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=DISCOVER value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=HIDE_COST value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=CREATOR_DBID value=63320
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=USE_DISCOVER_VISUALS value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=SUPPRESS_ALL_SUMMON_VO value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=SPAWN_TIME_COUNT value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=2169 value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=BACON_HEROPOWER_BASE_HERO_ID value=63319
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=213 tag=COPIED_FROM_ENTITY_ID value=212 
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=213 tag=3669 value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() - FULL_ENTITY - Creating ID=214 CardID=TB_BaconShop_HERO_70_SKIN_I
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=CONTROLLER value=10
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=CARDTYPE value=HERO
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=PLAYER_ID value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=HEALTH value=30
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=ZONE value=SETASIDE
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=ENTITY_ID value=214
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=FACTION value=NEUTRAL
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=RARITY value=RARE
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=CREATOR value=91
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=HERO_POWER value=63320
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=REVEALED value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=CREATOR_DBID value=118390
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=PLAYER_LEADERBOARD_PLACE value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=SUPPRESS_ALL_SUMMON_VO value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=SPAWN_TIME_COUNT value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=USE_LEADERBOARD_AS_SPAWN_ORIGIN value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=HERO_POWER_ENTITY value=213
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=BACON_SKIN value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=BACON_SKIN_PARENT_ID value=63319
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=HAS_ACTIVATE_POWER value=1
+D 09:54:15.1887537 GameState.DebugPrintPower() -     tag=3085 value=30
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=214 tag=LINKED_ENTITY value=25 
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=214 tag=2210 value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=214 tag=BATTLEGROUNDS_FAVORITE_FINISHER value=33 
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=214 tag=LAST_AFFECTED_BY value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=214 tag=COPIED_FROM_ENTITY_ID value=91 
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=214 tag=3669 value=1 
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=214 tag=LINKED_ENTITY value=0 
+D 09:54:15.1887537 GameState.DebugPrintPower() - TAG_CHANGE Entity=214 tag=3025 value=30 
+D 09:54:15.2894928 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.2894928 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=M. Bigglesworth id=214 zone=SETASIDE zonePos=0 cardId=TB_BaconShop_HERO_70_SKIN_I player=10] tag=3026 value=19 
+D 09:54:15.3100457 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.3100457 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=M. Bigglesworth id=214 zone=SETASIDE zonePos=0 cardId=TB_BaconShop_HERO_70_SKIN_I player=10] tag=ARMOR value=19 
+D 09:54:15.6894988 GameState.DebugPrintPowerList() - Count=66
+D 09:54:15.6894988 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Chaton de Kel’Thuzad id=213 zone=SETASIDE zonePos=0 cardId=TB_BaconShop_HP_080 player=10] tag=3669 value=0 
+D 09:54:15.6894988 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=M. Bigglesworth id=214 zone=SETASIDE zonePos=0 cardId=TB_BaconShop_HERO_70_SKIN_I player=10] tag=3669 value=0 
+D 09:54:15.6894988 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_START_TRIGGERS 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=GameEntity EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=0 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_END 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Murozond EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NEXT_STEP value=MAIN_START 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=Ench. de joueur 8 boutique CdB id=47 zone=PLAY zonePos=0 cardId=TB_BaconShop_8P_PlayerE player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=33 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Player#1234 EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Murozond EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NEXT_STEP value=MAIN_CLEANUP 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Murozond EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_CLEANUP 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Player#1234 EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Murozond EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NEXT_STEP value=MAIN_NEXT 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_NEXT 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=GameEntity EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=0 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Murozond tag=1292 value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Murozond tag=1292 value=0 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Player#1234 tag=1292 value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Murozond tag=CURRENT_PLAYER value=0 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Player#1234 tag=CURRENT_PLAYER value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=TURN value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=1882 value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Player#1234 tag=TURN value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NEXT_STEP value=MAIN_READY 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_READY 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Player#1234 EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NUM_TURNS_IN_PLAY value=2 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Player#1234 tag=NUM_TURNS_IN_PLAY value=2 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Murozond tag=NUM_TURNS_IN_PLAY value=2 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=[entityName=Murozond id=46 zone=PLAY zonePos=0 cardId=TB_BaconShopBob_SKIN_BD player=10] tag=NUM_TURNS_IN_PLAY value=2 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=[entityName=Faelin de Zin-Azshari id=86 zone=PLAY zonePos=0 cardId=BG22_HERO_201_SKIN_F player=2] tag=NUM_TURNS_IN_PLAY value=2 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=[entityName=Plans d’expédition id=197 zone=PLAY zonePos=0 cardId=BG22_HERO_201p player=2] tag=NUM_TURNS_IN_PLAY value=2 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NEXT_STEP value=MAIN_START_TRIGGERS 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=Ench. de joueur 8 boutique CdB id=47 zone=PLAY zonePos=0 cardId=TB_BaconShop_8P_PlayerE player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=30 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() -     FULL_ENTITY - Creating ID=233 CardID=
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ZONE value=SETASIDE
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CONTROLLER value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ENTITY_ID value=233
+D 09:54:15.6894988 GameState.DebugPrintPower() -     SHOW_ENTITY - Updating Entity=233 CardID=TB_BaconShop_HP_038e
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CONTROLLER value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CARDTYPE value=ENCHANTMENT
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ATTACHED value=5
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ZONE value=SETASIDE
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ENTITY_ID value=233
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CLASS value=NEUTRAL
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CREATOR value=47
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=1037 value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=1068 value=0
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CREATOR_DBID value=57980
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=SPAWN_TIME_COUNT value=1
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=2882 value=1
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=233 tag=1068 value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=233 tag=1068 value=0 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=233 tag=ZONE value=PLAY 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=Player#1234 tag=LAST_AFFECTED_BY value=47 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=Ench. de joueur 8 boutique CdB id=47 zone=PLAY zonePos=0 cardId=TB_BaconShop_8P_PlayerE player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=37 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.6894988 GameState.DebugPrintPower() -     FULL_ENTITY - Creating ID=234 CardID=
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ZONE value=SETASIDE
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CONTROLLER value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ENTITY_ID value=234
+D 09:54:15.6894988 GameState.DebugPrintPower() -     SHOW_ENTITY - Updating Entity=234 CardID=BG29_813e
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CONTROLLER value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CARDTYPE value=ENCHANTMENT
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ATTACHED value=5
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ZONE value=SETASIDE
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ENTITY_ID value=234
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CLASS value=NEUTRAL
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CREATOR value=47
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ENCHANTMENT_INVISIBLE value=1
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=1037 value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=1068 value=0
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CREATOR_DBID value=57980
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=SPAWN_TIME_COUNT value=1
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=2860 value=1
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=234 tag=1068 value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=234 tag=1068 value=0 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=234 tag=ZONE value=PLAY 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     FULL_ENTITY - Creating ID=235 CardID=
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ZONE value=SETASIDE
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CONTROLLER value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ENTITY_ID value=235
+D 09:54:15.6894988 GameState.DebugPrintPower() -     SHOW_ENTITY - Updating Entity=235 CardID=Bacon_Free_Refresh_Player_Ench
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CONTROLLER value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CARDTYPE value=ENCHANTMENT
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ATTACHED value=5
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ZONE value=SETASIDE
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=ENTITY_ID value=235
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CLASS value=NEUTRAL
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CREATOR value=47
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=1037 value=2
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=1068 value=0
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=CREATOR_DBID value=57980
+D 09:54:15.6894988 GameState.DebugPrintPower() -         tag=SPAWN_TIME_COUNT value=1
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=235 tag=1068 value=1 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=235 tag=1068 value=0 
+D 09:54:15.6894988 GameState.DebugPrintPower() -     TAG_CHANGE Entity=235 tag=ZONE value=PLAY 
+D 09:54:15.6894988 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.7558455 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.7558455 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=M. Bigglesworth id=214 zone=SETASIDE zonePos=0 cardId=TB_BaconShop_HERO_70_SKIN_I player=10] tag=PLAYER_LEADERBOARD_PLACE value=2 
+D 09:54:15.7724702 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.7724702 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Rokara id=171 zone=SETASIDE zonePos=0 cardId=BG20_HERO_100_SKIN_D player=10] tag=PLAYER_LEADERBOARD_PLACE value=3 
+D 09:54:15.7894544 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.7894544 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Kurtrus Chutecendre id=186 zone=SETASIDE zonePos=0 cardId=BG20_HERO_280 player=10] tag=PLAYER_LEADERBOARD_PLACE value=4 
+D 09:54:15.8060259 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.8060259 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Tavish Foudrepique id=125 zone=SETASIDE zonePos=0 cardId=BG22_HERO_000_SKIN_C player=10] tag=PLAYER_LEADERBOARD_PLACE value=5 
+D 09:54:15.8223024 GameState.DebugPrintPowerList() - Count=2
+D 09:54:15.8223024 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Faelin de Zin-Azshari id=86 zone=PLAY zonePos=0 cardId=BG22_HERO_201_SKIN_F player=2] tag=PLAYER_LEADERBOARD_PLACE value=6 
+D 09:54:15.8223024 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Le grand Akazamzarak id=156 zone=SETASIDE zonePos=0 cardId=TB_BaconShop_HERO_21 player=10] tag=PLAYER_LEADERBOARD_PLACE value=7 
+D 09:54:15.8390851 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.8390851 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Onyxia id=140 zone=SETASIDE zonePos=0 cardId=BG22_HERO_305 player=10] tag=PLAYER_LEADERBOARD_PLACE value=8 
+D 09:54:15.8560849 GameState.DebugPrintPowerList() - Count=2
+D 09:54:15.8560849 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Faelin de Zin-Azshari id=86 zone=PLAY zonePos=0 cardId=BG22_HERO_201_SKIN_F player=2] tag=PLAYER_LEADERBOARD_PLACE value=5 
+D 09:54:15.8560849 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Tavish Foudrepique id=125 zone=SETASIDE zonePos=0 cardId=BG22_HERO_000_SKIN_C player=10] tag=PLAYER_LEADERBOARD_PLACE value=6 
+D 09:54:15.8726504 GameState.DebugPrintPowerList() - Count=3
+D 09:54:15.8726504 GameState.DebugPrintPower() - TAG_CHANGE Entity=GameEntity tag=STEP value=MAIN_START_TRIGGERS 
+D 09:54:15.8726504 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=Ench. de joueur 8 boutique CdB id=47 zone=PLAY zonePos=0 cardId=TB_BaconShop_8P_PlayerE player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=2 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.8726504 GameState.DebugPrintPower() -     TAG_CHANGE Entity=[entityName=Faelin de Zin-Azshari id=86 zone=PLAY zonePos=0 cardId=BG22_HERO_201_SKIN_F player=2] tag=NEXT_OPPONENT_PLAYER_ID value=7 
+D 09:54:15.8893117 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.8893117 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Tavish Foudrepique id=125 zone=SETASIDE zonePos=0 cardId=BG22_HERO_000_SKIN_C player=10] tag=PLAYER_LEADERBOARD_PLACE value=5 
+D 09:54:15.9055010 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.9055010 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Faelin de Zin-Azshari id=86 zone=PLAY zonePos=0 cardId=BG22_HERO_201_SKIN_F player=2] tag=PLAYER_LEADERBOARD_PLACE value=6 
+D 09:54:15.9224965 GameState.DebugPrintPowerList() - Count=27
+D 09:54:15.9224965 GameState.DebugPrintPower() - FULL_ENTITY - Creating ID=253 CardID=TB_BaconShop_UpdateDmgCap
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=CONTROLLER value=2
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=CARDTYPE value=SPELL
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=ZONE value=SETASIDE
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=ENTITY_ID value=253
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=CLASS value=NEUTRAL
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=CREATOR value=47
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=1037 value=2
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=1200 value=1
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=CREATOR_DBID value=57980
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=SUPPRESS_ALL_SUMMON_VO value=1
+D 09:54:15.9224965 GameState.DebugPrintPower() -     tag=SPAWN_TIME_COUNT value=1
+D 09:54:15.9224965 GameState.DebugPrintPower() - TAG_CHANGE Entity=253 tag=1715 value=47 
+D 09:54:15.9224965 GameState.DebugPrintPower() - TAG_CHANGE Entity=253 tag=1068 value=1 
+D 09:54:15.9224965 GameState.DebugPrintPower() - TAG_CHANGE Entity=253 tag=1068 value=0 
+D 09:54:15.9224965 GameState.DebugPrintPower() - TAG_CHANGE Entity=253 tag=ZONE value=PLAY 
+D 09:54:15.9224965 GameState.DebugPrintPower() - META_DATA - Meta=HISTORY_TARGET Data=0 InfoCount=1
+D 09:54:15.9224965 GameState.DebugPrintPower() -             Info[0] = 253
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_START BlockType=POWER Entity=253 EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=0 Target=0 SubOption=-1 
+D 09:54:15.9224965 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=BACON_COMBAT_DAMAGE_CAP value=5 
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.9224965 GameState.DebugPrintPower() - TAG_CHANGE Entity=253 tag=1068 value=4 
+D 09:54:15.9224965 GameState.DebugPrintPower() - TAG_CHANGE Entity=253 tag=1068 value=0 
+D 09:54:15.9224965 GameState.DebugPrintPower() - TAG_CHANGE Entity=253 tag=SUPPRESS_ALL_SUMMON_VO value=0 
+D 09:54:15.9224965 GameState.DebugPrintPower() - TAG_CHANGE Entity=253 tag=ZONE value=GRAVEYARD 
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=Ench. de joueur 8 boutique CdB id=47 zone=PLAY zonePos=0 cardId=TB_BaconShop_8P_PlayerE player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=29 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=Ench. de joueur 8 boutique CdB id=47 zone=PLAY zonePos=0 cardId=TB_BaconShop_8P_PlayerE player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=Ench. de joueur 8 boutique CdB id=47 zone=PLAY zonePos=0 cardId=TB_BaconShop_8P_PlayerE player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=35 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=UNKNOWN ENTITY [cardType=INVALID] id=233 zone=SETASIDE zonePos=0 cardId= player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=0 Target=0 SubOption=-1 TriggerKeyword=2882
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=Player#1234 EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=-1 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.9224965 GameState.DebugPrintPower() -     TAG_CHANGE Entity=GameEntity tag=NEXT_STEP value=MAIN_START 
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_START BlockType=TRIGGER Entity=[entityName=Ench. de joueur 8 boutique CdB id=47 zone=PLAY zonePos=0 cardId=TB_BaconShop_8P_PlayerE player=2] EffectCardId=System.Collections.Generic.List`1[System.String] EffectIndex=7 Target=0 SubOption=-1 TriggerKeyword=TAG_NOT_SET
+D 09:54:15.9224965 GameState.DebugPrintPower() - BLOCK_END
+D 09:54:15.9390257 GameState.DebugPrintPowerList() - Count=2
+D 09:54:15.9390257 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Faelin de Zin-Azshari id=86 zone=PLAY zonePos=0 cardId=BG22_HERO_201_SKIN_F player=2] tag=PLAYER_LEADERBOARD_PLACE value=5 
+D 09:54:15.9390257 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Tavish Foudrepique id=125 zone=SETASIDE zonePos=0 cardId=BG22_HERO_000_SKIN_C player=10] tag=PLAYER_LEADERBOARD_PLACE value=6 
+D 09:54:15.9558098 GameState.DebugPrintPowerList() - Count=2
+D 09:54:15.9558098 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Faelin de Zin-Azshari id=86 zone=PLAY zonePos=0 cardId=BG22_HERO_201_SKIN_F player=2] tag=PLAYER_LEADERBOARD_PLACE value=4 
+D 09:54:15.9558098 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Kurtrus Chutecendre id=186 zone=SETASIDE zonePos=0 cardId=BG20_HERO_280 player=10] tag=PLAYER_LEADERBOARD_PLACE value=5 
+D 09:54:15.9721456 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.9721456 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Tavish Foudrepique id=125 zone=SETASIDE zonePos=0 cardId=BG22_HERO_000_SKIN_C player=10] tag=PLAYER_LEADERBOARD_PLACE value=5 
+D 09:54:15.9888237 GameState.DebugPrintPowerList() - Count=1
+D 09:54:15.9888237 GameState.DebugPrintPower() - TAG_CHANGE Entity=[entityName=Kurtrus Chutecendre id=186 zone=SETASIDE zonePos=0 cardId=BG20_HERO_280 player=10] tag=PLAYER_LEADERBOARD_PLACE value=6 
