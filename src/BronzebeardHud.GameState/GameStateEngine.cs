@@ -100,6 +100,7 @@ public class GameStateEngine
                     Console.WriteLine($"[Engine] STEP TagChange: entity={tc.Entity.Kind} resolved={_resolver.Resolve(tc.Entity)} gameEntityId={_gameEntityId} value={tc.Value}");
                 if (_resolver.Resolve(tc.Entity) is { } tcId)
                 {
+                    EnrichFromBracketRef(tcId, tc.Entity);
                     _entities.SetTag(tcId, tc.Tag, tc.Value);
 
                     if (tcId == _gameEntityId && tc.Tag == "STEP")
@@ -200,27 +201,36 @@ public class GameStateEngine
     private List<OpponentState> BuildOpponentStates()
     {
         var opponents = new List<OpponentState>();
-        foreach (var (entityId, (playerId, _)) in _players)
+
+        // In BG, opponent heroes are entities with:
+        // - CARDTYPE=HERO
+        // - ZONE=SETASIDE
+        // - PLAYER_LEADERBOARD_PLACE tag set (> 0)
+        // - Not the local player's hero
+        var localHeroEntityId = _localPlayerEntityId > 0
+            ? _entities.Get(_localPlayerEntityId)?.TagInt("HERO_ENTITY") ?? 0
+            : 0;
+
+        var oppHeroes = _entities.Find(e =>
+            e.Zone == "SETASIDE"
+            && e.TagInt("PLAYER_LEADERBOARD_PLACE") > 0
+            && e.Id != (uint)localHeroEntityId);
+
+        foreach (var hero in oppHeroes)
         {
-            if (entityId == _localPlayerEntityId) continue;
-            var entity = _entities.Get(entityId);
-            if (entity?.Tag("BACON_DUMMY_PLAYER") == "1") continue;
-
-            var heroEntityId = entity?.TagInt("HERO_ENTITY") ?? 0;
-            var hero = heroEntityId > 0 ? _entities.Get((uint)heroEntityId) : null;
-
             opponents.Add(new OpponentState
             {
-                EntityId = entityId,
-                PlayerId = playerId,
-                HeroCardId = hero?.CardId ?? "",
-                HeroEntityId = (uint)heroEntityId,
-                Health = (hero?.TagInt("HEALTH") ?? 0) - (hero?.TagInt("DAMAGE") ?? 0),
-                TavernTier = entity?.TagInt("PLAYER_TECH_LEVEL") ?? 0,
+                EntityId = hero.Id,
+                PlayerId = 0,
+                HeroCardId = hero.CardId,
+                HeroEntityId = hero.Id,
+                Health = hero.TagInt("HEALTH") - hero.TagInt("DAMAGE"),
+                TavernTier = hero.TagInt("PLAYER_TECH_LEVEL"),
                 LastKnownBoard = new List<Minion>(),
                 LastSeenTurn = 0,
             });
         }
+
         return opponents;
     }
 
@@ -274,6 +284,25 @@ public class GameStateEngine
         var used = playerEntity.TagInt("RESOURCES_USED");
         var temp = playerEntity.TagInt("TEMP_RESOURCES");
         return Math.Max(0, resources - used + temp);
+    }
+
+    private void EnrichFromBracketRef(uint entityId, EntityRef entityRef)
+    {
+        if (entityRef.Kind != EntityRefKind.BracketRef) return;
+
+        // BracketRef carries cardId, zone, and other metadata that may not
+        // have been seen via FullEntityCreate (e.g. opponent heroes in BG).
+        // Ensure the entity exists (SetTag auto-creates, but we need it
+        // to exist before setting CardId).
+        if (!string.IsNullOrEmpty(entityRef.Zone))
+            _entities.SetTag(entityId, "ZONE", entityRef.Zone);
+
+        if (!string.IsNullOrEmpty(entityRef.CardId))
+        {
+            var entity = _entities.Get(entityId);
+            if (entity != null && string.IsNullOrEmpty(entity.CardId))
+                entity.CardId = entityRef.CardId;
+        }
     }
 
     private void UpdateCardId(uint id, string cardId)
