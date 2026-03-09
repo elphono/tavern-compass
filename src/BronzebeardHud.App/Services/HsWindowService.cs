@@ -23,6 +23,12 @@ public class HsWindowService
     /// </summary>
     public string? OverlayWindowTitle { get; set; }
 
+    /// <summary>
+    /// Desired overlay position/size for the helper to apply via Win32 SetWindowPos.
+    /// Set before calling GetHsWindowRect on WSL.
+    /// </summary>
+    public WindowRect? DesiredOverlayRect { get; set; }
+
     public WindowRect? GetHsWindowRect()
     {
         if (OperatingSystem.IsWindows())
@@ -80,7 +86,7 @@ public class HsWindowService
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            // Pass overlay title so helper can force it topmost via Win32
+            // Pass overlay title so helper can force it topmost + position via Win32
             // WSLg appends " (<distro>)" to window titles
             if (!string.IsNullOrEmpty(OverlayWindowTitle))
             {
@@ -88,6 +94,15 @@ public class HsWindowService
                     ? $"{OverlayWindowTitle} ({s_wslDistroName})"
                     : OverlayWindowTitle;
                 proc.StartInfo.ArgumentList.Add(wslTitle);
+
+                // Pass desired overlay position so helper moves it via SetWindowPos
+                if (DesiredOverlayRect is { } dr)
+                {
+                    proc.StartInfo.ArgumentList.Add(dr.X.ToString());
+                    proc.StartInfo.ArgumentList.Add(dr.Y.ToString());
+                    proc.StartInfo.ArgumentList.Add(dr.Width.ToString());
+                    proc.StartInfo.ArgumentList.Add(dr.Height.ToString());
+                }
             }
             proc.Start();
             var output = proc.StandardOutput.ReadLine();

@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using BronzebeardHud.App.Services;
@@ -32,33 +33,60 @@ public partial class MainWindow : Window
             };
         }
 
-        // HS window tracking timer — works on both Windows (P/Invoke) and WSL (helper exe)
+        // HS window tracking — runs helper on background thread
+        // On WSL, Avalonia Position doesn't work (WSLg ignores X11 move requests),
+        // so the helper moves the overlay via Win32 SetWindowPos directly.
+        var overlayWidth = 400;
         var hsService = new HsWindowService { OverlayWindowTitle = Title };
-        var pollInterval = OperatingSystem.IsWindows()
-            ? TimeSpan.FromMilliseconds(250)
-            : TimeSpan.FromMilliseconds(500); // WSL helper is ~90ms, so 500ms is fine
-        var timer = new DispatcherTimer { Interval = pollInterval };
-        timer.Tick += (_, _) =>
+        var pollMs = OperatingSystem.IsWindows() ? 250 : 500;
+        _ = Task.Run(async () =>
         {
-            var rect = hsService.GetHsWindowRect();
-            if (rect != null)
+            var tickCount = 0;
+            while (true)
             {
-                // Position on the right side of the HS window, inside it
-                var overlayWidth = (int)Width;
-                Position = new Avalonia.PixelPoint(rect.X + rect.Width - overlayWidth, rect.Y);
-                Height = rect.Height;
-                if (!IsVisible) Show();
-            }
-            else
-            {
-                // HS not running or minimized — hide overlay
-                if (IsVisible) Hide();
-            }
+                await Task.Delay(pollMs);
+                try
+                {
+                    var rect = hsService.GetHsWindowRect();
+                    if (tickCount++ % 20 == 0)
+                        Console.WriteLine($"[Overlay] tick={tickCount} rect={rect?.X},{rect?.Y},{rect?.Width},{rect?.Height} desired={hsService.DesiredOverlayRect?.X},{hsService.DesiredOverlayRect?.Y}");
 
-            // Re-assert topmost (Avalonia property, reinforced by Win32 on WSL via helper)
-            Topmost = false;
-            Topmost = true;
-        };
-        timer.Start();
+                    if (rect != null)
+                    {
+                        // Calculate where overlay should go: right side of HS window
+                        var ox = rect.X + rect.Width - overlayWidth;
+                        var oy = rect.Y;
+                        var oh = rect.Height;
+                        // Set desired position for next helper call (WSL: helper moves it via Win32)
+                        hsService.DesiredOverlayRect = new HsWindowService.WindowRect(ox, oy, overlayWidth, oh);
+
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            // On Windows, Avalonia Position works fine
+                            if (OperatingSystem.IsWindows())
+                            {
+                                Position = new Avalonia.PixelPoint(ox, oy);
+                                Height = oh;
+                            }
+                            if (!IsVisible) Show();
+                            Topmost = false;
+                            Topmost = true;
+                        });
+                    }
+                    else
+                    {
+                        hsService.DesiredOverlayRect = null;
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            if (IsVisible) Hide();
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Overlay] Error: {ex.Message}");
+                }
+            }
+        });
     }
 }
