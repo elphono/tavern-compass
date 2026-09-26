@@ -69,9 +69,9 @@ public sealed class Plugin : IPlugin
     private string _shownKey = string.Empty;
     private string _tavernKey = string.Empty;
     private int _diagnosticRound = -1;
-    private readonly CompositionPanelState _compPanel = new();
+    private CompositionPanelState _compPanel = new();
     private TavernAdvice? _lastAdvice;
-    private IReadOnlyList<OwnedCard> _lastOwned = Array.Empty<OwnedCard>();
+    private PlayerCards _lastCards = BronzebeardHud.Stats.PlayerCards.None;
     private string? _shownCompStatus;
     private string _opponentKey = string.Empty;
 
@@ -129,6 +129,9 @@ public sealed class Plugin : IPlugin
 
     public void OnLoad()
     {
+        // HDT calls OnLoad again on this same instance when the plugin is disabled then re-enabled
+        // (Plugins/PluginWrapper.cs:58-94): what was remembered for the previous panels must go with them.
+        ResetSessionState();
         Directory.CreateDirectory(Path.Combine(StatsDirectory, "manual"));
         _stats = new StatsService(StatsDirectory);
         _comps = new CompService(StatsDirectory);
@@ -138,6 +141,22 @@ public sealed class Plugin : IPlugin
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _trinkets = new TrinketPickPanel(Core.OverlayCanvas, StatsDirectory);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
+    }
+
+    private void ResetSessionState()
+    {
+        _inHeroSelection = false;
+        _compsLoadedThisGame = false;
+        _shownKey = string.Empty;
+        _tavernKey = string.Empty;
+        _trinketKey = string.Empty;
+        _opponentKey = string.Empty;
+        _historyKey = -1;
+        _diagnosticRound = -1;
+        _compPanel = new CompositionPanelState();
+        _lastAdvice = null;
+        _lastCards = BronzebeardHud.Stats.PlayerCards.None;
+        _shownCompStatus = null;
     }
 
     public void OnUnload()
@@ -318,14 +337,15 @@ public sealed class Plugin : IPlugin
         var changed = false;
         if (phase == OverlayPhase.Shop)
         {
-            var owned = HdtEntityAdapter.OwnedCards(game);
+            var cards = HdtEntityAdapter.PlayerCards(game);
+            var owned = cards.All;
             var tavern = HdtEntityAdapter.TavernCardIds(game);
             var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + string.Join(",", tavern) + "|" + _comps.Version;
             if (key != _tavernKey || _lastAdvice == null)
             {
                 _tavernKey = key;
                 changed = true;
-                _lastOwned = owned;
+                _lastCards = cards;
                 _lastAdvice = TavernAdvisor.Advise(tavern, owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames());
                 _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _comps.Pins);
 
@@ -335,7 +355,7 @@ public sealed class Plugin : IPlugin
                 if (round != _diagnosticRound && tavern.Count > 0)
                 {
                     _diagnosticRound = round;
-                    Log.Info(TavernAdvisor.DiagnosticLine(round, _comps.Compositions().Count, _comps.State, _lastAdvice, _tavern.FirstMarker,
+                    Log.Info(TavernAdvisor.DiagnosticLine(round, _comps.Compositions().Count, _comps.State, _lastAdvice, cards, _tavern.FirstMarker,
                         Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
                 }
             }
@@ -343,7 +363,7 @@ public sealed class Plugin : IPlugin
 
         var wasVisible = _compPanel.PanelVisible;
         var advice = _lastAdvice;
-        var ownedNow = _lastOwned;
+        var ownedNow = _lastCards.All;
         _compPanel.Update(phase, () => advice != null && (changed || _compPanel.Rows.Count == 0)
             ? CompositionRows.Build(advice.Targets, advice.Playable, ownedNow)
             : _compPanel.Rows);

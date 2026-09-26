@@ -11,7 +11,8 @@ namespace BronzebeardHud.HdtPlugin;
 /// <summary>
 /// The compositions the tavern advisor aims at: hand-typed HSReplay files first
 /// (<c>stats\manual\*.comps.txt</c>, format in the spec), then Firestone's composition stats
-/// from the 7-day cache. Loaded once per game, off the UI thread.
+/// from the 7-day cache. Reloaded at each game, off the UI thread, and loaded by the first
+/// <see cref="Poll"/> when no game start was seen (plugin re-enabled, or HDT started mid-game).
 /// </summary>
 internal sealed class CompService : IDisposable
 {
@@ -20,8 +21,8 @@ internal sealed class CompService : IDisposable
     private readonly HttpStatsFetcher _fetcher = new();
     private readonly StatsCache _cache;
     private readonly string _manualDirectory;
-    private Task<CompositionCacheResult>? _refresh;
-    private CompositionCacheResult? _firestone;
+    private readonly CompositionRefresh _refresh;
+    private bool _manualLoaded;
     private IReadOnlyList<Composition> _manual = Array.Empty<Composition>();
     private readonly List<string> _manualErrors = new();
 
@@ -32,13 +33,65 @@ internal sealed class CompService : IDisposable
     {
         _cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
         _manualDirectory = Path.Combine(statsDirectory, "manual");
+        _refresh = new CompositionRefresh(() => Task.Run(() => _cache.GetCompositionsAsync(TimePeriod, RefreshPolicy.CompStats, CancellationToken.None)));
     }
 
     public int Version { get; private set; }
 
-    /// <summary>Called when a game's first shopping phase starts.</summary>
+    /// <summary>Called when a game's first shopping phase starts: re-read the manual files, reload Firestone's.</summary>
     public void BeginGame()
     {
+        LoadManual();
+        _refresh.Request();
+        Version++;
+    }
+
+    /// <summary>Called on every update: loads what was never loaded, and collects a finished load.</summary>
+    public void Poll()
+    {
+        if (!_manualLoaded)
+        {
+            LoadManual();
+            Version++;
+        }
+
+        if (_refresh.Poll())
+        {
+            Version++;
+        }
+    }
+
+    public IReadOnlyList<Composition> Compositions() =>
+        _refresh.Last?.File is { } firestone ? _manual.Concat(firestone.Compositions).ToList() : _manual;
+
+    /// <summary>Firestone side, for the diagnostic line: "loading", "ok", or the reason there is nothing.</summary>
+    public string State => _refresh.State;
+
+    public string? Status
+    {
+        get
+        {
+            var problems = new List<string>();
+            if (_refresh.IsLoading)
+            {
+                problems.Add("loading Firestone compositions…");
+            }
+
+            if (_refresh.Last?.Error is { } error)
+            {
+                problems.Add(error);
+            }
+
+            problems.AddRange(_manualErrors);
+            return problems.Count == 0 ? null : string.Join(" · ", problems);
+        }
+    }
+
+    public void Dispose() => _fetcher.Dispose();
+
+    private void LoadManual()
+    {
+        _manualLoaded = true;
         var manual = new List<Composition>();
         _manualErrors.Clear();
         if (Directory.Exists(_manualDirectory))
@@ -70,54 +123,5 @@ internal sealed class CompService : IDisposable
                 _manualErrors.Add($"pins.txt: {e.Message}");
             }
         }
-
-        if (_refresh == null || _refresh.IsCompleted)
-        {
-            _refresh = Task.Run(() => _cache.GetCompositionsAsync(TimePeriod, RefreshPolicy.CompStats, CancellationToken.None));
-        }
-
-        Version++;
     }
-
-    public void Poll()
-    {
-        if (_refresh is not { IsCompleted: true } done)
-        {
-            return;
-        }
-
-        _firestone = done.Status == TaskStatus.RanToCompletion
-            ? done.Result
-            : new CompositionCacheResult(_firestone?.File, downloaded: false, error: done.Exception?.GetBaseException().Message);
-        _refresh = null;
-        Version++;
-    }
-
-    public IReadOnlyList<Composition> Compositions() =>
-        _firestone?.File is { } firestone ? _manual.Concat(firestone.Compositions).ToList() : _manual;
-
-    /// <summary>Short state for the diagnostic line: loading, ok, or error.</summary>
-    public string State => _refresh != null ? "loading" : _firestone?.Error != null ? "error" : _firestone?.File != null ? "ok" : "none";
-
-    public string? Status
-    {
-        get
-        {
-            var problems = new List<string>();
-            if (_refresh != null)
-            {
-                problems.Add("loading Firestone compositions…");
-            }
-
-            if (_firestone?.Error is { } error)
-            {
-                problems.Add(error);
-            }
-
-            problems.AddRange(_manualErrors);
-            return problems.Count == 0 ? null : string.Join(" · ", problems);
-        }
-    }
-
-    public void Dispose() => _fetcher.Dispose();
 }

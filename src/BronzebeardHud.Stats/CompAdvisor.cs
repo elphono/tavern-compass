@@ -20,6 +20,28 @@ public sealed class OwnedCard
 }
 
 /// <summary>How far the player's cards go towards one composition.</summary>
+/// <summary>
+/// The player's cards that can steer a composition: minions on the board and every card in hand, since a
+/// key piece held in hand orients the game as much as one already played.
+/// </summary>
+public sealed class PlayerCards
+{
+    public PlayerCards(IReadOnlyList<OwnedCard> board, IReadOnlyList<OwnedCard> hand)
+    {
+        Board = board;
+        Hand = hand;
+    }
+
+    public static PlayerCards None { get; } = new(Array.Empty<OwnedCard>(), Array.Empty<OwnedCard>());
+
+    public IReadOnlyList<OwnedCard> Board { get; }
+
+    public IReadOnlyList<OwnedCard> Hand { get; }
+
+    /// <summary>What the advisor scores: board and hand alike.</summary>
+    public IReadOnlyList<OwnedCard> All => Board.Concat(Hand).ToList();
+}
+
 public sealed class CompProgress
 {
     public CompProgress(Composition composition, IReadOnlyList<string> coreOwned, IReadOnlyList<string> addonOwned, int tribeMatches, double score)
@@ -193,7 +215,11 @@ public static class TavernAdvisor
     /// One log line per shop round, e.g.
     /// <c>Bronzebeard HUD: tavern round=3 comps=24 (ok) playable=22 targets=[Murloc Scam 3.5; Murloc Handbuff 0.5] tavern=4 markers=1 first=#0 x=1086 y=497 w=176 h=57 canvas=2291x1360</c>.
     /// </summary>
-    public static string DiagnosticLine(int round, int compositionCount, string compositionState, TavernAdvice advice, LayoutRect? firstMarker, double canvasWidth, double canvasHeight)
+    /// <summary>
+    /// One line per shop round in HDT's log. compsInLobby counts the compositions whose tribes are all in
+    /// the lobby (the only ones the advisor may target); board and hand count the cards read from HDT.
+    /// </summary>
+    public static string DiagnosticLine(int round, int compositionCount, string compositionState, TavernAdvice advice, PlayerCards cards, LayoutRect? firstMarker, double canvasWidth, double canvasHeight)
     {
         var inv = System.Globalization.CultureInfo.InvariantCulture;
         string N(double v) => Math.Round(v).ToString("0", inv);
@@ -204,7 +230,8 @@ public static class TavernAdvisor
         var first = firstIndex is { } index && firstMarker is { } rect
             ? $"#{index} x={N(rect.Left)} y={N(rect.Top)} w={N(rect.Width)} h={N(rect.Height)}"
             : "none";
-        return $"Bronzebeard HUD: tavern round={round} comps={compositionCount} ({compositionState}) playable={advice.PlayableCompositions} " +
+        return $"Bronzebeard HUD: tavern round={round} comps={compositionCount} ({compositionState}) compsInLobby={advice.PlayableCompositions} " +
+               $"board={cards.Board.Count} hand={cards.Hand.Count} " +
                $"targets={targets} tavern={advice.Cards.Count} markers={advice.MarkerCount} first={first} canvas={N(canvasWidth)}x{N(canvasHeight)}";
     }
 }

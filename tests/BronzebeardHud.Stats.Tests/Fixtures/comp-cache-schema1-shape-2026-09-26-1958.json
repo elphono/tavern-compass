@@ -1,0 +1,1205 @@
+{
+  "schema": 1,
+  "source": "firestone",
+  "sourceUrl": "https://static.zerotoheroes.com/api/bgs/comp-stats/last-patch/overview-from-hourly.gz.json",
+  "generatedAt": "2026-09-26T14:10:43Z",
+  "fetchedAt": "2026-09-26T17:58:52Z",
+  "timePeriod": "last-patch",
+  "compositions": [
+    {
+      "id": "archetype_01",
+      "name": "Archetype 01",
+      "tribes": [
+        "UNDEAD"
+      ],
+      "coreCards": [
+        "SYN_001",
+        "SYN_002",
+        "SYN_003",
+        "SYN_004",
+        "SYN_005"
+      ],
+      "addonCards": [
+        "SYN_006",
+        "SYN_007",
+        "SYN_008",
+        "SYN_009"
+      ],
+      "averagePlacement": 3.05,
+      "dataPoints": 101,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_002",
+          "SYN_001",
+          "SYN_005",
+          "SYN_004",
+          "SYN_006",
+          "SYN_003",
+          "SYN_001"
+        ],
+        [
+          "SYN_006",
+          "SYN_004",
+          "SYN_005",
+          "SYN_003",
+          "SYN_001",
+          "SYN_001",
+          "SYN_002"
+        ],
+        [
+          "SYN_010",
+          "SYN_004",
+          "SYN_005",
+          "SYN_003",
+          "SYN_001",
+          "SYN_002",
+          "SYN_001"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_02",
+      "name": "Archetype 02",
+      "tribes": [
+        "ABERRATION"
+      ],
+      "coreCards": [
+        "SYN_011",
+        "SYN_012"
+      ],
+      "addonCards": [
+        "SYN_013"
+      ],
+      "averagePlacement": 3.1,
+      "dataPoints": 102,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_014",
+          "SYN_015",
+          "SYN_011",
+          "SYN_016",
+          "SYN_017",
+          "SYN_017",
+          "SYN_012"
+        ],
+        [
+          "SYN_018",
+          "SYN_011",
+          "SYN_019",
+          "SYN_020",
+          "SYN_017",
+          "SYN_012"
+        ],
+        [
+          "SYN_021",
+          "SYN_022",
+          "SYN_013",
+          "SYN_011",
+          "SYN_023",
+          "SYN_012",
+          "SYN_013"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_03",
+      "name": "Archetype 03",
+      "tribes": [
+        "PIRATE"
+      ],
+      "coreCards": [
+        "SYN_024",
+        "SYN_025",
+        "SYN_026",
+        "SYN_027"
+      ],
+      "addonCards": [
+        "SYN_028",
+        "SYN_021"
+      ],
+      "averagePlacement": 3.15,
+      "dataPoints": 103,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_024",
+          "SYN_025",
+          "SYN_024",
+          "SYN_024",
+          "SYN_029",
+          "SYN_029",
+          "SYN_021"
+        ],
+        [
+          "SYN_030",
+          "SYN_025",
+          "SYN_025",
+          "SYN_019",
+          "SYN_024",
+          "SYN_024",
+          "SYN_024"
+        ],
+        [
+          "SYN_027",
+          "SYN_024",
+          "SYN_025",
+          "SYN_025",
+          "SYN_024",
+          "SYN_031",
+          "SYN_032"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_04",
+      "name": "Archetype 04",
+      "tribes": [
+        "ELEMENTAL"
+      ],
+      "coreCards": [
+        "SYN_033"
+      ],
+      "addonCards": [
+        "SYN_034",
+        "SYN_035",
+        "SYN_036",
+        "SYN_037",
+        "SYN_032",
+        "SYN_038",
+        "SYN_039",
+        "SYN_040"
+      ],
+      "averagePlacement": 3.2,
+      "dataPoints": 104,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_041",
+          "SYN_036",
+          "SYN_033",
+          "SYN_021",
+          "SYN_034",
+          "SYN_038",
+          "SYN_042"
+        ],
+        [
+          "SYN_040",
+          "SYN_043",
+          "SYN_043",
+          "SYN_033",
+          "SYN_033",
+          "SYN_021",
+          "SYN_021"
+        ],
+        [
+          "SYN_033",
+          "SYN_033",
+          "SYN_044",
+          "SYN_045",
+          "SYN_045",
+          "SYN_035",
+          "SYN_034"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_05",
+      "name": "Archetype 05",
+      "tribes": [
+        "ABERRATION"
+      ],
+      "coreCards": [
+        "SYN_046",
+        "SYN_013",
+        "SYN_023"
+      ],
+      "addonCards": [
+        "SYN_022",
+        "SYN_011",
+        "SYN_047",
+        "SYN_012",
+        "SYN_048"
+      ],
+      "averagePlacement": 3.25,
+      "dataPoints": 105,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_047",
+          "SYN_030",
+          "SYN_032",
+          "SYN_046",
+          "SYN_029",
+          "SYN_021"
+        ],
+        [
+          "SYN_013",
+          "SYN_046",
+          "SYN_049",
+          "SYN_013",
+          "SYN_023",
+          "SYN_050",
+          "SYN_050"
+        ],
+        [
+          "SYN_023",
+          "SYN_022",
+          "SYN_051",
+          "SYN_051",
+          "SYN_013",
+          "SYN_046",
+          "SYN_013"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_06",
+      "name": "Archetype 06",
+      "tribes": [],
+      "coreCards": [
+        "SYN_030",
+        "SYN_038"
+      ],
+      "addonCards": [
+        "SYN_051",
+        "SYN_052",
+        "SYN_034",
+        "SYN_048"
+      ],
+      "averagePlacement": 3.3,
+      "dataPoints": 106,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_034",
+          "SYN_048",
+          "SYN_051",
+          "SYN_030",
+          "SYN_017",
+          "SYN_017",
+          "SYN_038"
+        ],
+        [
+          "SYN_048",
+          "SYN_030",
+          "SYN_053",
+          "SYN_054",
+          "SYN_054",
+          "SYN_012",
+          "SYN_038"
+        ],
+        [
+          "SYN_030",
+          "SYN_030",
+          "SYN_055",
+          "SYN_056",
+          "SYN_052",
+          "SYN_022",
+          "SYN_029"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_07",
+      "name": "Archetype 07",
+      "tribes": [
+        "MURLOC"
+      ],
+      "coreCards": [
+        "SYN_045",
+        "SYN_057"
+      ],
+      "addonCards": [
+        "SYN_058",
+        "SYN_030",
+        "SYN_059",
+        "SYN_060"
+      ],
+      "averagePlacement": 3.35,
+      "dataPoints": 107,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_057",
+          "SYN_061",
+          "SYN_058",
+          "SYN_058",
+          "SYN_058",
+          "SYN_045",
+          "SYN_045"
+        ],
+        [
+          "SYN_057",
+          "SYN_030",
+          "SYN_060",
+          "SYN_045",
+          "SYN_045",
+          "SYN_022",
+          "SYN_032"
+        ],
+        [
+          "SYN_057",
+          "SYN_062",
+          "SYN_063",
+          "SYN_045",
+          "SYN_063",
+          "SYN_023",
+          "SYN_064"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_08",
+      "name": "Archetype 08",
+      "tribes": [
+        "BEAST"
+      ],
+      "coreCards": [
+        "SYN_065",
+        "SYN_066",
+        "SYN_067"
+      ],
+      "addonCards": [
+        "SYN_014",
+        "SYN_068",
+        "SYN_069",
+        "SYN_017",
+        "SYN_012"
+      ],
+      "averagePlacement": 3.4,
+      "dataPoints": 108,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_014",
+          "SYN_067",
+          "SYN_069",
+          "SYN_069",
+          "SYN_065",
+          "SYN_066",
+          "SYN_066"
+        ],
+        [
+          "SYN_014",
+          "SYN_067",
+          "SYN_017",
+          "SYN_069",
+          "SYN_069",
+          "SYN_065",
+          "SYN_066"
+        ],
+        [
+          "SYN_014",
+          "SYN_070",
+          "SYN_017",
+          "SYN_065",
+          "SYN_065",
+          "SYN_012",
+          "SYN_012"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_09",
+      "name": "Archetype 09",
+      "tribes": [
+        "MURLOC"
+      ],
+      "coreCards": [
+        "SYN_071",
+        "SYN_059",
+        "SYN_057"
+      ],
+      "addonCards": [
+        "SYN_072",
+        "SYN_045",
+        "SYN_061",
+        "SYN_073",
+        "SYN_034"
+      ],
+      "averagePlacement": 3.45,
+      "dataPoints": 109,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_057",
+          "SYN_057",
+          "SYN_061",
+          "SYN_032",
+          "SYN_058",
+          "SYN_074",
+          "SYN_045"
+        ],
+        [
+          "SYN_057",
+          "SYN_026",
+          "SYN_071",
+          "SYN_059",
+          "SYN_072",
+          "SYN_071",
+          "SYN_061"
+        ],
+        [
+          "SYN_060",
+          "SYN_061",
+          "SYN_072",
+          "SYN_045",
+          "SYN_071",
+          "SYN_071",
+          "SYN_072"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_10",
+      "name": "Archetype 10",
+      "tribes": [
+        "DEMON"
+      ],
+      "coreCards": [
+        "SYN_053",
+        "SYN_075",
+        "SYN_038",
+        "SYN_076"
+      ],
+      "addonCards": [
+        "SYN_012",
+        "SYN_077"
+      ],
+      "averagePlacement": 3.5,
+      "dataPoints": 110,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_078",
+          "SYN_053",
+          "SYN_079",
+          "SYN_075",
+          "SYN_038",
+          "SYN_080",
+          "SYN_032"
+        ],
+        [
+          "SYN_081",
+          "SYN_082",
+          "SYN_038",
+          "SYN_079",
+          "SYN_075",
+          "SYN_034"
+        ],
+        [
+          "SYN_048",
+          "SYN_030",
+          "SYN_050",
+          "SYN_053",
+          "SYN_053",
+          "SYN_038",
+          "SYN_034"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_11",
+      "name": "Archetype 11",
+      "tribes": [
+        "MECHANICAL"
+      ],
+      "coreCards": [
+        "SYN_083",
+        "SYN_084",
+        "SYN_085"
+      ],
+      "addonCards": [
+        "SYN_063",
+        "SYN_086",
+        "SYN_087",
+        "SYN_023"
+      ],
+      "averagePlacement": 3.55,
+      "dataPoints": 111,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_057",
+          "SYN_045",
+          "SYN_083",
+          "SYN_083",
+          "SYN_083",
+          "SYN_087",
+          "SYN_032"
+        ],
+        [
+          "SYN_088",
+          "SYN_030",
+          "SYN_048",
+          "SYN_038",
+          "SYN_017",
+          "SYN_083",
+          "SYN_089"
+        ],
+        [
+          "SYN_084",
+          "SYN_087",
+          "SYN_087",
+          "SYN_087",
+          "SYN_083",
+          "SYN_090",
+          "SYN_090"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_12",
+      "name": "Archetype 12",
+      "tribes": [
+        "DRAGON"
+      ],
+      "coreCards": [
+        "SYN_091",
+        "SYN_092",
+        "SYN_093"
+      ],
+      "addonCards": [
+        "SYN_094",
+        "SYN_088",
+        "SYN_095",
+        "SYN_034",
+        "SYN_096",
+        "SYN_032",
+        "SYN_097",
+        "SYN_098"
+      ],
+      "averagePlacement": 3.6,
+      "dataPoints": 112,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_015",
+          "SYN_053",
+          "SYN_053",
+          "SYN_091",
+          "SYN_099",
+          "SYN_027",
+          "SYN_034"
+        ],
+        [
+          "SYN_021",
+          "SYN_055",
+          "SYN_030",
+          "SYN_096",
+          "SYN_091",
+          "SYN_021",
+          "SYN_030"
+        ],
+        [
+          "SYN_092",
+          "SYN_098",
+          "SYN_100",
+          "SYN_032",
+          "SYN_098",
+          "SYN_094",
+          "SYN_091"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_13",
+      "name": "Archetype 13",
+      "tribes": [
+        "QUILBOAR"
+      ],
+      "coreCards": [
+        "SYN_101",
+        "SYN_102",
+        "SYN_103",
+        "SYN_104"
+      ],
+      "addonCards": [
+        "SYN_105",
+        "SYN_106",
+        "SYN_107",
+        "SYN_108",
+        "SYN_023",
+        "SYN_052"
+      ],
+      "averagePlacement": 3.65,
+      "dataPoints": 113,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_103",
+          "SYN_107",
+          "SYN_104",
+          "SYN_101",
+          "SYN_104",
+          "SYN_101",
+          "SYN_106"
+        ],
+        [
+          "SYN_103",
+          "SYN_105",
+          "SYN_102",
+          "SYN_104",
+          "SYN_101",
+          "SYN_023",
+          "SYN_101"
+        ],
+        [
+          "SYN_102",
+          "SYN_053",
+          "SYN_104",
+          "SYN_101",
+          "SYN_101",
+          "SYN_029",
+          "SYN_038"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_14",
+      "name": "Archetype 14",
+      "tribes": [
+        "DEMON"
+      ],
+      "coreCards": [
+        "SYN_082",
+        "SYN_109",
+        "SYN_110",
+        "SYN_075"
+      ],
+      "addonCards": [
+        "SYN_038",
+        "SYN_111",
+        "SYN_076",
+        "SYN_079"
+      ],
+      "averagePlacement": 3.7,
+      "dataPoints": 114,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_079",
+          "SYN_075",
+          "SYN_082",
+          "SYN_109",
+          "SYN_038",
+          "SYN_034",
+          "SYN_112"
+        ],
+        [
+          "SYN_018",
+          "SYN_113",
+          "SYN_076",
+          "SYN_110",
+          "SYN_114",
+          "SYN_109",
+          "SYN_075"
+        ],
+        [
+          "SYN_109",
+          "SYN_082",
+          "SYN_081",
+          "SYN_079",
+          "SYN_029",
+          "SYN_112",
+          "SYN_032"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_15",
+      "name": "Archetype 15",
+      "tribes": [
+        "MECHANICAL"
+      ],
+      "coreCards": [
+        "SYN_115",
+        "SYN_063",
+        "SYN_084",
+        "SYN_023",
+        "SYN_086"
+      ],
+      "addonCards": [
+        "SYN_087",
+        "SYN_085",
+        "SYN_083"
+      ],
+      "averagePlacement": 3.75,
+      "dataPoints": 115,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_086",
+          "SYN_086",
+          "SYN_116",
+          "SYN_086",
+          "SYN_063",
+          "SYN_084",
+          "SYN_084"
+        ],
+        [
+          "SYN_084",
+          "SYN_115",
+          "SYN_115",
+          "SYN_083",
+          "SYN_063",
+          "SYN_084",
+          "SYN_023"
+        ],
+        [
+          "SYN_064",
+          "SYN_038",
+          "SYN_115",
+          "SYN_064",
+          "SYN_063",
+          "SYN_063",
+          "SYN_023"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_16",
+      "name": "Archetype 16",
+      "tribes": [
+        "BEAST"
+      ],
+      "coreCards": [
+        "SYN_017",
+        "SYN_012",
+        "SYN_070",
+        "SYN_014"
+      ],
+      "addonCards": [
+        "SYN_117",
+        "SYN_016"
+      ],
+      "averagePlacement": 3.8,
+      "dataPoints": 116,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_018",
+          "SYN_014",
+          "SYN_023",
+          "SYN_070",
+          "SYN_070",
+          "SYN_017",
+          "SYN_012"
+        ],
+        [
+          "SYN_015",
+          "SYN_018",
+          "SYN_018",
+          "SYN_011",
+          "SYN_011",
+          "SYN_017",
+          "SYN_012"
+        ],
+        [
+          "SYN_014",
+          "SYN_117",
+          "SYN_070",
+          "SYN_017",
+          "SYN_017",
+          "SYN_012",
+          "SYN_012"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_17",
+      "name": "Archetype 17",
+      "tribes": [
+        "DRAGON"
+      ],
+      "coreCards": [
+        "SYN_118",
+        "SYN_095",
+        "SYN_088",
+        "SYN_093"
+      ],
+      "addonCards": [
+        "SYN_096",
+        "SYN_051"
+      ],
+      "averagePlacement": 3.85,
+      "dataPoints": 117,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_119",
+          "SYN_057",
+          "SYN_118",
+          "SYN_095",
+          "SYN_092",
+          "SYN_118"
+        ],
+        [
+          "SYN_088",
+          "SYN_118",
+          "SYN_095",
+          "SYN_118",
+          "SYN_118",
+          "SYN_095",
+          "SYN_118"
+        ],
+        [
+          "SYN_093",
+          "SYN_095",
+          "SYN_088",
+          "SYN_095",
+          "SYN_088",
+          "SYN_118",
+          "SYN_051"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_18",
+      "name": "Archetype 18",
+      "tribes": [
+        "NAGA"
+      ],
+      "coreCards": [
+        "SYN_030",
+        "SYN_038",
+        "SYN_023"
+      ],
+      "addonCards": [
+        "SYN_051",
+        "SYN_013",
+        "SYN_048"
+      ],
+      "averagePlacement": 3.9,
+      "dataPoints": 118,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_051",
+          "SYN_051",
+          "SYN_013",
+          "SYN_013",
+          "SYN_022",
+          "SYN_046",
+          "SYN_023"
+        ],
+        [
+          "SYN_042",
+          "SYN_051",
+          "SYN_022",
+          "SYN_013",
+          "SYN_013",
+          "SYN_023",
+          "SYN_046"
+        ],
+        [
+          "SYN_051",
+          "SYN_051",
+          "SYN_013",
+          "SYN_013",
+          "SYN_019",
+          "SYN_023",
+          "SYN_046"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_19",
+      "name": "Archetype 19",
+      "tribes": [
+        "NAGA"
+      ],
+      "coreCards": [
+        "SYN_038",
+        "SYN_030"
+      ],
+      "addonCards": [
+        "SYN_032",
+        "SYN_034",
+        "SYN_048"
+      ],
+      "averagePlacement": 3.95,
+      "dataPoints": 119,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_120",
+          "SYN_121",
+          "SYN_011",
+          "SYN_030",
+          "SYN_050",
+          "SYN_034",
+          "SYN_038"
+        ],
+        [
+          "SYN_014",
+          "SYN_048",
+          "SYN_030",
+          "SYN_017",
+          "SYN_031",
+          "SYN_034",
+          "SYN_038"
+        ],
+        [
+          "SYN_014",
+          "SYN_048",
+          "SYN_030",
+          "SYN_122",
+          "SYN_017",
+          "SYN_034",
+          "SYN_038"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_20",
+      "name": "Archetype 20",
+      "tribes": [
+        "BEAST"
+      ],
+      "coreCards": [
+        "SYN_123",
+        "SYN_066",
+        "SYN_065",
+        "SYN_124",
+        "SYN_014",
+        "SYN_067"
+      ],
+      "addonCards": [
+        "SYN_068",
+        "SYN_017"
+      ],
+      "averagePlacement": 4.0,
+      "dataPoints": 120,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_124",
+          "SYN_124",
+          "SYN_065",
+          "SYN_065",
+          "SYN_066",
+          "SYN_066",
+          "SYN_123"
+        ],
+        [
+          "SYN_117",
+          "SYN_065",
+          "SYN_065",
+          "SYN_066",
+          "SYN_066",
+          "SYN_123",
+          "SYN_068"
+        ],
+        [
+          "SYN_014",
+          "SYN_068",
+          "SYN_067",
+          "SYN_065",
+          "SYN_065",
+          "SYN_123",
+          "SYN_066"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_21",
+      "name": "Archetype 21",
+      "tribes": [
+        "DRAGON"
+      ],
+      "coreCards": [
+        "SYN_093",
+        "SYN_095"
+      ],
+      "addonCards": [
+        "SYN_100",
+        "SYN_088",
+        "SYN_051",
+        "SYN_096",
+        "SYN_092",
+        "SYN_118"
+      ],
+      "averagePlacement": 4.05,
+      "dataPoints": 121,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_019",
+          "SYN_011",
+          "SYN_011",
+          "SYN_051",
+          "SYN_095",
+          "SYN_095",
+          "SYN_012"
+        ],
+        [
+          "SYN_011",
+          "SYN_011",
+          "SYN_125",
+          "SYN_012",
+          "SYN_095",
+          "SYN_095",
+          "SYN_093"
+        ],
+        [
+          "SYN_093",
+          "SYN_099",
+          "SYN_051",
+          "SYN_095",
+          "SYN_088",
+          "SYN_096",
+          "SYN_017"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_22",
+      "name": "Archetype 22",
+      "tribes": [
+        "MECHANICAL"
+      ],
+      "coreCards": [
+        "SYN_084",
+        "SYN_083",
+        "SYN_086",
+        "SYN_063"
+      ],
+      "addonCards": [
+        "SYN_085",
+        "SYN_115",
+        "SYN_087",
+        "SYN_023"
+      ],
+      "averagePlacement": 4.1,
+      "dataPoints": 122,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_087",
+          "SYN_045",
+          "SYN_083",
+          "SYN_086",
+          "SYN_086",
+          "SYN_034",
+          "SYN_084"
+        ],
+        [
+          "SYN_115",
+          "SYN_115",
+          "SYN_084",
+          "SYN_126",
+          "SYN_086",
+          "SYN_086",
+          "SYN_127"
+        ],
+        [
+          "SYN_029",
+          "SYN_083",
+          "SYN_115",
+          "SYN_087",
+          "SYN_086",
+          "SYN_063",
+          "SYN_084"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_23",
+      "name": "Archetype 23",
+      "tribes": [
+        "MURLOC"
+      ],
+      "coreCards": [
+        "SYN_128",
+        "SYN_023",
+        "SYN_129",
+        "SYN_130",
+        "SYN_032"
+      ],
+      "addonCards": [
+        "SYN_060",
+        "SYN_034",
+        "SYN_057"
+      ],
+      "averagePlacement": 4.15,
+      "dataPoints": 123,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_057",
+          "SYN_057",
+          "SYN_128",
+          "SYN_128",
+          "SYN_045",
+          "SYN_129",
+          "SYN_032"
+        ],
+        [
+          "SYN_057",
+          "SYN_128",
+          "SYN_034",
+          "SYN_130",
+          "SYN_129",
+          "SYN_130",
+          "SYN_023"
+        ],
+        [
+          "SYN_060",
+          "SYN_128",
+          "SYN_034",
+          "SYN_023",
+          "SYN_130",
+          "SYN_129",
+          "SYN_131"
+        ]
+      ]
+    },
+    {
+      "id": "archetype_24",
+      "name": "Archetype 24",
+      "tribes": [
+        "MECHANICAL"
+      ],
+      "coreCards": [
+        "SYN_012",
+        "SYN_011"
+      ],
+      "addonCards": [
+        "SYN_132"
+      ],
+      "averagePlacement": 4.2,
+      "dataPoints": 124,
+      "tier": null,
+      "inspirationBoards": [
+        [
+          "SYN_028",
+          "SYN_011",
+          "SYN_116",
+          "SYN_012",
+          "SYN_012",
+          "SYN_012"
+        ],
+        [
+          "SYN_011",
+          "SYN_011",
+          "SYN_045",
+          "SYN_054",
+          "SYN_012",
+          "SYN_012",
+          "SYN_012"
+        ],
+        [
+          "SYN_011",
+          "SYN_011",
+          "SYN_011",
+          "SYN_012",
+          "SYN_012",
+          "SYN_012"
+        ]
+      ]
+    }
+  ]
+}

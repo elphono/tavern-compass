@@ -81,7 +81,12 @@ public sealed class Composition
 
 public sealed class CompositionFile
 {
-    public const int CurrentSchema = 1;
+    /// <summary>
+    /// Raised whenever the cached format gains something older files lack, so that a cache written by an
+    /// older plugin is downloaded again instead of being served for a week. 2: final-board order
+    /// (<see cref="Composition.ReferenceBoard"/>), which schema 1 files never carry.
+    /// </summary>
+    public const int CurrentSchema = 2;
 
     public CompositionFile(
         string source,
@@ -137,7 +142,8 @@ public static class CompositionLoader
 
         if (obj["schema"] is not { Type: JTokenType.Integer } schema || schema.Value<int>() != CompositionFile.CurrentSchema)
         {
-            throw new StatsFormatException($"schema: expected {CompositionFile.CurrentSchema}");
+            var found = obj["schema"]?.ToString(Formatting.None) ?? "missing";
+            throw new StatsFormatException($"schema {found} ≠ {CompositionFile.CurrentSchema}");
         }
 
         var source = obj.Value<string>("source");

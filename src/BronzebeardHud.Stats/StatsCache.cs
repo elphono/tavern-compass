@@ -184,17 +184,20 @@ public sealed class StatsCache
         var failurePath = path + ".failed";
         var now = _clock();
 
-        var cached = TryLoad(path, load);
+        var (cached, cacheProblem) = TryLoad(path, load);
         if (cached != null && fetchedAtOf(cached) is { } fetchedAt && now - fetchedAt < policy.MaxAge)
         {
             return (cached, false, null);
         }
 
+        // A cache that exists but cannot be used (older format, damaged file) is downloaded again like a
+        // missing one; if that fails too, the error names both, so that no caller shows an unexplained zero.
+        var prefix = cacheProblem == null ? string.Empty : $"cache: {cacheProblem}, ";
         var lastFailure = TryReadFailure(failurePath);
         if (lastFailure is { } failedAt && now - failedAt < policy.RetryAfterFailure)
         {
             var retryAt = failedAt + policy.RetryAfterFailure;
-            return (cached, false, $"last download failed at {Format(failedAt)}; next attempt after {Format(retryAt)}");
+            return (cached, false, $"{prefix}last download failed at {Format(failedAt)}; next attempt after {Format(retryAt)}");
         }
 
         try
@@ -216,26 +219,29 @@ public sealed class StatsCache
         {
             Directory.CreateDirectory(_directory);
             File.WriteAllText(failurePath, now.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture));
-            return (cached, false, $"download of {url} failed: {e.Message}");
+            return (cached, false, cacheProblem == null ? $"download of {url} failed: {e.Message}" : $"{prefix}redownload failed: {e.Message}");
         }
     }
 
-    private static T? TryLoad<T>(string path, Func<string, T> load)
+    /// <summary>
+    /// The cached file, or why it cannot be used: a corrupt cache, or one in an older format, counts as no
+    /// cache and is replaced by the next good download. (null, null) when there is no file at all.
+    /// </summary>
+    private static (T? File, string? Problem) TryLoad<T>(string path, Func<string, T> load)
         where T : class
     {
         if (!File.Exists(path))
         {
-            return null;
+            return (null, null);
         }
 
         try
         {
-            return load(path);
+            return (load(path), null);
         }
-        catch (StatsFormatException)
+        catch (StatsFormatException e)
         {
-            // A corrupt cache counts as no cache; it will be replaced by the next good download.
-            return null;
+            return (null, e.Message);
         }
     }
 

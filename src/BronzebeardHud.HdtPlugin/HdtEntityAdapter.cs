@@ -86,20 +86,22 @@ internal static class HdtEntityAdapter
         return game.IsBattlegroundsCombatPhase ? OverlayPhase.Combat : OverlayPhase.Shop;
     }
 
-    /// <summary>Minions on the player's board and every card in hand, golden copies mapped to their base card.</summary>
-    public static IReadOnlyList<OwnedCard> OwnedCards(GameV2 game)
+    /// <summary>
+    /// Minions on the player's board and every card in hand, golden copies mapped to their base card; kept
+    /// apart so that the diagnostic line can tell how many of each HDT handed over.
+    /// </summary>
+    public static PlayerCards PlayerCards(GameV2 game)
     {
         try
         {
-            return game.Player.Board.Where(e => e.IsMinion)
-                .Concat(game.Player.Hand)
-                .Where(e => !string.IsNullOrEmpty(e.CardId))
-                .Select(e => new OwnedCard(BaseCardId(e.CardId!), TribeOf(e)))
-                .ToList();
+            OwnedCard Owned(HdtEntity e) => new(BaseCardId(e.CardId!), TribeOf(e));
+            var board = game.Player.Board.Where(e => e.IsMinion && !string.IsNullOrEmpty(e.CardId)).Select(Owned).ToList();
+            var hand = game.Player.Hand.Where(e => !string.IsNullOrEmpty(e.CardId)).Select(Owned).ToList();
+            return new PlayerCards(board, hand);
         }
         catch (InvalidOperationException)
         {
-            return Array.Empty<OwnedCard>();
+            return BronzebeardHud.Stats.PlayerCards.None;
         }
     }
 

@@ -45,7 +45,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 - Données : `%LocalAppData%\BronzebeardHud\stats\`, qui contient le cache Firestone (héros et
   trinkets : 24 h ; compositions : 7 jours). Dans son sous-dossier `manual\`, les fichiers écrits à la
   main : `*.json` (stats de héros HSReplay, spec § 2), `*.comps.txt` (compositions HSReplay, spec § 6)
-  et `pins.txt` (sbires à signaler en taverne, un par ligne).
+  et `pins.txt` (sbires à signaler en taverne, un par ligne). Un cache d'un format antérieur (champ
+  `schema` : 2 pour les compositions depuis l'ordre du plateau final) ou illisible est retéléchargé ;
+  si ce téléchargement échoue, la ligne `Bronzebeard HUD: tavern …` du journal d'HDT dit pourquoi
+  (`comps=0 (cache: schema 1 ≠ 2, redownload failed: …)`). On ne supprime jamais le cache à la main.
 - Panneaux déplaçables (compos visées, combats) : menu Plugins d'HDT › Bronzebeard HUD › « Move panels »
   (ou le bouton du plugin dans les options). Hors de ce mode, rien n'est cliquable au-dessus du jeu. Les
   positions sont gardées dans `%LocalAppData%\BronzebeardHud\layout.json`, en fractions de la taille de
