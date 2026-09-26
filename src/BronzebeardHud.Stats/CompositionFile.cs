@@ -39,8 +39,10 @@ public sealed class Composition
         IReadOnlyList<string> addonCards,
         double? averagePlacement = null,
         int? dataPoints = null,
-        string? tier = null)
+        string? tier = null,
+        IReadOnlyList<IReadOnlyList<string>>? inspirationBoards = null)
     {
+        InspirationBoards = inspirationBoards ?? Array.Empty<IReadOnlyList<string>>();
         Id = id;
         Name = name;
         Tribes = tribes;
@@ -64,6 +66,9 @@ public sealed class Composition
     public double? AveragePlacement { get; }
     public int? DataPoints { get; }
     public string? Tier { get; }
+
+    /// <summary>Real final boards of this composition (card ids, left to right), best MMR first; may be empty.</summary>
+    public IReadOnlyList<IReadOnlyList<string>> InspirationBoards { get; }
 }
 
 public sealed class CompositionFile
@@ -193,7 +198,19 @@ public static class CompositionLoader
                 throw new StatsFormatException($"{path}.tier: expected one of {string.Join(", ", AllowedTiers)}");
             }
 
-            compositions.Add(new Composition(id!, name!, tribes, core, addon, averagePlacement, dataPoints, tier));
+            var boards = new List<IReadOnlyList<string>>();
+            if (comp["inspirationBoards"] is { Type: not JTokenType.Null } boardsToken)
+            {
+                if (boardsToken is not JArray boardArray || boardArray.Any(b => b is not JArray board || board.Count == 0 || board.Count > 7
+                        || board.Any(c => c.Type != JTokenType.String || string.IsNullOrWhiteSpace(c.Value<string>()))))
+                {
+                    throw new StatsFormatException($"{path}.inspirationBoards: expected boards of 1 to 7 card ids");
+                }
+
+                boards.AddRange(boardArray.Select(b => (IReadOnlyList<string>)b.Select(c => c.Value<string>()!).ToList()));
+            }
+
+            compositions.Add(new Composition(id!, name!, tribes, core, addon, averagePlacement, dataPoints, tier, boards));
         }
 
         return new CompositionFile(
@@ -217,6 +234,7 @@ public static class CompositionLoader
             ["averagePlacement"] = c.AveragePlacement.HasValue ? new JValue(c.AveragePlacement.Value) : JValue.CreateNull(),
             ["dataPoints"] = c.DataPoints.HasValue ? new JValue(c.DataPoints.Value) : JValue.CreateNull(),
             ["tier"] = c.Tier != null ? new JValue(c.Tier) : JValue.CreateNull(),
+            ["inspirationBoards"] = new JArray(c.InspirationBoards.Select(b => new JArray(b.Cast<object>().ToArray()))),
         }));
         return new JObject
         {

@@ -22,6 +22,9 @@ public static class FirestoneCompImporter
     public const double AddonShare = 0.2;
     public const int MinimumBoards = 20;
 
+    /// <summary>Final boards kept per archetype as inspiration: the ones reached at the highest MMR.</summary>
+    public const int InspirationBoards = 3;
+
     // Firestone archetype ids start with the tribe ("mech_glambot", "abberation_discard" [sic]).
     private static readonly Dictionary<string, string> TribeByPrefix = new(StringComparer.Ordinal)
     {
@@ -52,12 +55,13 @@ public static class FirestoneCompImporter
         var compositions = new List<Composition>();
         foreach (var comp in root.CompStats.Where(c => !string.IsNullOrWhiteSpace(c?.Archetype)))
         {
-            var boards = (comp.HeroStats ?? new List<FsHeroStat>())
+            var finalBoards = (comp.HeroStats ?? new List<FsHeroStat>())
                 .SelectMany(h => h?.FinalBoards ?? new List<FsFinalBoard>())
-                .Select(b => b?.FinalComp?.Board)
-                .Where(b => b != null && b.Count > 0)
-                .Select(b => new HashSet<string>(b!.Where(m => !string.IsNullOrEmpty(m?.CardId)).Select(m => CardIds.Normalize(m.CardId!)), StringComparer.Ordinal))
+                .Where(b => b?.FinalComp?.Board is { Count: > 0 })
+                .Select(b => (Mmr: b.Mmr ?? 0, Cards: b.FinalComp!.Board!.Where(m => !string.IsNullOrEmpty(m?.CardId)).Select(m => CardIds.Normalize(m.CardId!)).Take(7).ToList()))
+                .Where(b => b.Cards.Count > 0)
                 .ToList();
+            var boards = finalBoards.Select(b => new HashSet<string>(b.Cards, StringComparer.Ordinal)).ToList();
             if (boards.Count < MinimumBoards)
             {
                 continue;
@@ -78,6 +82,13 @@ public static class FirestoneCompImporter
             var addon = shares.Where(x => x.Share >= AddonShare && x.Share < CoreShare).Select(x => x.Id).ToList();
             var prefix = comp.Archetype!.Split('_')[0];
             var tribes = TribeByPrefix.TryGetValue(prefix, out var tribe) ? new[] { tribe } : Array.Empty<string>();
+            var inspiration = finalBoards
+                .OrderByDescending(b => b.Mmr)
+                .Select(b => b.Cards)
+                .GroupBy(cards => string.Join(",", cards), StringComparer.Ordinal)
+                .Select(g => (IReadOnlyList<string>)g.First())
+                .Take(InspirationBoards)
+                .ToList();
             compositions.Add(new Composition(
                 comp.Archetype,
                 Humanize(comp.Archetype),
@@ -85,7 +96,8 @@ public static class FirestoneCompImporter
                 core,
                 addon,
                 comp.AveragePlacement is >= 1 and <= 8 ? comp.AveragePlacement : null,
-                comp.DataPoints));
+                comp.DataPoints,
+                inspirationBoards: inspiration));
         }
 
         if (compositions.Count == 0)
@@ -139,6 +151,7 @@ public static class FirestoneCompImporter
 
     private sealed class FsFinalBoard
     {
+        [JsonProperty("mmr")] public int? Mmr { get; set; }
         [JsonProperty("finalComp")] public FsFinalComp? FinalComp { get; set; }
     }
 

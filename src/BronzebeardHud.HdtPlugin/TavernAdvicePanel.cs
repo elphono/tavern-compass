@@ -154,6 +154,19 @@ internal sealed class TavernAdvicePanel
             });
         }
 
+        if (_progress.Count > 0 && _progress[0].Composition.InspirationBoards.Count > 0)
+        {
+            var board = _progress[0].Composition.InspirationBoards[0];
+            var names = board.Select(id => Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(id)?.LocalizedName ?? id);
+            lines.Children.Add(new TextBlock
+            {
+                Text = "Inspiration: " + string.Join(", ", names),
+                FontSize = 11 * scale,
+                Foreground = Brushes.LightGray,
+                TextWrapping = TextWrapping.Wrap,
+            });
+        }
+
         if (!string.IsNullOrEmpty(_status))
         {
             lines.Children.Add(new TextBlock { Text = _status, FontSize = 10 * scale, Foreground = Brushes.Gold, TextWrapping = TextWrapping.Wrap });
