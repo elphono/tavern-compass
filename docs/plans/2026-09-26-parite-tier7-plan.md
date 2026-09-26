@@ -45,7 +45,7 @@ de la spec.
 
 | Fonctionnalité | Fichiers | Tests |
 |---|---|---|
-| Tranche de MMR | `MmrBracket.cs` (MMR → percentile, d'après `mmr-percentiles`) | MMR sous le seuil du top 50 %, entre deux seuils, au-dessus du top 1 % ; table vide |
+| Tranche de MMR (livrée) | `MmrBracket.cs` ; la table `mmrPercentiles` vient du fichier de héros lui-même, sans endpoint de plus | MMR sous le seuil du top 50 %, pile sur un seuil, entre deux seuils, au-dessus du top 1 % ; table vide ; pas de note |
 | MMR des adversaires | `LeaderboardClient.cs`, `LeaderboardIndex.cs` (port de `leaderboard.rs`) ; `OpponentMmrPanel.cs` | nom avec ou sans `#1234` ; casse ; homonymes (on garde le meilleur MMR) ; page malformée ; pages bornées |
 | **Conseiller de compositions** (prioritaire, livré) | `CompositionFile.cs`, `FirestoneCompImporter.cs`, `HsReplayCompText.cs`, `CompAdvisor.cs`, `TavernLayout.cs` ; `CompService.cs`, `TavernAdvicePanel.cs` | classement sur 3 tours successifs, carte utile à deux compos, plateau vide, compo sans pièce, cartes clés par fréquence, texte HSReplay, cache 7 jours, disposition 3 à 7 sbires |
 | Stats de compositions | intégrées au conseiller (import, cache, place moyenne dans le panneau) | — |

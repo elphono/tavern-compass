@@ -41,6 +41,18 @@ public class HeroPickAdvisorTests
     }
 
     [Fact]
+    public void BuildRows_CarriesTheBracketOfEachSource()
+    {
+        var top25 = new HeroStatsFile(StatsSources.Firestone, TestData.GridPool().Heroes, mmrPercentile: 25);
+        var hero = new OfferedHero(entityId: 51, cardId: "GRID_04", baseCardId: "GRID_04", position: 1);
+
+        var figures = Assert.Single(HeroPickAdvisor.BuildRows(new[] { hero }, new[] { top25 })[0].Figures);
+
+        Assert.Equal(25, figures.MmrPercentile);
+        Assert.Equal(3.4, figures.AveragePlacement);
+    }
+
+    [Fact]
     public void BuildRows_NoOfferedHero_NoRow()
     {
         Assert.Empty(HeroPickAdvisor.BuildRows(Array.Empty<OfferedHero>(), new[] { TestData.GridPool() }));

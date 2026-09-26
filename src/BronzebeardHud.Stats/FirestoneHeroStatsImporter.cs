@@ -84,6 +84,7 @@ public static class FirestoneHeroStatsImporter
             ["fetchedAt"] = fetchedAt.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
             ["mmrPercentile"] = first?["mmrPercentile"]?.Type == JTokenType.Integer ? first["mmrPercentile"] : JValue.CreateNull(),
             ["timePeriod"] = first?["timePeriod"]?.Type == JTokenType.String ? first["timePeriod"] : JValue.CreateNull(),
+            ["mmrThresholds"] = root["mmrPercentiles"] is JArray table ? table : new JArray(),
             ["heroes"] = new JArray(byHero.Values.OrderBy(h => h.Value<string>("heroCardId"), StringComparer.Ordinal)),
         };
 

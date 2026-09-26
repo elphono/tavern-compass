@@ -53,6 +53,21 @@ public sealed class HeroStat
     public IReadOnlyList<double>? PlacementDistribution { get; }
 }
 
+/// <summary>Minimum MMR to belong to a percentile bracket (Firestone's mmrPercentiles table).</summary>
+public sealed class MmrThreshold
+{
+    public MmrThreshold(int percentile, int mmr)
+    {
+        Percentile = percentile;
+        Mmr = mmr;
+    }
+
+    /// <summary>100 = every player, 1 = the top 1 %.</summary>
+    public int Percentile { get; }
+
+    public int Mmr { get; }
+}
+
 /// <summary>One local stats file: one source, one time period, one MMR bracket.</summary>
 public sealed class HeroStatsFile
 {
@@ -65,8 +80,10 @@ public sealed class HeroStatsFile
         DateTimeOffset? generatedAt = null,
         DateTimeOffset? fetchedAt = null,
         int? mmrPercentile = null,
-        string? timePeriod = null)
+        string? timePeriod = null,
+        IReadOnlyList<MmrThreshold>? mmrThresholds = null)
     {
+        MmrThresholds = mmrThresholds ?? Array.Empty<MmrThreshold>();
         Source = source;
         Heroes = heroes;
         SourceUrl = sourceUrl;
@@ -88,6 +105,9 @@ public sealed class HeroStatsFile
 
     public int? MmrPercentile { get; }
     public string? TimePeriod { get; }
+
+    /// <summary>The source's MMR brackets, when it publishes them; empty otherwise.</summary>
+    public IReadOnlyList<MmrThreshold> MmrThresholds { get; }
 
     public HeroStat? Find(string baseHeroCardId) =>
         Heroes.FirstOrDefault(h => string.Equals(h.HeroCardId, baseHeroCardId, StringComparison.Ordinal));

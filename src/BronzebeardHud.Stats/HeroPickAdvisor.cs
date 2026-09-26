@@ -7,8 +7,9 @@ namespace BronzebeardHud.Stats;
 /// <summary>What one source says about one offered hero.</summary>
 public sealed class HeroFigures
 {
-    public HeroFigures(string source, string? tier, double averagePlacement, double? pickRate, int dataPoints)
+    public HeroFigures(string source, string? tier, double averagePlacement, double? pickRate, int dataPoints, int? mmrPercentile = null)
     {
+        MmrPercentile = mmrPercentile;
         Source = source;
         Tier = tier;
         AveragePlacement = averagePlacement;
@@ -24,6 +25,9 @@ public sealed class HeroFigures
     public double AveragePlacement { get; }
     public double? PickRate { get; }
     public int DataPoints { get; }
+
+    /// <summary>Bracket the figures come from (100 = every player), when the source says.</summary>
+    public int? MmrPercentile { get; }
 }
 
 /// <summary>One column of the hero-pick panel.</summary>
@@ -67,7 +71,8 @@ public static class HeroPickAdvisor
                         tiersBySource[i][stat.HeroCardId],
                         stat.AveragePlacement,
                         stat.PickRate,
-                        stat.DataPoints));
+                        stat.DataPoints,
+                        sources[i].MmrPercentile));
                 }
 
                 return new HeroPickRow(hero, figures);

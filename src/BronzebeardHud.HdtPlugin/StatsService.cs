@@ -15,8 +15,6 @@ namespace BronzebeardHud.HdtPlugin;
 /// </summary>
 internal sealed class StatsService : IDisposable
 {
-    // Phase 1 shows the "every player" bracket; phase 2 picks the player's own bracket.
-    private const int MmrPercentile = 100;
     private const string TimePeriod = "last-patch";
 
     private readonly HttpStatsFetcher _fetcher = new();
@@ -36,16 +34,33 @@ internal sealed class StatsService : IDisposable
     /// <summary>Changes whenever the sources change, so the panel knows when to rebuild.</summary>
     public int Version { get; private set; }
 
-    /// <summary>Called once when a hero selection starts: reload hand-typed files, refresh the cache if due.</summary>
-    public void BeginHeroSelection()
+    /// <summary>
+    /// Called once when a hero selection starts: reload hand-typed files, then fetch (or reuse) the
+    /// "every player" file, read its bracket table, and switch to the player's own bracket.
+    /// </summary>
+    /// <param name="rating">The player's MMR as HDT exposes it; null when unknown.</param>
+    public void BeginHeroSelection(int? rating)
     {
         (_manual, _manualErrors) = HeroStatsLoader.LoadDirectory(_manualDirectory);
         if (_refresh == null || _refresh.IsCompleted)
         {
-            _refresh = Task.Run(() => _cache.GetHeroStatsAsync(MmrPercentile, TimePeriod, RefreshPolicy.HeroStats, CancellationToken.None));
+            _refresh = Task.Run(() => LoadForBracketAsync(rating));
         }
 
         Version++;
+    }
+
+    private async Task<CacheResult> LoadForBracketAsync(int? rating)
+    {
+        var all = await _cache.GetHeroStatsAsync(MmrBracket.EveryPlayer, TimePeriod, RefreshPolicy.HeroStats, CancellationToken.None).ConfigureAwait(false);
+        var bracket = MmrBracket.Select(rating, all.File?.MmrThresholds ?? Array.Empty<MmrThreshold>());
+        if (bracket == MmrBracket.EveryPlayer)
+        {
+            return all;
+        }
+
+        var mine = await _cache.GetHeroStatsAsync(bracket, TimePeriod, RefreshPolicy.HeroStats, CancellationToken.None).ConfigureAwait(false);
+        return mine.File != null ? mine : new CacheResult(all.File, all.Downloaded, mine.Error);
     }
 
     public void Poll()

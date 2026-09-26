@@ -193,7 +193,8 @@ public static class HeroStatsLoader
             OptionalDate(obj, "generatedAt"),
             OptionalDate(obj, "fetchedAt"),
             mmrPercentile,
-            OptionalString(obj, "timePeriod", "timePeriod"));
+            OptionalString(obj, "timePeriod", "timePeriod"),
+            Thresholds(obj["mmrThresholds"]));
     }
 
     public static string Serialize(HeroStatsFile file)
@@ -219,9 +220,45 @@ public static class HeroStatsLoader
             ["fetchedAt"] = FormatDate(file.FetchedAt),
             ["mmrPercentile"] = file.MmrPercentile.HasValue ? new JValue(file.MmrPercentile.Value) : JValue.CreateNull(),
             ["timePeriod"] = file.TimePeriod != null ? new JValue(file.TimePeriod) : JValue.CreateNull(),
+            ["mmrThresholds"] = new JArray(file.MmrThresholds.Select(m => new JObject { ["percentile"] = m.Percentile, ["mmr"] = m.Mmr })),
             ["heroes"] = heroes,
         };
         return root.ToString(Formatting.Indented);
+    }
+
+    /// <summary>Optional [{percentile, mmr}] table; each percentile at most once, both integers >= 0.</summary>
+    internal static IReadOnlyList<MmrThreshold> Thresholds(JToken? token)
+    {
+        if (token == null || token.Type == JTokenType.Null)
+        {
+            return Array.Empty<MmrThreshold>();
+        }
+
+        if (token is not JArray array)
+        {
+            throw new StatsFormatException("mmrThresholds: expected an array");
+        }
+
+        var thresholds = new List<MmrThreshold>();
+        foreach (var item in array)
+        {
+            if (item is not JObject entry
+                || entry["percentile"] is not { Type: JTokenType.Integer } percentile
+                || entry["mmr"] is not { Type: JTokenType.Integer } mmr
+                || percentile.Value<int>() <= 0 || percentile.Value<int>() > 100 || mmr.Value<int>() < 0)
+            {
+                throw new StatsFormatException("mmrThresholds: expected {percentile: 1..100, mmr: >= 0} entries");
+            }
+
+            thresholds.Add(new MmrThreshold(percentile.Value<int>(), mmr.Value<int>()));
+        }
+
+        if (thresholds.Select(t => t.Percentile).Distinct().Count() != thresholds.Count)
+        {
+            throw new StatsFormatException("mmrThresholds: a percentile appears twice");
+        }
+
+        return thresholds;
     }
 
     private static JToken FormatDate(DateTimeOffset? date) =>

@@ -145,7 +145,8 @@ internal sealed class HeroPickPanel
                 detail += $" · {(pickRate * 100).ToString("0", CultureInfo.InvariantCulture)}%";
             }
 
-            var label = Text($" {detail} {SourceLabel(figures.Source)}", 13 * scale, Brushes.White);
+            var bracket = figures.MmrPercentile is { } percentile && percentile < MmrBracket.EveryPlayer ? $" {percentile}%" : string.Empty;
+            var label = Text($" {detail} {SourceLabel(figures.Source)}{bracket}", 13 * scale, Brushes.White);
             label.VerticalAlignment = VerticalAlignment.Center;
             line.Children.Add(label);
             lines.Children.Add(line);

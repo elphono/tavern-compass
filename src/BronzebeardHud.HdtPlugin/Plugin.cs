@@ -99,7 +99,7 @@ public sealed class Plugin : IPlugin
         {
             _inHeroSelection = true;
             _compsLoadedThisGame = false;
-            _stats.BeginHeroSelection();
+            _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
         }
 
         _stats.Poll();
