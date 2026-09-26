@@ -64,48 +64,26 @@ public sealed class CompositionRow
 
 public static class CompositionRows
 {
-    public const int MaxRows = 3;
-
     /// <summary>
-    /// Target compositions first, in ranking order; then, while there is room, the lobby's best-placed
-    /// playable compositions as suggestions (so the panel is not empty on turn 1). Each row shows the
-    /// composition's reference board left to right, a position being owned when the player holds that card
-    /// (board or hand, golden copies count), copies matched left to right: holding one copy of a card the
-    /// board has twice marks only the first. Without a reference board, key pieces then add-ons, order unknown.
+    /// One row per composition shown (<see cref="TavernAdvisor.Aim"/>: ticked ones first, then the
+    /// suggestions, best placement first), in that order. Each row shows the composition's reference board
+    /// left to right, a position being owned when the player holds that card (board or hand, golden copies
+    /// count), copies matched left to right: holding one copy of a card the board has twice marks only the
+    /// first. Without a reference board, key pieces then add-ons, order unknown. Nothing is shown before
+    /// something is reachable: a list of the lobby's best compositions would be the same every game.
     /// </summary>
-    /// <remarks>
-    /// Ticked compositions (<paramref name="chosen"/>) come first, in the order they were ticked, even out of
-    /// the ranking; then the rest as above, keeping at least one line that can still be ticked.
-    /// </remarks>
     public static IReadOnlyList<CompositionRow> Build(
-        IReadOnlyList<CompProgress> targets, IReadOnlyList<Composition> playable, IEnumerable<OwnedCard> owned, int maxRows = MaxRows,
+        IReadOnlyList<CompProgress> shown, IEnumerable<OwnedCard> owned,
         IReadOnlyList<string>? chosen = null, IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null)
     {
-        HeroCompPick? EffectOf(Composition c) => heroEffects != null && heroEffects.TryGetValue(c.Id, out var e) ? e : null;
-        var cards = owned.ToList();
-        var ownedCounts = cards
+        var ownedCounts = owned
             .GroupBy(c => c.CardId, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
-        var ticked = (chosen ?? Array.Empty<string>())
-            .Select(id => playable.FirstOrDefault(c => c.Id == id))
-            .Where(c => c != null)
-            .Select(c => Row(c!, CompAdvisor.Progress(cards, c!).Score, isTarget: true, ownedCounts, isChecked: true, EffectOf(c!)))
+        var ticked = new HashSet<string>(chosen ?? Array.Empty<string>(), StringComparer.Ordinal);
+        return shown
+            .Select(p => Row(p.Composition, p.Score, isTarget: true, ownedCounts, ticked.Contains(p.Composition.Id),
+                heroEffects != null && heroEffects.TryGetValue(p.Composition.Id, out var effect) ? effect : null))
             .ToList();
-        var limit = ticked.Count == 0 ? maxRows : Math.Max(maxRows, ticked.Count + 1);
-        var rows = new List<CompositionRow>(ticked);
-        var shown = new HashSet<string>(rows.Select(r => r.Composition.Id), StringComparer.Ordinal);
-        rows.AddRange(targets
-            .Where(t => !shown.Contains(t.Composition.Id))
-            .Take(limit - rows.Count)
-            .Select(t => Row(t.Composition, t.Score, isTarget: true, ownedCounts, heroEffect: EffectOf(t.Composition))));
-        shown.UnionWith(rows.Select(r => r.Composition.Id));
-        rows.AddRange(playable
-            .Where(c => !shown.Contains(c.Id))
-            .OrderBy(c => c.AveragePlacement ?? double.MaxValue)
-            .ThenBy(c => c.Id, StringComparer.Ordinal)
-            .Take(Math.Max(0, limit - rows.Count))
-            .Select(c => Row(c, 0, isTarget: false, ownedCounts, heroEffect: EffectOf(c))));
-        return rows;
     }
 
     private static CompositionRow Row(Composition composition, double score, bool isTarget, IReadOnlyDictionary<string, int> ownedCounts, bool isChecked = false,

@@ -129,6 +129,28 @@ public static class CompAdvisor
             .ToList();
     }
 
+    /// <summary>
+    /// The suggested compositions: every reachable one (something held counts for it: a key piece, an
+    /// add-on or a minion of its tribe; <see cref="Rank"/>), best average placement first, the estimate with
+    /// the hero being played when there is one (<see cref="HeroCompAffinity"/>), the composition's own
+    /// average otherwise; how far the player is (the score) only breaks ties. At most <paramref name="count"/>.
+    /// </summary>
+    public static IReadOnlyList<CompProgress> Suggest(IReadOnlyList<OwnedCard> owned, IReadOnlyList<Composition> playable, int count,
+        IReadOnlyCollection<string>? exclude = null, IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null) =>
+        Rank(owned, playable, int.MaxValue, heroEffects)
+            .Where(p => exclude == null || !exclude.Contains(p.Composition.Id))
+            .OrderBy(p => PlacementFor(p.Composition, heroEffects))
+            .ThenByDescending(p => p.Score)
+            .ThenBy(p => p.Composition.Id, StringComparer.Ordinal)
+            .Take(Math.Max(0, count))
+            .ToList();
+
+    /// <summary>The placement suggestions are sorted by: with the hero being played when known, else the composition's own.</summary>
+    public static double PlacementFor(Composition composition, IReadOnlyDictionary<string, HeroCompPick>? heroEffects) =>
+        heroEffects != null && heroEffects.TryGetValue(composition.Id, out var effect)
+            ? effect.Estimate
+            : composition.AveragePlacement ?? double.MaxValue;
+
     /// <summary>Where the player stands on one composition, whatever its score (a ticked one may be at 0).</summary>
     public static CompProgress Progress(IReadOnlyList<OwnedCard> cards, Composition comp)
     {
@@ -187,18 +209,31 @@ public sealed class TavernAdvice
     public int MarkerCount => Cards.Count(c => c.Advances.Count > 0);
 }
 
+/// <summary>What the target panel shows, and what the markers aim at (<see cref="TavernAdvisor.Aim"/>).</summary>
+public sealed class CompositionFocus
+{
+    public CompositionFocus(IReadOnlyList<CompProgress> shown, IReadOnlyList<CompProgress> aimed, IReadOnlyList<Composition> pool)
+    {
+        Shown = shown;
+        Aimed = aimed;
+        Pool = pool;
+    }
+
+    public IReadOnlyList<CompProgress> Shown { get; }
+    public IReadOnlyList<CompProgress> Aimed { get; }
+
+    /// <summary>The compositions whose key pieces are marked.</summary>
+    public IReadOnlyList<Composition> Pool { get; }
+}
+
 public static class TavernAdvisor
 {
     /// <summary>
-    /// Marks the tavern for the player, from turn 1 on. Replay of Ali's game of 2026-09-26 showed why the
-    /// first rule (only pieces of the three target compositions) left the tavern unmarked: with an empty
-    /// board and hand there is no target, and later the targets' pieces rarely show up. Rule now:
-    /// - a <b>key piece</b> of any composition playable in this lobby is marked, target or not (like
-    ///   Tier7's comp key pieces), even when the player already holds a copy (a triple is on the way);
-    /// - an <b>add-on</b> of a target composition is marked when the player does not hold it yet.
-    /// A composition is playable when all its tribes are in the lobby, or it has none; an unknown lobby
-    /// (empty list) filters nothing. Compositions on a card are listed targets first, in ranking order,
-    /// then by average placement.
+    /// Marks the tavern for the player. The compositions shown and aimed at come from <see cref="Aim"/>; a
+    /// card is marked when it is a <b>key piece</b> of an aimed composition (even when a copy is held: a
+    /// triple is on the way) or an <b>add-on</b> of one not held yet. Before anything is reachable (empty
+    /// board and hand, nothing ticked), the key pieces of every composition playable in the lobby are marked,
+    /// so that turn 1 is not left blank (replay of Ali's game of 2026-09-26: no marker at all otherwise).
     /// </summary>
     public static TavernAdvice Advise(
         IReadOnlyList<string> tavernCardIds,
@@ -206,39 +241,47 @@ public static class TavernAdvisor
         IReadOnlyList<Composition> compositions,
         IReadOnlyCollection<string> lobbyTribes,
         IReadOnlyList<string>? chosen = null,
-        IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null)
+        IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null,
+        int suggested = HudSettings.DefaultSuggested)
     {
         var playable = Playable(compositions, lobbyTribes);
-        var targets = CompAdvisor.Rank(owned, playable, heroEffects: heroEffects);
+        var focus = Aim(compositions, playable, owned, chosen, suggested, heroEffects);
         var ownedIds = new HashSet<string>(owned.Select(c => c.CardId), StringComparer.Ordinal);
-        var (aimed, pool) = Focus(compositions, playable, targets, owned, chosen);
         var cards = tavernCardIds.Select((rawId, position) =>
         {
-            var advances = CardEffect.On(rawId, aimed, pool, ownedIds)
+            var advances = CardEffect.On(rawId, focus.Aimed, focus.Pool, ownedIds)
                 .Select(e => (e.Composition, e.IsKeyPiece))
                 .ToList();
             return new ShopAdvice(position, CardIds.Normalize(rawId), advances);
         }).ToList();
-        return new TavernAdvice(targets, cards, playable);
+        return new TavernAdvice(focus.Shown, cards, playable);
     }
 
     /// <summary>
-    /// What the markers aim at. Nothing ticked: the automatic targets, and key pieces of every playable
-    /// composition. Something ticked (<see cref="CompositionSelection"/>): the ticked compositions alone, in
-    /// the order they were ticked, whatever their rank, for key pieces and add-ons alike.
+    /// What the target panel shows, and what the markers aim at (Ali, 2026-09-26: a chosen number of
+    /// suggestions, best average result first).
+    /// - Shown: the ticked compositions first, in the order they were ticked, then <paramref name="suggested"/>
+    ///   reachable compositions (<see cref="CompAdvisor.Suggest"/>), best placement first.
+    /// - Aimed: the ticked compositions alone when something is ticked (only their minions are marked);
+    ///   otherwise the shown suggestions; before anything is reachable, none, with the key pieces of every
+    ///   playable composition as the pool.
     /// </summary>
-    public static (IReadOnlyList<CompProgress> Aimed, IReadOnlyList<Composition> Pool) Focus(
-        IReadOnlyList<Composition> compositions, IReadOnlyList<Composition> playable, IReadOnlyList<CompProgress> targets,
-        IReadOnlyList<OwnedCard> owned, IReadOnlyList<string>? chosen)
+    public static CompositionFocus Aim(
+        IReadOnlyList<Composition> compositions, IReadOnlyList<Composition> playable, IReadOnlyList<OwnedCard> owned,
+        IReadOnlyList<string>? chosen, int suggested, IReadOnlyDictionary<string, HeroCompPick>? heroEffects)
     {
-        if (chosen is not { Count: > 0 })
+        var byId = compositions.GroupBy(c => c.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var ticked = (chosen ?? Array.Empty<string>()).Where(byId.ContainsKey).Select(id => CompAdvisor.Progress(owned, byId[id])).ToList();
+        var suggestions = CompAdvisor.Suggest(owned, playable, suggested, ticked.Select(t => t.Composition.Id).ToList(), heroEffects);
+        var shown = ticked.Concat(suggestions).ToList();
+        if (ticked.Count > 0)
         {
-            return (targets, playable);
+            return new CompositionFocus(shown, ticked, ticked.Select(t => t.Composition).ToList());
         }
 
-        var byId = compositions.GroupBy(c => c.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-        var ticked = chosen.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
-        return (ticked.Select(c => CompAdvisor.Progress(owned, c)).ToList(), ticked);
+        return suggestions.Count > 0
+            ? new CompositionFocus(shown, suggestions, suggestions.Select(t => t.Composition).ToList())
+            : new CompositionFocus(shown, Array.Empty<CompProgress>(), playable);
     }
 
     /// <summary>The compositions whose tribes are all in the lobby; all of them when the lobby is unknown.</summary>
@@ -268,6 +311,7 @@ public static class TavernAdvisor
             ? $"#{index} x={N(rect.Left)} y={N(rect.Top)} w={N(rect.Width)} h={N(rect.Height)}"
             : "none";
         return $"Bronzebeard HUD: tavern round={round} comps={compositionCount} ({compositionState}) compsInLobby={advice.PlayableCompositions} " +
+               $"shown={advice.Targets.Count} sort=placement " +
                $"board={cards.Board.Count} hand={cards.Hand.Count} " +
                $"targets={targets} tavern={advice.Cards.Count} minions={minions} markers={advice.MarkerCount} first={first} " +
                $"changes={changes} refreshes={refreshes} canvas={N(canvasWidth)}x{N(canvasHeight)}";

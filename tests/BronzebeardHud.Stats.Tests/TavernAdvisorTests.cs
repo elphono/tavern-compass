@@ -40,7 +40,7 @@ public class TavernAdvisorTests
         Assert.Equal(new[] { "pirate_discover" }, shop2.Targets.Select(t => t.Composition.Id));
         Assert.Equal(new[] { ("pirate_discover", false) }, Marks(shop2.Cards[0]));
         Assert.Empty(shop2.Cards[1].Advances); // undead add-on, undead not targeted
-        Assert.Equal(new[] { ("pirate_discover", true), ("neutral_tea_set", true) }, Marks(shop2.Cards[2])); // target first
+        Assert.Equal(new[] { ("pirate_discover", true) }, Marks(shop2.Cards[2])); // the neutral set holds nothing: not shown, not aimed at
 
         // Shop 3: two undead key pieces held; undead is the target, its add-on is marked, the pirate add-on no longer.
         var owned3 = new[] { new OwnedCard("BG32_324", "UNDEAD"), new OwnedCard("BG25_010", "UNDEAD") };
@@ -92,7 +92,7 @@ public class TavernAdvisorTests
         var cards = new PlayerCards(new[] { new OwnedCard("BG21_005", "PIRATE") }, new[] { new OwnedCard("BG25_010", "UNDEAD"), new OwnedCard("BG24_022", "MECHANICAL") });
         var line = TavernAdvisor.DiagnosticLine(3, 24, "ok", shop, cards, minions: 3, changes: 4, refreshes: 1, first, 2291, 1360);
 
-        Assert.Equal("Bronzebeard HUD: tavern round=3 comps=24 (ok) compsInLobby=3 board=1 hand=2 targets=[Pirate Discover 0.5] tavern=4 minions=3 markers=2 " +
+        Assert.Equal("Bronzebeard HUD: tavern round=3 comps=24 (ok) compsInLobby=3 shown=1 sort=placement board=1 hand=2 targets=[Pirate Discover 0.5] tavern=4 minions=3 markers=2 " +
                      "first=#1 x=976 y=601 w=165 h=31 changes=4 refreshes=1 canvas=2291x1360", line);
         Assert.Empty(shop.Cards[3].Advances); // the spell takes a slot and gets no marker
         Assert.EndsWith("targets=none tavern=0 minions=0 markers=0 first=none changes=0 refreshes=0 canvas=2000x1220",

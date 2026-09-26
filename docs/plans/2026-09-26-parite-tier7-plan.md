@@ -111,7 +111,9 @@ reste sous `MaxRating`.
 
 **Sous Windows** : tout le rendu.
 
-**Règle, arrêtée le 2026-09-26** : le plugin ne duplique rien de ce que le jeu ou HDT affichent déjà.
+**Règle, arrêtée le 2026-09-26** : le plugin ne duplique rien de ce que le jeu ou HDT affichent déjà
+**gratuitement** ; une fonction Tier7 payante d'HDT (Tavern Markers, par exemple) peut être reproduite,
+c'est l'objet même du plugin.
 
 ## Phase 5 : écarts restants, classés pour ≈ 6 800 de MMR
 
@@ -151,6 +153,7 @@ suivante, dans cet ordre.
 | Tranche | Contenu | Données | Garde | Tests |
 |---|---|---|---|---|
 | 6.1 Compos × ton héros (livré ; 2 points par place : l'effet du héros, ±0,32 place pour 90 % des couples et ±0,76 au plus, départage des compos aussi avancées sans jamais passer une pièce clé) | en boutique, chaque compo du panneau montre sa place estimée avec le héros joué, « ≈ 3,5 with your hero (23) », et le classement des compos en tient compte | `heroStats` des comp-stats, même prudence que 5.3 (30 parties a priori, 10 au moins) | `hero-affinity` | trois héros qui changent l'ordre de trois compos, petit échantillon sans effet, mutation sur le poids |
+| 6.1b Nombre de compos suggérées (retour d'Ali, livré) | − et + dans le panneau, 1 à 8, 3 par défaut, `settings.json` ; suggestions = compos atteignables, meilleure place moyenne d'abord (avec le héros joué si connue), l'avancement ne départage qu'à place égale ; cochées en tête ; marqueurs sur les compos affichées | `HudSettings.cs`, `CompAdvisor.Suggest`, `TavernAdvisor.Aim` | `comp-count` | ordre, nombre 1/3/8, cochée en tête, placement avec le héros, bornes et aller-retour du fichier |
 | 6.2 Épinglage au clic | cliquer une carte de Bob l'épingle pour la partie, en plus de `pins.txt` | rangée `TavernRow`, clic comme les cases (`IsOverlayHitTestVisible`) | `tavern-pins` | épingler, désépingler sur trois tours, nouvelle partie, fusion avec `pins.txt` |
 | 6.3 Transitions entre compos | vers quelles compos pivoter depuis une compo visée, et par quelles cartes communes ; affiché comme heuristique | cartes clés et compléments partagés, plateaux finaux | `comp-transitions` | recouvrements fort, faible, nul ; mutation sur le seuil |
 | 6.4 Plateaux des tops par sbire | sur une vignette ou une carte de Bob : compos et plateaux finaux réels qui le contiennent, position habituelle | `finalBoards`, 3 à 5 plateaux par compo, cache en dizaines de Ko | `minion-boards` | deux compos aux positions distinctes, sbire absent, classement des plateaux |

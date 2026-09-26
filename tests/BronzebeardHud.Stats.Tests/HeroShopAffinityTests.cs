@@ -59,7 +59,7 @@ public class HeroShopAffinityTests
     public void ThePanelLineShowsTheEstimateWithTheHero()
     {
         var effects = HeroCompAffinity.Effects("HERO_A", All);
-        var rows = CompositionRows.Build(CompAdvisor.Rank(OneKeyEach, All, heroEffects: effects), All, OneKeyEach, heroEffects: effects);
+        var rows = CompositionRows.Build(CompAdvisor.Suggest(OneKeyEach, All, 3, heroEffects: effects), OneKeyEach, heroEffects: effects);
         Assert.Equal("≈ 3,2 with your hero (60)", rows[0].HeroEffect!.ShopText);
         Assert.Null(rows[1].HeroEffect);
     }

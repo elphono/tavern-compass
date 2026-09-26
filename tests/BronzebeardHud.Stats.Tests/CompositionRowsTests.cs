@@ -22,39 +22,38 @@ public class CompositionRowsTests
     private static IEnumerable<(string, bool)> Board(CompositionRow row) => row.Vignettes.Select(v => (v.CardId, v.Owned));
 
     [Fact]
-    public void Board1_OneTarget_ThenSuggestionsByPlacement_VignettesInFinalBoardOrder()
+    public void Board1_ReachableCompsByPlacement_VignettesInFinalBoardOrder()
     {
-        var owned = new[] { new OwnedCard("BG32_324_G", "UNDEAD"), new OwnedCard("BG36_515", "UNDEAD") };
-        var targets = CompAdvisor.Rank(owned, Lobby);
+        var owned = new[] { new OwnedCard("BG32_324_G", "UNDEAD"), new OwnedCard("BG36_515", "UNDEAD"), new OwnedCard("BG31_808", "BEAST") };
 
-        var rows = CompositionRows.Build(targets, Lobby, owned);
+        var rows = CompositionRows.Build(CompAdvisor.Suggest(owned, Lobby, 3), owned);
 
-        Assert.Equal(new[] { ("undead_butcher", true), ("hsr-beasts", false), ("pirate_discover", false) },
-            rows.Select(r => (r.Composition.Id, r.IsTarget)));
+        // Beasts (3.46) before undead (3.81): best placement first; pirates and mechs hold nothing, so they are not suggested.
+        Assert.Equal(new[] { "hsr-beasts", "undead_butcher" }, rows.Select(r => r.Composition.Id));
+        var undead = rows[1];
         // Golden Butcher counts; one copy of BG36_515 marks only the first of its two positions.
         Assert.Equal(new[] { ("BG28_309", false), ("BG32_324", true), ("BG36_515", true), ("BG36_515", false), ("BG25_010", false), ("BG32_880", false), ("BG25_354", false) },
-            Board(rows[0]));
-        Assert.Equal(Enumerable.Range(1, 7), rows[0].Vignettes.Select(v => v.Position));
-        Assert.Equal((1, 2), (rows[0].KeyOwned, rows[0].KeyTotal));
-        Assert.True(rows[0].OrderKnown);
-        Assert.Equal("3,8", rows[0].PlacementText);
+            Board(undead));
+        Assert.Equal(Enumerable.Range(1, 7), undead.Vignettes.Select(v => v.Position));
+        Assert.Equal((1, 2), (undead.KeyOwned, undead.KeyTotal));
+        Assert.True(undead.OrderKnown);
+        Assert.Equal("3,8", undead.PlacementText);
 
         // No board order in the hand-written source: key pieces then add-ons, flagged as unknown order.
-        Assert.False(rows[1].OrderKnown);
-        Assert.Equal(new[] { "BG31_808", "BG30_002", "BG29_300" }, rows[1].Vignettes.Select(v => v.CardId));
-        Assert.Equal("3,5", rows[1].PlacementText);
+        Assert.False(rows[0].OrderKnown);
+        Assert.Equal(new[] { "BG31_808", "BG30_002", "BG29_300" }, rows[0].Vignettes.Select(v => v.CardId));
+        Assert.Equal("3,5", rows[0].PlacementText);
     }
 
     [Fact]
-    public void Board2_TwoTargetsRankedByScore_EachInItsOwnOrder()
+    public void Board2_TwoReachableComps_EachInItsOwnOrder()
     {
         var owned = new[] { new OwnedCard("BG33_823", "PIRATE"), new OwnedCard("BG26_817", "PIRATE"), new OwnedCard("BG24_022", "MECHANICAL") };
-        var targets = CompAdvisor.Rank(owned, Lobby);
 
-        var rows = CompositionRows.Build(targets, Lobby, owned);
+        var rows = CompositionRows.Build(CompAdvisor.Suggest(owned, Lobby, 3), owned);
 
-        Assert.Equal(new[] { "pirate_discover", "mech_magnet", "hsr-beasts" }, rows.Select(r => r.Composition.Id));
-        Assert.Equal(new[] { 7.0, 3.5, 0.0 }, rows.Select(r => r.Score));
+        Assert.Equal(new[] { "pirate_discover", "mech_magnet" }, rows.Select(r => r.Composition.Id));
+        Assert.Equal(new[] { 7.0, 3.5 }, rows.Select(r => r.Score));
         Assert.Equal(new[] { ("BG33_823", true), ("BG33_825", false), ("BG26_817", true) }, Board(rows[0]));
         Assert.Equal(new[] { ("BG25_040", false), ("BG28_300", false), ("BG24_022", true), ("BG24_022", false) }, Board(rows[1]));
         Assert.Equal("4,1", rows[1].PlacementText);
@@ -68,9 +67,7 @@ public class CompositionRowsTests
             new OwnedCard("BG32_324", "UNDEAD"), new OwnedCard("BG26_817", "PIRATE"),
             new OwnedCard("BG25_040", "MECHANICAL"), new OwnedCard("BG31_808", "BEAST"),
         };
-        var targets = CompAdvisor.Rank(owned, Lobby, maxTargets: 4);
-
-        var rows = CompositionRows.Build(targets, Lobby, owned, maxRows: 3);
+        var rows = CompositionRows.Build(CompAdvisor.Suggest(owned, Lobby, 3), owned);
 
         Assert.Equal(3, rows.Count);
         Assert.All(rows, r => Assert.True(r.IsTarget));
@@ -85,7 +82,8 @@ public class CompositionRowsTests
         try
         {
             CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
-            var row = CompositionRows.Build(Array.Empty<CompProgress>(), new[] { Mech }, Array.Empty<OwnedCard>()).Single();
+            var owned = new[] { new OwnedCard("BG24_022", "MECHANICAL") };
+            var row = CompositionRows.Build(CompAdvisor.Suggest(owned, new[] { Mech }, 3), owned).Single();
             Assert.Equal("4,1", row.PlacementText);
         }
         finally
@@ -112,7 +110,7 @@ public class CompositionRowsTests
         IReadOnlyList<CompositionRow> RowsFor(params OwnedCard[] owned)
         {
             computed++;
-            return CompositionRows.Build(CompAdvisor.Rank(owned, Lobby), Lobby, owned);
+            return CompositionRows.Build(CompAdvisor.Suggest(owned, Lobby, 3), owned);
         }
 
         var shops = new[]

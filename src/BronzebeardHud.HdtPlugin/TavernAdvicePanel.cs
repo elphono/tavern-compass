@@ -20,6 +20,8 @@ internal sealed class TavernAdvicePanel
 {
     private readonly CompositionSelection _selection;
     private readonly Action<string> _toggle;
+    private readonly Func<int> _suggested;
+    private readonly Action<int> _changeSuggested;
 
     private readonly Canvas _canvas;
     private readonly PanelMover _mover;
@@ -35,8 +37,12 @@ internal sealed class TavernAdvicePanel
     private IReadOnlyList<CompositionRow> _rows = new List<CompositionRow>();
 
     /// <param name="toggle">Called with a composition id when its box is clicked.</param>
-    public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle)
+    /// <param name="suggested">How many suggestions the panel shows (settings.json).</param>
+    /// <param name="changeSuggested">Called with −1 or +1 when the − or + of the panel is clicked.</param>
+    public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle, Func<int> suggested, Action<int> changeSuggested)
     {
+        _suggested = suggested;
+        _changeSuggested = changeSuggested;
         _canvas = canvas;
         _mover = mover;
         _selection = selection;
@@ -221,6 +227,28 @@ internal sealed class TavernAdvicePanel
 
     public static SolidColorBrush Brush(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
 
+    private Border StepButton(string text, int step, double scale)
+    {
+        var button = new Border
+        {
+            Width = 20 * scale,
+            Height = 20 * scale,
+            CornerRadius = new CornerRadius(4 * scale),
+            Background = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x44)),
+            BorderBrush = Brushes.LightGray,
+            BorderThickness = new Thickness(1),
+            Cursor = System.Windows.Input.Cursors.Hand,
+            Child = new TextBlock { Text = text, FontSize = 14 * scale, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+        };
+        button.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _changeSuggested(step);
+        };
+        OverlayExtensions.SetIsOverlayHitTestVisible(button, true);
+        return button;
+    }
+
     /// <summary>
     /// Beside the panel wherever it was moved, inside the window (TavernLayout.PreviewRect), handed to HDT's
     /// tooltip as a placement and offsets (TavernLayout.HdtTooltipOffsets).
@@ -274,7 +302,27 @@ internal sealed class TavernAdvicePanel
         var panel = TavernLayout.TargetPanel(width, height);
         var vignette = TavernLayout.VignetteSize * height;
         var lines = new StackPanel { Margin = new Thickness(6 * scale) };
-        lines.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray });
+        // Title, and how many suggestions to show: − n +, clickable while the overlay stays locked, like the boxes.
+        var title = new DockPanel();
+        var count = new StackPanel { Orientation = Orientation.Horizontal };
+        DockPanel.SetDock(count, Dock.Right);
+        count.Children.Add(StepButton("−", -1, scale));
+        count.Children.Add(new TextBlock
+        {
+            Text = $"{_suggested()} suggested",
+            FontSize = 12 * scale,
+            Foreground = Brushes.LightGray,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(4 * scale, 0, 4 * scale, 0),
+        });
+        count.Children.Add(StepButton("+", +1, scale));
+        title.Children.Add(count);
+        title.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+        lines.Children.Add(title);
+        if (_rows.Count == 0)
+        {
+            lines.Children.Add(new TextBlock { Text = "No composition reachable yet", FontSize = 12 * scale, Foreground = Brushes.LightGray, Margin = new Thickness(0, 4 * scale, 0, 0) });
+        }
         foreach (var row in _rows)
         {
             var colour = _selection.ColourOf(row.Composition.Id) is { } hex ? Brush(hex) : null;

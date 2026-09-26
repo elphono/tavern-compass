@@ -58,6 +58,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
 - Panneau des compos, overlay verrouillé : survoler une vignette montre la carte entière, et une case
   par compo la fait viser seule (quatre au plus, une couleur chacune, oubliées à la partie suivante).
+  Ses − et + règlent le nombre de compos suggérées (1 à 8, 3 par défaut), gardé dans
+  `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}`. Les
+  suggestions sont les compos atteignables, meilleure place moyenne d'abord (avec le héros joué quand
+  elle est connue).
 - Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
   événements réels ne se vérifient que sous Windows, avec HDT installé.
 - Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests

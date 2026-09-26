@@ -41,6 +41,8 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _warbandGuard;
     private readonly FeatureGuard _heroCompsGuard;
     private readonly FeatureGuard _heroAffinityGuard;
+    private readonly FeatureGuard _compCountGuard;
+    private HudSettings _settings = HudSettings.Default;
 
     // The hero being played on each composition (HeroCompAffinity), recomputed when the hero or the compositions change.
     private IReadOnlyDictionary<string, HeroCompPick> _heroEffects = new Dictionary<string, HeroCompPick>();
@@ -67,6 +69,7 @@ public sealed class Plugin : IPlugin
         _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _tavern?.SetFooter(null)));
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
+        _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
         _heroAffinityGuard = new FeatureGuard("hero-affinity", (n, e) => Disable(n, e, () =>
         {
             _heroEffects = new Dictionary<string, HeroCompPick>();
@@ -82,6 +85,29 @@ public sealed class Plugin : IPlugin
             }
         }));
     }
+
+    /// <summary>%LocalAppData%\BronzebeardHud\settings.json, next to layout.json.</summary>
+    private static string SettingsPath => Path.Combine(Path.GetDirectoryName(StatsDirectory)!, "settings.json");
+
+    /// <summary>The − or + of the target panel: one suggestion less or more, 1 to 8, kept in settings.json.</summary>
+    private void ChangeSuggested(int step) => _compCountGuard.Run(() =>
+    {
+        _settings = _settings.WithSuggested(_settings.SuggestedCompositions + step);
+        Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+        var temp = SettingsPath + ".tmp";
+        File.WriteAllText(temp, _settings.Serialize());
+        if (File.Exists(SettingsPath))
+        {
+            File.Replace(temp, SettingsPath, null);
+        }
+        else
+        {
+            File.Move(temp, SettingsPath);
+        }
+
+        Log.Info($"Bronzebeard HUD: suggested compositions={_settings.SuggestedCompositions}");
+        _selectionVersion++; // redraws the markers, the choices and the panel, in the shop and in combat
+    });
 
     /// <summary>A composition's box was clicked in the target panel.</summary>
     private void ToggleComposition(string compositionId) => _selectionGuard.Run(() =>
@@ -190,8 +216,21 @@ public sealed class Plugin : IPlugin
         _stats = new StatsService(StatsDirectory);
         _comps = new CompService(StatsDirectory);
         _mover = new PanelMover(Core.OverlayCanvas, Path.Combine(Path.GetDirectoryName(StatsDirectory)!, "layout.json"));
+        try
+        {
+            string? settingsError;
+            (_settings, settingsError) = HudSettings.Parse(File.Exists(SettingsPath) ? File.ReadAllText(SettingsPath) : null);
+            if (settingsError != null)
+            {
+                Log.Warn("Bronzebeard HUD: " + settingsError);
+            }
+        }
+        catch (IOException e)
+        {
+            Log.Warn($"Bronzebeard HUD: cannot read {SettingsPath}: {e.Message}");
+        }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
@@ -356,7 +395,7 @@ public sealed class Plugin : IPlugin
 
         _choiceKey = key;
         var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
-            _choices.TrinketStat, _stats.Bracket, _selection.Checked, _heroEffects);
+            _choices.TrinketStat, _stats.Bracket, _selection.Checked, _heroEffects, _settings.SuggestedCompositions);
         if (advice.HasMarkers)
         {
             _choices.Show(advice);
@@ -513,7 +552,7 @@ public sealed class Plugin : IPlugin
                 _lastCards = cards;
                 _lastMinions = row.Count(s => s.IsMinion);
                 _lastAdvice = TavernAdvisor.Advise(row.Select(s => s.CardId).ToList(), owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
-                    _selection.Checked, _heroEffects);
+                    _selection.Checked, _heroEffects, _settings.SuggestedCompositions);
                 _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _comps.Pins);
                 _lastFirstMarker = _tavern.FirstMarker;
             }
@@ -538,7 +577,9 @@ public sealed class Plugin : IPlugin
         IReadOnlyList<CompositionRow> BuildRows()
         {
             _rowsSelectionVersion = _selectionVersion;
-            return CompositionRows.Build(advice!.Targets, advice.Playable, ownedNow, chosen: chosen, heroEffects: _heroEffects);
+            // The same focus as the markers, recomputed so that a box ticked or a count changed in combat shows at once.
+            var shown = TavernAdvisor.Aim(_comps.Compositions(), advice!.Playable, ownedNow, chosen, _settings.SuggestedCompositions, _heroEffects).Shown;
+            return CompositionRows.Build(shown, ownedNow, chosen, _heroEffects);
         }
 
         _compPanel.Update(phase, () => advice != null && (changed || _compPanel.Rows.Count == 0) ? BuildRows() : _compPanel.Rows);

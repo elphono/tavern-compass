@@ -31,7 +31,7 @@ public class CompositionSelectionTests
         // Shop 1: the board says undead, Ali says pirate. Undead's key piece is no longer marked; the pirate add-on is.
         var owned1 = new[] { new OwnedCard("BG32_324", "UNDEAD") };
         var shop1 = TavernAdvisor.Advise(tavern, owned1, All, Lobby, selection.Checked);
-        Assert.Equal("undead_butcher", shop1.Targets[0].Composition.Id);
+        Assert.Equal(new[] { "pirate_discover", "undead_butcher" }, shop1.Targets.Select(t => t.Composition.Id)); // ticked, then suggested
         Assert.Empty(shop1.Cards[0].Advances);
         Assert.Equal(new[] { ("pirate_discover", false) }, Marks(shop1.Cards[1]));
         Assert.Equal(new[] { ("pirate_discover", true) }, Marks(shop1.Cards[2]));
@@ -39,9 +39,9 @@ public class CompositionSelectionTests
         // Shop 2: three undead pieces, Pirate is nowhere in the automatic targets: it stays aimed at, and first in the panel.
         var owned2 = new[] { new OwnedCard("BG32_324", "UNDEAD"), new OwnedCard("BG25_010", "UNDEAD"), new OwnedCard("BG28_309", "UNDEAD") };
         var shop2 = TavernAdvisor.Advise(tavern, owned2, All, Lobby, selection.Checked);
-        Assert.DoesNotContain(shop2.Targets, t => t.Composition.Id == "pirate_discover");
+        Assert.DoesNotContain(CompAdvisor.Suggest(owned2, All, 8), t => t.Composition.Id == "pirate_discover");
         Assert.Equal(new[] { ("pirate_discover", false) }, Marks(shop2.Cards[1]));
-        var rows = CompositionRows.Build(shop2.Targets, shop2.Playable, owned2, chosen: selection.Checked);
+        var rows = CompositionRows.Build(shop2.Targets, owned2, selection.Checked);
         Assert.Equal(("pirate_discover", true), (rows[0].Composition.Id, rows[0].IsChecked));
         Assert.Equal("undead_butcher", rows[1].Composition.Id);
         Assert.False(rows[1].IsChecked);
@@ -63,7 +63,8 @@ public class CompositionSelectionTests
         var auto = ChoiceAdvisor.Advise(options, owned, All, Lobby);
         var ticked = ChoiceAdvisor.Advise(options, owned, All, Lobby, chosen: new[] { "mech_magnet" });
 
-        Assert.Equal(new[] { "undead_butcher", "mech_magnet", null }, auto.Options.Select(o => o.Effects.FirstOrDefault()?.Composition.Id));
+        // Automatic: only undead is reachable, so only undead is aimed at.
+        Assert.Equal(new[] { "undead_butcher", null, null }, auto.Options.Select(o => o.Effects.FirstOrDefault()?.Composition.Id));
         Assert.Equal(new[] { null, "mech_magnet", null }, ticked.Options.Select(o => o.Effects.FirstOrDefault()?.Composition.Id));
         Assert.True(ticked.Options[1].Effects[0].IsCurrent);
     }
@@ -156,23 +157,24 @@ public class CompositionSelectionTests
     {
         var selection = new CompositionSelection();
         var owned = new[] { new OwnedCard("BG32_324", "UNDEAD") };
-        var targets = CompAdvisor.Rank(owned, All);
+        IReadOnlyList<CompositionRow> Rows() =>
+            CompositionRows.Build(TavernAdvisor.Aim(All, All, owned, selection.Checked, 3, null).Shown, owned, selection.Checked);
         var state = new CompositionPanelState();
-        state.Update(OverlayPhase.Shop, () => CompositionRows.Build(targets, All, owned));
+        state.Update(OverlayPhase.Shop, Rows);
         state.Update(OverlayPhase.Combat, () => throw new InvalidOperationException());
         Assert.Equal("undead_butcher", state.Rows[0].Composition.Id);
 
         selection.Toggle("naga_spells");
-        state.Replace(CompositionRows.Build(targets, All, owned, chosen: selection.Checked));
+        state.Replace(Rows());
         Assert.Equal(("naga_spells", true), (state.Rows[0].Composition.Id, state.Rows[0].IsChecked));
-        Assert.Equal(3, state.Rows.Count);
+        Assert.Equal(2, state.Rows.Count); // the ticked one, then the only reachable one
         selection.Toggle("mech_magnet");
         selection.Toggle("beast_lobster");
-        state.Replace(CompositionRows.Build(targets, All, owned, chosen: selection.Checked));
-        Assert.Equal(new[] { true, true, true, false }, state.Rows.Select(r => r.IsChecked)); // one more line, still tickable
+        state.Replace(Rows());
+        Assert.Equal(new[] { true, true, true, false }, state.Rows.Select(r => r.IsChecked));
 
         state.Update(OverlayPhase.OutOfGame, () => throw new InvalidOperationException());
-        state.Replace(CompositionRows.Build(targets, All, owned, chosen: selection.Checked));
+        state.Replace(Rows());
         Assert.Empty(state.Rows);
 
         selection.Clear();

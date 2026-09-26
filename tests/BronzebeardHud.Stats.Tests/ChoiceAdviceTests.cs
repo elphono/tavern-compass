@@ -58,7 +58,7 @@ public class ChoiceAdviceTests
     }
 
     [Fact]
-    public void FourOptions_DarkGift_KeyPieceOfANonTargetComp_AddOn_Copy_Neutral()
+    public void FourOptions_DarkGift_UnreachableComp_AddOn_Copy_Neutral()
     {
         var options = new[]
         {
@@ -69,9 +69,9 @@ public class ChoiceAdviceTests
         var advice = ChoiceAdvisor.Advise(options, UndeadWithAPirate, All, Lobby);
 
         Assert.Equal(ChoiceKind.DarkGift, advice.Kind);
-        Assert.Equal(-1, advice.Options[0].Effects.Single().TargetRank); // Mech is playable, not targeted
+        Assert.Empty(advice.Options[0].Effects); // Mech is playable but nothing of it is held: not shown, not aimed at
         Assert.Equal(
-            new[] { "★ Mech Magnet 0/2→1/2", "+ Pirate Discover 0/2", "★ Undead Butcher 2/3 copy", "no target comp" },
+            new[] { "no target comp", "+ Pirate Discover 0/2", "★ Undead Butcher 2/3 copy", "no target comp" },
             Labels(advice).Select(l => Assert.Single(l)));
     }
 
