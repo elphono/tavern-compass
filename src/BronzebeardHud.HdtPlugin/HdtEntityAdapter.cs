@@ -37,19 +37,33 @@ internal static class HdtEntityAdapter
     }
 
     /// <summary>
-    /// The entities of the player's pending choice, in on-screen order: Player.OfferedEntityIds gives the
-    /// order, Player.OfferedEntities (creation order) the entities; see <see cref="ChoiceOrder"/>.
+    /// The options of the player's pending choice, in on-screen order, with what the advice needs: card type
+    /// and English text from HearthDb, tribe, Dark Gift tag (HDT: OverlayWindow.xaml.cs:1714) and zone.
     /// </summary>
-    public static IReadOnlyList<EntitySnapshot> OfferedEntities(GameV2 game)
+    public static IReadOnlyList<OfferedOption> OfferedOptions(GameV2 game)
     {
         try
         {
             var ids = game.Player.OfferedEntityIds.ToList();
-            return ChoiceOrder.Arrange(ids, game.Player.OfferedEntities.Select(ToSnapshot).ToList());
+            var entities = ChoiceOrder.Arrange(ids, game.Player.OfferedEntities.ToList(), e => e.Id);
+            return entities.Select(e =>
+            {
+                var cardId = e.CardId ?? string.Empty;
+                HearthDb.Cards.All.TryGetValue(cardId, out var card);
+                var isTrinket = card?.Type == CardType.BATTLEGROUND_TRINKET;
+                return new OfferedOption(
+                    e.Id,
+                    cardId.Length == 0 ? cardId : BaseCardId(cardId),
+                    card?.Type.ToString() ?? "INVALID",
+                    TribeOf(e),
+                    e.GetTag(GameTag.DARK_GIFT_ENTITY) > 0,
+                    e.GetTag(GameTag.ZONE),
+                    isTrinket ? card!.GetLocText(Locale.enUS) : null);
+            }).ToList();
         }
         catch (InvalidOperationException)
         {
-            return Array.Empty<EntitySnapshot>();
+            return Array.Empty<OfferedOption>();
         }
     }
 

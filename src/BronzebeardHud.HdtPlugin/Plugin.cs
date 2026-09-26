@@ -26,7 +26,7 @@ public sealed class Plugin : IPlugin
     private MenuItem? _moveItem;
     private TavernAdvicePanel? _tavern;
     private OpponentMmrPanel? _opponentMmr;
-    private TrinketPickPanel? _trinkets;
+    private ChoiceAdvicePanel? _choices;
     private GameHistoryPanel? _history;
     private readonly GameTimeline _timeline = new();
     private int _historyKey = -1;
@@ -35,7 +35,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _heroSelectionGuard;
     private readonly FeatureGuard _tavernGuard;
     private readonly FeatureGuard _opponentMmrGuard;
-    private readonly FeatureGuard _trinketGuard;
+    private readonly FeatureGuard _choiceGuard;
     private readonly FeatureGuard _historyGuard;
 
     public Plugin()
@@ -43,7 +43,8 @@ public sealed class Plugin : IPlugin
         _heroSelectionGuard = new FeatureGuard("hero-selection", (n, e) => Disable(n, e, () => _panel?.Hide()));
         _tavernGuard = new FeatureGuard("tavern-advice", (n, e) => Disable(n, e, () => { _tavern?.HideMarkers(); _tavern?.HidePanel(); }));
         _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
-        _trinketGuard = new FeatureGuard("trinket-choice", (n, e) => Disable(n, e, () => _trinkets?.Hide()));
+        // Replaces "trinket-choice": trinkets are now one kind of choice among discovers and Dark Gifts.
+        _choiceGuard = new FeatureGuard("discover-advice", (n, e) => Disable(n, e, () => _choices?.Hide()));
         _historyGuard = new FeatureGuard("history", (n, e) => Disable(n, e, () => _history?.Hide()));
     }
 
@@ -61,7 +62,8 @@ public sealed class Plugin : IPlugin
             // The panel is already broken; the other features keep running.
         }
     }
-    private string _trinketKey = string.Empty;
+    private string _choiceKey = string.Empty;
+    private string _loggedChoice = string.Empty;
     private StatsService? _stats;
     private CompService? _comps;
     private bool _inHeroSelection;
@@ -139,7 +141,7 @@ public sealed class Plugin : IPlugin
         _panel = new HeroPickPanel(Core.OverlayCanvas);
         _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
-        _trinkets = new TrinketPickPanel(Core.OverlayCanvas, StatsDirectory);
+        _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
     }
 
@@ -149,7 +151,8 @@ public sealed class Plugin : IPlugin
         _compsLoadedThisGame = false;
         _shownKey = string.Empty;
         _tavernKey = string.Empty;
-        _trinketKey = string.Empty;
+        _choiceKey = string.Empty;
+        _loggedChoice = string.Empty;
         _opponentKey = string.Empty;
         _historyKey = -1;
         _diagnosticRound = -1;
@@ -166,9 +169,9 @@ public sealed class Plugin : IPlugin
         _opponentMmr?.Detach();
         _opponentMmr?.Dispose();
         _opponentMmr = null;
-        _trinkets?.Detach();
-        _trinkets?.Dispose();
-        _trinkets = null;
+        _choices?.Detach();
+        _choices?.Dispose();
+        _choices = null;
         _history?.Detach();
         _history = null;
         _panel = null;
@@ -192,7 +195,7 @@ public sealed class Plugin : IPlugin
         _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
         _tavernGuard.Run(() => UpdateTavern(game));
         _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
-        _trinketGuard.Run(() => UpdateTrinketChoice(game));
+        _choiceGuard.Run(() => UpdateChoice(game));
         _historyGuard.Run(() => UpdateHistory(game));
     }
 
@@ -222,35 +225,52 @@ public sealed class Plugin : IPlugin
         }
     }
 
-    private void UpdateTrinketChoice(GameV2 game)
+    /// <summary>
+    /// Any choice of the player (discover, Dark Gift, trinket): a label above each option. One line in HDT's
+    /// log per choice, including the ones without a known layout, so that uncovered kinds show up.
+    /// </summary>
+    private void UpdateChoice(GameV2 game)
     {
-        if (_trinkets == null || _stats == null)
+        if (_choices == null || _stats == null || _comps == null)
         {
             return;
         }
 
-        var offered = game.IsBattlegroundsMatch
-            ? TrinketChoice.Offered(HdtEntityAdapter.OfferedEntities(game))
-            : new List<EntitySnapshot>();
-        if (offered.Count == 0)
+        var options = game.IsBattlegroundsMatch ? HdtEntityAdapter.OfferedOptions(game) : Array.Empty<OfferedOption>();
+        var kind = ChoiceClassifier.Kind(options);
+        if (kind == ChoiceKind.None)
         {
-            _trinketKey = string.Empty;
-            _trinkets.Hide();
+            _choiceKey = string.Empty;
+            _choices.Hide();
             return;
         }
 
-        var loaded = _trinkets.Poll();
-        var key = string.Join(",", offered.Select(e => e.Id)) + "|" + _stats.Bracket;
-        if (key != _trinketKey || loaded)
+        _comps.Poll();
+        var loaded = kind == ChoiceKind.Trinket && _choices.PollTrinketStats();
+        var ids = string.Join(",", options.Select(o => o.EntityId));
+        var key = $"{ids}|{_comps.Version}|{_stats.Bracket}|{_choices.TrinketStatsLoaded}";
+        if (key == _choiceKey && !loaded)
         {
-            if (!_trinketKey.StartsWith(string.Join(",", offered.Select(e => e.Id)) + "|", StringComparison.Ordinal))
-            {
-                // Once per choice: the on-screen order HDT gave, to compare with the game.
-                Log.Info($"Bronzebeard HUD: trinket choice order={ChoiceOrder.Describe(offered)} cards=[{string.Join(",", offered.Select(e => e.CardId))}]");
-            }
+            return;
+        }
 
-            _trinketKey = key;
-            _trinkets.Show(offered.Select(e => e.CardId!).ToList(), _stats.Bracket);
+        _choiceKey = key;
+        var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
+            _choices.TrinketStat, _stats.Bracket);
+        if (advice.HasMarkers)
+        {
+            _choices.Show(advice);
+        }
+        else
+        {
+            _choices.Hide();
+        }
+
+        if (ids != _loggedChoice)
+        {
+            _loggedChoice = ids;
+            Log.Info(ChoiceAdvisor.DiagnosticLine(options, advice, _comps.Compositions().Count, _comps.State, _choices.LastLines, _choices.FirstLabel,
+                Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
         }
     }
 

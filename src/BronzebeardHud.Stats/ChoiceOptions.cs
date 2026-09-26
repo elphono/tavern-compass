@@ -21,23 +21,27 @@ public static class ChoiceOrder
     /// The entities in the order of <paramref name="offeredIds"/>. Empty when one offered id has no entity
     /// yet (HDT hides entities whose tags are still changing): a partial list would put advice on the wrong card.
     /// </summary>
-    public static IReadOnlyList<EntitySnapshot> Arrange(IReadOnlyList<int> offeredIds, IReadOnlyList<EntitySnapshot> entities)
+    public static IReadOnlyList<EntitySnapshot> Arrange(IReadOnlyList<int> offeredIds, IReadOnlyList<EntitySnapshot> entities) =>
+        Arrange(offeredIds, entities, e => e.Id);
+
+    /// <summary>The same rule for any item that carries an entity id.</summary>
+    public static IReadOnlyList<T> Arrange<T>(IReadOnlyList<int> offeredIds, IReadOnlyList<T> items, Func<T, int> idOf)
     {
-        var byId = new Dictionary<int, EntitySnapshot>();
-        foreach (var entity in entities)
+        var byId = new Dictionary<int, T>();
+        foreach (var item in items)
         {
-            byId[entity.Id] = entity;
+            byId[idOf(item)] = item;
         }
 
-        var ordered = new List<EntitySnapshot>(offeredIds.Count);
+        var ordered = new List<T>(offeredIds.Count);
         foreach (var id in offeredIds)
         {
-            if (!byId.TryGetValue(id, out var entity))
+            if (!byId.TryGetValue(id, out var item))
             {
-                return Array.Empty<EntitySnapshot>();
+                return Array.Empty<T>();
             }
 
-            ordered.Add(entity);
+            ordered.Add(item);
         }
 
         return ordered;

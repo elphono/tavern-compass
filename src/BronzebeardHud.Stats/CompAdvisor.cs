@@ -183,33 +183,22 @@ public static class TavernAdvisor
         IReadOnlyList<Composition> compositions,
         IReadOnlyCollection<string> lobbyTribes)
     {
-        var playable = compositions
-            .Where(c => lobbyTribes.Count == 0 || c.Tribes.All(lobbyTribes.Contains))
-            .ToList();
+        var playable = Playable(compositions, lobbyTribes);
         var targets = CompAdvisor.Rank(owned, playable);
-        var targetOrder = targets.Select((t, i) => (t.Composition.Id, i)).ToDictionary(x => x.Id, x => x.i, StringComparer.Ordinal);
         var ownedIds = new HashSet<string>(owned.Select(c => c.CardId), StringComparer.Ordinal);
-
-        int Order(Composition c) => targetOrder.TryGetValue(c.Id, out var rank) ? rank : int.MaxValue;
-
         var cards = tavernCardIds.Select((rawId, position) =>
         {
-            var cardId = CardIds.Normalize(rawId);
-            var advances = playable
-                .Where(c => c.CoreCards.Contains(cardId))
-                .Select(c => (Composition: c, IsKeyPiece: true))
-                .Concat(targets
-                    .Select(t => t.Composition)
-                    .Where(c => !ownedIds.Contains(cardId) && !c.CoreCards.Contains(cardId) && c.AddonCards.Contains(cardId))
-                    .Select(c => (Composition: c, IsKeyPiece: false)))
-                .OrderBy(a => Order(a.Composition))
-                .ThenBy(a => a.Composition.AveragePlacement ?? double.MaxValue)
-                .ThenBy(a => a.Composition.Id, StringComparer.Ordinal)
+            var advances = CardEffect.On(rawId, targets, playable, ownedIds)
+                .Select(e => (e.Composition, e.IsKeyPiece))
                 .ToList();
-            return new ShopAdvice(position, cardId, advances);
+            return new ShopAdvice(position, CardIds.Normalize(rawId), advances);
         }).ToList();
         return new TavernAdvice(targets, cards, playable);
     }
+
+    /// <summary>The compositions whose tribes are all in the lobby; all of them when the lobby is unknown.</summary>
+    public static IReadOnlyList<Composition> Playable(IReadOnlyList<Composition> compositions, IReadOnlyCollection<string> lobbyTribes) =>
+        compositions.Where(c => lobbyTribes.Count == 0 || c.Tribes.All(lobbyTribes.Contains)).ToList();
 
     /// <summary>
     /// One log line per shop round, e.g.

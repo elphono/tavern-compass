@@ -28,24 +28,30 @@ public static class MarkerText
     /// it fits <paramref name="maxChars"/>: full name, then initials for every word but the last
     /// ("★ U. Butcher 2/5"), then initials only ("★ UB 2/5"), then mark and count ("★ 2/5", then "★2/5"), then cut.
     /// </summary>
-    public static string Label(string compositionName, int owned, int total, bool isKeyPiece, int maxChars)
+    public static string Label(string compositionName, int owned, int total, bool isKeyPiece, int maxChars) =>
+        Label(isKeyPiece ? "★" : "+", compositionName, $"{owned}/{total}", maxChars);
+
+    /// <summary>
+    /// The same shortening for any mark and count: "★ Undead Butcher 2/5→3/5" (a choice), "≈ Undead Butcher"
+    /// (no count). Parts left empty are skipped.
+    /// </summary>
+    public static string Label(string mark, string compositionName, string count, int maxChars)
     {
-        var mark = isKeyPiece ? "★" : "+";
-        var count = $"{owned}/{total}";
+        string Join(params string[] parts) => string.Join(" ", parts.Where(p => p.Length > 0));
         var words = compositionName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        var candidates = new List<string> { $"{mark} {compositionName} {count}" };
+        var candidates = new List<string> { Join(mark, compositionName, count) };
         if (words.Length > 1)
         {
-            candidates.Add($"{mark} {string.Join(" ", words.Take(words.Length - 1).Select(w => char.ToUpperInvariant(w[0]) + "."))} {words[words.Length - 1]} {count}");
+            candidates.Add(Join(mark, string.Join(" ", words.Take(words.Length - 1).Select(w => char.ToUpperInvariant(w[0]) + ".")) + " " + words[words.Length - 1], count));
         }
 
         if (words.Length > 0)
         {
-            candidates.Add($"{mark} {string.Concat(words.Select(w => char.ToUpperInvariant(w[0])))} {count}");
+            candidates.Add(Join(mark, string.Concat(words.Select(w => char.ToUpperInvariant(w[0]))), count));
         }
 
-        candidates.Add($"{mark} {count}");
-        candidates.Add($"{mark}{count}");
+        candidates.Add(Join(mark, count));
+        candidates.Add(mark + count);
         var fitting = candidates.FirstOrDefault(c => DisplayLength(c) <= maxChars);
         if (fitting != null)
         {

@@ -48,42 +48,4 @@ public class TrinketTests
         var json = "{\"schema\":1,\"trinkets\":[{\"trinketCardId\":\"BG36_MagicItem_400\",\"averagePlacement\":3.5,\"dataPoints\":10,\"placementByPercentile\":{\"25\":9.1}}]}";
         Assert.StartsWith("trinkets[0].placementByPercentile", Assert.Throws<StatsFormatException>(() => TrinketStatsLoader.Parse(json)).Message);
     }
-
-    private static EntitySnapshot Offer(int id, string cardId, bool trinket = true, int zone = 6) =>
-        new(id, cardId, isHero: false, new Dictionary<string, int> { ["BACON_TRINKET"] = trinket ? 1 : 0, ["ZONE"] = zone });
-
-    [Fact]
-    public void TrinketChoice_OnlyWhenEveryOfferIsATrinket_AndNoneIsPlayedYet()
-    {
-        var offer = new[] { Offer(71, "BG36_MagicItem_400"), Offer(72, "BG30_MagicItem_542"), Offer(73, "BG32_MagicItem_120") };
-        Assert.Equal(new[] { 71, 72, 73 }, TrinketChoice.Offered(offer).Select(e => e.Id));
-
-        Assert.Empty(TrinketChoice.Offered(new[] { Offer(71, "BG36_MagicItem_400"), Offer(74, "BG28_HERO_p", trinket: false) })); // hero power choice
-        Assert.Empty(TrinketChoice.Offered(new[] { Offer(71, "BG36_MagicItem_400", zone: 1), Offer(72, "BG30_MagicItem_542") })); // already chosen
-        Assert.Empty(TrinketChoice.Offered(new[] { Offer(71, "BG36_MagicItem_400") })); // not a choice
-    }
-
-    [Theory]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
-    public void TrinketLayout_FollowsHdtsGrid_SymmetricEquallySpacedNoOverlap(int count)
-    {
-        const double width = 2291, height = 1360;
-        var scale = height / 1080;
-        var rects = TrinketLayout.Compute(width, height, count);
-
-        Assert.Equal(count, rects.Count);
-        for (var i = 0; i < count; i++)
-        {
-            Assert.Equal(2 * (width / 2 + 10 * scale), rects[i].CenterX + rects[count - 1 - i].CenterX, precision: 6);
-            Assert.Equal(height / 2 - (82.5 + 215) * scale, rects[i].Top, precision: 6);
-        }
-
-        for (var i = 0; i + 1 < count; i++)
-        {
-            Assert.Equal(277 * scale, rects[i + 1].CenterX - rects[i].CenterX, precision: 6);
-            Assert.True(rects[i].Right < rects[i + 1].Left, $"badges {i} and {i + 1} overlap");
-        }
-    }
 }
