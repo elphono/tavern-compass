@@ -86,10 +86,6 @@ internal static class HdtEntityAdapter
         return game.IsBattlegroundsCombatPhase ? OverlayPhase.Combat : OverlayPhase.Shop;
     }
 
-    /// <summary>Battlegrounds shopping: hero picked, not in combat.</summary>
-    public static bool IsShopPhase(GameV2 game) =>
-        game.IsBattlegroundsMatch && game.IsBattlegroundsHeroPickingDone && !game.IsBattlegroundsCombatPhase;
-
     /// <summary>Minions on the player's board and every card in hand, golden copies mapped to their base card.</summary>
     public static IReadOnlyList<OwnedCard> OwnedCards(GameV2 game)
     {

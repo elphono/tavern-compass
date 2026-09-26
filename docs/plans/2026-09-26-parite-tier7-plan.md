@@ -9,7 +9,7 @@ Windows.
 ```mermaid
 flowchart LR
     P1["Phase 1<br/>squelette + stats des héros proposés"] --> P2["Phase 2<br/>tranche de MMR, MMR adverse, compos"]
-    P2 --> P3["Phase 3<br/>tribus, trinkets, prochain adversaire, épinglage"]
+    P2 --> P3["Phase 3<br/>tribus, trinkets, épinglage"]
     P3 --> P4["Phase 4<br/>historique, graphe des PV, inspiration, quêtes"]
     classDef done fill:#ffffff,stroke:#2b8a3e,stroke-width:4px,color:#000000
     class P1,P2,P3,P4 done
@@ -84,13 +84,13 @@ pendant la saison à mesure que des joueurs passent 8 000. Le client de la phase
 bornes en pages au moment de télécharger : il part de la dernière page et remonte tant que le MMR
 reste sous `MaxRating`.
 
-## Phase 3 : tribus, trinkets, prochain adversaire, épinglage
+## Phase 3 : tribus, trinkets, épinglage
 
 | Fonctionnalité | Fichiers | Tests |
 |---|---|---|
 | Impact des tribus du lobby (livré) | `LobbyTribes.cs` (règle `buildHeroStats` de Firestone), `tribeImpacts` dans le format local | tribus présentes ou absentes, effectifs trop faibles écartés, lobby complet ou inconnu, héros sans chiffre écarté, saisie manuelle laissée intacte |
 | Stats de trinkets (livré) | `TrinketStats.cs` (format, import, choix, disposition d'HDT) ; `TrinketPickPanel.cs` | place par tranche et repli, entrées impossibles écartées, fichier malformé, choix de trinkets seulement, choix terminé, 2 à 4 trinkets |
-| Prochain adversaire (livré) | `NextOpponent.cs`, `LeaderboardLayout.Tile` ; `NextOpponentMarker.cs` | identifiant présent, absent ou nul, joueur mort (fantôme), héros remplacé en cours de partie, tuiles du classement |
+| Prochain adversaire | **retiré — déjà affiché nativement par le jeu** (décision d'Ali, 2026-09-26). Marqueur, garde `next-opponent`, `NextOpponent.cs` et ses tests supprimés ; seul reste le cadre du prochain adversaire dans le classement du panneau Combats (`Standings`, via `NEXT_OPPONENT_PLAYER_ID`) | — |
 | Épinglage en taverne (livré, **reclassé** : par fichier `stats\manual\pins.txt` ; l'épinglage d'un clic est reporté, car il rendrait l'overlay cliquable au-dessus du jeu) | `TavernPins.cs` ; marqueur ◆ dans `TavernAdvicePanel.cs` | épingle, retire, ré-épingle, persiste d'une partie à l'autre, noms et identifiants, carte inconnue |
 
 ## Phase 4 : historique, graphe des PV, inspiration, quêtes
@@ -103,6 +103,8 @@ reste sous `MaxRating`.
 | Stats de quêtes | **coupées** : le fichier de quêtes de Firestone est vide sur le dernier patch (`questStats: []`, `dataPoints: 0`, mesuré le 2026-09-26) | — |
 
 **Sous Windows** : tout le rendu.
+
+**Règle, arrêtée le 2026-09-26** : le plugin ne duplique rien de ce que le jeu ou HDT affichent déjà.
 
 ## Ce qui reste un arbitrage d'Ali
 

@@ -27,7 +27,6 @@ public sealed class Plugin : IPlugin
     private TavernAdvicePanel? _tavern;
     private OpponentMmrPanel? _opponentMmr;
     private TrinketPickPanel? _trinkets;
-    private NextOpponentMarker? _nextOpponent;
     private GameHistoryPanel? _history;
     private readonly GameTimeline _timeline = new();
     private int _historyKey = -1;
@@ -37,7 +36,6 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _tavernGuard;
     private readonly FeatureGuard _opponentMmrGuard;
     private readonly FeatureGuard _trinketGuard;
-    private readonly FeatureGuard _nextOpponentGuard;
     private readonly FeatureGuard _historyGuard;
 
     public Plugin()
@@ -46,7 +44,6 @@ public sealed class Plugin : IPlugin
         _tavernGuard = new FeatureGuard("tavern-advice", (n, e) => Disable(n, e, () => { _tavern?.HideMarkers(); _tavern?.HidePanel(); }));
         _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
         _trinketGuard = new FeatureGuard("trinket-choice", (n, e) => Disable(n, e, () => _trinkets?.Hide()));
-        _nextOpponentGuard = new FeatureGuard("next-opponent", (n, e) => Disable(n, e, () => _nextOpponent?.Hide()));
         _historyGuard = new FeatureGuard("history", (n, e) => Disable(n, e, () => _history?.Hide()));
     }
 
@@ -64,7 +61,6 @@ public sealed class Plugin : IPlugin
             // The panel is already broken; the other features keep running.
         }
     }
-    private string _nextOpponentKey = string.Empty;
     private string _trinketKey = string.Empty;
     private StatsService? _stats;
     private CompService? _comps;
@@ -141,7 +137,6 @@ public sealed class Plugin : IPlugin
         _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _trinkets = new TrinketPickPanel(Core.OverlayCanvas, StatsDirectory);
-        _nextOpponent = new NextOpponentMarker(Core.OverlayCanvas);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
     }
 
@@ -155,8 +150,6 @@ public sealed class Plugin : IPlugin
         _trinkets?.Detach();
         _trinkets?.Dispose();
         _trinkets = null;
-        _nextOpponent?.Detach();
-        _nextOpponent = null;
         _history?.Detach();
         _history = null;
         _panel = null;
@@ -181,7 +174,6 @@ public sealed class Plugin : IPlugin
         _tavernGuard.Run(() => UpdateTavern(game));
         _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
         _trinketGuard.Run(() => UpdateTrinketChoice(game));
-        _nextOpponentGuard.Run(() => UpdateNextOpponent(game));
         _historyGuard.Run(() => UpdateHistory(game));
     }
 
@@ -208,33 +200,6 @@ public sealed class Plugin : IPlugin
         {
             _historyKey = key;
             _history.Show(_timeline, heroes, game.Player.Id, nextOpponent);
-        }
-    }
-
-    private void UpdateNextOpponent(GameV2 game)
-    {
-        if (_nextOpponent == null)
-        {
-            return;
-        }
-
-        var tile = HdtEntityAdapter.IsShopPhase(game)
-            ? NextOpponent.Find(HdtEntityAdapter.NextOpponentPlayerId(game), HdtEntityAdapter.Heroes(game))
-            : null;
-        var key = tile == null ? string.Empty : $"{tile.LeaderboardPlace}:{tile.IsGhost}";
-        if (key == _nextOpponentKey)
-        {
-            return;
-        }
-
-        _nextOpponentKey = key;
-        if (tile == null)
-        {
-            _nextOpponent.Hide();
-        }
-        else
-        {
-            _nextOpponent.Show(tile);
         }
     }
 

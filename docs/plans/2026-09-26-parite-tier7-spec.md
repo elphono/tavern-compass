@@ -28,7 +28,7 @@ Priorité : 1 = cœur de la parité, 2 = attendu, 3 = confort. *Qui la fournit* 
 | **Conseiller de compositions** (demande d'Ali) | les deux | compos visées d'après plateau + main, et sbires de Bob qui y ajoutent une pièce ; en boutique | plateau, main, taverne, compos connues | plugin, données externes : compos Firestone (§ 6), saisie HSReplay | 1 |
 | Impact des tribus du lobby sur un héros | Firestone | place moyenne corrigée ; à la sélection | `tribeStats`, tribus du lobby | plugin, données externes : JSON de héros ; tribus fournies par HDT | 2 |
 | Stats des trinkets proposés | les deux | place moyenne ; au choix | stats agrégées | plugin, données externes : JSON de trinkets de Firestone | 2 |
-| Prochain adversaire mis en évidence | projet | marque sur le classement | `NEXT_OPPONENT_PLAYER_ID` | plugin, données HDT | 2 |
+| Prochain adversaire mis en évidence | projet | marque sur le classement | `NEXT_OPPONENT_PLAYER_ID` | **retiré** : le jeu l'affiche déjà | — |
 | Épingler ou surligner un sbire en taverne | les deux | cadre sur la carte ; en boutique | cartes de la taverne | plugin, données HDT | 2 |
 | Montées et triples depuis le dernier combat | Firestone | ajout au popup de survol | tags `PLAYER_TECH_LEVEL`, `PLAYER_TRIPLES` | plugin, données HDT | 2 |
 | Stats de quêtes et récompenses | les deux | tours pour finir, place moyenne | stats agrégées | plugin, données externes : JSON de quêtes de Firestone | 3 |
@@ -111,7 +111,7 @@ flowchart TB
     subgraph HS["Fenêtre Hearthstone, toile d'overlay de HDT"]
         direction TB
         TIERS["HAUT : navigateur de sbires (HDT)"]
-        LB["GAUCHE : classement du jeu,<br/>dernier plateau au survol (HDT)<br/>+ MMR adverse, prochain adversaire (plugin)"]
+        LB["GAUCHE : classement du jeu,<br/>dernier plateau au survol (HDT)<br/>+ MMR adverse (plugin)"]
         MID["CENTRE : Bob's Buddy (HDT)<br/>+ stats sous chaque héros proposé (plugin)"]
         RIGHT["DROITE : stats de compos<br/>et de trinkets (plugin)"]
         SESSION["BAS : widget de session (HDT, position réglable)"]
