@@ -39,15 +39,14 @@ public sealed class Plugin : IPlugin
     public void OnLoad()
     {
         _stats = new StatsService(StatsDirectory);
-        _panel = new HeroPickPanel();
-        Core.OverlayCanvas.Children.Add(_panel);
+        _panel = new HeroPickPanel(Core.OverlayCanvas);
     }
 
     public void OnUnload()
     {
         if (_panel != null)
         {
-            Core.OverlayCanvas.Children.Remove(_panel);
+            _panel.Detach();
             _panel = null;
         }
 
@@ -97,7 +96,5 @@ public sealed class Plugin : IPlugin
             _shownKey = key;
             _panel.Show(HeroPickAdvisor.BuildRows(offered, _stats.Sources()), _stats.Status);
         }
-
-        _panel.Reposition(Core.OverlayCanvas);
     }
 }

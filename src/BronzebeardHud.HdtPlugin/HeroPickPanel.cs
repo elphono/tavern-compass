@@ -9,81 +9,152 @@ using BronzebeardHud.Stats;
 namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
-/// One column per offered hero, drawn on HDT's overlay canvas under the hero picker.
-/// Built in code rather than XAML so that the plugin compiles under WSL.
+/// One badge per offered hero, each centred on the grey plate under that hero's portrait, plus a
+/// status line under the row. Positions come from <see cref="HeroPickLayout"/> and are recomputed
+/// whenever the overlay canvas changes size. Built in code rather than XAML so it compiles under WSL.
 /// </summary>
-internal sealed class HeroPickPanel : Border
+internal sealed class HeroPickPanel
 {
-    private const double ColumnWidth = 190;
+    private readonly Canvas _canvas;
+    private readonly List<Border> _badges = new();
+    private readonly TextBlock _status = new() { Foreground = Brushes.Gold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, IsHitTestVisible = false };
+    private IReadOnlyList<HeroPickRow> _rows = new List<HeroPickRow>();
+    private bool _visible;
 
-    private readonly StackPanel _columns = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-    private readonly TextBlock _status = new() { Foreground = Brushes.Gold, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
-
-    public HeroPickPanel()
+    public HeroPickPanel(Canvas canvas)
     {
-        Background = new SolidColorBrush(Color.FromArgb(0xD9, 0x14, 0x14, 0x1E));
-        BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F));
-        BorderThickness = new Thickness(2);
-        CornerRadius = new CornerRadius(6);
-        Padding = new Thickness(10);
-        IsHitTestVisible = false;
-        Visibility = Visibility.Collapsed;
-        Child = new StackPanel { Children = { _columns, _status } };
+        _canvas = canvas;
+        _status.Visibility = Visibility.Collapsed;
+        _canvas.Children.Add(_status);
+        _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
     public void Show(IReadOnlyList<HeroPickRow> rows, string? status)
     {
-        _columns.Children.Clear();
+        _rows = rows;
+        foreach (var badge in _badges)
+        {
+            _canvas.Children.Remove(badge);
+        }
+
+        _badges.Clear();
         foreach (var row in rows)
         {
-            _columns.Children.Add(BuildColumn(row));
+            var badge = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F)),
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(6),
+                IsHitTestVisible = false,
+                Tag = row,
+            };
+            _badges.Add(badge);
+            _canvas.Children.Add(badge);
         }
 
         _status.Text = status ?? string.Empty;
-        _status.Visibility = string.IsNullOrEmpty(status) ? Visibility.Collapsed : Visibility.Visible;
-        _status.MaxWidth = ColumnWidth * rows.Count;
-        Visibility = Visibility.Visible;
+        _visible = true;
+        Relayout();
     }
 
-    public void Hide() => Visibility = Visibility.Collapsed;
-
-    /// <summary>Centred horizontally, just under the offered hero portraits.</summary>
-    public void Reposition(Canvas canvas)
+    public void Hide()
     {
-        if (Visibility != Visibility.Visible || canvas.ActualWidth <= 0)
+        _visible = false;
+        foreach (var badge in _badges)
+        {
+            badge.Visibility = Visibility.Collapsed;
+        }
+
+        _status.Visibility = Visibility.Collapsed;
+    }
+
+    public void Detach()
+    {
+        _canvas.SizeChanged -= OnCanvasSizeChanged;
+        foreach (var badge in _badges)
+        {
+            _canvas.Children.Remove(badge);
+        }
+
+        _canvas.Children.Remove(_status);
+    }
+
+    private void OnCanvasSizeChanged(object sender, SizeChangedEventArgs e) => Relayout();
+
+    /// <summary>Place every badge for the current canvas size; the content is rebuilt so fonts follow the scale.</summary>
+    private void Relayout()
+    {
+        if (!_visible)
         {
             return;
         }
 
-        Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Canvas.SetLeft(this, (canvas.ActualWidth - DesiredSize.Width) / 2);
-        Canvas.SetTop(this, canvas.ActualHeight * 0.70);
+        var width = _canvas.ActualWidth;
+        var height = _canvas.ActualHeight;
+        var rects = HeroPickLayout.Compute(width, height, _badges.Count);
+        if (rects.Count != _badges.Count)
+        {
+            return;
+        }
+
+        var scale = HeroPickLayout.Scale(height);
+        for (var i = 0; i < _badges.Count; i++)
+        {
+            var badge = _badges[i];
+            var rect = rects[i];
+            badge.Width = rect.Width;
+            badge.Height = rect.Height;
+            badge.Padding = new Thickness(4 * scale, 2 * scale, 4 * scale, 2 * scale);
+            badge.Child = BuildContent((HeroPickRow)badge.Tag, scale);
+            Canvas.SetLeft(badge, rect.Left);
+            Canvas.SetTop(badge, rect.Top);
+            badge.Visibility = Visibility.Visible;
+        }
+
+        if (string.IsNullOrEmpty(_status.Text) || rects.Count == 0)
+        {
+            _status.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        _status.FontSize = 12 * scale;
+        _status.Width = rects[rects.Count - 1].Right - rects[0].Left;
+        Canvas.SetLeft(_status, rects[0].Left);
+        Canvas.SetTop(_status, rects[0].Top + rects[0].Height + 4 * scale);
+        _status.Visibility = Visibility.Visible;
     }
 
-    private static UIElement BuildColumn(HeroPickRow row)
+    private static UIElement BuildContent(HeroPickRow row, double scale)
     {
-        var column = new StackPanel { Width = ColumnWidth, Margin = new Thickness(4, 0, 4, 0) };
+        var lines = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         if (!row.HasData)
         {
-            column.Children.Add(Text("no data", 14, Brushes.LightGray));
-            return column;
+            lines.Children.Add(Text("no data", 14 * scale, Brushes.LightGray));
+            return lines;
         }
 
-        foreach (var figures in row.Figures)
+        // One compact line per source: the plate is too small for more than two.
+        foreach (var figures in row.Figures.Take(2))
         {
-            column.Children.Add(Text(figures.Tier ?? "–", 30, TierBrush(figures.Tier), FontWeights.Bold));
-            column.Children.Add(Text($"avg place {figures.AveragePlacement.ToString("0.00", CultureInfo.InvariantCulture)}", 15, Brushes.White));
+            var line = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            line.Children.Add(Text(figures.Tier ?? "–", 22 * scale, TierBrush(figures.Tier), FontWeights.Bold));
+            var detail = figures.AveragePlacement.ToString("0.00", CultureInfo.InvariantCulture);
             if (figures.PickRate is { } pickRate)
             {
-                column.Children.Add(Text($"picked {(pickRate * 100).ToString("0.0", CultureInfo.InvariantCulture)} %", 13, Brushes.White));
+                detail += $" · {(pickRate * 100).ToString("0", CultureInfo.InvariantCulture)}%";
             }
 
-            var games = figures.DataPoints > 0 ? $" · {figures.DataPoints.ToString("N0", CultureInfo.InvariantCulture)} games" : string.Empty;
-            column.Children.Add(Text(figures.Source + games, 11, Brushes.LightGray));
+            var label = Text($" {detail} {SourceLabel(figures.Source)}", 13 * scale, Brushes.White);
+            label.VerticalAlignment = VerticalAlignment.Center;
+            line.Children.Add(label);
+            lines.Children.Add(line);
         }
 
-        return column;
+        return lines;
     }
+
+    private static string SourceLabel(string source) => source == StatsSources.HsReplayManual ? "HSR" : "FS";
 
     private static TextBlock Text(string text, double size, Brush brush, FontWeight? weight = null) => new()
     {
@@ -91,7 +162,7 @@ internal sealed class HeroPickPanel : Border
         FontSize = size,
         Foreground = brush,
         FontWeight = weight ?? FontWeights.Normal,
-        HorizontalAlignment = HorizontalAlignment.Center,
+        IsHitTestVisible = false,
     };
 
     private static Brush TierBrush(string? tier) => tier switch

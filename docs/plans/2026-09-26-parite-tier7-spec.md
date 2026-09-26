@@ -149,3 +149,9 @@ flowchart TB
 4. Le téléchargement réel depuis le processus HDT : proxy, TLS de .NET Framework 4.8, droits
    d'écriture dans le dossier de cache.
 5. L'absence de conflit d'assemblies dans le processus HDT, Newtonsoft.Json compris.
+
+**Vérifié par Ali le 2026-09-26, sous HDT 1.58.3** : les points 1, 3 et 4 (plugin chargé et activé,
+sélection de héros détectée, stats Firestone réelles téléchargées et affichées) ; le point 5 n'a
+posé aucun problème visible. Le point 2 a révélé un défaut d'alignement (un seul bloc, qui débordait
+sur le bouton OK). Il est corrigé par `HeroPickLayout`, une pastille par héros placée avec la méthode
+d'HDT, et **reste à revérifier**.
