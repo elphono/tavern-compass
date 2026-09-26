@@ -36,6 +36,19 @@ internal static class HdtEntityAdapter
         }
     }
 
+    /// <summary>The entities of the player's pending choice (HDT: Player.OfferedEntities), in the game's order.</summary>
+    public static IReadOnlyList<EntitySnapshot> OfferedEntities(GameV2 game)
+    {
+        try
+        {
+            return game.Player.OfferedEntities.Select(ToSnapshot).ToList();
+        }
+        catch (InvalidOperationException)
+        {
+            return Array.Empty<EntitySnapshot>();
+        }
+    }
+
     /// <summary>Battlegrounds shopping: hero picked, not in combat.</summary>
     public static bool IsShopPhase(GameV2 game) =>
         game.IsBattlegroundsMatch && game.IsBattlegroundsHeroPickingDone && !game.IsBattlegroundsCombatPhase;

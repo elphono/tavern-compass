@@ -91,7 +91,7 @@ reste sous `MaxRating`.
 | Fonctionnalité | Fichiers | Tests |
 |---|---|---|
 | Impact des tribus du lobby (livré) | `LobbyTribes.cs` (règle `buildHeroStats` de Firestone), `tribeImpacts` dans le format local | tribus présentes ou absentes, effectifs trop faibles écartés, lobby complet ou inconnu, héros sans chiffre écarté, saisie manuelle laissée intacte |
-| Stats de trinkets | `FirestoneTrinketStatsImporter.cs`, `TrinketPanel.cs` | conversion, trinkets proposés |
+| Stats de trinkets (livré) | `TrinketStats.cs` (format, import, choix, disposition d'HDT) ; `TrinketPickPanel.cs` | place par tranche et repli, entrées impossibles écartées, fichier malformé, choix de trinkets seulement, choix terminé, 2 à 4 trinkets |
 | Prochain adversaire | `NextOpponent.cs` | identifiant présent, absent, joueur mort |
 | Épinglage en taverne | `TavernPins.cs`, `PinOverlay.cs` | épingle, retire, persiste d'une partie à l'autre |
 

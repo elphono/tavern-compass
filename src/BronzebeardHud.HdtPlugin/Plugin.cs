@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -21,6 +22,8 @@ public sealed class Plugin : IPlugin
     private HeroPickPanel? _panel;
     private TavernAdvicePanel? _tavern;
     private OpponentMmrPanel? _opponentMmr;
+    private TrinketPickPanel? _trinkets;
+    private string _trinketKey = string.Empty;
     private StatsService? _stats;
     private CompService? _comps;
     private bool _inHeroSelection;
@@ -51,6 +54,7 @@ public sealed class Plugin : IPlugin
         _panel = new HeroPickPanel(Core.OverlayCanvas);
         _tavern = new TavernAdvicePanel(Core.OverlayCanvas);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
+        _trinkets = new TrinketPickPanel(Core.OverlayCanvas, StatsDirectory);
     }
 
     public void OnUnload()
@@ -60,6 +64,9 @@ public sealed class Plugin : IPlugin
         _opponentMmr?.Detach();
         _opponentMmr?.Dispose();
         _opponentMmr = null;
+        _trinkets?.Detach();
+        _trinkets?.Dispose();
+        _trinkets = null;
         _panel = null;
         _tavern = null;
         _stats?.Dispose();
@@ -85,6 +92,33 @@ public sealed class Plugin : IPlugin
         UpdateHeroSelection(game);
         UpdateTavern(game);
         UpdateOpponentMmr(game);
+        UpdateTrinketChoice(game);
+    }
+
+    private void UpdateTrinketChoice(GameV2 game)
+    {
+        if (_trinkets == null || _stats == null)
+        {
+            return;
+        }
+
+        var offered = game.IsBattlegroundsMatch
+            ? TrinketChoice.Offered(HdtEntityAdapter.OfferedEntities(game))
+            : new List<EntitySnapshot>();
+        if (offered.Count == 0)
+        {
+            _trinketKey = string.Empty;
+            _trinkets.Hide();
+            return;
+        }
+
+        var loaded = _trinkets.Poll();
+        var key = string.Join(",", offered.Select(e => e.Id)) + "|" + _stats.Bracket;
+        if (key != _trinketKey || loaded)
+        {
+            _trinketKey = key;
+            _trinkets.Show(offered.Select(e => e.CardId!).ToList(), _stats.Bracket);
+        }
     }
 
     private void UpdateOpponentMmr(GameV2 game)

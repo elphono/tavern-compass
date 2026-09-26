@@ -77,6 +77,9 @@ internal sealed class StatsService : IDisposable
         Version++;
     }
 
+    /// <summary>The player's MMR bracket as last resolved (100 = every player until known).</summary>
+    public int Bracket => _firestone?.File?.MmrPercentile ?? MmrBracket.EveryPlayer;
+
     public IReadOnlyList<HeroStatsFile> Sources() =>
         _firestone?.File is { } firestone ? _manual.Concat(new[] { firestone }).ToList() : _manual;
 

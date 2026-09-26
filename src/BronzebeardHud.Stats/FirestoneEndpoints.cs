@@ -32,6 +32,13 @@ public static class FirestoneEndpoints
         return $"{Base}/comp-stats/{timePeriod}/overview-from-hourly.gz.json";
     }
 
+    /// <summary>Trinket stats (libs/battlegrounds/services/src/lib/services/bgs-trinkets.service.ts, BGS_TRINKETS_URL).</summary>
+    public static string TrinketStats(string timePeriod)
+    {
+        Check(100, timePeriod);
+        return $"{Base}/trinket-stats/{timePeriod}/overview-from-hourly.gz.json";
+    }
+
     public static string MmrPercentileTable(string timePeriod)
     {
         Check(100, timePeriod);

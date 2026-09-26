@@ -154,6 +154,22 @@ public sealed class StatsCache
         return new CompositionCacheResult(file, downloaded, error);
     }
 
+    public string TrinketStatsPath(string timePeriod) =>
+        Path.Combine(_directory, $"firestone-trinket-stats-{timePeriod}.json");
+
+    /// <summary>Firestone trinket stats (about 0.2 MB), same daily policy as the hero stats.</summary>
+    public async Task<(TrinketStatsFile? File, bool Downloaded, string? Error)> GetTrinketStatsAsync(
+        string timePeriod, RefreshPolicy policy, CancellationToken cancellationToken) =>
+        await GetAsync(
+            FirestoneEndpoints.TrinketStats(timePeriod),
+            TrinketStatsPath(timePeriod),
+            policy,
+            TrinketStatsLoader.Load,
+            f => f.FetchedAt,
+            TrinketStatsLoader.ImportFirestone,
+            TrinketStatsLoader.Serialize,
+            cancellationToken).ConfigureAwait(false);
+
     private async Task<(T? File, bool Downloaded, string? Error)> GetAsync<T>(
         string url,
         string path,
