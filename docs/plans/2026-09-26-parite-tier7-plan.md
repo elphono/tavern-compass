@@ -93,7 +93,7 @@ reste sous `MaxRating`.
 | Impact des tribus du lobby (livré) | `LobbyTribes.cs` (règle `buildHeroStats` de Firestone), `tribeImpacts` dans le format local | tribus présentes ou absentes, effectifs trop faibles écartés, lobby complet ou inconnu, héros sans chiffre écarté, saisie manuelle laissée intacte |
 | Stats de trinkets (livré) | `TrinketStats.cs` (format, import, choix, disposition d'HDT) ; `TrinketPickPanel.cs` | place par tranche et repli, entrées impossibles écartées, fichier malformé, choix de trinkets seulement, choix terminé, 2 à 4 trinkets |
 | Prochain adversaire (livré) | `NextOpponent.cs`, `LeaderboardLayout.Tile` ; `NextOpponentMarker.cs` | identifiant présent, absent ou nul, joueur mort (fantôme), héros remplacé en cours de partie, tuiles du classement |
-| Épinglage en taverne | `TavernPins.cs`, `PinOverlay.cs` | épingle, retire, persiste d'une partie à l'autre |
+| Épinglage en taverne (livré, **reclassé** : par fichier `stats\manual\pins.txt` ; l'épinglage d'un clic est reporté, car il rendrait l'overlay cliquable au-dessus du jeu) | `TavernPins.cs` ; marqueur ◆ dans `TavernAdvicePanel.cs` | épingle, retire, ré-épingle, persiste d'une partie à l'autre, noms et identifiants, carte inconnue |
 
 ## Phase 4 : historique, graphe des PV, inspiration, quêtes
 

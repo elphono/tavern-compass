@@ -17,6 +17,7 @@ internal sealed class TavernAdvicePanel
 {
     private static readonly Brush KeyBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x00));
     private static readonly Brush AddonBrush = new SolidColorBrush(Color.FromRgb(0x4D, 0xA6, 0xFF));
+    private static readonly Brush PinBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0x4D, 0xFF));
 
     private readonly Canvas _canvas;
     private readonly List<(Border Marker, int Position)> _markers = new();
@@ -24,6 +25,7 @@ internal sealed class TavernAdvicePanel
     private IReadOnlyList<ShopAdvice> _advice = new List<ShopAdvice>();
     private IReadOnlyList<CompProgress> _progress = new List<CompProgress>();
     private string? _status;
+    private TavernPins _pins = TavernPins.Empty;
     private bool _visible;
 
     public TavernAdvicePanel(Canvas canvas)
@@ -42,8 +44,9 @@ internal sealed class TavernAdvicePanel
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
-    public void Show(IReadOnlyList<ShopAdvice> advice, IReadOnlyList<CompProgress> progress, string? status)
+    public void Show(IReadOnlyList<ShopAdvice> advice, IReadOnlyList<CompProgress> progress, string? status, TavernPins pins)
     {
+        _pins = pins;
         _advice = advice;
         _progress = progress;
         _status = status;
@@ -93,17 +96,24 @@ internal sealed class TavernAdvicePanel
         var height = _canvas.ActualHeight;
         var scale = height / 1080;
         var rects = TavernLayout.Markers(width, height, _advice.Count);
-        foreach (var advice in _advice.Where(a => a.Advances.Count > 0))
+        foreach (var advice in _advice.Where(a => a.Advances.Count > 0 || _pins.IsPinned(a.CardId)))
         {
             var rect = rects[advice.Position];
             var isKey = advice.Advances.Any(a => a.IsKeyPiece);
-            var text = string.Join(" · ", advice.Advances.Select(a => (a.IsKeyPiece ? "★ " : "+ ") + a.Composition.Name));
+            var isPinned = _pins.IsPinned(advice.CardId);
+            var parts = advice.Advances.Select(a => (a.IsKeyPiece ? "★ " : "+ ") + a.Composition.Name).ToList();
+            if (isPinned)
+            {
+                parts.Insert(0, "◆ pinned");
+            }
+
+            var text = string.Join(" · ", parts);
             var marker = new Border
             {
                 Width = rect.Width,
                 Height = rect.Height,
                 Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
-                BorderBrush = isKey ? KeyBrush : AddonBrush,
+                BorderBrush = isPinned ? PinBrush : isKey ? KeyBrush : AddonBrush,
                 BorderThickness = new Thickness(2 * scale),
                 CornerRadius = new CornerRadius(4 * scale),
                 IsHitTestVisible = false,

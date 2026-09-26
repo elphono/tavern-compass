@@ -25,6 +25,9 @@ internal sealed class CompService : IDisposable
     private IReadOnlyList<Composition> _manual = Array.Empty<Composition>();
     private readonly List<string> _manualErrors = new();
 
+    /// <summary>Minions to flag in the tavern, from stats\manual\pins.txt.</summary>
+    public TavernPins Pins { get; private set; } = TavernPins.Empty;
+
     public CompService(string statsDirectory)
     {
         _cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
@@ -54,6 +57,20 @@ internal sealed class CompService : IDisposable
         }
 
         _manual = manual;
+        Pins = TavernPins.Empty;
+        var pinsPath = Path.Combine(_manualDirectory, "pins.txt");
+        if (File.Exists(pinsPath))
+        {
+            try
+            {
+                Pins = TavernPins.Parse(File.ReadAllText(pinsPath), HdtEntityAdapter.ResolveCardName);
+            }
+            catch (Exception e) when (e is StatsFormatException or IOException)
+            {
+                _manualErrors.Add($"pins.txt: {e.Message}");
+            }
+        }
+
         if (_refresh == null || _refresh.IsCompleted)
         {
             _refresh = Task.Run(() => _cache.GetCompositionsAsync(TimePeriod, RefreshPolicy.CompStats, CancellationToken.None));

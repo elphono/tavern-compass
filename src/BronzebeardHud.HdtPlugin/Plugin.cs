@@ -254,6 +254,6 @@ public sealed class Plugin : IPlugin
 
         _tavernKey = key;
         var targets = CompAdvisor.Rank(owned, _comps.Compositions());
-        _tavern.Show(CompAdvisor.AdviseShop(tavern, targets, owned), targets, _comps.Status);
+        _tavern.Show(CompAdvisor.AdviseShop(tavern, targets, owned), targets, _comps.Status, _comps.Pins);
     }
 }
