@@ -164,6 +164,7 @@ public static class HeroStatsLoader
             }
 
             var distribution = OptionalDistribution(hero, $"{path}.placementDistribution");
+            var tribeImpacts = OptionalTribeImpacts(hero, $"{path}.tribeImpacts");
 
             heroes.Add(new HeroStat(
                 heroCardId,
@@ -171,7 +172,8 @@ public static class HeroStatsLoader
                 dataPointsToken.Value<int>(),
                 pickRate,
                 tier,
-                distribution));
+                distribution,
+                tribeImpacts));
         }
 
         var mmrToken = obj["mmrPercentile"];
@@ -209,6 +211,13 @@ public static class HeroStatsLoader
             ["placementDistribution"] = h.PlacementDistribution != null
                 ? new JArray(h.PlacementDistribution.Select(p => (object)p).ToArray())
                 : JValue.CreateNull(),
+            ["tribeImpacts"] = new JArray(h.TribeImpacts.Select(i => new JObject
+            {
+                ["tribe"] = i.Tribe,
+                ["impact"] = i.Impact,
+                ["dataPoints"] = i.DataPoints,
+                ["dataPointsOnMissingTribe"] = i.DataPointsOnMissingTribe,
+            })),
         }));
 
         var root = new JObject
@@ -347,6 +356,37 @@ public static class HeroStatsLoader
         }
 
         return values;
+    }
+
+    private static IReadOnlyList<TribeImpact> OptionalTribeImpacts(JObject hero, string path)
+    {
+        var token = hero["tribeImpacts"];
+        if (token == null || token.Type == JTokenType.Null)
+        {
+            return Array.Empty<TribeImpact>();
+        }
+
+        if (token is not JArray array)
+        {
+            throw new StatsFormatException($"{path}: expected an array");
+        }
+
+        var impacts = new List<TribeImpact>();
+        foreach (var item in array)
+        {
+            if (item is not JObject entry
+                || entry.Value<string>("tribe") is not { } tribe || !Tribes.All.Contains(tribe)
+                || entry["impact"]?.Type is not (JTokenType.Float or JTokenType.Integer)
+                || entry["dataPoints"]?.Type != JTokenType.Integer
+                || entry["dataPointsOnMissingTribe"]?.Type != JTokenType.Integer)
+            {
+                throw new StatsFormatException($"{path}: expected {{tribe, impact, dataPoints, dataPointsOnMissingTribe}} entries with a known tribe");
+            }
+
+            impacts.Add(new TribeImpact(tribe, entry.Value<double>("impact"), entry.Value<int>("dataPoints"), entry.Value<int>("dataPointsOnMissingTribe")));
+        }
+
+        return impacts;
     }
 
     private static DateTimeOffset? OptionalDate(JObject obj, string name)

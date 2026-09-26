@@ -16,6 +16,27 @@ public static class StatsSources
     public static readonly IReadOnlyList<string> All = new[] { Firestone, HsReplayManual };
 }
 
+/// <summary>How much having one tribe in the lobby moves a hero's average placement (Firestone tribeStats).</summary>
+public sealed class TribeImpact
+{
+    public TribeImpact(string tribe, double impact, int dataPoints, int dataPointsOnMissingTribe)
+    {
+        Tribe = tribe;
+        Impact = impact;
+        DataPoints = dataPoints;
+        DataPointsOnMissingTribe = dataPointsOnMissingTribe;
+    }
+
+    /// <summary>Race name, e.g. UNDEAD.</summary>
+    public string Tribe { get; }
+
+    /// <summary>Firestone's impactAveragePosition: negative = the tribe helps (lower placement).</summary>
+    public double Impact { get; }
+
+    public int DataPoints { get; }
+    public int DataPointsOnMissingTribe { get; }
+}
+
 /// <summary>Aggregated figures for one base hero, as one source reports them.</summary>
 public sealed class HeroStat
 {
@@ -25,8 +46,10 @@ public sealed class HeroStat
         int dataPoints,
         double? pickRate = null,
         string? tier = null,
-        IReadOnlyList<double>? placementDistribution = null)
+        IReadOnlyList<double>? placementDistribution = null,
+        IReadOnlyList<TribeImpact>? tribeImpacts = null)
     {
+        TribeImpacts = tribeImpacts ?? Array.Empty<TribeImpact>();
         HeroCardId = heroCardId;
         AveragePlacement = averagePlacement;
         DataPoints = dataPoints;
@@ -51,6 +74,9 @@ public sealed class HeroStat
 
     /// <summary>Percentage of games ending at each placement, index 0 = first place.</summary>
     public IReadOnlyList<double>? PlacementDistribution { get; }
+
+    /// <summary>Per-tribe effect on the average placement; empty when the source does not say.</summary>
+    public IReadOnlyList<TribeImpact> TribeImpacts { get; }
 }
 
 /// <summary>Minimum MMR to belong to a percentile bracket (Firestone's mmrPercentiles table).</summary>

@@ -146,11 +146,13 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        var key = string.Join(",", offered.Select(h => $"{h.EntityId}:{h.CardId}")) + "|" + _stats.Version;
+        var tribes = HdtEntityAdapter.LobbyTribeNames();
+        var key = string.Join(",", offered.Select(h => $"{h.EntityId}:{h.CardId}")) + "|" + _stats.Version + "|" + string.Join(",", tribes);
         if (key != _shownKey)
         {
             _shownKey = key;
-            _panel.Show(HeroPickAdvisor.BuildRows(offered, _stats.Sources()), _stats.Status);
+            var sources = _stats.Sources().Select(file => LobbyTribes.Apply(file, tribes)).ToList();
+            _panel.Show(HeroPickAdvisor.BuildRows(offered, sources), _stats.Status);
         }
     }
 

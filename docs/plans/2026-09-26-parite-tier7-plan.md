@@ -90,7 +90,7 @@ reste sous `MaxRating`.
 
 | Fonctionnalité | Fichiers | Tests |
 |---|---|---|
-| Impact des tribus du lobby | `TribeImpact.cs` (règle `buildHeroStats` de Firestone) | tribus absentes, présentes, filtrage des effectifs trop faibles |
+| Impact des tribus du lobby (livré) | `LobbyTribes.cs` (règle `buildHeroStats` de Firestone), `tribeImpacts` dans le format local | tribus présentes ou absentes, effectifs trop faibles écartés, lobby complet ou inconnu, héros sans chiffre écarté, saisie manuelle laissée intacte |
 | Stats de trinkets | `FirestoneTrinketStatsImporter.cs`, `TrinketPanel.cs` | conversion, trinkets proposés |
 | Prochain adversaire | `NextOpponent.cs` | identifiant présent, absent, joueur mort |
 | Épinglage en taverne | `TavernPins.cs`, `PinOverlay.cs` | épingle, retire, persiste d'une partie à l'autre |

@@ -65,6 +65,7 @@ public static class FirestoneHeroStatsImporter
                     : JValue.CreateNull(),
                 ["tier"] = JValue.CreateNull(),
                 ["placementDistribution"] = Distribution(token["placementDistribution"]),
+                ["tribeImpacts"] = TribeImpacts(token["tribeStats"]),
             };
 
             if (!byHero.TryGetValue(heroCardId, out var existing)
@@ -89,6 +90,42 @@ public static class FirestoneHeroStatsImporter
         };
 
         return HeroStatsLoader.Parse(localRoot.ToString(Formatting.None));
+    }
+
+    // Race ids of python-hearthstone's enums.Race, as Firestone writes them in tribeStats.
+    private static readonly Dictionary<int, string> TribeByRace = new()
+    {
+        [11] = "UNDEAD", [14] = "MURLOC", [15] = "DEMON", [17] = "MECHANICAL", [18] = "ELEMENTAL", [20] = "BEAST",
+        [23] = "PIRATE", [24] = "DRAGON", [43] = "QUILBOAR", [92] = "NAGA", [126] = "ABERRATION",
+    };
+
+    /// <summary>Firestone's tribeStats, reduced to what the lobby-tribe adjustment reads; unknown races are dropped.</summary>
+    private static JArray TribeImpacts(JToken? token)
+    {
+        var impacts = new JArray();
+        if (token is not JArray array)
+        {
+            return impacts;
+        }
+
+        foreach (var item in array.OfType<JObject>())
+        {
+            if (item["tribe"]?.Type == JTokenType.Integer && TribeByRace.TryGetValue(item.Value<int>("tribe"), out var tribe)
+                && item["impactAveragePosition"]?.Type is JTokenType.Float or JTokenType.Integer
+                && item["dataPoints"]?.Type == JTokenType.Integer
+                && item["dataPointsOnMissingTribe"]?.Type == JTokenType.Integer)
+            {
+                impacts.Add(new JObject
+                {
+                    ["tribe"] = tribe,
+                    ["impact"] = item.Value<double>("impactAveragePosition"),
+                    ["dataPoints"] = item.Value<int>("dataPoints"),
+                    ["dataPointsOnMissingTribe"] = item.Value<int>("dataPointsOnMissingTribe"),
+                });
+            }
+        }
+
+        return impacts;
     }
 
     /// <summary>Firestone gives [{rank, percentage, totalMatches}]; keep the 8 percentages in rank order.</summary>

@@ -128,6 +128,15 @@ internal static class HdtEntityAdapter
         }
     }
 
+    /// <summary>Tribes in this lobby as HDT knows them (BattlegroundsUtils.GetAvailableRaces); empty when unknown.</summary>
+    public static IReadOnlyList<string> LobbyTribeNames()
+    {
+        var races = BattlegroundsUtils.GetAvailableRaces();
+        return races == null
+            ? Array.Empty<string>()
+            : races.Select(r => r.ToString()).Where(Tribes.All.Contains).OrderBy(r => r, StringComparer.Ordinal).ToList();
+    }
+
     private static Dictionary<string, string>? _cardIdsByName;
 
     /// <summary>Card name (English or French, any case) → card id, Battlegrounds pool minions first.</summary>
