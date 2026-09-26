@@ -2,7 +2,7 @@
 
 # Plan : plugin HDT pour la parité Firestone / HSReplay-Tier7
 
-Suite de la spec `2026-09-26-parite-tier7-spec.md`. Cinq phases, dans l'ordre de la valeur
+Suite de la spec `2026-09-26-parite-tier7-spec.md`. Six phases, dans l'ordre de la valeur
 apportée ; chacune se termine par des tests verts sous WSL et une liste de contrôles à faire sous
 Windows.
 
@@ -13,7 +13,10 @@ flowchart LR
     P3 --> P4["Phase 4<br/>historique, graphe des PV, inspiration, quêtes"]
     P4 --> P5["Phase 5<br/>top 4 des héros, plateau vs courbe,<br/>compos par héros, bilan par adversaire"]
     classDef done fill:#ffffff,stroke:#2b8a3e,stroke-width:4px,color:#000000
+    P5 --> P6["Phase 6 (Ali : « rajoute tout »)<br/>compos × ton héros, épinglage au clic, transitions,<br/>plateaux des tops par sbire, Timewarped, Meta Snapshot"]
+    classDef todo fill:#ffffff,stroke:#d9480f,stroke-width:4px,color:#000000
     class P1,P2,P3,P4,P5 done
+    class P6 todo
 ```
 
 ## Structure du code
@@ -139,6 +142,19 @@ adversaire est un confort.
 | 5.2 Plateau contre la courbe du héros (livré ; tour Firestone = ceil(TURN/2), `rtstats-turn-start-parser.ts:14-16`) | import de `warbandStats`, schéma des stats de héros porté à 2 ; `WarbandCurve.cs` ; ligne dans le panneau des compos | `warband-curve` | tours 1 à 3 successifs, tour hors courbe, héros sans données, ancien cache retéléchargé |
 | 5.3 Meilleures compos d'un héros (livré ; échantillons de 17 parties en médiane : estimation tirée vers la moyenne de la compo, 30 parties a priori, 10 au moins, nombre de parties affiché) | `heroAffinity` dans le format des compos, schéma 3 ; ligne sous chaque héros proposé | `hero-comps` | seuil d'effectifs, ordre, héros absent, ancien cache retéléchargé |
 | 5.4 Bilan par adversaire (livré ; combats contre un fantôme écartés, leur résultat ne se lit pas aux PV) | `Standings` (`GameTimeline.cs`) ; colonne du panneau Combats | `history` (même panneau) | trois combats contre deux adversaires, égalité, fantôme |
+
+## Phase 6 : le reste de la parité, à la demande d'Ali
+
+Décision d'Ali du 2026-09-26 : « rajoute tout ». Une tranche par commit, livrée et redéployée avant la
+suivante, dans cet ordre.
+
+| Tranche | Contenu | Données | Garde | Tests |
+|---|---|---|---|---|
+| 6.1 Compos × ton héros | en boutique, chaque compo du panneau montre sa place estimée avec le héros joué, « ≈ 3,5 with your hero (23) », et le classement des compos en tient compte | `heroStats` des comp-stats, même prudence que 5.3 (30 parties a priori, 10 au moins) | `hero-affinity` | trois héros qui changent l'ordre de trois compos, petit échantillon sans effet, mutation sur le poids |
+| 6.2 Épinglage au clic | cliquer une carte de Bob l'épingle pour la partie, en plus de `pins.txt` | rangée `TavernRow`, clic comme les cases (`IsOverlayHitTestVisible`) | `tavern-pins` | épingler, désépingler sur trois tours, nouvelle partie, fusion avec `pins.txt` |
+| 6.3 Transitions entre compos | vers quelles compos pivoter depuis une compo visée, et par quelles cartes communes ; affiché comme heuristique | cartes clés et compléments partagés, plateaux finaux | `comp-transitions` | recouvrements fort, faible, nul ; mutation sur le seuil |
+| 6.4 Plateaux des tops par sbire | sur une vignette ou une carte de Bob : compos et plateaux finaux réels qui le contiennent, position habituelle | `finalBoards`, 3 à 5 plateaux par compo, cache en dizaines de Ko | `minion-boards` | deux compos aux positions distinctes, sbire absent, classement des plateaux |
+| 6.5 Timewarped, Meta Snapshot | Timewarped seulement s'il est actif cette saison (sinon sauté, preuve à l'appui) ; bouton qui ouvre la page méta BG dans le navigateur | log d'Ali, notes de patch | `meta-snapshot` | URL, absence de Timewarped prouvée |
 
 ## Ce qui reste un arbitrage d'Ali
 
