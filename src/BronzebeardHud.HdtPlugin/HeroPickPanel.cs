@@ -134,8 +134,9 @@ internal sealed class HeroPickPanel
             return lines;
         }
 
-        // One compact line per source: the plate is too small for more than two.
-        foreach (var figures in row.Figures.Take(2))
+        // One compact line per source (two at most, the plate is small), and under the first source its
+        // top-4 and first-place shares: MMR is won in the top 4.
+        foreach (var (figures, index) in row.Figures.Take(2).Select((f, i) => (f, i)))
         {
             var line = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
             line.Children.Add(Text(figures.Tier ?? "–", 22 * scale, TierBrush(figures.Tier), FontWeights.Bold));
@@ -150,6 +151,12 @@ internal sealed class HeroPickPanel
             label.VerticalAlignment = VerticalAlignment.Center;
             line.Children.Add(label);
             lines.Children.Add(line);
+            if (index == 0 && figures.OddsText is { } odds)
+            {
+                var oddsLine = Text(odds, 13 * scale, Brushes.LightGray);
+                oddsLine.HorizontalAlignment = HorizontalAlignment.Center;
+                lines.Children.Add(oddsLine);
+            }
         }
 
         return lines;
