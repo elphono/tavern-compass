@@ -2,7 +2,7 @@
 
 # Plan : plugin HDT pour la parité Firestone / HSReplay-Tier7
 
-Suite de la spec `2026-09-26-parite-tier7-spec.md`. Quatre phases, dans l'ordre de la valeur
+Suite de la spec `2026-09-26-parite-tier7-spec.md`. Cinq phases, dans l'ordre de la valeur
 apportée ; chacune se termine par des tests verts sous WSL et une liste de contrôles à faire sous
 Windows.
 
@@ -11,8 +11,11 @@ flowchart LR
     P1["Phase 1<br/>squelette + stats des héros proposés"] --> P2["Phase 2<br/>tranche de MMR, MMR adverse, compos"]
     P2 --> P3["Phase 3<br/>tribus, trinkets, épinglage"]
     P3 --> P4["Phase 4<br/>historique, graphe des PV, inspiration, quêtes"]
+    P4 --> P5["Phase 5<br/>top 4 des héros, plateau vs courbe,<br/>compos par héros, bilan par adversaire"]
     classDef done fill:#ffffff,stroke:#2b8a3e,stroke-width:4px,color:#000000
+    classDef todo fill:#ffffff,stroke:#d9480f,stroke-width:4px,color:#000000
     class P1,P2,P3,P4 done
+    class P5 todo
 ```
 
 ## Structure du code
@@ -106,6 +109,36 @@ reste sous `MaxRating`.
 **Sous Windows** : tout le rendu.
 
 **Règle, arrêtée le 2026-09-26** : le plugin ne duplique rien de ce que le jeu ou HDT affichent déjà.
+
+## Phase 5 : écarts restants, classés pour ≈ 6 800 de MMR
+
+Inventaire vérifié dans le code d'HDT (HearthSim/Hearthstone-Deck-Tracker, master 509bb0b) :
+
+| Fonction de Firestone ou HSReplay | Déjà affichée ? | Décision |
+|---|---|---|
+| Compteurs (gemmes de sang, or du tour suivant…) | HDT : 17 compteurs, `Hearthstone/CounterSystem/BgCounters/` | exclu |
+| Navigateur de sbires, tier 7, Dark Paradox | HDT : `BattlegroundsMinionsViewModel.cs:143-190` (tier 7), `:202-225` (Dark Paradox) | exclu |
+| Widget de session (MMR, dernières parties) | HDT : `BattlegroundsSessionViewModel.xaml.cs:36-110` | exclu |
+| Survol d'un adversaire : dernier plateau et son âge, divinité, triples et montées par tier | HDT : `BattlegroundsOpponentInfo.xaml.cs:31-42, 59-108` | exclu |
+| Probabilité du prochain combat | HDT : Bob's Buddy (`BobsBuddyInvoker`, présent dans le journal d'Ali) | exclu, tout comme le `combatWinrate` de Firestone qui le recoupe |
+| Prochain adversaire, sbires dorés | le jeu | exclu |
+| Boutique Timewarp | HDT, pour Tier7 seulement (`OverlayWindow.xaml.cs:1719-1730`) ; aucune dans le log d'Ali du 2026-09-26 | reporté tant qu'elle n'apparaît pas |
+| Top 4 et 1re place par héros | non (Tier7, payant) | **5.1** |
+| Force du plateau contre la courbe du héros (`warbandStats` : somme ATK + PV du plateau au combat, par tour) | non | **5.2** |
+| Meilleures compos d'un héros (`heroStats` des compos : place moyenne par héros) | non | **5.3** |
+| Bilan contre chaque adversaire (victoires, défaites) | non dans HDT (le survol n'en montre pas) ; **non vérifié** dans l'interface du jeu | **5.4** |
+
+Classement par valeur à ≈ 6 800 (jugement, pas mesure) : le MMR se gagne dans le top 4, donc la
+probabilité de top 4 au choix du héros passe en tête ; le plateau comparé à la courbe du héros dit
+s'il faut monter ou pousser des stats ; les compos d'un héros orientent dès le tour 1 ; le bilan par
+adversaire est un confort.
+
+| Tranche | Fichiers | Garde | Tests |
+|---|---|---|---|
+| 5.1 Top 4 et 1re place au choix du héros | `HeroPickAdvisor.cs` (depuis `placementDistribution`, déjà en cache) ; `HeroPickPanel.cs` | `hero-selection` (même panneau) | distribution complète, partielle ou absente, arrondis, 4 héros distincts |
+| 5.2 Plateau contre la courbe du héros | import de `warbandStats`, schéma des stats de héros porté à 2 ; `WarbandCurve.cs` ; ligne dans le panneau des compos | `warband-curve` | tours 1 à 3 successifs, tour hors courbe, héros sans données, ancien cache retéléchargé |
+| 5.3 Meilleures compos d'un héros | `heroAffinity` dans le format des compos, schéma 3 ; ligne sous chaque héros proposé | `hero-comps` | seuil d'effectifs, ordre, héros absent, ancien cache retéléchargé |
+| 5.4 Bilan par adversaire | `Standings` (`GameTimeline.cs`) ; colonne du panneau Combats | `history` (même panneau) | trois combats contre deux adversaires, égalité, fantôme |
 
 ## Ce qui reste un arbitrage d'Ali
 
