@@ -18,6 +18,38 @@ logic; the overlay app was rebuilt from scratch. The Rust repo remains the
 reference for parsing behaviour and, in particular, for
 `docs/reference/power-log-format.md` — read that before touching the lexer.
 
+## Plugin Hearthstone Deck Tracker (depuis le 2026-09-26)
+
+La parité avec Firestone et HSReplay-Tier7 passe désormais par un **plugin HDT** : HDT fournit
+déjà l'overlay Battlegrounds gratuit de HSReplay (Bob's Buddy compris), et le plugin ajoute le reste.
+Spec et plan : `docs/plans/2026-09-26-parite-tier7-{spec,plan}.md`. L'app Avalonia ci-dessous reste
+en place, mais ce n'est plus la cible. Le plugin **ne lit jamais la mémoire du jeu** : il n'utilise
+que ce qu'HDT expose, et HDT, lui, la lit.
+
+| Projet | Cible | Rôle |
+|---|---|---|
+| `src/BronzebeardHud.Stats` | `netstandard2.0` | logique métier : format local des stats, import Firestone, cache, tiers, héros proposés ; aucune dépendance à HDT ni à WPF |
+| `src/BronzebeardHud.HdtPlugin` | `net48` | `IPlugin` et UI WPF écrite en C#, sans XAML (le XAML WPF ne compile pas sous Linux) ; **hors de la solution** |
+| `tests/BronzebeardHud.Stats.Tests` | `net8.0` | xUnit, sur la bibliothèque |
+
+```bash
+dotnet test                                  # la solution : tout sauf le plugin, sans réseau
+dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (zip de 20 Mo) dans lib/hdt/<version>/
+```
+
+- `lib/` est ignoré par git. La version d'HDT contre laquelle on compile est `HdtVersion`, dans le
+  `.csproj` du plugin ; la cible `FetchHdtAssemblies` télécharge la release GitHub correspondante.
+- Déploiement (Windows) : copier `BronzebeardHud.HdtPlugin.dll` et `BronzebeardHud.Stats.dll` dans
+  `%AppData%\HearthstoneDeckTracker\Plugins\BronzebeardHud\`, **sans** `Newtonsoft.Json.dll` : HDT
+  charge la sienne, dans la même version (13.0.3).
+- Données : `%LocalAppData%\BronzebeardHud\stats\`, qui contient le cache Firestone (rafraîchi au
+  plus une fois par 24 h) ; les saisies manuelles HSReplay vont dans son sous-dossier `manual\`, au
+  format décrit par la spec.
+- Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
+  événements réels ne se vérifient que sous Windows, avec HDT installé.
+- Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests
+  utilisent des données synthétiques.
+
 ## Tech Stack
 
 .NET 8, Avalonia 11 (Fluent theme, compiled bindings), xUnit. Everything

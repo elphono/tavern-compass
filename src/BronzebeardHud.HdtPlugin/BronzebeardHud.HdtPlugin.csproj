@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Hearthstone Deck Tracker plugin: HDT adaptation and WPF UI only, written in C# without
+       XAML so that it builds under WSL. Business logic lives in BronzebeardHud.Stats.
+       Not part of BronzebeardHud.sln: building it needs the HDT assemblies, which the
+       FetchHdtAssemblies target downloads on first build into lib/hdt/ (ignored by git). -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <HdtVersion>1.55.6</HdtVersion>
+    <HdtRoot>$(MSBuildThisFileDirectory)..\..\lib\hdt\$(HdtVersion)\</HdtRoot>
+    <HdtZip>Hearthstone.Deck.Tracker-v$(HdtVersion).zip</HdtZip>
+    <HdtZipUrl>https://github.com/HearthSim/Hearthstone-Deck-Tracker/releases/download/v$(HdtVersion)/$(HdtZip)</HdtZipUrl>
+    <HdtDir>$(HdtRoot)Hearthstone Deck Tracker\</HdtDir>
+    <!-- The portable zip names the executable with spaces; its assembly name is HearthstoneDeckTracker. -->
+    <HdtExe>$(HdtDir)Hearthstone Deck Tracker.exe</HdtExe>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Build-only: .NET Framework reference assemblies, so net48 compiles without Windows. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Net.Http" />
+    <!-- Provided by HDT at runtime: never copied next to the plugin. -->
+    <Reference Include="HearthstoneDeckTracker">
+      <HintPath>$(HdtExe)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="HearthDb">
+      <HintPath>$(HdtDir)HearthDb.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BronzebeardHud.Stats\BronzebeardHud.Stats.csproj" />
+  </ItemGroup>
+
+  <Target Name="FetchHdtAssemblies" BeforeTargets="ResolveAssemblyReferences"
+          Condition="!Exists('$(HdtExe)')">
+    <Message Importance="high" Text="Downloading HDT $(HdtVersion) assemblies from $(HdtZipUrl)" />
+    <DownloadFile SourceUrl="$(HdtZipUrl)" DestinationFolder="$(HdtRoot)" />
+    <Unzip SourceFiles="$(HdtRoot)$(HdtZip)" DestinationFolder="$(HdtRoot)" />
+    <Delete Files="$(HdtRoot)$(HdtZip)" />
+    <Error Condition="!Exists('$(HdtExe)')"
+           Text="$(HdtExe) not found after unpacking $(HdtZip)" />
+  </Target>
+
+</Project>
