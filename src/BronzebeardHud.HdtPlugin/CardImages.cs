@@ -1,10 +1,12 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Hearthstone_Deck_Tracker.Hearthstone;
 using Hearthstone_Deck_Tracker.Utility.Assets;
+using Hearthstone_Deck_Tracker.Utility.Extensions;
 using HdtCard = Hearthstone_Deck_Tracker.Hearthstone.Card;
 
 namespace BronzebeardHud.HdtPlugin;
@@ -19,7 +21,7 @@ internal static class CardImages
 {
     private static readonly Brush TickBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0xCC, 0x40));
 
-    public static FrameworkElement Vignette(string cardId, bool owned, double size, double scale)
+    public static FrameworkElement Vignette(string cardId, bool owned, double size, double scale, double previewHeight, bool previewOnLeft)
     {
         var image = new Image { Width = size, Height = size, Stretch = Stretch.UniformToFill };
         var frame = new Border
@@ -32,8 +34,18 @@ internal static class CardImages
             BorderBrush = owned ? TickBrush : Brushes.DimGray,
             ClipToBounds = true,
             Child = image,
-            ToolTip = Database.GetCardFromId(cardId)?.LocalizedName ?? cardId,
         };
+
+        // Hover shows the whole card, through HDT's own overlay tooltips: the overlay lets clicks through,
+        // so WPF never sees the mouse, but HDT polls the cursor at 60 Hz over elements declared hoverable
+        // (Windows/OverlayWindow.MouseOverDetection.cs:419-430, 493-494) and raises MouseEnter/MouseLeave on
+        // them, which its ToolTip attached property turns into a tooltip drawn in the overlay, flipped and
+        // kept inside the window (Utility/Extensions/OverlayExtensions.Tooltip.cs:34-47, 90-118;
+        // Windows/OverlayWindow.Tooltips.cs:34-175). Hover-only: the game keeps every click.
+        OverlayExtensions.SetIsOverlayHoverVisible(frame, true);
+        OverlayExtensions.SetToolTip(frame, FullCard(cardId, previewHeight));
+        ToolTipService.SetInitialShowDelay(frame, 0);
+        ToolTipService.SetPlacement(frame, previewOnLeft ? PlacementMode.Left : PlacementMode.Right);
         var grid = new Grid { Children = { frame } };
         if (owned)
         {
@@ -55,6 +67,26 @@ internal static class CardImages
 
         Load(AssetDownloaders.cardPortraitDownloader, cardId, image, grey: !owned);
         return grid;
+    }
+
+    /// <summary>
+    /// The whole card as HDT's card tooltip shows it: its Battlegrounds render, 256 or 512 px wide
+    /// (AssetDownloaders.cardImageDownloader, Utility/Assets/AssetDownloaders.cs:20, 59-65), fetched the
+    /// first time the preview is shown.
+    /// </summary>
+    public static FrameworkElement FullCard(string cardId, double height)
+    {
+        var image = new Image { Height = height, Width = height * 256 / 388, Stretch = Stretch.Uniform, IsHitTestVisible = false };
+        var loaded = false;
+        image.Loaded += (_, _) =>
+        {
+            if (!loaded)
+            {
+                loaded = true;
+                Load(AssetDownloaders.cardImageDownloader, cardId, image, grey: false);
+            }
+        };
+        return image;
     }
 
     public static Image Hero(string heroCardId, double size)

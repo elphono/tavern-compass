@@ -25,8 +25,10 @@ public sealed class CompositionVignette
 /// <summary>One line of the target composition panel.</summary>
 public sealed class CompositionRow
 {
-    public CompositionRow(Composition composition, double score, bool isTarget, int keyOwned, IReadOnlyList<CompositionVignette> vignettes, bool orderKnown)
+    public CompositionRow(Composition composition, double score, bool isTarget, int keyOwned, IReadOnlyList<CompositionVignette> vignettes, bool orderKnown,
+        bool isChecked = false)
     {
+        IsChecked = isChecked;
         Composition = composition;
         Score = score;
         IsTarget = isTarget;
@@ -37,6 +39,9 @@ public sealed class CompositionRow
 
     public Composition Composition { get; }
     public double Score { get; }
+
+    /// <summary>Ticked by the player (<see cref="CompositionSelection"/>): shown first, whatever its rank.</summary>
+    public bool IsChecked { get; }
 
     /// <summary>False for a suggestion (best placement in the lobby) shown before anything is targeted.</summary>
     public bool IsTarget { get; }
@@ -64,26 +69,41 @@ public static class CompositionRows
     /// (board or hand, golden copies count), copies matched left to right: holding one copy of a card the
     /// board has twice marks only the first. Without a reference board, key pieces then add-ons, order unknown.
     /// </summary>
+    /// <remarks>
+    /// Ticked compositions (<paramref name="chosen"/>) come first, in the order they were ticked, even out of
+    /// the ranking; then the rest as above, keeping at least one line that can still be ticked.
+    /// </remarks>
     public static IReadOnlyList<CompositionRow> Build(
-        IReadOnlyList<CompProgress> targets, IReadOnlyList<Composition> playable, IEnumerable<OwnedCard> owned, int maxRows = MaxRows)
+        IReadOnlyList<CompProgress> targets, IReadOnlyList<Composition> playable, IEnumerable<OwnedCard> owned, int maxRows = MaxRows,
+        IReadOnlyList<string>? chosen = null)
     {
-        var ownedCounts = owned
+        var cards = owned.ToList();
+        var ownedCounts = cards
             .GroupBy(c => c.CardId, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
-        var rows = targets.Take(maxRows)
-            .Select(t => Row(t.Composition, t.Score, isTarget: true, ownedCounts))
+        var ticked = (chosen ?? Array.Empty<string>())
+            .Select(id => playable.FirstOrDefault(c => c.Id == id))
+            .Where(c => c != null)
+            .Select(c => Row(c!, CompAdvisor.Progress(cards, c!).Score, isTarget: true, ownedCounts, isChecked: true))
             .ToList();
+        var limit = ticked.Count == 0 ? maxRows : Math.Max(maxRows, ticked.Count + 1);
+        var rows = new List<CompositionRow>(ticked);
         var shown = new HashSet<string>(rows.Select(r => r.Composition.Id), StringComparer.Ordinal);
+        rows.AddRange(targets
+            .Where(t => !shown.Contains(t.Composition.Id))
+            .Take(limit - rows.Count)
+            .Select(t => Row(t.Composition, t.Score, isTarget: true, ownedCounts)));
+        shown.UnionWith(rows.Select(r => r.Composition.Id));
         rows.AddRange(playable
             .Where(c => !shown.Contains(c.Id))
             .OrderBy(c => c.AveragePlacement ?? double.MaxValue)
             .ThenBy(c => c.Id, StringComparer.Ordinal)
-            .Take(maxRows - rows.Count)
+            .Take(Math.Max(0, limit - rows.Count))
             .Select(c => Row(c, 0, isTarget: false, ownedCounts)));
         return rows;
     }
 
-    private static CompositionRow Row(Composition composition, double score, bool isTarget, IReadOnlyDictionary<string, int> ownedCounts)
+    private static CompositionRow Row(Composition composition, double score, bool isTarget, IReadOnlyDictionary<string, int> ownedCounts, bool isChecked = false)
     {
         var orderKnown = composition.ReferenceBoard is { Count: > 0 };
         var cards = orderKnown
@@ -101,7 +121,7 @@ public static class CompositionRows
             return new CompositionVignette(index + 1, cardId, owned);
         }).ToList();
         var keyOwned = composition.CoreCards.Count(ownedCounts.ContainsKey);
-        return new CompositionRow(composition, score, isTarget, keyOwned, vignettes, orderKnown);
+        return new CompositionRow(composition, score, isTarget, keyOwned, vignettes, orderKnown, isChecked);
     }
 }
 
@@ -131,6 +151,15 @@ public sealed class CompositionPanelState
     public IReadOnlyList<CompositionRow> Rows { get; private set; } = Array.Empty<CompositionRow>();
     public bool PanelVisible { get; private set; }
     public bool MarkersVisible { get; private set; }
+
+    /// <summary>New rows while the panel is up, whatever the phase: a composition ticked during combat.</summary>
+    public void Replace(IReadOnlyList<CompositionRow> rows)
+    {
+        if (PanelVisible)
+        {
+            Rows = rows;
+        }
+    }
 
     /// <param name="computeRows">Called only in the shop, where the cards are known.</param>
     public void Update(OverlayPhase phase, Func<IReadOnlyList<CompositionRow>> computeRows)

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -5,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using BronzebeardHud.Stats;
+using Hearthstone_Deck_Tracker.Utility.Extensions;
 
 namespace BronzebeardHud.HdtPlugin;
 
@@ -16,9 +18,8 @@ namespace BronzebeardHud.HdtPlugin;
 /// </summary>
 internal sealed class TavernAdvicePanel
 {
-    private static readonly Brush KeyBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x00));
-    private static readonly Brush AddonBrush = new SolidColorBrush(Color.FromRgb(0x1E, 0x90, 0xFF));
-    private static readonly Brush PinBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0x4D, 0xFF));
+    private readonly CompositionSelection _selection;
+    private readonly Action<string> _toggle;
 
     private readonly Canvas _canvas;
     private readonly PanelMover _mover;
@@ -32,17 +33,19 @@ internal sealed class TavernAdvicePanel
     private bool _panelVisible;
     private IReadOnlyList<CompositionRow> _rows = new List<CompositionRow>();
 
-    public TavernAdvicePanel(Canvas canvas, PanelMover mover)
+    /// <param name="toggle">Called with a composition id when its box is clicked.</param>
+    public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle)
     {
         _canvas = canvas;
         _mover = mover;
+        _selection = selection;
+        _toggle = toggle;
         _targets = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F)),
             BorderThickness = new Thickness(2),
             CornerRadius = new CornerRadius(6),
-            IsHitTestVisible = false,
             Visibility = Visibility.Collapsed,
         };
         _canvas.Children.Add(_targets);
@@ -143,8 +146,10 @@ internal sealed class TavernAdvicePanel
 
         foreach (var (card, lines) in marked)
         {
-            var colour = _pins.IsPinned(card.CardId) ? PinBrush : card.Advances.Any(a => a.IsKeyPiece) ? KeyBrush : AddonBrush;
-            var textColour = colour == KeyBrush ? Brushes.Black : Brushes.White;
+            // One colour per ticked composition, white when nothing is ticked (CompositionSelection); every
+            // colour of the palette is light, so the text is black. Pins, typed by hand, are white too.
+            var colour = Brush(_selection.MarkerColour(card.Advances.Select(a => a.Composition.Id)));
+            var textColour = Brushes.Black;
 
             // A thick frame around the card itself, so the marked card stands out at a glance.
             var slot = slots[card.Position];
@@ -198,9 +203,18 @@ internal sealed class TavernAdvicePanel
         }
     }
 
+    public static SolidColorBrush Brush(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
+
+    /// <summary>When false, the panel draws no boxes (the selection feature was switched off by its guard).</summary>
+    public bool SelectionEnabled { get; set; } = true;
+
     /// <summary>
-    /// One line per composition: name, average placement, key pieces n/m, then the final board as card
-    /// vignettes left to right: held cards in colour with a tick, missing ones greyed out.
+    /// One line per composition: a box to tick it (clickable while the overlay stays locked: HDT makes its
+    /// window catch the mouse only while the cursor is over an element declared with IsOverlayHitTestVisible,
+    /// Windows/OverlayWindow.MouseOverDetection.cs:489-491, registered at OverlayWindow.xaml.cs:194-200), its
+    /// name in its colour once ticked, average placement, key pieces n/m, then the final board as card
+    /// vignettes left to right: held cards in colour with a tick, missing ones greyed out, the whole card
+    /// shown on hover.
     /// </summary>
     private void RelayoutPanel()
     {
@@ -215,29 +229,52 @@ internal sealed class TavernAdvicePanel
         var scale = TavernLayout.Scale(height);
         var panel = TavernLayout.TargetPanel(width, height);
         var vignette = TavernLayout.VignetteSize * height;
+        var previewOnLeft = TavernLayout.PreviewOnLeft(Canvas.GetLeft(_targets) is var left && !double.IsNaN(left) ? left + panel.Width / 2 : panel.CenterX, width);
         var lines = new StackPanel { Margin = new Thickness(6 * scale) };
         lines.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray });
         foreach (var row in _rows)
         {
+            var colour = _selection.ColourOf(row.Composition.Id) is { } hex ? Brush(hex) : null;
             var header = $"{row.Composition.Name} · {row.PlacementText} · {row.KeyOwned}/{row.KeyTotal} key"
-                         + (row.IsTarget ? string.Empty : " · suggestion")
+                         + (row.IsChecked || row.IsTarget ? string.Empty : " · suggestion")
                          + (row.OrderKnown ? string.Empty : " · order unknown");
-            lines.Children.Add(new TextBlock
+            var headerLine = new DockPanel { Margin = new Thickness(0, 4 * scale, 0, 2 * scale) };
+            if (SelectionEnabled)
+            {
+                var id = row.Composition.Id;
+                var box = new CheckBox
+                {
+                    IsChecked = row.IsChecked,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 4 * scale, 0),
+                    LayoutTransform = new ScaleTransform(scale, scale),
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                };
+                box.Click += (_, _) => _toggle(id);
+                OverlayExtensions.SetIsOverlayHitTestVisible(box, true);
+                headerLine.Children.Add(box);
+            }
+
+            headerLine.Children.Add(new TextBlock
             {
                 Text = header,
                 FontSize = 13 * scale,
-                FontWeight = row.IsTarget ? FontWeights.Bold : FontWeights.Normal,
-                Foreground = row.IsTarget ? Brushes.White : Brushes.LightGray,
+                FontWeight = row.IsChecked || row.IsTarget ? FontWeights.Bold : FontWeights.Normal,
+                Foreground = colour ?? (row.IsTarget ? Brushes.White : Brushes.LightGray),
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 4 * scale, 0, 2 * scale),
+                VerticalAlignment = VerticalAlignment.Center,
             });
+            lines.Children.Add(headerLine);
             var board = new StackPanel { Orientation = Orientation.Horizontal };
             foreach (var card in row.Vignettes)
             {
-                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale));
+                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale, TavernLayout.PreviewHeight * height, previewOnLeft));
             }
 
-            lines.Children.Add(board);
+            // A ticked composition's colour also runs down the left of its board.
+            lines.Children.Add(colour == null
+                ? board
+                : new Border { BorderBrush = colour, BorderThickness = new Thickness(4 * scale, 0, 0, 0), Padding = new Thickness(4 * scale, 0, 0, 0), Child = board });
         }
 
         if (!string.IsNullOrEmpty(_status))
@@ -248,7 +285,7 @@ internal sealed class TavernAdvicePanel
         _targets.Child = lines;
         _targets.Width = panel.Width;
         _targets.MinHeight = panel.Height;
-        _mover.Place(_targets, "target-compositions", panel);
+        _mover.Place(_targets, "target-compositions", panel, interactive: true);
         _targets.Visibility = Visibility.Visible;
     }
 }

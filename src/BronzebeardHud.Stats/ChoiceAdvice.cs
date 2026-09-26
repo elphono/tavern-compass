@@ -276,11 +276,12 @@ public static class ChoiceAdvisor
         IReadOnlyList<Composition> compositions,
         IReadOnlyCollection<string> lobbyTribes,
         Func<string, TrinketStat?>? trinketStat = null,
-        int bracket = MmrBracket.EveryPlayer)
+        int bracket = MmrBracket.EveryPlayer,
+        IReadOnlyList<string>? chosen = null)
     {
         var kind = ChoiceClassifier.Kind(options);
         var playable = TavernAdvisor.Playable(compositions, lobbyTribes);
-        var targets = CompAdvisor.Rank(owned, playable);
+        var (targets, pool) = TavernAdvisor.Focus(compositions, playable, CompAdvisor.Rank(owned, playable), owned, chosen);
         if (kind is ChoiceKind.None or ChoiceKind.Unsupported)
         {
             return new ChoiceAdvice(kind, Array.Empty<OptionAdvice>(), targets);
@@ -297,7 +298,7 @@ public static class ChoiceAdvisor
                 note = new TrinketNote(stat?.PlacementFor(bracket), stat?.PickRate, adjustment, justifiedBy);
             }
 
-            return new OptionAdvice(position, option, CardEffect.On(option.CardId, targets, playable, ownedIds), note);
+            return new OptionAdvice(position, option, CardEffect.On(option.CardId, targets, pool, ownedIds), note);
         }).ToList();
         return new ChoiceAdvice(kind, advice, targets);
     }

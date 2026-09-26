@@ -99,24 +99,27 @@ public static class CompAdvisor
     public static IReadOnlyList<CompProgress> Rank(IEnumerable<OwnedCard> owned, IEnumerable<Composition> compositions, int maxTargets = MaxTargets)
     {
         var cards = owned.ToList();
-        var ids = new HashSet<string>(cards.Select(c => c.CardId), StringComparer.Ordinal);
         return compositions
-            .Select(comp =>
-            {
-                var core = comp.CoreCards.Where(ids.Contains).ToList();
-                var addon = comp.AddonCards.Where(ids.Contains).ToList();
-                var tribeMatches = comp.Tribes.Count == 0
-                    ? 0
-                    : cards.Count(c => c.Tribe == Tribes.Any || (c.Tribe != null && comp.Tribes.Contains(c.Tribe)));
-                var score = KeyPieceWeight * core.Count + AddonWeight * addon.Count + TribeWeight * tribeMatches;
-                return new CompProgress(comp, core, addon, tribeMatches, score);
-            })
+            .Select(comp => Progress(cards, comp))
             .Where(p => p.Score > 0)
             .OrderByDescending(p => p.Score)
             .ThenBy(p => p.Composition.AveragePlacement ?? double.MaxValue)
             .ThenBy(p => p.Composition.Id, StringComparer.Ordinal)
             .Take(maxTargets)
             .ToList();
+    }
+
+    /// <summary>Where the player stands on one composition, whatever its score (a ticked one may be at 0).</summary>
+    public static CompProgress Progress(IReadOnlyList<OwnedCard> cards, Composition comp)
+    {
+        var ids = new HashSet<string>(cards.Select(c => c.CardId), StringComparer.Ordinal);
+        var core = comp.CoreCards.Where(ids.Contains).ToList();
+        var addon = comp.AddonCards.Where(ids.Contains).ToList();
+        var tribeMatches = comp.Tribes.Count == 0
+            ? 0
+            : cards.Count(c => c.Tribe == Tribes.Any || (c.Tribe != null && comp.Tribes.Contains(c.Tribe)));
+        var score = KeyPieceWeight * core.Count + AddonWeight * addon.Count + TribeWeight * tribeMatches;
+        return new CompProgress(comp, core, addon, tribeMatches, score);
     }
 
     /// <summary>For each tavern card, the target compositions it would add a piece to that the player lacks.</summary>
@@ -181,19 +184,40 @@ public static class TavernAdvisor
         IReadOnlyList<string> tavernCardIds,
         IReadOnlyList<OwnedCard> owned,
         IReadOnlyList<Composition> compositions,
-        IReadOnlyCollection<string> lobbyTribes)
+        IReadOnlyCollection<string> lobbyTribes,
+        IReadOnlyList<string>? chosen = null)
     {
         var playable = Playable(compositions, lobbyTribes);
         var targets = CompAdvisor.Rank(owned, playable);
         var ownedIds = new HashSet<string>(owned.Select(c => c.CardId), StringComparer.Ordinal);
+        var (aimed, pool) = Focus(compositions, playable, targets, owned, chosen);
         var cards = tavernCardIds.Select((rawId, position) =>
         {
-            var advances = CardEffect.On(rawId, targets, playable, ownedIds)
+            var advances = CardEffect.On(rawId, aimed, pool, ownedIds)
                 .Select(e => (e.Composition, e.IsKeyPiece))
                 .ToList();
             return new ShopAdvice(position, CardIds.Normalize(rawId), advances);
         }).ToList();
         return new TavernAdvice(targets, cards, playable);
+    }
+
+    /// <summary>
+    /// What the markers aim at. Nothing ticked: the automatic targets, and key pieces of every playable
+    /// composition. Something ticked (<see cref="CompositionSelection"/>): the ticked compositions alone, in
+    /// the order they were ticked, whatever their rank, for key pieces and add-ons alike.
+    /// </summary>
+    public static (IReadOnlyList<CompProgress> Aimed, IReadOnlyList<Composition> Pool) Focus(
+        IReadOnlyList<Composition> compositions, IReadOnlyList<Composition> playable, IReadOnlyList<CompProgress> targets,
+        IReadOnlyList<OwnedCard> owned, IReadOnlyList<string>? chosen)
+    {
+        if (chosen is not { Count: > 0 })
+        {
+            return (targets, playable);
+        }
+
+        var byId = compositions.GroupBy(c => c.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var ticked = chosen.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
+        return (ticked.Select(c => CompAdvisor.Progress(owned, c)).ToList(), ticked);
     }
 
     /// <summary>The compositions whose tribes are all in the lobby; all of them when the lobby is unknown.</summary>

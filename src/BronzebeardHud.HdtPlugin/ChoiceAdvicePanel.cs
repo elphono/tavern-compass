@@ -19,13 +19,12 @@ namespace BronzebeardHud.HdtPlugin;
 /// </summary>
 internal sealed class ChoiceAdvicePanel : IDisposable
 {
-    private static readonly Brush CurrentBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x00));
-    private static readonly Brush OtherBrush = new SolidColorBrush(Color.FromRgb(0x1E, 0x90, 0xFF));
     private static readonly Brush NeutralBrush = new SolidColorBrush(Color.FromArgb(0xE6, 0x3A, 0x3A, 0x44));
     private static readonly Brush TrinketBrush = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E));
     private static readonly Brush TrinketBorder = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F));
 
     private readonly Canvas _canvas;
+    private readonly CompositionSelection _selection;
     private readonly HttpStatsFetcher _fetcher = new();
     private readonly StatsCache _cache;
     private readonly List<UIElement> _labels = new();
@@ -33,9 +32,10 @@ internal sealed class ChoiceAdvicePanel : IDisposable
     private TrinketStatsFile? _stats;
     private ChoiceAdvice? _advice;
 
-    public ChoiceAdvicePanel(Canvas canvas, string statsDirectory)
+    public ChoiceAdvicePanel(Canvas canvas, string statsDirectory, CompositionSelection selection)
     {
         _canvas = canvas;
+        _selection = selection;
         _cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
@@ -129,12 +129,11 @@ internal sealed class ChoiceAdvicePanel : IDisposable
         for (var i = 0; i < rects.Count; i++)
         {
             var option = advice.Options[i];
-            var effect = option.Effects.FirstOrDefault();
+            // The same colours as the tavern markers: the ticked composition's, white when nothing is ticked.
             var background = option.Trinket != null ? TrinketBrush
-                : effect == null ? NeutralBrush
-                : effect.IsCurrent ? CurrentBrush
-                : OtherBrush;
-            var foreground = background == CurrentBrush ? Brushes.Black : Brushes.White;
+                : option.Effects.Count == 0 ? NeutralBrush
+                : TavernAdvicePanel.Brush(_selection.MarkerColour(option.Effects.Select(e => e.Composition.Id)));
+            var foreground = background == TrinketBrush || background == NeutralBrush ? Brushes.White : Brushes.Black;
             var text = new StackPanel();
             foreach (var line in lines[i])
             {

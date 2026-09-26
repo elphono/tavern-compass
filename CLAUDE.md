@@ -55,6 +55,8 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   l'overlay : `{"schema": 1, "panels": {"combats": {"left": 0.70, "top": 0.05}}}`. Un fichier illisible
   donne la disposition par défaut (message dans le journal d'HDT) ; « Reset panel positions » la rétablit.
   Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
+- Panneau des compos, overlay verrouillé : survoler une vignette montre la carte entière, et une case
+  par compo la fait viser seule (quatre au plus, une couleur chacune, oubliées à la partie suivante).
 - Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
   événements réels ne se vérifient que sous Windows, avec HDT installé.
 - Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests

@@ -29,7 +29,7 @@ internal sealed class PanelMover
 
     private readonly Canvas _canvas;
     private readonly string _path;
-    private readonly Dictionary<Border, (string Id, Brush Brush, Thickness Thickness)> _panels = new();
+    private readonly Dictionary<Border, (string Id, Brush Brush, Thickness Thickness, bool Interactive)> _panels = new();
     private readonly PanelLayout _layout;
     private Border? _dragged;
     private Point _grab;
@@ -58,12 +58,17 @@ internal sealed class PanelMover
 
     public bool MoveMode { get; private set; }
 
-    /// <summary>Puts a panel at its remembered (or default) place, and makes it draggable in move mode.</summary>
-    public void Place(Border panel, string panelId, LayoutRect defaultRect)
+    /// <summary>
+    /// Puts a panel at its remembered (or default) place, and makes it draggable in move mode. An
+    /// <paramref name="interactive"/> panel keeps WPF hit-testing on outside move mode, so that its own
+    /// clickable children (declared to HDT one by one) receive their clicks; the panel as a whole is still
+    /// declared clickable to HDT only in move mode, so the game keeps its clicks around those children.
+    /// </summary>
+    public void Place(Border panel, string panelId, LayoutRect defaultRect, bool interactive = false)
     {
         if (!_panels.ContainsKey(panel))
         {
-            _panels[panel] = (panelId, panel.BorderBrush, panel.BorderThickness);
+            _panels[panel] = (panelId, panel.BorderBrush, panel.BorderThickness, interactive);
             panel.MouseLeftButtonDown += OnDown;
             panel.MouseMove += OnMove;
             panel.MouseLeftButtonUp += OnUp;
@@ -107,9 +112,9 @@ internal sealed class PanelMover
 
     private void Apply(Border panel)
     {
-        var (_, brush, thickness) = _panels[panel];
+        var (_, brush, thickness, interactive) = _panels[panel];
         OverlayExtensions.SetIsOverlayHitTestVisible(panel, MoveMode);
-        panel.IsHitTestVisible = MoveMode;
+        panel.IsHitTestVisible = MoveMode || interactive;
         panel.Cursor = MoveMode ? Cursors.SizeAll : null;
         panel.BorderBrush = MoveMode ? MoveBorder : brush;
         panel.BorderThickness = MoveMode ? new Thickness(3) : thickness;

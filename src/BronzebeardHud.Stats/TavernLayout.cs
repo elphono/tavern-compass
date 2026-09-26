@@ -80,6 +80,19 @@ public static class TavernLayout
     public const double VignetteSize = 0.052;
 
     /// <summary>
+    /// Height of the full-card preview shown when a vignette is hovered: HDT draws a Battlegrounds card
+    /// 0.39 × H tall (Utility/RegionDrawer/RegionDrawer.cs:11); a little smaller, so that it fits above or
+    /// beside the panel.
+    /// </summary>
+    public const double PreviewHeight = 0.36;
+
+    /// <summary>
+    /// Which side of a vignette the preview goes: towards the middle of the window, so that it does not run
+    /// off the edge the panel sits on (HDT's tooltips flip too: Windows/OverlayWindow.Tooltips.cs:130-137).
+    /// </summary>
+    public static bool PreviewOnLeft(double panelCenterX, double width) => panelCenterX > width / 2;
+
+    /// <summary>
     /// The target composition panel's default place: the lower right part of Hearthstone's 4:3 frame,
     /// below the player's board row (OverlayWindow.Update.cs:537-538 + MouseOverDetection.cs:38), right of
     /// the hero and hero power (which sit within W/2 ± 0.2 × H), above the gold at the bottom. Sized for

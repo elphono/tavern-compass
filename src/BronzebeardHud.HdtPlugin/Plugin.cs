@@ -37,6 +37,13 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _opponentMmrGuard;
     private readonly FeatureGuard _choiceGuard;
     private readonly FeatureGuard _historyGuard;
+    private readonly FeatureGuard _selectionGuard;
+
+    // The compositions Ali ticks: kept across a plugin reload within a game, forgotten at the next game.
+    private readonly CompositionSelection _selection = new();
+    private int _selectionVersion;
+    private int _rowsSelectionVersion = -1;
+    private int _gameNumber;
 
     public Plugin()
     {
@@ -46,7 +53,31 @@ public sealed class Plugin : IPlugin
         // Replaces "trinket-choice": trinkets are now one kind of choice among discovers and Dark Gifts.
         _choiceGuard = new FeatureGuard("discover-advice", (n, e) => Disable(n, e, () => _choices?.Hide()));
         _historyGuard = new FeatureGuard("history", (n, e) => Disable(n, e, () => _history?.Hide()));
+        _selectionGuard = new FeatureGuard("comp-selection", (n, e) => Disable(n, e, () =>
+        {
+            _selection.Clear();
+            _selectionVersion++;
+            if (_tavern != null)
+            {
+                _tavern.SelectionEnabled = false;
+            }
+        }));
     }
+
+    /// <summary>A composition's box was clicked in the target panel.</summary>
+    private void ToggleComposition(string compositionId) => _selectionGuard.Run(() =>
+    {
+        if (_selection.Toggle(compositionId))
+        {
+            Log.Info($"Bronzebeard HUD: ticked compositions=[{string.Join(",", _selection.Checked)}]");
+        }
+        else
+        {
+            Log.Info($"Bronzebeard HUD: {compositionId} not ticked, four compositions already are");
+        }
+
+        _selectionVersion++;
+    });
 
     /// <summary>Report a disabled feature once in HDT's log, then take its panel off the screen.</summary>
     private static void Disable(string feature, Exception error, Action hide)
@@ -141,9 +172,9 @@ public sealed class Plugin : IPlugin
         _comps = new CompService(StatsDirectory);
         _mover = new PanelMover(Core.OverlayCanvas, Path.Combine(Path.GetDirectoryName(StatsDirectory)!, "layout.json"));
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
-        _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory);
+        _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
     }
 
@@ -250,7 +281,7 @@ public sealed class Plugin : IPlugin
         _comps.Poll();
         var loaded = kind == ChoiceKind.Trinket && _choices.PollTrinketStats();
         var ids = string.Join(",", options.Select(o => o.EntityId));
-        var key = $"{ids}|{_comps.Version}|{_stats.Bracket}|{_choices.TrinketStatsLoaded}";
+        var key = $"{ids}|{_comps.Version}|{_stats.Bracket}|{_choices.TrinketStatsLoaded}|{_selectionVersion}";
         if (key == _choiceKey && !loaded)
         {
             return;
@@ -258,7 +289,7 @@ public sealed class Plugin : IPlugin
 
         _choiceKey = key;
         var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
-            _choices.TrinketStat, _stats.Bracket);
+            _choices.TrinketStat, _stats.Bracket, _selection.Checked);
         if (advice.HasMarkers)
         {
             _choices.Show(advice);
@@ -324,6 +355,8 @@ public sealed class Plugin : IPlugin
         {
             _inHeroSelection = true;
             _compsLoadedThisGame = false;
+            _selection.BeginGame(++_gameNumber);
+            _selectionVersion++;
             _rowTracker = new TavernRowTracker();
             _timeline.Reset();
             _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
@@ -371,14 +404,15 @@ public sealed class Plugin : IPlugin
             var row = HdtEntityAdapter.TavernRow(game);
             // Followed by entity: a purchase, a reroll or an added card redraws the markers at once.
             var rowChanged = _rowTracker.Observe(game.GetTurnNumber(), row.Select(s => s.EntityId).ToList());
-            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + _comps.Version;
+            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + _comps.Version + "|" + _selectionVersion;
             if (rowChanged || key != _tavernKey || _lastAdvice == null)
             {
                 _tavernKey = key;
                 changed = true;
                 _lastCards = cards;
                 _lastMinions = row.Count(s => s.IsMinion);
-                _lastAdvice = TavernAdvisor.Advise(row.Select(s => s.CardId).ToList(), owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames());
+                _lastAdvice = TavernAdvisor.Advise(row.Select(s => s.CardId).ToList(), owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
+                    _selection.Checked);
                 _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _comps.Pins);
                 _lastFirstMarker = _tavern.FirstMarker;
             }
@@ -399,9 +433,20 @@ public sealed class Plugin : IPlugin
         var wasVisible = _compPanel.PanelVisible;
         var advice = _lastAdvice;
         var ownedNow = _lastCards.All;
-        _compPanel.Update(phase, () => advice != null && (changed || _compPanel.Rows.Count == 0)
-            ? CompositionRows.Build(advice.Targets, advice.Playable, ownedNow)
-            : _compPanel.Rows);
+        var chosen = _selection.Checked;
+        IReadOnlyList<CompositionRow> BuildRows()
+        {
+            _rowsSelectionVersion = _selectionVersion;
+            return CompositionRows.Build(advice!.Targets, advice.Playable, ownedNow, chosen: chosen);
+        }
+
+        _compPanel.Update(phase, () => advice != null && (changed || _compPanel.Rows.Count == 0) ? BuildRows() : _compPanel.Rows);
+        if (phase == OverlayPhase.Combat && advice != null && _rowsSelectionVersion != _selectionVersion)
+        {
+            // A box ticked during combat: the rows follow at once, the markers at the next shop.
+            _compPanel.Replace(BuildRows());
+            changed = true;
+        }
         if (!_compPanel.MarkersVisible)
         {
             _tavernKey = string.Empty;
