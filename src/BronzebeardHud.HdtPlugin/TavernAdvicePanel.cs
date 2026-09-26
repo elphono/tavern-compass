@@ -49,7 +49,7 @@ internal sealed class TavernAdvicePanel
             CornerRadius = new CornerRadius(6),
             Visibility = Visibility.Collapsed,
         };
-        _canvas.Children.Add(_targets);
+        OverlayLayer.Add(_canvas, _targets);
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
@@ -211,8 +211,8 @@ internal sealed class TavernAdvicePanel
             Canvas.SetLeft(label, rect.Left);
             Canvas.SetTop(label, rect.Top);
 
-            _canvas.Children.Add(frame);
-            _canvas.Children.Add(label);
+            OverlayLayer.Add(_canvas, frame);
+            OverlayLayer.Add(_canvas, label);
             _markers.Add(frame);
             _markers.Add(label);
             FirstMarker ??= rect;
@@ -220,6 +220,34 @@ internal sealed class TavernAdvicePanel
     }
 
     public static SolidColorBrush Brush(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
+
+    /// <summary>
+    /// Beside the panel wherever it was moved, inside the window (TavernLayout.PreviewRect), handed to HDT's
+    /// tooltip as a placement and offsets (TavernLayout.HdtTooltipOffsets).
+    /// </summary>
+    private void PlacePreview(FrameworkElement vignette)
+    {
+        if (_canvas.ActualWidth <= 0 || double.IsNaN(Canvas.GetLeft(_targets)) || double.IsNaN(Canvas.GetTop(_targets)))
+        {
+            return;
+        }
+
+        var corner = vignette.TranslatePoint(new Point(0, 0), _canvas);
+        var target = new LayoutRect(corner.X + vignette.ActualWidth / 2, corner.Y + vignette.ActualHeight / 2, vignette.ActualWidth, vignette.ActualHeight);
+        var panel = new LayoutRect(Canvas.GetLeft(_targets) + _targets.ActualWidth / 2, Canvas.GetTop(_targets) + _targets.ActualHeight / 2,
+            _targets.ActualWidth, _targets.ActualHeight);
+        var (side, preview) = TavernLayout.PreviewRect(panel, target, _canvas.ActualWidth, _canvas.ActualHeight);
+        var (offsetX, offsetY) = TavernLayout.HdtTooltipOffsets(side, preview, target);
+        ToolTipService.SetPlacement(vignette, side switch
+        {
+            PreviewSide.Left => System.Windows.Controls.Primitives.PlacementMode.Left,
+            PreviewSide.Right => System.Windows.Controls.Primitives.PlacementMode.Right,
+            PreviewSide.Above => System.Windows.Controls.Primitives.PlacementMode.Top,
+            _ => System.Windows.Controls.Primitives.PlacementMode.Bottom,
+        });
+        ToolTipService.SetHorizontalOffset(vignette, offsetX);
+        ToolTipService.SetVerticalOffset(vignette, offsetY);
+    }
 
     /// <summary>When false, the panel draws no boxes (the selection feature was switched off by its guard).</summary>
     public bool SelectionEnabled { get; set; } = true;
@@ -245,7 +273,6 @@ internal sealed class TavernAdvicePanel
         var scale = TavernLayout.Scale(height);
         var panel = TavernLayout.TargetPanel(width, height);
         var vignette = TavernLayout.VignetteSize * height;
-        var previewOnLeft = TavernLayout.PreviewOnLeft(Canvas.GetLeft(_targets) is var left && !double.IsNaN(left) ? left + panel.Width / 2 : panel.CenterX, width);
         var lines = new StackPanel { Margin = new Thickness(6 * scale) };
         lines.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray });
         foreach (var row in _rows)
@@ -284,7 +311,7 @@ internal sealed class TavernAdvicePanel
             var board = new StackPanel { Orientation = Orientation.Horizontal };
             foreach (var card in row.Vignettes)
             {
-                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale, TavernLayout.PreviewHeight * height, previewOnLeft));
+                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale, TavernLayout.PreviewHeight * height, PlacePreview));
             }
 
             // A ticked composition's colour also runs down the left of its board.

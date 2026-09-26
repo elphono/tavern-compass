@@ -1,7 +1,6 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Hearthstone_Deck_Tracker.Hearthstone;
@@ -21,7 +20,11 @@ internal static class CardImages
 {
     private static readonly Brush TickBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0xCC, 0x40));
 
-    public static FrameworkElement Vignette(string cardId, bool owned, double size, double scale, double previewHeight, bool previewOnLeft)
+    /// <param name="placePreview">
+    /// Called as the cursor enters the vignette, before HDT's own handler shows the preview (handlers of one
+    /// element run in the order they were added), to set where the preview goes.
+    /// </param>
+    public static FrameworkElement Vignette(string cardId, bool owned, double size, double scale, double previewHeight, Action<FrameworkElement> placePreview)
     {
         var image = new Image { Width = size, Height = size, Stretch = Stretch.UniformToFill };
         var frame = new Border
@@ -42,10 +45,10 @@ internal static class CardImages
         // them, which its ToolTip attached property turns into a tooltip drawn in the overlay, flipped and
         // kept inside the window (Utility/Extensions/OverlayExtensions.Tooltip.cs:34-47, 90-118;
         // Windows/OverlayWindow.Tooltips.cs:34-175). Hover-only: the game keeps every click.
+        frame.MouseEnter += (_, _) => placePreview(frame);
         OverlayExtensions.SetIsOverlayHoverVisible(frame, true);
         OverlayExtensions.SetToolTip(frame, FullCard(cardId, previewHeight));
         ToolTipService.SetInitialShowDelay(frame, 0);
-        ToolTipService.SetPlacement(frame, previewOnLeft ? PlacementMode.Left : PlacementMode.Right);
         var grid = new Grid { Children = { frame } };
         if (owned)
         {
@@ -76,7 +79,7 @@ internal static class CardImages
     /// </summary>
     public static FrameworkElement FullCard(string cardId, double height)
     {
-        var image = new Image { Height = height, Width = height * 256 / 388, Stretch = Stretch.Uniform, IsHitTestVisible = false };
+        var image = new Image { Height = height, Width = height * BronzebeardHud.Stats.TavernLayout.PreviewAspect, Stretch = Stretch.Uniform, IsHitTestVisible = false };
         var loaded = false;
         image.Loaded += (_, _) =>
         {

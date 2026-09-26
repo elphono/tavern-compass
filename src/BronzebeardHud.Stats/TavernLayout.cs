@@ -17,6 +17,15 @@ namespace BronzebeardHud.Stats;
 /// same pitch within 0.05 %, card bottom within 2 px; the shop constants are the ones HDT uses for this scene.
 /// Valid for windows at least 4:3 wide.
 /// </summary>
+/// <summary>Which side of the target panel the card preview goes.</summary>
+public enum PreviewSide
+{
+    Left,
+    Right,
+    Above,
+    Below,
+}
+
 public static class TavernLayout
 {
     public const double ShopCardWidth = 138;
@@ -86,11 +95,69 @@ public static class TavernLayout
     /// </summary>
     public const double PreviewHeight = 0.36;
 
+    /// <summary>Width over height of a Battlegrounds card render (256 × 388).</summary>
+    public const double PreviewAspect = 256.0 / 388;
+
+    /// <summary>Space between the preview and the panel, × H.</summary>
+    public const double PreviewGap = 0.008;
+
     /// <summary>
-    /// Which side of a vignette the preview goes: towards the middle of the window, so that it does not run
-    /// off the edge the panel sits on (HDT's tooltips flip too: Windows/OverlayWindow.Tooltips.cs:130-137).
+    /// Where the full-card preview of a hovered vignette goes: beside the whole panel, never over it (so it
+    /// hides neither the vignette nor its neighbours), towards the middle of the window first, then on the
+    /// other side, then above or below the panel; always inside the window, vertically centred on the
+    /// vignette as far as the window allows. When nothing fits (a panel as wide as the window), the side
+    /// with the most room, kept inside the window.
     /// </summary>
-    public static bool PreviewOnLeft(double panelCenterX, double width) => panelCenterX > width / 2;
+    public static (PreviewSide Side, LayoutRect Rect) PreviewRect(LayoutRect panel, LayoutRect vignette, double width, double height)
+    {
+        var h = PreviewHeight * height;
+        var w = h * PreviewAspect;
+        var gap = PreviewGap * height;
+        var top = Math.Max(0, Math.Min(height - h, vignette.CenterY - h / 2));
+        LayoutRect At(double left, double t) => new(left + w / 2, t + h / 2, w, h);
+
+        var leftFits = panel.Left - gap - w >= 0;
+        var rightFits = panel.Right + gap + w <= width;
+        var towardsLeft = panel.CenterX > width / 2;
+        if (towardsLeft ? leftFits : rightFits)
+        {
+            return towardsLeft ? (PreviewSide.Left, At(panel.Left - gap - w, top)) : (PreviewSide.Right, At(panel.Right + gap, top));
+        }
+
+        if (towardsLeft ? rightFits : leftFits)
+        {
+            return towardsLeft ? (PreviewSide.Right, At(panel.Right + gap, top)) : (PreviewSide.Left, At(panel.Left - gap - w, top));
+        }
+
+        var left = Math.Max(0, Math.Min(width - w, vignette.CenterX - w / 2));
+        if (panel.Top - gap - h >= 0)
+        {
+            return (PreviewSide.Above, At(left, panel.Top - gap - h));
+        }
+
+        if (panel.Top + panel.Height + gap + h <= height)
+        {
+            return (PreviewSide.Below, At(left, panel.Top + panel.Height + gap));
+        }
+
+        return panel.Left > width - panel.Right
+            ? (PreviewSide.Left, At(Math.Max(0, panel.Left - gap - w), top))
+            : (PreviewSide.Right, At(Math.Min(width - w, panel.Right + gap), top));
+    }
+
+    /// <summary>
+    /// The offsets that make HDT's overlay tooltip land on <paramref name="preview"/>: HDT places it from the
+    /// hovered element's rectangle, the placement and these offsets (Windows/OverlayWindow.Tooltips.cs:142-150),
+    /// then keeps it inside the window (171-172). Our rectangle never makes HDT flip the side (121-137): it
+    /// lies beyond the panel, hence beyond the vignette, on the chosen side.
+    /// </summary>
+    public static (double OffsetX, double OffsetY) HdtTooltipOffsets(PreviewSide side, LayoutRect preview, LayoutRect target) => side switch
+    {
+        PreviewSide.Left => (target.Left - preview.Width - preview.Left, preview.Top - (target.Top + target.Height / 2 - preview.Height / 2)),
+        PreviewSide.Right => (preview.Left - target.Right, preview.Top - (target.Top + target.Height / 2 - preview.Height / 2)),
+        PreviewSide.Above => (preview.Left - (target.CenterX - preview.Width / 2), target.Top - preview.Height - preview.Top),
+        _ => (preview.Left - (target.CenterX - preview.Width / 2), preview.Top - (target.Top + target.Height)),
+    };
 
     /// <summary>
     /// The target composition panel's default place: the lower right part of Hearthstone's 4:3 frame,

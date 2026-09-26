@@ -162,7 +162,7 @@ internal sealed class ChoiceAdvicePanel : IDisposable
             };
             Canvas.SetLeft(label, rects[i].Left);
             Canvas.SetTop(label, rects[i].Top);
-            _canvas.Children.Add(label);
+            OverlayLayer.Add(_canvas, label);
             _labels.Add(label);
             FirstLabel ??= rects[i];
         }

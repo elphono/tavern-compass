@@ -26,7 +26,7 @@ internal sealed class HeroPickPanel
     {
         _canvas = canvas;
         _status.Visibility = Visibility.Collapsed;
-        _canvas.Children.Add(_status);
+        OverlayLayer.Add(_canvas, _status);
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
@@ -53,7 +53,7 @@ internal sealed class HeroPickPanel
                 Tag = row,
             };
             _badges.Add(badge);
-            _canvas.Children.Add(badge);
+            OverlayLayer.Add(_canvas, badge);
         }
 
         _status.Text = status ?? string.Empty;

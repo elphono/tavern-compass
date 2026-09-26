@@ -179,13 +179,4 @@ public class CompositionSelectionTests
         Assert.False(selection.Any);
         Assert.Equal(CompositionSelection.AutoColour, selection.MarkerColour(new[] { "naga_spells" }));
     }
-
-    [Theory]
-    [InlineData(2290, 1359, 1700, true)]   // the panel's default place, on the right: preview to the left
-    [InlineData(2290, 1359, 400, false)]   // panel moved to the left: preview to the right
-    public void Preview_GoesTowardsTheMiddle(double width, double height, double panelCenterX, bool left)
-    {
-        Assert.Equal(left, TavernLayout.PreviewOnLeft(panelCenterX, width));
-        Assert.Equal(0.36 * height, TavernLayout.PreviewHeight * height, precision: 6);
-    }
 }

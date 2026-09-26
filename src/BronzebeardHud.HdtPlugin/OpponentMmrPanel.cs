@@ -143,7 +143,7 @@ internal sealed class OpponentMmrPanel : IDisposable
             };
             Canvas.SetLeft(label, rect.Left);
             Canvas.SetTop(label, rect.Top);
-            _canvas.Children.Add(label);
+            OverlayLayer.Add(_canvas, label);
             _labels.Add(label);
         }
     }

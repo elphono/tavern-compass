@@ -49,7 +49,7 @@ internal sealed class GameHistoryPanel
             IsHitTestVisible = false,
             Visibility = Visibility.Collapsed,
         };
-        _canvas.Children.Add(_panel);
+        OverlayLayer.Add(_canvas, _panel);
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
