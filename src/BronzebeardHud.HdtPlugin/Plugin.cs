@@ -38,6 +38,10 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _choiceGuard;
     private readonly FeatureGuard _historyGuard;
     private readonly FeatureGuard _selectionGuard;
+    private readonly FeatureGuard _warbandGuard;
+    private string? _warbandLine;
+    private int _warbandRound = -1;
+    private int _warbandLoggedRound = -1;
 
     // The compositions Ali ticks: kept across a plugin reload within a game, forgotten at the next game.
     private readonly CompositionSelection _selection = new();
@@ -53,6 +57,7 @@ public sealed class Plugin : IPlugin
         // Replaces "trinket-choice": trinkets are now one kind of choice among discovers and Dark Gifts.
         _choiceGuard = new FeatureGuard("discover-advice", (n, e) => Disable(n, e, () => _choices?.Hide()));
         _historyGuard = new FeatureGuard("history", (n, e) => Disable(n, e, () => _history?.Hide()));
+        _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _tavern?.SetFooter(null)));
         _selectionGuard = new FeatureGuard("comp-selection", (n, e) => Disable(n, e, () =>
         {
             _selection.Clear();
@@ -189,6 +194,9 @@ public sealed class Plugin : IPlugin
         _opponentKey = string.Empty;
         _historyKey = -1;
         _rowTracker = new TavernRowTracker();
+        _warbandLine = null;
+        _warbandRound = -1;
+        _warbandLoggedRound = -1;
         _compPanel = new CompositionPanelState();
         _lastAdvice = null;
         _lastCards = BronzebeardHud.Stats.PlayerCards.None;
@@ -230,6 +238,48 @@ public sealed class Plugin : IPlugin
         _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
         _choiceGuard.Run(() => UpdateChoice(game));
         _historyGuard.Run(() => UpdateHistory(game));
+        _warbandGuard.Run(() => UpdateWarband(game));
+    }
+
+    /// <summary>
+    /// Under the target compositions, in the shop and in combat: the board's attack plus health against the
+    /// average of the same hero at the same turn (Firestone warbandStats), and one line per round in HDT's log.
+    /// </summary>
+    private void UpdateWarband(GameV2 game)
+    {
+        if (_tavern == null || _stats == null)
+        {
+            return;
+        }
+
+        var phase = HdtEntityAdapter.Phase(game);
+        var hero = phase is OverlayPhase.Shop or OverlayPhase.Combat ? HdtEntityAdapter.PlayerHeroId(game) : null;
+        if (hero == null)
+        {
+            _warbandLine = null;
+            _tavern.SetFooter(null);
+            return;
+        }
+
+        _stats.EnsureStarted(game.CurrentBattlegroundsRating);
+        _stats.Poll();
+        var round = game.GetTurnNumber();
+        if (phase == OverlayPhase.Combat && _warbandLine != null)
+        {
+            // In combat minions die: the line stays as the shop left it, the board the combat started with.
+            if (_warbandRound == round && _warbandLoggedRound != round)
+            {
+                _warbandLoggedRound = round;
+                Log.Info($"Bronzebeard HUD: warband round={round} hero={hero} {_warbandLine}");
+            }
+
+            return;
+        }
+
+        var comparison = WarbandCurve.Compare(round, WarbandCurve.BoardStats(HdtEntityAdapter.BoardMinionStats(game)), hero, _stats.Sources());
+        _warbandRound = round;
+        _warbandLine = comparison.Line;
+        _tavern.SetFooter(comparison.Line);
     }
 
     private void UpdateHistory(GameV2 game)

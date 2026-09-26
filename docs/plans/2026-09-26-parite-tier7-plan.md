@@ -137,8 +137,8 @@ adversaire est un confort.
 
 | Tranche | Fichiers | Garde | Tests |
 |---|---|---|---|
-| 5.1 Top 4 et 1re place au choix du héros | `HeroPickAdvisor.cs` (depuis `placementDistribution`, déjà en cache) ; `HeroPickPanel.cs` | `hero-selection` (même panneau) | distribution complète, partielle ou absente, arrondis, 4 héros distincts |
-| 5.2 Plateau contre la courbe du héros | import de `warbandStats`, schéma des stats de héros porté à 2 ; `WarbandCurve.cs` ; ligne dans le panneau des compos | `warband-curve` | tours 1 à 3 successifs, tour hors courbe, héros sans données, ancien cache retéléchargé |
+| 5.1 Top 4 et 1re place au choix du héros (livré) | `HeroPickAdvisor.cs` (depuis `placementDistribution`, déjà en cache) ; `HeroPickPanel.cs` | `hero-selection` (même panneau) | distribution complète, partielle ou absente, arrondis, 4 héros distincts |
+| 5.2 Plateau contre la courbe du héros (livré ; tour Firestone = ceil(TURN/2), `rtstats-turn-start-parser.ts:14-16`) | import de `warbandStats`, schéma des stats de héros porté à 2 ; `WarbandCurve.cs` ; ligne dans le panneau des compos | `warband-curve` | tours 1 à 3 successifs, tour hors courbe, héros sans données, ancien cache retéléchargé |
 | 5.3 Meilleures compos d'un héros | `heroAffinity` dans le format des compos, schéma 3 ; ligne sous chaque héros proposé | `hero-comps` | seuil d'effectifs, ordre, héros absent, ancien cache retéléchargé |
 | 5.4 Bilan par adversaire | `Standings` (`GameTimeline.cs`) ; colonne du panneau Combats | `history` (même panneau) | trois combats contre deux adversaires, égalité, fantôme |
 

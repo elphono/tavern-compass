@@ -66,6 +66,7 @@ public static class FirestoneHeroStatsImporter
                 ["tier"] = JValue.CreateNull(),
                 ["placementDistribution"] = Distribution(token["placementDistribution"]),
                 ["tribeImpacts"] = TribeImpacts(token["tribeStats"]),
+                ["warbandStats"] = Warband(token["warbandStats"]),
             };
 
             if (!byHero.TryGetValue(heroCardId, out var existing)
@@ -129,6 +130,34 @@ public static class FirestoneHeroStatsImporter
     }
 
     /// <summary>Firestone gives [{rank, percentage, totalMatches}]; keep the 8 percentages in rank order.</summary>
+    /// <summary>
+    /// warbandStats [{turn, averageStats}]: the average of the sum of attack and health of the player's board
+    /// at each turn's combat (Firestone rtstats-bgs-board-stats-parser.ts, replay-metadata-bulder.service.ts:225-229).
+    /// Unreadable entries and repeated turns are dropped; null when nothing is left.
+    /// </summary>
+    private static JToken Warband(JToken? token)
+    {
+        if (token is not JArray array)
+        {
+            return JValue.CreateNull();
+        }
+
+        var byTurn = new SortedDictionary<int, double>();
+        foreach (var item in array.OfType<JObject>())
+        {
+            if (item["turn"]?.Type == JTokenType.Integer && item.Value<int>("turn") >= 1
+                && item["averageStats"]?.Type is JTokenType.Float or JTokenType.Integer && item.Value<double>("averageStats") >= 0
+                && !byTurn.ContainsKey(item.Value<int>("turn")))
+            {
+                byTurn[item.Value<int>("turn")] = item.Value<double>("averageStats");
+            }
+        }
+
+        return byTurn.Count == 0
+            ? JValue.CreateNull()
+            : new JArray(byTurn.Select(p => new JObject { ["turn"] = p.Key, ["averageStats"] = p.Value }));
+    }
+
     private static JToken Distribution(JToken? token)
     {
         if (token is not JArray array)

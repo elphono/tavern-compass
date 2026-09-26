@@ -153,6 +153,41 @@ internal static class HdtEntityAdapter
         return race == Race.INVALID ? null : race.ToString();
     }
 
+    /// <summary>The player's hero as a base hero id (skins mapped to their parent); null before one is picked.</summary>
+    public static string? PlayerHeroId(GameV2 game)
+    {
+        try
+        {
+            var hero = game.Player.Board.FirstOrDefault(e => e.IsHero && !string.IsNullOrEmpty(e.CardId));
+            if (hero == null)
+            {
+                return null;
+            }
+
+            var snapshot = ToSnapshot(hero);
+            return HeroIdNormalizer.Normalize(snapshot.CardId!, snapshot.ParentCardId);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Attack and health of each minion on the player's board.</summary>
+    public static IReadOnlyList<(int Attack, int Health)> BoardMinionStats(GameV2 game)
+    {
+        try
+        {
+            return game.Player.Board.Where(e => e.IsMinion)
+                .Select(e => (e.GetTag(GameTag.ATK), e.GetTag(GameTag.HEALTH)))
+                .ToList();
+        }
+        catch (InvalidOperationException)
+        {
+            return Array.Empty<(int, int)>();
+        }
+    }
+
     /// <summary>
     /// Lobby players (name and hero), as HDT already read them (GameMetaData.BattlegroundsLobbyInfo),
     /// the local player excluded. Empty until HDT has the lobby.

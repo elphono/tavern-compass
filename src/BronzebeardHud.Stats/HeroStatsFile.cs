@@ -37,6 +37,22 @@ public sealed class TribeImpact
     public int DataPointsOnMissingTribe { get; }
 }
 
+/// <summary>
+/// Average warband strength at one turn: Firestone's warbandStats, the sum of attack and health of the
+/// player's minions at the start of that turn's combat.
+/// </summary>
+public sealed class WarbandPoint
+{
+    public WarbandPoint(int turn, double averageStats)
+    {
+        Turn = turn;
+        AverageStats = averageStats;
+    }
+
+    public int Turn { get; }
+    public double AverageStats { get; }
+}
+
 /// <summary>Aggregated figures for one base hero, as one source reports them.</summary>
 public sealed class HeroStat
 {
@@ -47,8 +63,10 @@ public sealed class HeroStat
         double? pickRate = null,
         string? tier = null,
         IReadOnlyList<double>? placementDistribution = null,
-        IReadOnlyList<TribeImpact>? tribeImpacts = null)
+        IReadOnlyList<TribeImpact>? tribeImpacts = null,
+        IReadOnlyList<WarbandPoint>? warbandCurve = null)
     {
+        WarbandCurve = warbandCurve ?? Array.Empty<WarbandPoint>();
         TribeImpacts = tribeImpacts ?? Array.Empty<TribeImpact>();
         HeroCardId = heroCardId;
         AveragePlacement = averagePlacement;
@@ -77,6 +95,9 @@ public sealed class HeroStat
 
     /// <summary>Per-tribe effect on the average placement; empty when the source does not say.</summary>
     public IReadOnlyList<TribeImpact> TribeImpacts { get; }
+
+    /// <summary>Average warband strength by turn, in turn order; empty when the source does not say.</summary>
+    public IReadOnlyList<WarbandPoint> WarbandCurve { get; }
 }
 
 /// <summary>Minimum MMR to belong to a percentile bracket (Firestone's mmrPercentiles table).</summary>
@@ -97,7 +118,11 @@ public sealed class MmrThreshold
 /// <summary>One local stats file: one source, one time period, one MMR bracket.</summary>
 public sealed class HeroStatsFile
 {
-    public const int CurrentSchema = 1;
+    /// <summary>
+    /// 2: heroes may carry warbandStats. Hand-typed files may stay at 1; a cached Firestone file must be
+    /// at 2, or it is downloaded again (<see cref="HeroStatsLoader.RequireCurrent"/>).
+    /// </summary>
+    public const int CurrentSchema = 2;
 
     public HeroStatsFile(
         string source,
@@ -107,8 +132,10 @@ public sealed class HeroStatsFile
         DateTimeOffset? fetchedAt = null,
         int? mmrPercentile = null,
         string? timePeriod = null,
-        IReadOnlyList<MmrThreshold>? mmrThresholds = null)
+        IReadOnlyList<MmrThreshold>? mmrThresholds = null,
+        int schema = CurrentSchema)
     {
+        Schema = schema;
         MmrThresholds = mmrThresholds ?? Array.Empty<MmrThreshold>();
         Source = source;
         Heroes = heroes;
@@ -118,6 +145,9 @@ public sealed class HeroStatsFile
         MmrPercentile = mmrPercentile;
         TimePeriod = timePeriod;
     }
+
+    /// <summary>The schema the file was written with.</summary>
+    public int Schema { get; }
 
     public string Source { get; }
     public IReadOnlyList<HeroStat> Heroes { get; }

@@ -28,6 +28,7 @@ internal sealed class TavernAdvicePanel
     private TavernAdvice? _advice;
     private HashSet<string> _owned = new();
     private string? _status;
+    private string? _footer;
     private TavernPins _pins = TavernPins.Empty;
     private bool _visible;
     private bool _panelVisible;
@@ -76,6 +77,21 @@ internal sealed class TavernAdvicePanel
         _status = status;
         _panelVisible = true;
         RelayoutPanel();
+    }
+
+    /// <summary>A last line under the compositions (the warband against its curve); null for none.</summary>
+    public void SetFooter(string? footer)
+    {
+        if (footer == _footer)
+        {
+            return;
+        }
+
+        _footer = footer;
+        if (_panelVisible)
+        {
+            RelayoutPanel();
+        }
     }
 
     public void HidePanel()
@@ -275,6 +291,11 @@ internal sealed class TavernAdvicePanel
             lines.Children.Add(colour == null
                 ? board
                 : new Border { BorderBrush = colour, BorderThickness = new Thickness(4 * scale, 0, 0, 0), Padding = new Thickness(4 * scale, 0, 0, 0), Child = board });
+        }
+
+        if (!string.IsNullOrEmpty(_footer))
+        {
+            lines.Children.Add(new TextBlock { Text = _footer, FontSize = 12 * scale, Foreground = Brushes.White, FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4 * scale, 0, 0) });
         }
 
         if (!string.IsNullOrEmpty(_status))

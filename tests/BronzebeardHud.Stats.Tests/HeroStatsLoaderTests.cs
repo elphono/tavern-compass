@@ -79,7 +79,7 @@ public class HeroStatsLoaderTests
     [Fact]
     public void Parse_UnknownSchema_IsRejected()
     {
-        var e = Assert.Throws<StatsFormatException>(() => HeroStatsLoader.Parse(ValidFile.Replace("\"schema\": 1", "\"schema\": 2")));
+        var e = Assert.Throws<StatsFormatException>(() => HeroStatsLoader.Parse(ValidFile.Replace("\"schema\": 1", "\"schema\": 3")));
         Assert.StartsWith("schema:", e.Message);
     }
 

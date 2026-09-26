@@ -130,7 +130,7 @@ public sealed class StatsCache
             FirestoneEndpoints.HeroStats(mmrPercentile, timePeriod),
             HeroStatsPath(mmrPercentile, timePeriod),
             policy,
-            HeroStatsLoader.Load,
+            path => HeroStatsLoader.RequireCurrent(HeroStatsLoader.Load(path)),
             f => f.FetchedAt,
             FirestoneHeroStatsImporter.Import,
             HeroStatsLoader.Serialize,

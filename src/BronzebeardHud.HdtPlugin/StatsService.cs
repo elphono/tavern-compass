@@ -63,6 +63,18 @@ internal sealed class StatsService : IDisposable
         return mine.File != null ? mine : new CacheResult(all.File, all.Downloaded, mine.Error);
     }
 
+    /// <summary>
+    /// Loads the stats if no hero selection was seen (plugin re-enabled, or HDT started mid-game): the
+    /// warband curve needs them in the shop too.
+    /// </summary>
+    public void EnsureStarted(int? rating)
+    {
+        if (_refresh == null && _firestone == null)
+        {
+            BeginHeroSelection(rating);
+        }
+    }
+
     public void Poll()
     {
         if (_refresh is not { IsCompleted: true } done)

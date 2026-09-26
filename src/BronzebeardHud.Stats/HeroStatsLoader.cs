@@ -91,9 +91,9 @@ public static class HeroStatsLoader
         }
 
         var schema = obj["schema"];
-        if (schema == null || schema.Type != JTokenType.Integer || schema.Value<int>() != HeroStatsFile.CurrentSchema)
+        if (schema == null || schema.Type != JTokenType.Integer || schema.Value<int>() < 1 || schema.Value<int>() > HeroStatsFile.CurrentSchema)
         {
-            throw new StatsFormatException($"schema: expected {HeroStatsFile.CurrentSchema}, got {Describe(schema)}");
+            throw new StatsFormatException($"schema: expected 1 to {HeroStatsFile.CurrentSchema}, got {Describe(schema)}");
         }
 
         var source = RequiredString(obj, "source", "source");
@@ -165,6 +165,7 @@ public static class HeroStatsLoader
 
             var distribution = OptionalDistribution(hero, $"{path}.placementDistribution");
             var tribeImpacts = OptionalTribeImpacts(hero, $"{path}.tribeImpacts");
+            var warbandCurve = OptionalWarbandCurve(hero, $"{path}.warbandStats");
 
             heroes.Add(new HeroStat(
                 heroCardId,
@@ -173,7 +174,8 @@ public static class HeroStatsLoader
                 pickRate,
                 tier,
                 distribution,
-                tribeImpacts));
+                tribeImpacts,
+                warbandCurve));
         }
 
         var mmrToken = obj["mmrPercentile"];
@@ -196,7 +198,52 @@ public static class HeroStatsLoader
             OptionalDate(obj, "fetchedAt"),
             mmrPercentile,
             OptionalString(obj, "timePeriod", "timePeriod"),
-            Thresholds(obj["mmrThresholds"]));
+            Thresholds(obj["mmrThresholds"]),
+            schema.Value<int>());
+    }
+
+    /// <summary>
+    /// For the cache: a file written before the current schema lacks data the plugin now shows (the warband
+    /// curve), so it counts as unusable and is downloaded again, with this reason if that fails.
+    /// </summary>
+    public static HeroStatsFile RequireCurrent(HeroStatsFile file) =>
+        file.Schema == HeroStatsFile.CurrentSchema
+            ? file
+            : throw new StatsFormatException($"schema {file.Schema} ≠ {HeroStatsFile.CurrentSchema}");
+
+    /// <summary>Optional [{turn, averageStats}]: turns ≥ 1, each at most once, stats ≥ 0; returned in turn order.</summary>
+    private static IReadOnlyList<WarbandPoint>? OptionalWarbandCurve(JObject hero, string path)
+    {
+        var token = hero["warbandStats"];
+        if (token == null || token.Type == JTokenType.Null)
+        {
+            return null;
+        }
+
+        if (token is not JArray array)
+        {
+            throw new StatsFormatException($"{path}: expected an array");
+        }
+
+        var points = new List<WarbandPoint>();
+        foreach (var item in array)
+        {
+            if (item is not JObject point
+                || point["turn"]?.Type != JTokenType.Integer || point.Value<int>("turn") < 1
+                || point["averageStats"]?.Type is not (JTokenType.Float or JTokenType.Integer) || point.Value<double>("averageStats") < 0)
+            {
+                throw new StatsFormatException($"{path}: expected {{\"turn\": >= 1, \"averageStats\": >= 0}}, got {Describe(item)}");
+            }
+
+            if (points.Any(p => p.Turn == point.Value<int>("turn")))
+            {
+                throw new StatsFormatException($"{path}: turn {point.Value<int>("turn")} appears twice");
+            }
+
+            points.Add(new WarbandPoint(point.Value<int>("turn"), point.Value<double>("averageStats")));
+        }
+
+        return points.OrderBy(p => p.Turn).ToList();
     }
 
     public static string Serialize(HeroStatsFile file)
@@ -218,6 +265,7 @@ public static class HeroStatsLoader
                 ["dataPoints"] = i.DataPoints,
                 ["dataPointsOnMissingTribe"] = i.DataPointsOnMissingTribe,
             })),
+            ["warbandStats"] = new JArray(h.WarbandCurve.Select(w => new JObject { ["turn"] = w.Turn, ["averageStats"] = w.AverageStats })),
         }));
 
         var root = new JObject
