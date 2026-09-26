@@ -46,6 +46,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   trinkets : 24 h ; compositions : 7 jours). Dans son sous-dossier `manual\`, les fichiers écrits à la
   main : `*.json` (stats de héros HSReplay, spec § 2), `*.comps.txt` (compositions HSReplay, spec § 6)
   et `pins.txt` (sbires à signaler en taverne, un par ligne).
+- Panneaux déplaçables (compos visées, combats) : menu Plugins d'HDT › Bronzebeard HUD › « Move panels »
+  (ou le bouton du plugin dans les options). Hors de ce mode, rien n'est cliquable au-dessus du jeu. Les
+  positions sont gardées dans `%LocalAppData%\BronzebeardHud\layout.json`, en fractions de la taille de
+  l'overlay : `{"schema": 1, "panels": {"combats": {"left": 0.70, "top": 0.05}}}`. Un fichier illisible
+  donne la disposition par défaut (message dans le journal d'HDT) ; « Reset panel positions » la rétablit.
+  Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
 - Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
   événements réels ne se vérifient que sous Windows, avec HDT installé.
 - Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests

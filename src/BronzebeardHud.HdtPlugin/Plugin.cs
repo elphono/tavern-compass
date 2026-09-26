@@ -21,6 +21,9 @@ namespace BronzebeardHud.HdtPlugin;
 public sealed class Plugin : IPlugin
 {
     private HeroPickPanel? _panel;
+    private PanelMover? _mover;
+    private MenuItem? _menu;
+    private MenuItem? _moveItem;
     private TavernAdvicePanel? _tavern;
     private OpponentMmrPanel? _opponentMmr;
     private TrinketPickPanel? _trinkets;
@@ -81,22 +84,61 @@ public sealed class Plugin : IPlugin
     public string Description =>
         "Battlegrounds hero-pick stats and composition advice (Firestone public aggregates, hand-typed HSReplay data) on top of HDT's overlay.";
 
-    public string ButtonText => "Open stats folder";
+    public string ButtonText => "Move panels (on/off)";
     public string Author => "elphono";
     public Version Version => new(0, 2, 0);
-    public MenuItem MenuItem => null!;
+    /// <summary>HDT's Plugins menu: move mode on/off, reset panel places, open the data folder.</summary>
+    public MenuItem MenuItem => _menu ??= BuildMenu();
+
+    private MenuItem BuildMenu()
+    {
+        var menu = new MenuItem { Header = "Bronzebeard HUD" };
+        _moveItem = new MenuItem { Header = "Move panels", IsCheckable = true };
+        _moveItem.Click += (_, _) => ToggleMoveMode();
+        var reset = new MenuItem { Header = "Reset panel positions" };
+        reset.Click += (_, _) => _mover?.Reset();
+        var folder = new MenuItem { Header = "Open data folder" };
+        folder.Click += (_, _) => OpenDataFolder();
+        menu.Items.Add(_moveItem);
+        menu.Items.Add(reset);
+        menu.Items.Add(folder);
+        return menu;
+    }
+
+    private void ToggleMoveMode()
+    {
+        if (_mover == null)
+        {
+            return;
+        }
+
+        _mover.ToggleMoveMode();
+        if (_moveItem != null)
+        {
+            _moveItem.IsChecked = _mover.MoveMode;
+        }
+
+        Log.Info($"Bronzebeard HUD: move mode {(_mover.MoveMode ? "on" : "off")}");
+    }
+
+    private static void OpenDataFolder()
+    {
+        Directory.CreateDirectory(Path.Combine(StatsDirectory, "manual"));
+        Process.Start("explorer.exe", Path.GetDirectoryName(StatsDirectory)!);
+    }
 
     public void OnLoad()
     {
         Directory.CreateDirectory(Path.Combine(StatsDirectory, "manual"));
         _stats = new StatsService(StatsDirectory);
         _comps = new CompService(StatsDirectory);
+        _mover = new PanelMover(Core.OverlayCanvas, Path.Combine(Path.GetDirectoryName(StatsDirectory)!, "layout.json"));
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _trinkets = new TrinketPickPanel(Core.OverlayCanvas, StatsDirectory);
         _nextOpponent = new NextOpponentMarker(Core.OverlayCanvas);
-        _history = new GameHistoryPanel(Core.OverlayCanvas);
+        _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
     }
 
     public void OnUnload()
@@ -121,11 +163,7 @@ public sealed class Plugin : IPlugin
         _comps = null;
     }
 
-    public void OnButtonPress()
-    {
-        Directory.CreateDirectory(Path.Combine(StatsDirectory, "manual"));
-        Process.Start("explorer.exe", StatsDirectory);
-    }
+    public void OnButtonPress() => ToggleMoveMode();
 
     public void OnUpdate()
     {

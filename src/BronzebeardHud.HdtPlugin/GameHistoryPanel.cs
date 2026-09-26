@@ -22,13 +22,15 @@ internal sealed class GameHistoryPanel
     };
 
     private readonly Canvas _canvas;
+    private readonly PanelMover _mover;
     private readonly Border _panel;
     private GameTimeline? _timeline;
     private int _playerId;
 
-    public GameHistoryPanel(Canvas canvas)
+    public GameHistoryPanel(Canvas canvas, PanelMover mover)
     {
         _canvas = canvas;
+        _mover = mover;
         _panel = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
@@ -112,8 +114,7 @@ internal sealed class GameHistoryPanel
         _panel.Child = content;
         _panel.Width = rect.Width;
         _panel.Height = rect.Height;
-        Canvas.SetLeft(_panel, rect.Left);
-        Canvas.SetTop(_panel, rect.Top);
+        _mover.Place(_panel, "combats", rect);
         _panel.Visibility = Visibility.Visible;
     }
 }

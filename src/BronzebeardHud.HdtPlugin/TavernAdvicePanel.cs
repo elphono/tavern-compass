@@ -21,6 +21,7 @@ internal sealed class TavernAdvicePanel
     private static readonly Brush PinBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0x4D, 0xFF));
 
     private readonly Canvas _canvas;
+    private readonly PanelMover _mover;
     private readonly List<UIElement> _markers = new();
     private readonly Border _targets;
     private TavernAdvice? _advice;
@@ -29,9 +30,10 @@ internal sealed class TavernAdvicePanel
     private TavernPins _pins = TavernPins.Empty;
     private bool _visible;
 
-    public TavernAdvicePanel(Canvas canvas)
+    public TavernAdvicePanel(Canvas canvas, PanelMover mover)
     {
         _canvas = canvas;
+        _mover = mover;
         _targets = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
@@ -224,8 +226,7 @@ internal sealed class TavernAdvicePanel
         _targets.Child = lines;
         _targets.Width = panel.Width;
         _targets.MinHeight = panel.Height;
-        Canvas.SetLeft(_targets, panel.Left);
-        Canvas.SetTop(_targets, panel.Top);
+        _mover.Place(_targets, "target-compositions", panel);
         _targets.Visibility = Visibility.Visible;
     }
 }
