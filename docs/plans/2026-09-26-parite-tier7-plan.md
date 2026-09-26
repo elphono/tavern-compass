@@ -49,9 +49,41 @@ de la spec.
 | MMR des adversaires | `LeaderboardClient.cs`, `LeaderboardIndex.cs` (port de `leaderboard.rs`) ; `OpponentMmrPanel.cs` | nom avec ou sans `#1234` ; casse ; homonymes (on garde le meilleur MMR) ; page malformée ; pages bornées |
 | Stats de compositions | `CompStatsFile.cs`, `FirestoneCompStatsImporter.cs` ; `CompPanel.cs` | conversion sans `finalBoards` ; affinité avec un héros ; âge du cache 7 jours |
 
-Le leaderboard Blizzard se lit page par page : la phase 2 fixe un plafond de pages et un cache d'une
-session. **Sous Windows** : noms du lobby fournis par `Core.Game.MetaData.BattlegroundsLobbyInfo`,
-placement des panneaux.
+**Sous Windows** : noms du lobby fournis par `Core.Game.MetaData.BattlegroundsLobbyInfo`, placement
+des panneaux.
+
+### MMR des adversaires : quelle tranche du leaderboard télécharger
+
+Décision d'Ali (2026-09-26) : la tranche qui tombe autour de son MMR, ajustable ensuite. **Région EU**,
+établie par mesure et non supposée : l'identifiant de compte de ses parties dans HDT
+(`BgsLastGames.xml`, attribut `Player`) a pour partie haute `0x200000257544347`, dont l'octet de
+région vaut 2, c'est-à-dire EU (même décodage que `Helper.GetRegion` d'HDT).
+
+Mesure du 2026-09-26 sur `hearthstone.blizzard.com/en-us/api/community/leaderboardsData?region=EU&leaderboardId=battlegrounds&page=N`
+(saison 19 ; 121 pages de 25 joueurs, 3 022 joueurs en tout) :
+
+| Page | Rangs | MMR |
+|---|---|---|
+| 1 | 1 – 25 | 14 613 – 18 218 |
+| 40 | 976 – 1 000 | 8 782 – 8 803 |
+| 65 | 1 601 – 1 625 | 8 244 – 8 261 |
+| 90 | 2 226 – 2 250 | 8 050 – 8 052 |
+| 105 | 2 601 – 2 625 | 8 022 – 8 024 |
+| 121 | 3 001 – 3 022 | 8 000 |
+
+**Le leaderboard s'arrête à 8 000.** Ali est à 6 840 : la marge envisagée (−600 / +800, soit 6 240 à
+7 640) ne contient aucune page. La tranche retenue par défaut est donc le bas du classement, la plus
+proche de son MMR : **8 000 à 8 050, soit les pages 90 à 121 ce jour-là (32 requêtes)**. Chaque page
+pèse 304 Ko, dont 1,5 Ko de lignes ; le reste est de la métadonnée de saison.
+
+| Réglage | Valeur par défaut | Où le changer |
+|---|---|---|
+| `LeaderboardRange` : `Region`, `MinRating`, `MaxRating` | `EU`, 8 000, 8 050 | `LeaderboardRange.Default` dans `src/BronzebeardHud.Stats/LeaderboardRange.cs` ; le plugin n'a pas encore d'écran de réglages |
+
+Les bornes sont en MMR, et non en pages, pour deux raisons : Ali raisonne en MMR, et une page glisse
+pendant la saison à mesure que des joueurs passent 8 000. Le client de la phase 2 convertira donc les
+bornes en pages au moment de télécharger : il part de la dernière page et remonte tant que le MMR
+reste sous `MaxRating`.
 
 ## Phase 3 : tribus, trinkets, prochain adversaire, épinglage
 
@@ -73,5 +105,7 @@ tout le rendu.
 1. Les tranches de MMR de HSReplay n'ont pas été vérifiées (le site nous répond 403) : pour une
    saisie manuelle, `mmrPercentile` reçoit le percentile affiché par HSReplay s'il en montre un, et
    reste vide sinon.
-2. Le plafond de pages du leaderboard (phase 2) : un classement complet représente plusieurs centaines
-   de requêtes.
+2. L'utilité du MMR adverse à 6 840. Seuls les adversaires à 8 000 ou plus sont au classement, et
+   Firestone prévient que sa recherche « won't work for low- or medium-MMR players ». Trois issues :
+   la garder telle quelle, la désactiver tant que le MMR du joueur (fourni par HDT) reste loin sous
+   8 000, ou la retirer de la phase 2.
