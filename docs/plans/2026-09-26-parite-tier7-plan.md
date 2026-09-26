@@ -12,9 +12,7 @@ flowchart LR
     P2 --> P3["Phase 3<br/>tribus, trinkets, prochain adversaire, épinglage"]
     P3 --> P4["Phase 4<br/>historique, graphe des PV, inspiration, quêtes"]
     classDef done fill:#ffffff,stroke:#2b8a3e,stroke-width:4px,color:#000000
-    classDef todo fill:#ffffff,stroke:#1f4fd1,stroke-width:3px,color:#000000
-    class P1 done
-    class P2,P3,P4 todo
+    class P1,P2,P3,P4 done
 ```
 
 ## Structure du code
