@@ -83,7 +83,7 @@ sources ; seuls `source` et les champs facultatifs changent.
 | `heroes[].averagePlacement` | oui | dans [1, 8] |
 | `heroes[].dataPoints` | oui | ≥ 0 (0 pour une saisie manuelle sans effectif) |
 | `pickRate`, `placementDistribution` | non | `pickRate` dans [0, 1] ; distribution de 8 pourcentages |
-| `tier` | non | la lettre affichée par la source (HSReplay va de S à F) ; absente → calculée par la règle de Firestone |
+| `tier` | non | la lettre affichée par la source (HSReplay va de S à F) ; absente → calculée par la règle de Firestone, si le fichier compte au moins 20 héros (en deçà, ce n'est pas un pool et aucun tier n'est affiché) |
 | `generatedAt`, `fetchedAt`, `sourceUrl`, `mmrPercentile`, `timePeriod` | non | traçabilité, affichés en infobulle |
 
 Un fichier qui viole une règle est **refusé en entier**, avec un message qui nomme le champ fautif :
