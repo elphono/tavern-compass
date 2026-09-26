@@ -217,6 +217,16 @@ public static class LeaderboardLayout
     public const double Top = 0.15;
     public const double TileSize = 0.69 / 8;
 
+    /// <summary>The leaderboard tile itself, for a frame drawn around it.</summary>
+    public static LayoutRect Tile(double width, double height, int place)
+    {
+        var frameWidth = height * 4 / 3;
+        var frameLeft = (width - frameWidth) / 2;
+        var tile = TileSize * height;
+        var tileLeft = frameLeft + frameWidth * 0.001 * (8 - place);
+        return new LayoutRect(tileLeft + tile / 2, Top * height + tile * (place - 0.5), tile, tile);
+    }
+
     public static LayoutRect MmrLabel(double width, double height, int place)
     {
         var frameWidth = height * 4 / 3;

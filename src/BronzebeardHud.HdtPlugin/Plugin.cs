@@ -23,6 +23,8 @@ public sealed class Plugin : IPlugin
     private TavernAdvicePanel? _tavern;
     private OpponentMmrPanel? _opponentMmr;
     private TrinketPickPanel? _trinkets;
+    private NextOpponentMarker? _nextOpponent;
+    private string _nextOpponentKey = string.Empty;
     private string _trinketKey = string.Empty;
     private StatsService? _stats;
     private CompService? _comps;
@@ -55,6 +57,7 @@ public sealed class Plugin : IPlugin
         _tavern = new TavernAdvicePanel(Core.OverlayCanvas);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _trinkets = new TrinketPickPanel(Core.OverlayCanvas, StatsDirectory);
+        _nextOpponent = new NextOpponentMarker(Core.OverlayCanvas);
     }
 
     public void OnUnload()
@@ -67,6 +70,8 @@ public sealed class Plugin : IPlugin
         _trinkets?.Detach();
         _trinkets?.Dispose();
         _trinkets = null;
+        _nextOpponent?.Detach();
+        _nextOpponent = null;
         _panel = null;
         _tavern = null;
         _stats?.Dispose();
@@ -93,6 +98,34 @@ public sealed class Plugin : IPlugin
         UpdateTavern(game);
         UpdateOpponentMmr(game);
         UpdateTrinketChoice(game);
+        UpdateNextOpponent(game);
+    }
+
+    private void UpdateNextOpponent(GameV2 game)
+    {
+        if (_nextOpponent == null)
+        {
+            return;
+        }
+
+        var tile = HdtEntityAdapter.IsShopPhase(game)
+            ? NextOpponent.Find(HdtEntityAdapter.NextOpponentPlayerId(game), HdtEntityAdapter.Heroes(game))
+            : null;
+        var key = tile == null ? string.Empty : $"{tile.LeaderboardPlace}:{tile.IsGhost}";
+        if (key == _nextOpponentKey)
+        {
+            return;
+        }
+
+        _nextOpponentKey = key;
+        if (tile == null)
+        {
+            _nextOpponent.Hide();
+        }
+        else
+        {
+            _nextOpponent.Show(tile);
+        }
     }
 
     private void UpdateTrinketChoice(GameV2 game)
