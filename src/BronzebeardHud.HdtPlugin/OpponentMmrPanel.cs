@@ -128,13 +128,17 @@ internal sealed class OpponentMmrPanel : IDisposable
                 BorderThickness = new Thickness(1.5 * scale),
                 CornerRadius = new CornerRadius(4 * scale),
                 IsHitTestVisible = false,
-                Child = new TextBlock
+                // "8045 · #2614" can be wider than the label at small scales: shrink, never clip.
+                Child = new Viewbox
                 {
-                    Text = $"{row.Rating.ToString("N0", CultureInfo.InvariantCulture)} · #{row.Rank.ToString("N0", CultureInfo.InvariantCulture)}",
-                    FontSize = 12 * scale,
-                    Foreground = Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
+                    Stretch = Stretch.Uniform,
+                    StretchDirection = StretchDirection.DownOnly,
+                    Child = new TextBlock
+                    {
+                        Text = $"{row.Rating.ToString(CultureInfo.InvariantCulture)} · #{row.Rank.ToString(CultureInfo.InvariantCulture)}",
+                        FontSize = 12 * scale,
+                        Foreground = Brushes.White,
+                    },
                 },
             };
             Canvas.SetLeft(label, rect.Left);

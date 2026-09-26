@@ -69,6 +69,7 @@ public sealed class Plugin : IPlugin
     private bool _compsLoadedThisGame;
     private string _shownKey = string.Empty;
     private string _tavernKey = string.Empty;
+    private int _diagnosticRound = -1;
     private string _opponentKey = string.Empty;
 
     /// <summary>%LocalAppData%\BronzebeardHud\stats; hand-typed HSReplay files go in its "manual" subfolder.</summary>
@@ -268,6 +269,7 @@ public sealed class Plugin : IPlugin
         {
             _inHeroSelection = true;
             _compsLoadedThisGame = false;
+            _diagnosticRound = -1;
             _timeline.Reset();
             _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
         }
@@ -320,7 +322,18 @@ public sealed class Plugin : IPlugin
         }
 
         _tavernKey = key;
-        var targets = CompAdvisor.Rank(owned, _comps.Compositions());
-        _tavern.Show(CompAdvisor.AdviseShop(tavern, targets, owned), targets, _comps.Status, _comps.Pins);
+        var compositions = _comps.Compositions();
+        var advice = TavernAdvisor.Advise(tavern, owned, compositions, HdtEntityAdapter.LobbyTribeNames());
+        _tavern.Show(advice, owned.Select(c => c.CardId), _comps.Status, _comps.Pins);
+
+        // One diagnostic line per shop round, once the tavern has cards: enough to tell from HDT's log
+        // whether compositions were loaded, what was targeted and where the first marker went.
+        var round = game.GetTurnNumber();
+        if (round != _diagnosticRound && tavern.Count > 0)
+        {
+            _diagnosticRound = round;
+            Log.Info(TavernAdvisor.DiagnosticLine(round, compositions.Count, _comps.State, advice, _tavern.FirstMarker,
+                Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
+        }
     }
 }

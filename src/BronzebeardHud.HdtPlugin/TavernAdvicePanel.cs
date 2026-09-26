@@ -9,21 +9,22 @@ using BronzebeardHud.Stats;
 namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
-/// In the shop: a marker under each tavern minion that would add a piece to a target composition,
-/// and the "target compositions" panel. Positions come from <see cref="TavernLayout"/> and follow
-/// the overlay canvas size. Built in code, without XAML, so that it compiles under WSL.
+/// In the shop: a frame and a label on each tavern card that fits a composition (key piece of any
+/// composition playable in the lobby, add-on of a target, or a pin), and the target composition panel.
+/// Positions come from <see cref="TavernLayout"/> (HDT's shop constants) and follow the canvas size.
+/// Labels are built to fit by <see cref="MarkerText"/>; a DownOnly Viewbox shrinks, never clips, as a safety net.
 /// </summary>
 internal sealed class TavernAdvicePanel
 {
     private static readonly Brush KeyBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x00));
-    private static readonly Brush AddonBrush = new SolidColorBrush(Color.FromRgb(0x4D, 0xA6, 0xFF));
+    private static readonly Brush AddonBrush = new SolidColorBrush(Color.FromRgb(0x1E, 0x90, 0xFF));
     private static readonly Brush PinBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0x4D, 0xFF));
 
     private readonly Canvas _canvas;
-    private readonly List<(Border Marker, int Position)> _markers = new();
+    private readonly List<UIElement> _markers = new();
     private readonly Border _targets;
-    private IReadOnlyList<ShopAdvice> _advice = new List<ShopAdvice>();
-    private IReadOnlyList<CompProgress> _progress = new List<CompProgress>();
+    private TavernAdvice? _advice;
+    private HashSet<string> _owned = new();
     private string? _status;
     private TavernPins _pins = TavernPins.Empty;
     private bool _visible;
@@ -44,12 +45,15 @@ internal sealed class TavernAdvicePanel
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
-    public void Show(IReadOnlyList<ShopAdvice> advice, IReadOnlyList<CompProgress> progress, string? status, TavernPins pins)
+    /// <summary>The first marker drawn by the last layout, for the diagnostic line; null when none.</summary>
+    public LayoutRect? FirstMarker { get; private set; }
+
+    public void Show(TavernAdvice advice, IEnumerable<string> ownedCardIds, string? status, TavernPins pins)
     {
-        _pins = pins;
         _advice = advice;
-        _progress = progress;
+        _owned = new HashSet<string>(ownedCardIds);
         _status = status;
+        _pins = pins;
         _visible = true;
         Relayout();
     }
@@ -57,11 +61,7 @@ internal sealed class TavernAdvicePanel
     public void Hide()
     {
         _visible = false;
-        foreach (var (marker, _) in _markers)
-        {
-            marker.Visibility = Visibility.Collapsed;
-        }
-
+        ClearMarkers();
         _targets.Visibility = Visibility.Collapsed;
     }
 
@@ -76,7 +76,7 @@ internal sealed class TavernAdvicePanel
 
     private void ClearMarkers()
     {
-        foreach (var (marker, _) in _markers)
+        foreach (var marker in _markers)
         {
             _canvas.Children.Remove(marker);
         }
@@ -84,64 +84,113 @@ internal sealed class TavernAdvicePanel
         _markers.Clear();
     }
 
+    private List<string> LinesFor(ShopAdvice card, int maxChars)
+    {
+        var comps = card.Advances
+            .Select(a => (a.Composition.Name, a.Composition.CoreCards.Count(_owned.Contains), a.Composition.CoreCards.Count, a.IsKeyPiece))
+            .ToList();
+        var lines = MarkerText.Lines(comps, maxChars).ToList();
+        if (_pins.IsPinned(card.CardId))
+        {
+            lines.Insert(0, "◆ pinned");
+        }
+
+        return lines.Take(2).ToList();
+    }
+
     private void Relayout()
     {
         ClearMarkers();
-        if (!_visible || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
+        FirstMarker = null;
+        if (!_visible || _advice == null || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
         {
             return;
         }
 
         var width = _canvas.ActualWidth;
         var height = _canvas.ActualHeight;
-        var scale = height / 1080;
-        var rects = TavernLayout.Markers(width, height, _advice.Count);
-        foreach (var advice in _advice.Where(a => a.Advances.Count > 0 || _pins.IsPinned(a.CardId)))
+        var scale = TavernLayout.Scale(height);
+        var fontSize = TavernLayout.MarkerFontSize * scale;
+        var slotWidth = TavernLayout.Markers(width, height, _advice.Cards.Count).FirstOrDefault().Width;
+        var maxChars = MarkerText.MaxChars(slotWidth, fontSize, TavernLayout.MarkerPadding * scale);
+        var marked = _advice.Cards
+            .Where(c => c.Advances.Count > 0 || _pins.IsPinned(c.CardId))
+            .Select(c => (Card: c, Lines: LinesFor(c, maxChars)))
+            .ToList();
+        var lineCount = marked.Count == 0 ? 1 : marked.Max(m => m.Lines.Count);
+        var markers = TavernLayout.Markers(width, height, _advice.Cards.Count, lineCount);
+        var slots = TavernLayout.CardSlots(width, height, _advice.Cards.Count);
+
+        foreach (var (card, lines) in marked)
         {
-            var rect = rects[advice.Position];
-            var isKey = advice.Advances.Any(a => a.IsKeyPiece);
-            var isPinned = _pins.IsPinned(advice.CardId);
-            var parts = advice.Advances.Select(a => (a.IsKeyPiece ? "★ " : "+ ") + a.Composition.Name).ToList();
-            if (isPinned)
+            var colour = _pins.IsPinned(card.CardId) ? PinBrush : card.Advances.Any(a => a.IsKeyPiece) ? KeyBrush : AddonBrush;
+            var textColour = colour == KeyBrush ? Brushes.Black : Brushes.White;
+
+            // A thick frame around the card itself, so the marked card stands out at a glance.
+            var slot = slots[card.Position];
+            var frame = new Border
             {
-                parts.Insert(0, "◆ pinned");
+                Width = slot.Width,
+                Height = slot.Height,
+                BorderBrush = colour,
+                BorderThickness = new Thickness(4 * scale),
+                CornerRadius = new CornerRadius(10 * scale),
+                IsHitTestVisible = false,
+            };
+            Canvas.SetLeft(frame, slot.Left);
+            Canvas.SetTop(frame, slot.Top);
+
+            var rect = markers[card.Position];
+            var text = new StackPanel();
+            foreach (var line in lines)
+            {
+                text.Children.Add(new TextBlock
+                {
+                    Text = line,
+                    FontSize = fontSize,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = textColour,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                });
             }
 
-            var text = string.Join(" · ", parts);
-            var marker = new Border
+            var label = new Border
             {
                 Width = rect.Width,
                 Height = rect.Height,
-                Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
-                BorderBrush = isPinned ? PinBrush : isKey ? KeyBrush : AddonBrush,
-                BorderThickness = new Thickness(2 * scale),
-                CornerRadius = new CornerRadius(4 * scale),
+                Background = colour,
+                BorderBrush = Brushes.Black,
+                BorderThickness = new Thickness(1.5 * scale),
+                CornerRadius = new CornerRadius(5 * scale),
+                Padding = new Thickness(TavernLayout.MarkerPadding * scale, 0, TavernLayout.MarkerPadding * scale, 0),
                 IsHitTestVisible = false,
-                Child = new TextBlock
-                {
-                    Text = text,
-                    FontSize = 11 * scale,
-                    Foreground = isKey ? KeyBrush : Brushes.White,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                },
+                // Safety net: if the glyph-width estimate is ever short, shrink rather than clip.
+                Child = new Viewbox { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Child = text },
             };
-            Canvas.SetLeft(marker, rect.Left);
-            Canvas.SetTop(marker, rect.Top);
-            _canvas.Children.Add(marker);
-            _markers.Add((marker, advice.Position));
+            Canvas.SetLeft(label, rect.Left);
+            Canvas.SetTop(label, rect.Top);
+
+            _canvas.Children.Add(frame);
+            _canvas.Children.Add(label);
+            _markers.Add(frame);
+            _markers.Add(label);
+            FirstMarker ??= rect;
         }
 
+        RelayoutTargets(width, height, scale);
+    }
+
+    private void RelayoutTargets(double width, double height, double scale)
+    {
         var panel = TavernLayout.TargetPanel(width, height);
         var lines = new StackPanel { Margin = new Thickness(6 * scale) };
         lines.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray });
-        if (_progress.Count == 0)
+        if (_advice!.Targets.Count == 0)
         {
-            lines.Children.Add(new TextBlock { Text = "none yet: no key piece, add-on or tribe held", FontSize = 12 * scale, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap });
+            lines.Children.Add(new TextBlock { Text = "none yet: key pieces of lobby comps are framed", FontSize = 12 * scale, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap });
         }
 
-        foreach (var progress in _progress)
+        foreach (var progress in _advice.Targets)
         {
             var comp = progress.Composition;
             var average = comp.AveragePlacement is { } avg ? $" · avg {avg.ToString("0.00", CultureInfo.InvariantCulture)}" : string.Empty;
@@ -150,13 +199,13 @@ internal sealed class TavernAdvicePanel
                 Text = $"{comp.Name}: {progress.CoreOwned.Count}/{comp.CoreCards.Count} key pieces{average}",
                 FontSize = 14 * scale,
                 Foreground = Brushes.White,
-                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.Wrap,
             });
         }
 
-        if (_progress.Count > 0 && _progress[0].Composition.InspirationBoards.Count > 0)
+        if (_advice.Targets.Count > 0 && _advice.Targets[0].Composition.InspirationBoards.Count > 0)
         {
-            var board = _progress[0].Composition.InspirationBoards[0];
+            var board = _advice.Targets[0].Composition.InspirationBoards[0];
             var names = board.Select(id => Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(id)?.LocalizedName ?? id);
             lines.Children.Add(new TextBlock
             {

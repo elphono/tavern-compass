@@ -106,7 +106,7 @@ internal sealed class HeroPickPanel
             badge.Width = rect.Width;
             badge.Height = rect.Height;
             badge.Padding = new Thickness(4 * scale, 2 * scale, 4 * scale, 2 * scale);
-            badge.Child = BuildContent((HeroPickRow)badge.Tag, scale);
+            badge.Child = new Viewbox { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Child = BuildContent((HeroPickRow)badge.Tag, scale) };
             Canvas.SetLeft(badge, rect.Left);
             Canvas.SetTop(badge, rect.Top);
             badge.Visibility = Visibility.Visible;

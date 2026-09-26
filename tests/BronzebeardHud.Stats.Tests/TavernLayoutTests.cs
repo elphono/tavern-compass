@@ -12,13 +12,14 @@ public class TavernLayoutTests
     public void Markers_AreCentredUnderEachMinion_EquallySpaced_WithoutOverlap(int minions, double width, double height)
     {
         var markers = TavernLayout.Markers(width, height, minions);
-        var pitch = height * 4 / 3 * (0.63 / 7 + 2 * 0.0029);
+        var s = height / 1080;
+        var pitch = 138 * s; // HDT's shop card slot
 
         Assert.Equal(minions, markers.Count);
         for (var i = 0; i < minions; i++)
         {
             Assert.Equal(width, markers[i].CenterX + markers[minions - 1 - i].CenterX, precision: 6);
-            Assert.Equal(height / 2 - 0.045 * height, markers[i].CenterY, precision: 6); // bottom edge of the tavern row
+            Assert.Equal(height / 2 - 145 * s + 95 * s, markers[i].CenterY, precision: 6); // bottom edge of the card
             Assert.InRange(markers[i].Left, 0, width);
             Assert.InRange(markers[i].Right, 0, width);
         }
@@ -64,5 +65,27 @@ public class TavernLayoutTests
     {
         Assert.Empty(TavernLayout.Markers(2000, 1220, 0));
         Assert.Empty(TavernLayout.Markers(0, 1220, 5));
+    }
+
+    [Fact]
+    public void Markers_GrowWithTheirLines_AndCardSlotsFollowHdtsShop()
+    {
+        const double width = 2291, height = 1360;
+        var s = height / 1080;
+        var one = TavernLayout.Markers(width, height, 4, lines: 1)[0];
+        var two = TavernLayout.Markers(width, height, 4, lines: 2)[0];
+        Assert.Equal((13 * 1.3 + 8) * s, one.Height, precision: 6);
+        Assert.Equal((2 * 13 * 1.3 + 8) * s, two.Height, precision: 6);
+
+        var slots = TavernLayout.CardSlots(width, height, 3);
+        Assert.Equal(width / 2 - 138 * s, slots[0].CenterX, precision: 6);
+        Assert.Equal(width / 2, slots[1].CenterX, precision: 6);
+        Assert.Equal(width / 2 + 138 * s, slots[2].CenterX, precision: 6);
+        Assert.All(slots, r =>
+        {
+            Assert.Equal(height / 2 - 145 * s, r.CenterY, precision: 6);
+            Assert.Equal(138 * s, r.Width, precision: 6);
+            Assert.Equal(190 * s, r.Height, precision: 6);
+        });
     }
 }

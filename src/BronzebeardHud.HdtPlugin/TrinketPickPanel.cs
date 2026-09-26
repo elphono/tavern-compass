@@ -123,13 +123,13 @@ internal sealed class TrinketPickPanel : IDisposable
                 BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(6),
                 IsHitTestVisible = false,
-                Child = new TextBlock
+                // "avg 3.80 · 50% · FS 25%" is wider than the badge at some scales: shrink, never clip.
+                Child = new Viewbox
                 {
-                    Text = text,
-                    FontSize = 14 * scale,
-                    Foreground = Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
+                    Stretch = Stretch.Uniform,
+                    StretchDirection = StretchDirection.DownOnly,
+                    Margin = new Thickness(4 * scale, 0, 4 * scale, 0),
+                    Child = new TextBlock { Text = text, FontSize = 14 * scale, Foreground = Brushes.White },
                 },
             };
             Canvas.SetLeft(badge, rects[i].Left);

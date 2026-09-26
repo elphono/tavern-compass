@@ -96,6 +96,9 @@ internal sealed class CompService : IDisposable
     public IReadOnlyList<Composition> Compositions() =>
         _firestone?.File is { } firestone ? _manual.Concat(firestone.Compositions).ToList() : _manual;
 
+    /// <summary>Short state for the diagnostic line: loading, ok, or error.</summary>
+    public string State => _refresh != null ? "loading" : _firestone?.Error != null ? "error" : _firestone?.File != null ? "ok" : "none";
+
     public string? Status
     {
         get

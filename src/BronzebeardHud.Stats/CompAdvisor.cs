@@ -117,3 +117,91 @@ public static class CompAdvisor
             .ToList();
     }
 }
+
+/// <summary>What the tavern overlay shows: the target compositions and one marker entry per tavern card.</summary>
+public sealed class TavernAdvice
+{
+    public TavernAdvice(IReadOnlyList<CompProgress> targets, IReadOnlyList<ShopAdvice> cards, int playableCompositions)
+    {
+        Targets = targets;
+        Cards = cards;
+        PlayableCompositions = playableCompositions;
+    }
+
+    public IReadOnlyList<CompProgress> Targets { get; }
+
+    /// <summary>One entry per tavern card, left to right; an entry with advances gets a marker.</summary>
+    public IReadOnlyList<ShopAdvice> Cards { get; }
+
+    /// <summary>Compositions whose tribes are all in the lobby (or tribeless): the pool markers come from.</summary>
+    public int PlayableCompositions { get; }
+
+    public int MarkerCount => Cards.Count(c => c.Advances.Count > 0);
+}
+
+public static class TavernAdvisor
+{
+    /// <summary>
+    /// Marks the tavern for the player, from turn 1 on. Replay of Ali's game of 2026-09-26 showed why the
+    /// first rule (only pieces of the three target compositions) left the tavern unmarked: with an empty
+    /// board and hand there is no target, and later the targets' pieces rarely show up. Rule now:
+    /// - a <b>key piece</b> of any composition playable in this lobby is marked, target or not (like
+    ///   Tier7's comp key pieces), even when the player already holds a copy (a triple is on the way);
+    /// - an <b>add-on</b> of a target composition is marked when the player does not hold it yet.
+    /// A composition is playable when all its tribes are in the lobby, or it has none; an unknown lobby
+    /// (empty list) filters nothing. Compositions on a card are listed targets first, in ranking order,
+    /// then by average placement.
+    /// </summary>
+    public static TavernAdvice Advise(
+        IReadOnlyList<string> tavernCardIds,
+        IReadOnlyList<OwnedCard> owned,
+        IReadOnlyList<Composition> compositions,
+        IReadOnlyCollection<string> lobbyTribes)
+    {
+        var playable = compositions
+            .Where(c => lobbyTribes.Count == 0 || c.Tribes.All(lobbyTribes.Contains))
+            .ToList();
+        var targets = CompAdvisor.Rank(owned, playable);
+        var targetOrder = targets.Select((t, i) => (t.Composition.Id, i)).ToDictionary(x => x.Id, x => x.i, StringComparer.Ordinal);
+        var ownedIds = new HashSet<string>(owned.Select(c => c.CardId), StringComparer.Ordinal);
+
+        int Order(Composition c) => targetOrder.TryGetValue(c.Id, out var rank) ? rank : int.MaxValue;
+
+        var cards = tavernCardIds.Select((rawId, position) =>
+        {
+            var cardId = CardIds.Normalize(rawId);
+            var advances = playable
+                .Where(c => c.CoreCards.Contains(cardId))
+                .Select(c => (Composition: c, IsKeyPiece: true))
+                .Concat(targets
+                    .Select(t => t.Composition)
+                    .Where(c => !ownedIds.Contains(cardId) && !c.CoreCards.Contains(cardId) && c.AddonCards.Contains(cardId))
+                    .Select(c => (Composition: c, IsKeyPiece: false)))
+                .OrderBy(a => Order(a.Composition))
+                .ThenBy(a => a.Composition.AveragePlacement ?? double.MaxValue)
+                .ThenBy(a => a.Composition.Id, StringComparer.Ordinal)
+                .ToList();
+            return new ShopAdvice(position, cardId, advances);
+        }).ToList();
+        return new TavernAdvice(targets, cards, playable.Count);
+    }
+
+    /// <summary>
+    /// One log line per shop round, e.g.
+    /// <c>Bronzebeard HUD: tavern round=3 comps=24 (ok) playable=22 targets=[Murloc Scam 3.5; Murloc Handbuff 0.5] tavern=4 markers=1 first=#0 x=1086 y=497 w=176 h=57 canvas=2291x1360</c>.
+    /// </summary>
+    public static string DiagnosticLine(int round, int compositionCount, string compositionState, TavernAdvice advice, LayoutRect? firstMarker, double canvasWidth, double canvasHeight)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        string N(double v) => Math.Round(v).ToString("0", inv);
+        var targets = advice.Targets.Count == 0
+            ? "none"
+            : "[" + string.Join("; ", advice.Targets.Select(t => $"{t.Composition.Name} {t.Score.ToString("0.#", inv)}")) + "]";
+        var firstIndex = advice.Cards.FirstOrDefault(c => c.Advances.Count > 0)?.Position;
+        var first = firstIndex is { } index && firstMarker is { } rect
+            ? $"#{index} x={N(rect.Left)} y={N(rect.Top)} w={N(rect.Width)} h={N(rect.Height)}"
+            : "none";
+        return $"Bronzebeard HUD: tavern round={round} comps={compositionCount} ({compositionState}) playable={advice.PlayableCompositions} " +
+               $"targets={targets} tavern={advice.Cards.Count} markers={advice.MarkerCount} first={first} canvas={N(canvasWidth)}x{N(canvasHeight)}";
+    }
+}
