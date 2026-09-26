@@ -45,6 +45,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _pinsGuard;
     private readonly FeatureGuard _transitionsGuard;
     private readonly FeatureGuard _lineupsGuard;
+    private readonly FeatureGuard _metaGuard;
 
     // Pins made by click (Tavern Pinning): kept across a plugin reload within a game, forgotten at the next game.
     private readonly GamePins _gamePins = new();
@@ -77,6 +78,15 @@ public sealed class Plugin : IPlugin
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
+        _metaGuard = new FeatureGuard("meta-snapshot", (n, e) => Disable(n, e, () =>
+        {
+            if (_tavern != null)
+            {
+                _tavern.MetaEnabled = false;
+            }
+
+            _shownCompStatus = "\u0000";
+        }));
         _lineupsGuard = new FeatureGuard("minion-lineups", (n, e) => Disable(n, e, () =>
         {
             if (_tavern != null)
@@ -133,6 +143,13 @@ public sealed class Plugin : IPlugin
 
         Log.Info($"Bronzebeard HUD: suggested compositions={_settings.SuggestedCompositions}");
         _selectionVersion++; // redraws the markers, the choices and the panel, in the shop and in combat
+    });
+
+    /// <summary>The "Meta" button of the target panel: Firestone's composition tier list in the default browser.</summary>
+    private void OpenMetaSnapshot() => _metaGuard.Run(() =>
+    {
+        Process.Start(new ProcessStartInfo(MetaSnapshot.Url) { UseShellExecute = true });
+        Log.Info($"Bronzebeard HUD: meta snapshot opened {MetaSnapshot.Url}");
     });
 
     /// <summary>How top players field a minion, from the compositions playable in this lobby; null if the feature failed.</summary>
@@ -279,7 +296,7 @@ public sealed class Plugin : IPlugin
             Log.Warn($"Bronzebeard HUD: cannot read {SettingsPath}: {e.Message}");
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, LineupsFor);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, LineupsFor, OpenMetaSnapshot);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);

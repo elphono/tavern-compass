@@ -14,9 +14,7 @@ flowchart LR
     P4 --> P5["Phase 5<br/>top 4 des héros, plateau vs courbe,<br/>compos par héros, bilan par adversaire"]
     classDef done fill:#ffffff,stroke:#2b8a3e,stroke-width:4px,color:#000000
     P5 --> P6["Phase 6 (Ali : « rajoute tout »)<br/>compos × ton héros, épinglage au clic, transitions,<br/>plateaux des tops par sbire, Timewarped, Meta Snapshot"]
-    classDef todo fill:#ffffff,stroke:#d9480f,stroke-width:4px,color:#000000
-    class P1,P2,P3,P4,P5 done
-    class P6 todo
+    class P1,P2,P3,P4,P5,P6 done
 ```
 
 ## Structure du code
@@ -145,7 +143,7 @@ adversaire est un confort.
 | 5.3 Meilleures compos d'un héros (livré ; échantillons de 17 parties en médiane : estimation tirée vers la moyenne de la compo, 30 parties a priori, 10 au moins, nombre de parties affiché) | `heroAffinity` dans le format des compos, schéma 3 ; ligne sous chaque héros proposé | `hero-comps` | seuil d'effectifs, ordre, héros absent, ancien cache retéléchargé |
 | 5.4 Bilan par adversaire (livré ; combats contre un fantôme écartés, leur résultat ne se lit pas aux PV) | `Standings` (`GameTimeline.cs`) ; colonne du panneau Combats | `history` (même panneau) | trois combats contre deux adversaires, égalité, fantôme |
 
-## Phase 6 : le reste de la parité, à la demande d'Ali
+## Phase 6 : le reste de la parité, à la demande d'Ali (livrée)
 
 Décision d'Ali du 2026-09-26 : « rajoute tout ». Une tranche par commit, livrée et redéployée avant la
 suivante, dans cet ordre.
@@ -157,7 +155,7 @@ suivante, dans cet ordre.
 | 6.2 Épinglage au clic (livré, option B : les Tavern Markers d'HDT sont Tier7) | cliquer une carte de Bob l'épingle pour la partie, en plus de `pins.txt` | rangée `TavernRow`, clic comme les cases (`IsOverlayHitTestVisible`) | `tavern-pins` | épingler, désépingler sur trois tours, nouvelle partie, fusion avec `pins.txt` |
 | 6.3 Transitions entre compos (livré ; heuristique « ≈ », 2 cartes communes au moins : 158 des 552 couples de compos n'en partagent qu'une) | vers quelles compos pivoter depuis une compo visée, et par quelles cartes communes ; affiché comme heuristique | cartes clés et compléments partagés, plateaux finaux | `comp-transitions` | recouvrements fort, faible, nul ; mutation sur le seuil |
 | 6.4 Plateaux des tops par sbire (livré ; « ? » au-dessus des cartes de Bob, clic sur une vignette ; Firestone ne donne pas la place d'un plateau, classés par MMR ; cache compact de 77 Ko) | sur une vignette ou une carte de Bob : compos et plateaux finaux réels qui le contiennent, position habituelle | `finalBoards`, 3 à 5 plateaux par compo, cache en dizaines de Ko | `minion-boards` | deux compos aux positions distinctes, sbire absent, classement des plateaux |
-| 6.5 Timewarped, Meta Snapshot | Timewarped seulement s'il est actif cette saison (sinon sauté, preuve à l'appui) ; bouton qui ouvre la page méta BG dans le navigateur | log d'Ali, notes de patch | `meta-snapshot` | URL, absence de Timewarped prouvée |
+| 6.5 Timewarped, Meta Snapshot (livré : bouton « Meta ↗ » vers firestoneapp.com/battlegrounds/comps ; **Timewarped sauté** : ni `BACON_ALT_TAVERN_SYSTEM_ACTIVE` ni aucun tag `BACON_ALT_TAVERN_*` dans les deux parties d'Ali du 2026-09-26, dont les tours 6 et 9 ont servi aux trinkets) | Timewarped seulement s'il est actif cette saison (sinon sauté, preuve à l'appui) ; bouton qui ouvre la page méta BG dans le navigateur | log d'Ali, notes de patch | `meta-snapshot` | URL, absence de Timewarped prouvée |
 
 ## Ce qui reste un arbitrage d'Ali
 

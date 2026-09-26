@@ -23,6 +23,7 @@ internal sealed class TavernAdvicePanel
     private readonly Func<int> _suggested;
     private readonly Action<string> _togglePin;
     private readonly Func<string, MinionLineups?> _lineupsFor;
+    private readonly Action _openMeta;
     private MinionLineups? _lineups;
     private IReadOnlyList<bool> _minionSlots = Array.Empty<bool>();
     private readonly Action<int> _changeSuggested;
@@ -46,8 +47,9 @@ internal sealed class TavernAdvicePanel
     /// <param name="changeSuggested">Called with −1 or +1 when the − or + of the panel is clicked.</param>
     /// <param name="togglePin">Called with a card id when its pin button is clicked.</param>
     public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle, Func<int> suggested, Action<int> changeSuggested,
-        Action<string> togglePin, Func<string, MinionLineups?> lineupsFor)
+        Action<string> togglePin, Func<string, MinionLineups?> lineupsFor, Action openMeta)
     {
+        _openMeta = openMeta;
         _togglePin = togglePin;
         _lineupsFor = lineupsFor;
         _suggested = suggested;
@@ -70,6 +72,9 @@ internal sealed class TavernAdvicePanel
 
     /// <summary>The first marker drawn by the last layout, for the diagnostic line; null when none.</summary>
     public LayoutRect? FirstMarker { get; private set; }
+
+    /// <summary>When false, no "Meta" button (the meta-snapshot feature was switched off by its guard).</summary>
+    public bool MetaEnabled { get; set; } = true;
 
     /// <summary>When false, no "?" buttons nor clickable vignettes (the lineups feature was switched off by its guard).</summary>
     public bool LineupsEnabled { get; set; } = true;
@@ -479,6 +484,30 @@ internal sealed class TavernAdvicePanel
         var title = new DockPanel();
         var count = new StackPanel { Orientation = Orientation.Horizontal };
         DockPanel.SetDock(count, Dock.Right);
+        if (MetaEnabled)
+        {
+            // The meta tier list in the browser (MetaSnapshot.Url), clickable while the overlay stays locked.
+            var meta = new Border
+            {
+                Height = 20 * scale,
+                CornerRadius = new CornerRadius(4 * scale),
+                Background = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x44)),
+                BorderBrush = Brushes.LightGray,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(5 * scale, 0, 5 * scale, 0),
+                Margin = new Thickness(0, 0, 8 * scale, 0),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Child = new TextBlock { Text = "Meta ↗", FontSize = 12 * scale, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center },
+            };
+            meta.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                _openMeta();
+            };
+            OverlayExtensions.SetIsOverlayHitTestVisible(meta, true);
+            count.Children.Add(meta);
+        }
+
         count.Children.Add(StepButton("−", -1, scale));
         count.Children.Add(new TextBlock
         {
