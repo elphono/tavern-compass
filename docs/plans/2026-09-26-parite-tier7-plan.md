@@ -46,7 +46,7 @@ de la spec.
 | Fonctionnalité | Fichiers | Tests |
 |---|---|---|
 | Tranche de MMR (livrée) | `MmrBracket.cs` ; la table `mmrPercentiles` vient du fichier de héros lui-même, sans endpoint de plus | MMR sous le seuil du top 50 %, pile sur un seuil, entre deux seuils, au-dessus du top 1 % ; table vide ; pas de note |
-| MMR des adversaires | `LeaderboardClient.cs`, `LeaderboardIndex.cs` (port de `leaderboard.rs`) ; `OpponentMmrPanel.cs` | nom avec ou sans `#1234` ; casse ; homonymes (on garde le meilleur MMR) ; page malformée ; pages bornées |
+| MMR des adversaires (livré) | `Leaderboard.cs` (client, index, lobby → tuile, disposition) ; `OpponentMmrPanel.cs` | page 1 puis remontée depuis la dernière, arrêt au-dessus de la plage, pause d'1 s, plafond de 60 pages ; nom avec `#1234` et casse ; homonymes ; page non-200 ; JSON tronqué ; lobby → tuile par le héros |
 | **Conseiller de compositions** (prioritaire, livré) | `CompositionFile.cs`, `FirestoneCompImporter.cs`, `HsReplayCompText.cs`, `CompAdvisor.cs`, `TavernLayout.cs` ; `CompService.cs`, `TavernAdvicePanel.cs` | classement sur 3 tours successifs, carte utile à deux compos, plateau vide, compo sans pièce, cartes clés par fréquence, texte HSReplay, cache 7 jours, disposition 3 à 7 sbires |
 | Stats de compositions | intégrées au conseiller (import, cache, place moyenne dans le panneau) | — |
 
@@ -106,7 +106,4 @@ tout le rendu.
 1. Les tranches de MMR de HSReplay n'ont pas été vérifiées (le site nous répond 403) : pour une
    saisie manuelle, `mmrPercentile` reçoit le percentile affiché par HSReplay s'il en montre un, et
    reste vide sinon.
-2. L'utilité du MMR adverse à 6 840. Seuls les adversaires à 8 000 ou plus sont au classement, et
-   Firestone prévient que sa recherche « won't work for low- or medium-MMR players ». Trois issues :
-   la garder telle quelle, la désactiver tant que le MMR du joueur (fourni par HDT) reste loin sous
-   8 000, ou la retirer de la phase 2.
+2. ~~L'utilité du MMR adverse sous 8 000.~~ **Tranché le 2026-09-26 : Ali garde le MMR adverse tel quel, plage par défaut EU 8 000 – 8 050.**

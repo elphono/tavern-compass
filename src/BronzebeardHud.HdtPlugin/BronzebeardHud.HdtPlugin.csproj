@@ -34,6 +34,11 @@
       <HintPath>$(HdtDir)HearthDb.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Only for the lobby-info type HDT hands over; the plugin never calls HearthMirror itself. -->
+    <Reference Include="HearthMirror">
+      <HintPath>$(HdtDir)HearthMirror.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>

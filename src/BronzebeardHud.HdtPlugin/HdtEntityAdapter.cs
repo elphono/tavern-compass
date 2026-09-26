@@ -83,6 +83,51 @@ internal static class HdtEntityAdapter
         return race == Race.INVALID ? null : race.ToString();
     }
 
+    /// <summary>
+    /// Lobby players (name and hero), as HDT already read them (GameMetaData.BattlegroundsLobbyInfo),
+    /// the local player excluded. Empty until HDT has the lobby.
+    /// </summary>
+    public static IReadOnlyList<(string Name, string HeroCardId)> LobbyOpponents(GameV2 game)
+    {
+        try
+        {
+            var players = game.MetaData.BattlegroundsLobbyInfo?.Players;
+            if (players == null)
+            {
+                return Array.Empty<(string, string)>();
+            }
+
+            var ownHero = game.Player.Board.FirstOrDefault(e => e.IsHero)?.CardId;
+            return players
+                .Where(p => !string.IsNullOrEmpty(p.Name) && !string.IsNullOrEmpty(p.HeroCardId) && p.HeroCardId != ownHero)
+                .Select(p => (p.Name, p.HeroCardId))
+                .ToList();
+        }
+        catch (InvalidOperationException)
+        {
+            return Array.Empty<(string, string)>();
+        }
+    }
+
+    /// <summary>Hero card id → PLAYER_LEADERBOARD_PLACE, for every hero that has one.</summary>
+    public static IReadOnlyDictionary<string, int> LeaderboardPlaces(GameV2 game)
+    {
+        try
+        {
+            var places = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var hero in game.Entities.Values.Where(e => e.IsHero && e.HasTag(GameTag.PLAYER_LEADERBOARD_PLACE) && !string.IsNullOrEmpty(e.CardId)))
+            {
+                places[hero.CardId!] = hero.GetTag(GameTag.PLAYER_LEADERBOARD_PLACE);
+            }
+
+            return places;
+        }
+        catch (InvalidOperationException)
+        {
+            return new Dictionary<string, int>();
+        }
+    }
+
     private static Dictionary<string, string>? _cardIdsByName;
 
     /// <summary>Card name (English or French, any case) → card id, Battlegrounds pool minions first.</summary>

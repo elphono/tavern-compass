@@ -20,12 +20,14 @@ public sealed class Plugin : IPlugin
 {
     private HeroPickPanel? _panel;
     private TavernAdvicePanel? _tavern;
+    private OpponentMmrPanel? _opponentMmr;
     private StatsService? _stats;
     private CompService? _comps;
     private bool _inHeroSelection;
     private bool _compsLoadedThisGame;
     private string _shownKey = string.Empty;
     private string _tavernKey = string.Empty;
+    private string _opponentKey = string.Empty;
 
     /// <summary>%LocalAppData%\BronzebeardHud\stats; hand-typed HSReplay files go in its "manual" subfolder.</summary>
     internal static string StatsDirectory =>
@@ -48,12 +50,16 @@ public sealed class Plugin : IPlugin
         _comps = new CompService(StatsDirectory);
         _panel = new HeroPickPanel(Core.OverlayCanvas);
         _tavern = new TavernAdvicePanel(Core.OverlayCanvas);
+        _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
     }
 
     public void OnUnload()
     {
         _panel?.Detach();
         _tavern?.Detach();
+        _opponentMmr?.Detach();
+        _opponentMmr?.Dispose();
+        _opponentMmr = null;
         _panel = null;
         _tavern = null;
         _stats?.Dispose();
@@ -78,6 +84,36 @@ public sealed class Plugin : IPlugin
 
         UpdateHeroSelection(game);
         UpdateTavern(game);
+        UpdateOpponentMmr(game);
+    }
+
+    private void UpdateOpponentMmr(GameV2 game)
+    {
+        if (_opponentMmr == null)
+        {
+            return;
+        }
+
+        if (!game.IsBattlegroundsMatch || HdtEntityAdapter.IsHeroSelection(game))
+        {
+            _opponentKey = string.Empty;
+            _opponentMmr.Hide();
+            return;
+        }
+
+        _opponentMmr.EnsureDownloadStarted();
+        if (_opponentMmr.Index is not { } index)
+        {
+            return;
+        }
+
+        var opponents = OpponentMmr.Build(HdtEntityAdapter.LobbyOpponents(game), HdtEntityAdapter.LeaderboardPlaces(game), index);
+        var key = string.Join(",", opponents.Select(o => $"{o.LeaderboardPlace}:{o.Name}:{o.Row?.Rating}"));
+        if (key != _opponentKey)
+        {
+            _opponentKey = key;
+            _opponentMmr.Show(opponents);
+        }
     }
 
     private void UpdateHeroSelection(GameV2 game)
