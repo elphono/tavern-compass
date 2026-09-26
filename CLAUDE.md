@@ -42,9 +42,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 - Déploiement (Windows) : copier `BronzebeardHud.HdtPlugin.dll` et `BronzebeardHud.Stats.dll` dans
   `%AppData%\HearthstoneDeckTracker\Plugins\BronzebeardHud\`, **sans** `Newtonsoft.Json.dll` : HDT
   charge la sienne, dans la même version (13.0.3).
-- Données : `%LocalAppData%\BronzebeardHud\stats\`, qui contient le cache Firestone (rafraîchi au
-  plus une fois par 24 h) ; les saisies manuelles HSReplay vont dans son sous-dossier `manual\`, au
-  format décrit par la spec.
+- Données : `%LocalAppData%\BronzebeardHud\stats\`, qui contient le cache Firestone (héros et
+  trinkets : 24 h ; compositions : 7 jours). Dans son sous-dossier `manual\`, les fichiers écrits à la
+  main : `*.json` (stats de héros HSReplay, spec § 2), `*.comps.txt` (compositions HSReplay, spec § 6)
+  et `pins.txt` (sbires à signaler en taverne, un par ligne).
 - Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
   événements réels ne se vérifient que sous Windows, avec HDT installé.
 - Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests
