@@ -159,7 +159,8 @@ internal sealed class GameHistoryPanel
             };
             line.Children.Add(frame);
             var delta = row.Delta == 0 ? string.Empty : row.Delta > 0 ? $" +{row.Delta}" : $" {row.Delta}";
-            var label = $"{row.Rank}. {row.Hero.Health} HP{delta}" + (row.IsNextOpponent ? " · NEXT" : string.Empty) + (row.IsLocal ? " · you" : string.Empty);
+            var record = row.RecordText.Length > 0 ? $" · {row.RecordText}" : string.Empty;
+            var label = $"{row.Rank}. {row.Hero.Health} HP{delta}{record}" + (row.IsNextOpponent ? " · NEXT" : string.Empty) + (row.IsLocal ? " · you" : string.Empty);
             var brush = row.IsNextOpponent ? NextBrush : row.IsDead ? Brushes.Gray : Brushes.White;
             line.Children.Add(new Viewbox
             {

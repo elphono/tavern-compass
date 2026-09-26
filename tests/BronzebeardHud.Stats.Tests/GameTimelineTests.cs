@@ -116,6 +116,39 @@ public class GameTimelineTests
     }
 
     [Fact]
+    public void Standings_RecordAgainstEachOpponent_WinLossTie_GhostFightsLeftOut()
+    {
+        var t = new GameTimeline();
+        HeroHealth[] Lobby(int me, int p3, int p5, int p7, int p9) => new[]
+        {
+            new HeroHealth(Me, "BG22_HERO_004", me), new HeroHealth(3, "TB_BaconShop_HERO_39", p3), new HeroHealth(5, "BG31_HERO_802", p5),
+            new HeroHealth(7, "TB_BaconShop_HERO_16", p7), new HeroHealth(9, "BG25_HERO_103", p9),
+        };
+
+        void Fight(int turn, int opponent, HeroHealth[] before, HeroHealth[] after)
+        {
+            t.Observe(turn, inCombat: false, Me, opponent, before);
+            t.Observe(turn, inCombat: true, Me, 0, before);
+            t.Observe(turn + 1, inCombat: false, Me, 0, after);
+        }
+
+        Fight(2, 3, Lobby(30, 30, 30, 30, 5), Lobby(30, 26, 30, 30, 5));   // win against 3
+        Fight(3, 5, Lobby(30, 26, 30, 30, 5), Lobby(24, 26, 30, 30, 5));   // loss against 5
+        Fight(4, 3, Lobby(24, 26, 30, 30, 5), Lobby(19, 26, 30, 30, 0));   // loss against 3 (9 dies elsewhere)
+        Fight(5, 7, Lobby(19, 26, 30, 30, 0), Lobby(19, 26, 30, 30, 0));   // tie against 7
+        Fight(6, 9, Lobby(19, 26, 30, 30, 0), Lobby(19, 26, 30, 30, 0));   // against 9's ghost: not counted
+
+        var rows = Standings.Build(Lobby(19, 26, 30, 30, 0), t, Me, 0).ToDictionary(r => r.Hero.PlayerId);
+
+        Assert.Equal(5, t.Combats.Count);
+        Assert.Equal(("1-1", 1, 1, 0), (rows[3].RecordText, rows[3].Wins, rows[3].Losses, rows[3].Ties));
+        Assert.Equal("0-1", rows[5].RecordText);
+        Assert.Equal("0-0-1", rows[7].RecordText);
+        Assert.Equal(string.Empty, rows[9].RecordText);
+        Assert.Equal(string.Empty, rows[Me].RecordText);
+    }
+
+    [Fact]
     public void Standings_DeltaIsTheLastCombatsDamage()
     {
         var t = new GameTimeline();

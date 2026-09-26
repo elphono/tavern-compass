@@ -210,8 +210,11 @@ public static class HistoryLayout
 /// <summary>One line of the standings column: a player, its health now and since the last combat.</summary>
 public sealed class StandingRow
 {
-    public StandingRow(int rank, HeroHealth hero, int delta, bool isLocal, bool isNextOpponent)
+    public StandingRow(int rank, HeroHealth hero, int delta, bool isLocal, bool isNextOpponent, int wins = 0, int losses = 0, int ties = 0)
     {
+        Wins = wins;
+        Losses = losses;
+        Ties = ties;
         Rank = rank;
         Hero = hero;
         Delta = delta;
@@ -230,6 +233,17 @@ public sealed class StandingRow
     public bool IsLocal { get; }
     public bool IsNextOpponent { get; }
     public bool IsDead => Hero.Health <= 0;
+
+    /// <summary>
+    /// The local player's combats against this player this game. Fights against its ghost are left out: a
+    /// dead hero takes no damage, so their result cannot be read from health.
+    /// </summary>
+    public int Wins { get; }
+    public int Losses { get; }
+    public int Ties { get; }
+
+    /// <summary>"2-1", "1-0-1" with ties; empty before the first combat against this player.</summary>
+    public string RecordText => Wins + Losses + Ties == 0 ? string.Empty : Ties > 0 ? $"{Wins}-{Losses}-{Ties}" : $"{Wins}-{Losses}";
 }
 
 public static class Standings
@@ -250,12 +264,17 @@ public static class Standings
             .ThenBy(h => h.LeaderboardPlace <= 0 ? int.MaxValue : h.LeaderboardPlace)
             .ThenBy(h => h.PlayerId)
             .ToList();
+        int Count(int playerId, CombatResult result) =>
+            timeline.Combats.Count(c => c.OpponentPlayerId == playerId && c.OpponentHealthBefore > 0 && c.Result == result);
+
         var rows = new List<StandingRow>();
         for (var i = 0; i < ordered.Count; i++)
         {
             var rank = i > 0 && ordered[i].Health == ordered[i - 1].Health ? rows[i - 1].Rank : i + 1;
-            rows.Add(new StandingRow(rank, ordered[i], Delta(ordered[i]), ordered[i].PlayerId == localPlayerId,
-                nextOpponentPlayerId > 0 && ordered[i].PlayerId == nextOpponentPlayerId));
+            var id = ordered[i].PlayerId;
+            var local = id == localPlayerId;
+            rows.Add(new StandingRow(rank, ordered[i], Delta(ordered[i]), local, nextOpponentPlayerId > 0 && id == nextOpponentPlayerId,
+                local ? 0 : Count(id, CombatResult.Win), local ? 0 : Count(id, CombatResult.Loss), local ? 0 : Count(id, CombatResult.Tie)));
         }
 
         return rows;
