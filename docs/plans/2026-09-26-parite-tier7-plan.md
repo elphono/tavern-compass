@@ -47,7 +47,8 @@ de la spec.
 |---|---|---|
 | Tranche de MMR | `MmrBracket.cs` (MMR → percentile, d'après `mmr-percentiles`) | MMR sous le seuil du top 50 %, entre deux seuils, au-dessus du top 1 % ; table vide |
 | MMR des adversaires | `LeaderboardClient.cs`, `LeaderboardIndex.cs` (port de `leaderboard.rs`) ; `OpponentMmrPanel.cs` | nom avec ou sans `#1234` ; casse ; homonymes (on garde le meilleur MMR) ; page malformée ; pages bornées |
-| Stats de compositions | `CompStatsFile.cs`, `FirestoneCompStatsImporter.cs` ; `CompPanel.cs` | conversion sans `finalBoards` ; affinité avec un héros ; âge du cache 7 jours |
+| **Conseiller de compositions** (prioritaire, livré) | `CompositionFile.cs`, `FirestoneCompImporter.cs`, `HsReplayCompText.cs`, `CompAdvisor.cs`, `TavernLayout.cs` ; `CompService.cs`, `TavernAdvicePanel.cs` | classement sur 3 tours successifs, carte utile à deux compos, plateau vide, compo sans pièce, cartes clés par fréquence, texte HSReplay, cache 7 jours, disposition 3 à 7 sbires |
+| Stats de compositions | intégrées au conseiller (import, cache, place moyenne dans le panneau) | — |
 
 **Sous Windows** : noms du lobby fournis par `Core.Game.MetaData.BattlegroundsLobbyInfo`, placement
 des panneaux.

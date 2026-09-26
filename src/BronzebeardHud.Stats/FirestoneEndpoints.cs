@@ -25,6 +25,13 @@ public static class FirestoneEndpoints
         return $"{Base}/hero-stats/mmr-{mmrPercentile}/{timePeriod}/overview-from-hourly.gz.json";
     }
 
+    /// <summary>Composition stats (libs/battlegrounds/services/src/lib/services/bgs-comps.service.ts, BGS_CARDS_URL).</summary>
+    public static string CompStats(string timePeriod)
+    {
+        Check(100, timePeriod);
+        return $"{Base}/comp-stats/{timePeriod}/overview-from-hourly.gz.json";
+    }
+
     public static string MmrPercentileTable(string timePeriod)
     {
         Check(100, timePeriod);

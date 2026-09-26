@@ -1,0 +1,154 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using Newtonsoft.Json;
+
+namespace BronzebeardHud.Stats;
+
+/// <summary>
+/// Converts Firestone's <c>comp-stats/.../overview-from-hourly.gz.json</c> (31.5 MB) into the local
+/// composition format. That file has no key-card list (Firestone takes its CORE/ADDON cards from a
+/// separate editorial file, bgs-comps-strategies.gz.json, which is out of scope); the key pieces are
+/// therefore derived from the data it does carry, the real final boards of each archetype:
+/// a card present in at least <see cref="CoreShare"/> of them is a key piece, in at least
+/// <see cref="AddonShare"/> an add-on. Archetypes with fewer than <see cref="MinimumBoards"/>
+/// final boards are skipped: too few to tell a key piece from noise.
+/// </summary>
+public static class FirestoneCompImporter
+{
+    public const double CoreShare = 0.5;
+    public const double AddonShare = 0.2;
+    public const int MinimumBoards = 20;
+
+    // Firestone archetype ids start with the tribe ("mech_glambot", "abberation_discard" [sic]).
+    private static readonly Dictionary<string, string> TribeByPrefix = new(StringComparer.Ordinal)
+    {
+        ["beast"] = "BEAST", ["demon"] = "DEMON", ["dragon"] = "DRAGON", ["elemental"] = "ELEMENTAL",
+        ["mech"] = "MECHANICAL", ["murloc"] = "MURLOC", ["naga"] = "NAGA", ["pirate"] = "PIRATE",
+        ["quilboar"] = "QUILBOAR", ["undead"] = "UNDEAD", ["abberation"] = "ABERRATION", ["aberration"] = "ABERRATION",
+    };
+
+    public static CompositionFile Import(string firestoneJson, string sourceUrl, DateTimeOffset fetchedAt)
+    {
+        FsRoot? root;
+        try
+        {
+            var serializer = JsonSerializer.Create(new JsonSerializerSettings { DateParseHandling = DateParseHandling.None });
+            using var reader = new JsonTextReader(new StringReader(firestoneJson));
+            root = serializer.Deserialize<FsRoot>(reader);
+        }
+        catch (JsonException e)
+        {
+            throw new StatsFormatException($"Firestone comp stats: invalid JSON: {e.Message}", e);
+        }
+
+        if (root?.CompStats == null)
+        {
+            throw new StatsFormatException("Firestone comp stats: compStats is missing or not an array");
+        }
+
+        var compositions = new List<Composition>();
+        foreach (var comp in root.CompStats.Where(c => !string.IsNullOrWhiteSpace(c?.Archetype)))
+        {
+            var boards = (comp.HeroStats ?? new List<FsHeroStat>())
+                .SelectMany(h => h?.FinalBoards ?? new List<FsFinalBoard>())
+                .Select(b => b?.FinalComp?.Board)
+                .Where(b => b != null && b.Count > 0)
+                .Select(b => new HashSet<string>(b!.Where(m => !string.IsNullOrEmpty(m?.CardId)).Select(m => CardIds.Normalize(m.CardId!)), StringComparer.Ordinal))
+                .ToList();
+            if (boards.Count < MinimumBoards)
+            {
+                continue;
+            }
+
+            var shares = boards.SelectMany(b => b)
+                .GroupBy(id => id, StringComparer.Ordinal)
+                .Select(g => (Id: g.Key, Share: (double)g.Count() / boards.Count))
+                .OrderByDescending(x => x.Share)
+                .ThenBy(x => x.Id, StringComparer.Ordinal)
+                .ToList();
+            var core = shares.Where(x => x.Share >= CoreShare).Select(x => x.Id).ToList();
+            if (core.Count == 0)
+            {
+                continue;
+            }
+
+            var addon = shares.Where(x => x.Share >= AddonShare && x.Share < CoreShare).Select(x => x.Id).ToList();
+            var prefix = comp.Archetype!.Split('_')[0];
+            var tribes = TribeByPrefix.TryGetValue(prefix, out var tribe) ? new[] { tribe } : Array.Empty<string>();
+            compositions.Add(new Composition(
+                comp.Archetype,
+                Humanize(comp.Archetype),
+                tribes,
+                core,
+                addon,
+                comp.AveragePlacement is >= 1 and <= 8 ? comp.AveragePlacement : null,
+                comp.DataPoints));
+        }
+
+        if (compositions.Count == 0)
+        {
+            throw new StatsFormatException("Firestone comp stats: no archetype with enough final boards");
+        }
+
+        var file = new CompositionFile(
+            StatsSources.Firestone,
+            compositions,
+            sourceUrl,
+            TryDate(root.LastUpdateDate),
+            fetchedAt,
+            root.TimePeriod);
+        // Round-trip through the loader so that an import obeys exactly the local-format rules.
+        return CompositionLoader.Parse(CompositionLoader.Serialize(file));
+    }
+
+    /// <summary>"abberation_deathrattle" → "Aberration Deathrattle".</summary>
+    public static string Humanize(string archetype) =>
+        string.Join(" ", archetype.Replace("abberation", "aberration").Split('_')
+            .Where(w => w.Length > 0)
+            .Select(w => char.ToUpperInvariant(w[0]) + w.Substring(1)));
+
+    private static DateTimeOffset? TryDate(string? text) =>
+        text != null && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var date)
+            ? date
+            : null;
+
+    // Only the fields we read; Json.NET skips everything else while streaming.
+    private sealed class FsRoot
+    {
+        [JsonProperty("compStats")] public List<FsComp>? CompStats { get; set; }
+        [JsonProperty("lastUpdateDate")] public string? LastUpdateDate { get; set; }
+        [JsonProperty("timePeriod")] public string? TimePeriod { get; set; }
+    }
+
+    private sealed class FsComp
+    {
+        [JsonProperty("archetype")] public string? Archetype { get; set; }
+        [JsonProperty("dataPoints")] public int? DataPoints { get; set; }
+        [JsonProperty("averagePlacement")] public double? AveragePlacement { get; set; }
+        [JsonProperty("heroStats")] public List<FsHeroStat>? HeroStats { get; set; }
+    }
+
+    private sealed class FsHeroStat
+    {
+        [JsonProperty("finalBoards")] public List<FsFinalBoard>? FinalBoards { get; set; }
+    }
+
+    private sealed class FsFinalBoard
+    {
+        [JsonProperty("finalComp")] public FsFinalComp? FinalComp { get; set; }
+    }
+
+    private sealed class FsFinalComp
+    {
+        [JsonProperty("board")] public List<FsMinion>? Board { get; set; }
+    }
+
+    private sealed class FsMinion
+    {
+        [JsonProperty("cardID")] public string? CardId { get; set; }
+    }
+}

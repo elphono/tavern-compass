@@ -36,6 +36,78 @@ internal static class HdtEntityAdapter
         }
     }
 
+    /// <summary>Battlegrounds shopping: hero picked, not in combat.</summary>
+    public static bool IsShopPhase(GameV2 game) =>
+        game.IsBattlegroundsMatch && game.IsBattlegroundsHeroPickingDone && !game.IsBattlegroundsCombatPhase;
+
+    /// <summary>Minions on the player's board and every card in hand, golden copies mapped to their base card.</summary>
+    public static IReadOnlyList<OwnedCard> OwnedCards(GameV2 game)
+    {
+        try
+        {
+            return game.Player.Board.Where(e => e.IsMinion)
+                .Concat(game.Player.Hand)
+                .Where(e => !string.IsNullOrEmpty(e.CardId))
+                .Select(e => new OwnedCard(BaseCardId(e.CardId!), TribeOf(e)))
+                .ToList();
+        }
+        catch (InvalidOperationException)
+        {
+            return Array.Empty<OwnedCard>();
+        }
+    }
+
+    /// <summary>The minions Bob offers, left to right. In the shop, the opponent is Bob.</summary>
+    public static IReadOnlyList<string> TavernCardIds(GameV2 game)
+    {
+        try
+        {
+            return game.Opponent.Board.Where(e => e.IsMinion && !string.IsNullOrEmpty(e.CardId))
+                .OrderBy(e => e.GetTag(GameTag.ZONE_POSITION))
+                .Select(e => BaseCardId(e.CardId!))
+                .ToList();
+        }
+        catch (InvalidOperationException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    /// <summary>Old-style golden ids (TB_BaconUps_…) through HearthDb; "_G" ids by <see cref="BronzebeardHud.Stats.CardIds"/>.</summary>
+    private static string BaseCardId(string cardId) =>
+        BronzebeardHud.Stats.CardIds.Normalize(HearthDb.Cards.TripleToNormalCardIds.TryGetValue(cardId, out var normal) ? normal : cardId);
+
+    private static string? TribeOf(HdtEntity entity)
+    {
+        var race = (Race)entity.GetTag(GameTag.CARDRACE);
+        return race == Race.INVALID ? null : race.ToString();
+    }
+
+    private static Dictionary<string, string>? _cardIdsByName;
+
+    /// <summary>Card name (English or French, any case) → card id, Battlegrounds pool minions first.</summary>
+    public static string? ResolveCardName(string name)
+    {
+        if (_cardIdsByName == null)
+        {
+            var index = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var card in HearthDb.Cards.BaconPoolMinions.Values.Concat(HearthDb.Cards.All.Values))
+            {
+                foreach (var cardName in new[] { card.Name, card.GetLocName(Locale.frFR) })
+                {
+                    if (!string.IsNullOrEmpty(cardName) && !index.ContainsKey(cardName))
+                    {
+                        index[cardName] = card.Id;
+                    }
+                }
+            }
+
+            _cardIdsByName = index;
+        }
+
+        return _cardIdsByName.TryGetValue(name.Trim(), out var id) ? id : null;
+    }
+
     private static EntitySnapshot ToSnapshot(HdtEntity entity)
     {
         var tags = entity.Tags.ToDictionary(t => t.Key.ToString(), t => t.Value);

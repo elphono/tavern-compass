@@ -25,7 +25,7 @@ Priorité : 1 = cœur de la parité, 2 = attendu, 3 = confort. *Qui la fournit* 
 | **Stats des héros proposés** | les deux | tier, place moyenne, taux de choix ; à la sélection | héros proposés, stats agrégées | plugin, données externes : JSON de héros de Firestone, saisie HSReplay | 1 |
 | Tranche de MMR des stats | les deux | les mêmes stats pour ta tranche | MMR du joueur, percentiles | plugin, données externes : `mmr-percentiles` ; MMR fourni par HDT | 1 |
 | **MMR des adversaires** | Firestone | MMR et rang près du classement ; toute la partie | noms du lobby, classement public | plugin, données externes : leaderboard Blizzard ; noms fournis par HDT | 1 |
-| Stats de compositions | les deux | tier des compos, place moyenne, affinité avec ton héros ; en boutique | stats agrégées | plugin, données externes : JSON de compos de Firestone | 1 |
+| **Conseiller de compositions** (demande d'Ali) | les deux | compos visées d'après plateau + main, et sbires de Bob qui y ajoutent une pièce ; en boutique | plateau, main, taverne, compos connues | plugin, données externes : compos Firestone (§ 6), saisie HSReplay | 1 |
 | Impact des tribus du lobby sur un héros | Firestone | place moyenne corrigée ; à la sélection | `tribeStats`, tribus du lobby | plugin, données externes : JSON de héros ; tribus fournies par HDT | 2 |
 | Stats des trinkets proposés | les deux | place moyenne ; au choix | stats agrégées | plugin, données externes : JSON de trinkets de Firestone | 2 |
 | Prochain adversaire mis en évidence | projet | marque sur le classement | `NEXT_OPPONENT_PLAYER_ID` | plugin, données HDT | 2 |
@@ -36,7 +36,7 @@ Priorité : 1 = cœur de la parité, 2 = attendu, 3 = confort. *Qui la fournit* 
 | Graphe des PV de tous les joueurs | Firestone | courbes par tour | `HEALTH`, `DAMAGE` | plugin, données HDT | 3 |
 | Plateaux d'inspiration | HSReplay | plateaux finaux réels d'une compo | `finalBoards` du JSON de compos | plugin, données externes : JSON de compos de Firestone | 3 |
 | Bilan contre chaque adversaire du lobby | Firestone | victoires et défaites | historique local | plugin, données HDT | 3 |
-| Pièces clés d'une compo, quand s'engager | HSReplay | alerte en taverne | contenu Tier7 | plugin, données externes : saisie HSReplay | 3 |
+| Pièces clés d'une compo en taverne | HSReplay | marque sur la carte proposée | cartes clés | plugin, données externes : § 6 (intégré au conseiller) | 1 |
 | Détail « comment les tops jouent ce sbire » | HSReplay | au clic dans le navigateur | données HSReplay non publiques | impossible | — |
 | Plateau adverse en temps réel | — | — | le jeu ne l'écrit nulle part | impossible | — |
 
@@ -155,3 +155,37 @@ sélection de héros détectée, stats Firestone réelles téléchargées et aff
 posé aucun problème visible. Le point 2 a révélé un défaut d'alignement (un seul bloc, qui débordait
 sur le bouton OK). Il est corrigé par `HeroPickLayout`, une pastille par héros placée avec la méthode
 d'HDT, et **reste à revérifier**.
+
+## 6. Conseiller de compositions (demande d'Ali du 2026-09-26, prioritaire)
+
+En boutique, le plugin compare le plateau et la main aux compositions connues, affiche les trois
+plus proches (« 2/5 pièces clés ») et marque sous chaque sbire de Bob celui qui y ajoute une pièce
+(★ pièce clé, + appoint). **Score** d'une compo = 3 × pièces clés distinctes possédées + 1 × cartes
+d'appoint + 0,5 × sbires possédés de sa tribu (un amalgame compte pour toutes) ; visée si score > 0,
+égalité départagée par la place moyenne. Sans état : une compo écartée revient dès que le plateau y
+renvoie. Marqueurs placés avec les constantes d'HDT pour la rangée adverse, qui est la taverne en
+BG (`OverlayWindow.MouseOverDetection.cs:38-39, 57-64`, `OverlayWindow.Update.cs:534-535`).
+
+| Source | Récupération | Cartes clés |
+|---|---|---|
+| Firestone `comp-stats` | automatique, cache 7 jours (31,5 Mo → 10 Ko en local) | déduites des plateaux finaux réels : ≥ 50 % des plateaux = clé, ≥ 20 % = appoint ; archétype ignoré sous 20 plateaux (le fichier rédactionnel des cartes clés de Firestone reste exclu) |
+| HSReplay | **semi-manuelle** : hsreplay.net répond par un challenge JavaScript Cloudflare (403 « Just a moment… », mesuré le 2026-09-26), qu'on ne contourne pas | recopiées par Ali |
+
+Format local (JSON du cache) : `{"schema":1,"source":"firestone","compositions":[{"id":"undead_butcher",
+"name":"Undead Butcher","tribes":["UNDEAD"],"coreCards":["BG32_324","BG25_010"],"addonCards":["BG32_880"],
+"averagePlacement":3.81,"dataPoints":6461,"tier":null}]}`, même politique de validation qu'au § 2.
+
+**Marche à suivre HSReplay** : ouvrir la page des compositions dans son navigateur, recopier chaque
+compo dans `%LocalAppData%\BronzebeardHud\stats\manual\hsreplay.comps.txt` (nom libre, fin
+`.comps.txt`), relu à chaque partie ; une erreur s'affiche dans le panneau avec son numéro de ligne.
+
+```
+comp: Undead Butcher
+tribes: undead
+tier: A
+avg: 3.95
+core: Drustfallen Butcher, Handless Forsaken
+addon: Friendly Geist
+```
+
+Cartes par nom (anglais ou français, résolu par HearthDb) ou par identifiant ; `core:` obligatoire.

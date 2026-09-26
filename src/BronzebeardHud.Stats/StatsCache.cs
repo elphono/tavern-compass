@@ -81,8 +81,24 @@ public sealed class CacheResult
     public string? Error { get; }
 }
 
+/// <summary>What <see cref="StatsCache.GetCompositionsAsync"/> hands back.</summary>
+public sealed class CompositionCacheResult
+{
+    public CompositionCacheResult(CompositionFile? file, bool downloaded, string? error)
+    {
+        File = file;
+        Downloaded = downloaded;
+        Error = error;
+    }
+
+    public CompositionFile? File { get; }
+    public bool Downloaded { get; }
+    public string? Error { get; }
+}
+
 /// <summary>
-/// Local cache of Firestone hero stats, one file per MMR percentile and time period.
+/// Local cache of Firestone stats: hero stats (one file per MMR percentile and time period) and
+/// composition stats (one file per time period).
 /// Rules (see the spec): no download while the cached file is younger than
 /// <see cref="RefreshPolicy.MaxAge"/>; after a failure, no retry before
 /// <see cref="RefreshPolicy.RetryAfterFailure"/>; a failed or malformed download never
@@ -104,40 +120,79 @@ public sealed class StatsCache
     public string HeroStatsPath(int mmrPercentile, string timePeriod) =>
         Path.Combine(_directory, $"firestone-hero-stats-mmr-{mmrPercentile}-{timePeriod}.json");
 
+    public string CompositionsPath(string timePeriod) =>
+        Path.Combine(_directory, $"firestone-comp-stats-{timePeriod}.json");
+
     public async Task<CacheResult> GetHeroStatsAsync(
         int mmrPercentile, string timePeriod, RefreshPolicy policy, CancellationToken cancellationToken)
     {
-        var url = FirestoneEndpoints.HeroStats(mmrPercentile, timePeriod);
-        var path = HeroStatsPath(mmrPercentile, timePeriod);
+        var (file, downloaded, error) = await GetAsync(
+            FirestoneEndpoints.HeroStats(mmrPercentile, timePeriod),
+            HeroStatsPath(mmrPercentile, timePeriod),
+            policy,
+            HeroStatsLoader.Load,
+            f => f.FetchedAt,
+            FirestoneHeroStatsImporter.Import,
+            HeroStatsLoader.Serialize,
+            cancellationToken).ConfigureAwait(false);
+        return new CacheResult(file, downloaded, error);
+    }
+
+    /// <summary>Firestone composition stats, converted to the local composition format (31.5 MB download, see <see cref="RefreshPolicy.CompStats"/>).</summary>
+    public async Task<CompositionCacheResult> GetCompositionsAsync(
+        string timePeriod, RefreshPolicy policy, CancellationToken cancellationToken)
+    {
+        var (file, downloaded, error) = await GetAsync(
+            FirestoneEndpoints.CompStats(timePeriod),
+            CompositionsPath(timePeriod),
+            policy,
+            CompositionLoader.Load,
+            f => f.FetchedAt,
+            FirestoneCompImporter.Import,
+            CompositionLoader.Serialize,
+            cancellationToken).ConfigureAwait(false);
+        return new CompositionCacheResult(file, downloaded, error);
+    }
+
+    private async Task<(T? File, bool Downloaded, string? Error)> GetAsync<T>(
+        string url,
+        string path,
+        RefreshPolicy policy,
+        Func<string, T> load,
+        Func<T, DateTimeOffset?> fetchedAtOf,
+        Func<string, string, DateTimeOffset, T> import,
+        Func<T, string> serialize,
+        CancellationToken cancellationToken)
+        where T : class
+    {
         var failurePath = path + ".failed";
         var now = _clock();
 
-        var cached = TryLoad(path);
-        if (cached?.FetchedAt is { } fetchedAt && now - fetchedAt < policy.MaxAge)
+        var cached = TryLoad(path, load);
+        if (cached != null && fetchedAtOf(cached) is { } fetchedAt && now - fetchedAt < policy.MaxAge)
         {
-            return new CacheResult(cached, downloaded: false, error: null);
+            return (cached, false, null);
         }
 
         var lastFailure = TryReadFailure(failurePath);
         if (lastFailure is { } failedAt && now - failedAt < policy.RetryAfterFailure)
         {
             var retryAt = failedAt + policy.RetryAfterFailure;
-            return new CacheResult(cached, downloaded: false,
-                error: $"last download failed at {Format(failedAt)}; next attempt after {Format(retryAt)}");
+            return (cached, false, $"last download failed at {Format(failedAt)}; next attempt after {Format(retryAt)}");
         }
 
         try
         {
             var body = await _fetcher.FetchAsync(url, cancellationToken).ConfigureAwait(false);
-            var imported = FirestoneHeroStatsImporter.Import(body, url, now);
+            var imported = import(body, url, now);
             Directory.CreateDirectory(_directory);
-            WriteAtomically(path, HeroStatsLoader.Serialize(imported));
+            WriteAtomically(path, serialize(imported));
             if (File.Exists(failurePath))
             {
                 File.Delete(failurePath);
             }
 
-            return new CacheResult(imported, downloaded: true, error: null);
+            return (imported, true, null);
         }
         // An HttpClient timeout is also an OperationCanceledException: only a cancellation the
         // caller asked for escapes; a timeout is a failed download like any other.
@@ -145,11 +200,12 @@ public sealed class StatsCache
         {
             Directory.CreateDirectory(_directory);
             File.WriteAllText(failurePath, now.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture));
-            return new CacheResult(cached, downloaded: false, error: $"download of {url} failed: {e.Message}");
+            return (cached, false, $"download of {url} failed: {e.Message}");
         }
     }
 
-    private static HeroStatsFile? TryLoad(string path)
+    private static T? TryLoad<T>(string path, Func<string, T> load)
+        where T : class
     {
         if (!File.Exists(path))
         {
@@ -158,7 +214,7 @@ public sealed class StatsCache
 
         try
         {
-            return HeroStatsLoader.Load(path);
+            return load(path);
         }
         catch (StatsFormatException)
         {
