@@ -42,6 +42,11 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _heroCompsGuard;
     private readonly FeatureGuard _heroAffinityGuard;
     private readonly FeatureGuard _compCountGuard;
+    private readonly FeatureGuard _pinsGuard;
+
+    // Pins made by click (Tavern Pinning): kept across a plugin reload within a game, forgotten at the next game.
+    private readonly GamePins _gamePins = new();
+    private int _pinsVersion;
     private HudSettings _settings = HudSettings.Default;
 
     // The hero being played on each composition (HeroCompAffinity), recomputed when the hero or the compositions change.
@@ -70,6 +75,15 @@ public sealed class Plugin : IPlugin
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
+        _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
+        {
+            if (_tavern != null)
+            {
+                _tavern.PinButtonsEnabled = false;
+            }
+
+            _pinsVersion++;
+        }));
         _heroAffinityGuard = new FeatureGuard("hero-affinity", (n, e) => Disable(n, e, () =>
         {
             _heroEffects = new Dictionary<string, HeroCompPick>();
@@ -107,6 +121,15 @@ public sealed class Plugin : IPlugin
 
         Log.Info($"Bronzebeard HUD: suggested compositions={_settings.SuggestedCompositions}");
         _selectionVersion++; // redraws the markers, the choices and the panel, in the shop and in combat
+    });
+
+    /// <summary>A pin button was clicked above one of Bob's cards.</summary>
+    private void TogglePin(string cardId) => _pinsGuard.Run(() =>
+    {
+        var file = _comps?.Pins ?? TavernPins.Empty;
+        _gamePins.Toggle(cardId, file);
+        Log.Info($"Bronzebeard HUD: pinned=[{string.Join(",", _gamePins.Merge(file).CardIds)}]");
+        _pinsVersion++;
     });
 
     /// <summary>A composition's box was clicked in the target panel.</summary>
@@ -230,7 +253,7 @@ public sealed class Plugin : IPlugin
             Log.Warn($"Bronzebeard HUD: cannot read {SettingsPath}: {e.Message}");
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
@@ -462,6 +485,7 @@ public sealed class Plugin : IPlugin
             _inHeroSelection = true;
             _compsLoadedThisGame = false;
             _selection.BeginGame(++_gameNumber);
+            _gamePins.BeginGame(_gameNumber);
             _selectionVersion++;
             _rowTracker = new TavernRowTracker();
             _timeline.Reset();
@@ -544,7 +568,8 @@ public sealed class Plugin : IPlugin
                 });
             }
 
-            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + _comps.Version + "|" + _selectionVersion + "|" + hero + ":" + _heroEffects.Count;
+            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + _comps.Version + "|" + _selectionVersion + "|" + hero + ":" + _heroEffects.Count
+                      + "|" + _pinsVersion;
             if (rowChanged || key != _tavernKey || _lastAdvice == null)
             {
                 _tavernKey = key;
@@ -553,7 +578,7 @@ public sealed class Plugin : IPlugin
                 _lastMinions = row.Count(s => s.IsMinion);
                 _lastAdvice = TavernAdvisor.Advise(row.Select(s => s.CardId).ToList(), owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
                     _selection.Checked, _heroEffects, _settings.SuggestedCompositions);
-                _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _comps.Pins);
+                _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _gamePins.Merge(_comps.Pins), row.Select(s => s.IsMinion).ToList());
                 _lastFirstMarker = _tavern.FirstMarker;
             }
         }

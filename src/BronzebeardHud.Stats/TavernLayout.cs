@@ -79,6 +79,33 @@ public static class TavernLayout
             .ToList();
     }
 
+    /// <summary>Side of the pin button, and its gap above the card, in design units (× s).</summary>
+    public const double PinButtonSize = 24;
+    public const double PinButtonGap = 4;
+
+    /// <summary>
+    /// One pin button per tavern card, just above the card's slot and centred on it: never on the card, so
+    /// that buying (a click-and-drag on the card) is never caught by the overlay, and clear of the pin icon
+    /// HDT draws on pinned cards (<see cref="HdtPinIcon"/>).
+    /// </summary>
+    public static IReadOnlyList<LayoutRect> PinButtons(double width, double height, int cardCount)
+    {
+        var s = Scale(height);
+        return CardSlots(width, height, cardCount)
+            .Select(card => new LayoutRect(card.CenterX, card.Top - (PinButtonGap + PinButtonSize / 2) * s, PinButtonSize * s, PinButtonSize * s))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Where HDT's Tavern Markers draw their pin on a card: 30 × 30 design units, 35 from the top and 17 from
+    /// the right of the 138 × 190 slot (Controls/Overlay/Battlegrounds/MinionPinning/BattlegroundsMinionPinningCard.xaml:20-29).
+    /// </summary>
+    public static LayoutRect HdtPinIcon(LayoutRect slot, double height)
+    {
+        var s = Scale(height);
+        return new LayoutRect(slot.Right - (17 + 15) * s, slot.Top + (35 + 15) * s, 30 * s, 30 * s);
+    }
+
     /// <summary>Board row height, 0.158 × H: Windows/OverlayWindow.MouseOverDetection.cs:38.</summary>
     public const double BoardRowHeight = 0.158;
 

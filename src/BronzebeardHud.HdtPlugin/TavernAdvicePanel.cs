@@ -21,6 +21,8 @@ internal sealed class TavernAdvicePanel
     private readonly CompositionSelection _selection;
     private readonly Action<string> _toggle;
     private readonly Func<int> _suggested;
+    private readonly Action<string> _togglePin;
+    private IReadOnlyList<bool> _minionSlots = Array.Empty<bool>();
     private readonly Action<int> _changeSuggested;
 
     private readonly Canvas _canvas;
@@ -39,8 +41,11 @@ internal sealed class TavernAdvicePanel
     /// <param name="toggle">Called with a composition id when its box is clicked.</param>
     /// <param name="suggested">How many suggestions the panel shows (settings.json).</param>
     /// <param name="changeSuggested">Called with −1 or +1 when the − or + of the panel is clicked.</param>
-    public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle, Func<int> suggested, Action<int> changeSuggested)
+    /// <param name="togglePin">Called with a card id when its pin button is clicked.</param>
+    public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle, Func<int> suggested, Action<int> changeSuggested,
+        Action<string> togglePin)
     {
+        _togglePin = togglePin;
         _suggested = suggested;
         _changeSuggested = changeSuggested;
         _canvas = canvas;
@@ -62,8 +67,13 @@ internal sealed class TavernAdvicePanel
     /// <summary>The first marker drawn by the last layout, for the diagnostic line; null when none.</summary>
     public LayoutRect? FirstMarker { get; private set; }
 
-    public void ShowMarkers(TavernAdvice advice, IEnumerable<string> ownedCardIds, TavernPins pins)
+    /// <summary>When false, no pin buttons are drawn (the pinning feature was switched off by its guard).</summary>
+    public bool PinButtonsEnabled { get; set; } = true;
+
+    /// <param name="minionSlots">One entry per card of Bob's row: true for a minion (it gets a pin button), false for the spell.</param>
+    public void ShowMarkers(TavernAdvice advice, IEnumerable<string> ownedCardIds, TavernPins pins, IReadOnlyList<bool> minionSlots)
     {
+        _minionSlots = minionSlots;
         _advice = advice;
         _owned = new HashSet<string>(ownedCardIds);
         _pins = pins;
@@ -222,6 +232,63 @@ internal sealed class TavernAdvicePanel
             _markers.Add(frame);
             _markers.Add(label);
             FirstMarker ??= rect;
+        }
+
+        AddPinButtons(width, height, scale);
+    }
+
+    /// <summary>
+    /// A small ◇ above each of Bob's minions (◆ once pinned): a click pins the card for the game. Clickable
+    /// while the overlay stays locked, like the boxes (IsOverlayHitTestVisible); placed above the card, never
+    /// on it, so buying is never caught (TavernLayout.PinButtons).
+    /// </summary>
+    private void AddPinButtons(double width, double height, double scale)
+    {
+        if (!PinButtonsEnabled || _advice == null)
+        {
+            return;
+        }
+
+        var buttons = TavernLayout.PinButtons(width, height, _advice.Cards.Count);
+        for (var i = 0; i < buttons.Count && i < _minionSlots.Count; i++)
+        {
+            if (!_minionSlots[i])
+            {
+                continue;
+            }
+
+            var cardId = _advice.Cards[i].CardId;
+            var pinned = _pins.IsPinned(cardId);
+            var button = new Border
+            {
+                Width = buttons[i].Width,
+                Height = buttons[i].Height,
+                CornerRadius = new CornerRadius(buttons[i].Width / 2),
+                Background = pinned ? Brushes.White : new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
+                BorderBrush = Brushes.White,
+                BorderThickness = new Thickness(1.5 * scale),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                IsHitTestVisible = true,
+                Child = new TextBlock
+                {
+                    Text = pinned ? "◆" : "◇",
+                    FontSize = 14 * scale,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = pinned ? Brushes.Black : Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+            };
+            button.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                _togglePin(cardId);
+            };
+            OverlayExtensions.SetIsOverlayHitTestVisible(button, true);
+            Canvas.SetLeft(button, buttons[i].Left);
+            Canvas.SetTop(button, buttons[i].Top);
+            OverlayLayer.Add(_canvas, button);
+            _markers.Add(button);
         }
     }
 
