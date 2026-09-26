@@ -33,6 +33,7 @@ internal sealed class TavernAdvicePanel
     private HashSet<string> _owned = new();
     private string? _status;
     private string? _footer;
+    private IReadOnlyDictionary<string, IReadOnlyList<CompTransition>> _transitions = new Dictionary<string, IReadOnlyList<CompTransition>>();
     private TavernPins _pins = TavernPins.Empty;
     private bool _visible;
     private bool _panelVisible;
@@ -87,8 +88,10 @@ internal sealed class TavernAdvicePanel
         ClearMarkers();
     }
 
-    public void ShowPanel(IReadOnlyList<CompositionRow> rows, string? status)
+    /// <param name="transitions">Composition id → where it can pivot to (CompTransitions); none when absent.</param>
+    public void ShowPanel(IReadOnlyList<CompositionRow> rows, string? status, IReadOnlyDictionary<string, IReadOnlyList<CompTransition>>? transitions = null)
     {
+        _transitions = transitions ?? new Dictionary<string, IReadOnlyList<CompTransition>>();
         _rows = rows;
         _status = status;
         _panelVisible = true;
@@ -327,8 +330,9 @@ internal sealed class TavernAdvicePanel
             return;
         }
 
-        var corner = vignette.TranslatePoint(new Point(0, 0), _canvas);
-        var target = new LayoutRect(corner.X + vignette.ActualWidth / 2, corner.Y + vignette.ActualHeight / 2, vignette.ActualWidth, vignette.ActualHeight);
+        // Bounds as drawn: the panel's content may be shrunk to fit the window, and HDT measures the scaled size.
+        var bounds = vignette.TransformToAncestor(_canvas).TransformBounds(new Rect(0, 0, vignette.ActualWidth, vignette.ActualHeight));
+        var target = new LayoutRect(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2, bounds.Width, bounds.Height);
         var panel = new LayoutRect(Canvas.GetLeft(_targets) + _targets.ActualWidth / 2, Canvas.GetTop(_targets) + _targets.ActualHeight / 2,
             _targets.ActualWidth, _targets.ActualHeight);
         var (side, preview) = TavernLayout.PreviewRect(panel, target, _canvas.ActualWidth, _canvas.ActualHeight);
@@ -435,6 +439,28 @@ internal sealed class TavernAdvicePanel
             lines.Children.Add(colour == null
                 ? board
                 : new Border { BorderBrush = colour, BorderThickness = new Thickness(4 * scale, 0, 0, 0), Padding = new Thickness(4 * scale, 0, 0, 0), Child = board });
+
+            // Where this composition can pivot to, and the cards in common (hoverable like the others).
+            if (_transitions.TryGetValue(row.Composition.Id, out var transitions) && CompTransitions.Text(transitions) is { } pivot)
+            {
+                var line = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2 * scale, 0, 0) };
+                line.Children.Add(new TextBlock
+                {
+                    Text = pivot,
+                    FontSize = 11 * scale,
+                    FontStyle = FontStyles.Italic,
+                    Foreground = Brushes.LightGray,
+                    TextWrapping = TextWrapping.Wrap,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 4 * scale, 0),
+                });
+                foreach (var shared in transitions.SelectMany(t => t.Shared).Distinct().Take(7))
+                {
+                    line.Children.Add(CardImages.Vignette(shared, _owned.Contains(shared), vignette * 0.6, scale, TavernLayout.PreviewHeight * height, PlacePreview));
+                }
+
+                lines.Children.Add(line);
+            }
         }
 
         if (!string.IsNullOrEmpty(_footer))
@@ -447,10 +473,16 @@ internal sealed class TavernAdvicePanel
             lines.Children.Add(new TextBlock { Text = _status, FontSize = 10 * scale, Foreground = Brushes.Gold, TextWrapping = TextWrapping.Wrap });
         }
 
-        _targets.Child = lines;
         _targets.Width = panel.Width;
         _targets.MinHeight = panel.Height;
         _mover.Place(_targets, "target-compositions", panel, interactive: true);
+
+        // More lines (up to 8 suggestions, their pivots) must not run off the bottom of the window: the
+        // content shrinks to the room left under the panel's top, never gets cut.
+        lines.Width = panel.Width - 2 * 6 * scale - 4;
+        var room = Math.Max(panel.Height, height - Canvas.GetTop(_targets) - 0.005 * height);
+        _targets.MaxHeight = room;
+        _targets.Child = new Viewbox { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, MaxHeight = room - 4, VerticalAlignment = VerticalAlignment.Top, Child = lines };
         _targets.Visibility = Visibility.Visible;
     }
 }

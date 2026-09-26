@@ -43,6 +43,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _heroAffinityGuard;
     private readonly FeatureGuard _compCountGuard;
     private readonly FeatureGuard _pinsGuard;
+    private readonly FeatureGuard _transitionsGuard;
 
     // Pins made by click (Tavern Pinning): kept across a plugin reload within a game, forgotten at the next game.
     private readonly GamePins _gamePins = new();
@@ -75,6 +76,7 @@ public sealed class Plugin : IPlugin
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
+        _transitionsGuard = new FeatureGuard("comp-transitions", (n, e) => Disable(n, e, () => _shownCompStatus = "\u0000"));
         _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
             if (_tavern != null)
@@ -631,7 +633,13 @@ public sealed class Plugin : IPlugin
         else if (changed || !wasVisible || _comps.Status != _shownCompStatus)
         {
             _shownCompStatus = _comps.Status;
-            _tavern.ShowPanel(_compPanel.Rows, _comps.Status);
+            // Pivots for each composition shown, among the playable ones: guarded on their own.
+            IReadOnlyDictionary<string, IReadOnlyList<CompTransition>> transitions = new Dictionary<string, IReadOnlyList<CompTransition>>();
+            var pool = advice?.Playable ?? _comps.Compositions();
+            _transitionsGuard.Run(() => transitions = _compPanel.Rows
+                .GroupBy(r => r.Composition.Id)
+                .ToDictionary(g => g.Key, g => CompTransitions.For(g.First().Composition, pool)));
+            _tavern.ShowPanel(_compPanel.Rows, _comps.Status, transitions);
         }
     }
 }
