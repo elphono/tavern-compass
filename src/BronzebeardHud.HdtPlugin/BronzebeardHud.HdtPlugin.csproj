@@ -17,6 +17,15 @@
     <HdtExe>$(HdtDir)Hearthstone Deck Tracker.exe</HdtExe>
   </PropertyGroup>
 
+  <!-- Optional: compile against an installed HDT (Squirrel install, e.g. .../HearthstoneDeckTracker/app-1.58.3/)
+       instead of the GitHub release. HDT versions after the last GitHub release only ship through its
+       auto-updater, so this is the only way to build against the version actually running.
+       Usage: dotnet build src/BronzebeardHud.HdtPlugin -c Release -p:HdtInstallDir=/mnt/c/.../app-1.58.3/ -->
+  <PropertyGroup Condition="'$(HdtInstallDir)' != ''">
+    <HdtDir>$([MSBuild]::EnsureTrailingSlash('$(HdtInstallDir)'))</HdtDir>
+    <HdtExe>$(HdtDir)HearthstoneDeckTracker.exe</HdtExe>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- Build-only: .NET Framework reference assemblies, so net48 compiles without Windows. -->
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />

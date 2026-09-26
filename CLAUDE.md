@@ -39,6 +39,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 
 - `lib/` est ignoré par git. La version d'HDT contre laquelle on compile est `HdtVersion`, dans le
   `.csproj` du plugin ; la cible `FetchHdtAssemblies` télécharge la release GitHub correspondante.
+- GitHub s'arrête à la 1.55.6 : les versions suivantes ne sortent que par l'auto-updater d'HDT. Pour
+  compiler contre l'HDT réellement installé (recommandé avant un déploiement) :
+  `dotnet build src/BronzebeardHud.HdtPlugin -c Release -p:HdtInstallDir=/mnt/c/Users/<user>/AppData/Local/HearthstoneDeckTracker/app-<version>/`.
+  Mesuré le 2026-09-26 : le plugin compile sans erreur ni avertissement contre la 1.58.3.
 - Déploiement (Windows) : copier `BronzebeardHud.HdtPlugin.dll` et `BronzebeardHud.Stats.dll` dans
   `%AppData%\HearthstoneDeckTracker\Plugins\BronzebeardHud\`, **sans** `Newtonsoft.Json.dll` : HDT
   charge la sienne, dans la même version (13.0.3).
