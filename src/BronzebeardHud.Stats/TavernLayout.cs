@@ -33,7 +33,12 @@ public static class TavernLayout
 
     public static double MinionPitch(double height) => ShopCardWidth * Scale(height);
 
-    /// <summary>The tavern card slots, left to right.</summary>
+    /// <summary>
+    /// The tavern card slots, left to right. <paramref name="cardCount"/> counts every card of Bob's row, the
+    /// tavern spell included (<see cref="TavernRow"/>). The row is centred on W/2 and scaled by H only, as
+    /// HDT's shop overlay is (full-canvas grid, Windows/OverlayWindow.Update.cs:746-748, 822-824): the
+    /// window's ratio does not move it.
+    /// </summary>
     public static IReadOnlyList<LayoutRect> CardSlots(double width, double height, int cardCount)
     {
         if (width <= 0 || height <= 0 || cardCount <= 0)

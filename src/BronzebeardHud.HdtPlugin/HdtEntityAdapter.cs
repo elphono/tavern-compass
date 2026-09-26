@@ -123,19 +123,23 @@ internal static class HdtEntityAdapter
         }
     }
 
-    /// <summary>The minions Bob offers, left to right. In the shop, the opponent is Bob.</summary>
-    public static IReadOnlyList<string> TavernCardIds(GameV2 game)
+    /// <summary>
+    /// Bob's row, left to right: his minions and the tavern spell, which the game lays out in the same row
+    /// (see <see cref="TavernRow"/>). In the shop, the opponent is Bob.
+    /// </summary>
+    public static IReadOnlyList<TavernSlot> TavernRow(GameV2 game)
     {
         try
         {
-            return game.Opponent.Board.Where(e => e.IsMinion && !string.IsNullOrEmpty(e.CardId))
-                .OrderBy(e => e.GetTag(GameTag.ZONE_POSITION))
-                .Select(e => BaseCardId(e.CardId!))
-                .ToList();
+            return BronzebeardHud.Stats.TavernRow.Arrange(game.Opponent.Board
+                .Where(e => !string.IsNullOrEmpty(e.CardId)
+                            && (e.IsMinion || e.GetTag(GameTag.CARDTYPE) == (int)CardType.BATTLEGROUND_SPELL))
+                .Select(e => new TavernSlot(e.Id, e.IsMinion ? BaseCardId(e.CardId!) : e.CardId!, e.IsMinion, e.GetTag(GameTag.ZONE_POSITION)))
+                .ToList());
         }
         catch (InvalidOperationException)
         {
-            return Array.Empty<string>();
+            return Array.Empty<TavernSlot>();
         }
     }
 

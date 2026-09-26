@@ -85,15 +85,18 @@ public class TavernAdvisorTests
     [Fact]
     public void DiagnosticLine_HasTheExactFormat()
     {
-        var shop = TavernAdvisor.Advise(new[] { "BG20_101", "BG33_825", "BG_LOE_077" }, new[] { new OwnedCard("BG21_005", "PIRATE") }, All, Lobby);
-        var first = TavernLayout.Markers(2291, 1360, 3)[1];
+        // Three minions and the tavern spell (BG28_573) at the end of the row: four slots.
+        var shop = TavernAdvisor.Advise(new[] { "BG20_101", "BG33_825", "BG_LOE_077", "BG28_573" }, new[] { new OwnedCard("BG21_005", "PIRATE") }, All, Lobby);
+        var first = TavernLayout.Markers(2291, 1360, 4)[1];
 
         var cards = new PlayerCards(new[] { new OwnedCard("BG21_005", "PIRATE") }, new[] { new OwnedCard("BG25_010", "UNDEAD"), new OwnedCard("BG24_022", "MECHANICAL") });
-        var line = TavernAdvisor.DiagnosticLine(3, 24, "ok", shop, cards, first, 2291, 1360);
+        var line = TavernAdvisor.DiagnosticLine(3, 24, "ok", shop, cards, minions: 3, changes: 4, refreshes: 1, first, 2291, 1360);
 
-        Assert.Equal("Bronzebeard HUD: tavern round=3 comps=24 (ok) compsInLobby=3 board=1 hand=2 targets=[Pirate Discover 0.5] tavern=3 markers=2 " +
-                     "first=#1 x=1063 y=601 w=165 h=31 canvas=2291x1360", line);
-        Assert.EndsWith("targets=none tavern=0 markers=0 first=none canvas=2000x1220",
-            TavernAdvisor.DiagnosticLine(1, 0, "loading", TavernAdvisor.Advise(Array.Empty<string>(), Array.Empty<OwnedCard>(), All, Lobby), PlayerCards.None, null, 2000, 1220));
+        Assert.Equal("Bronzebeard HUD: tavern round=3 comps=24 (ok) compsInLobby=3 board=1 hand=2 targets=[Pirate Discover 0.5] tavern=4 minions=3 markers=2 " +
+                     "first=#1 x=976 y=601 w=165 h=31 changes=4 refreshes=1 canvas=2291x1360", line);
+        Assert.Empty(shop.Cards[3].Advances); // the spell takes a slot and gets no marker
+        Assert.EndsWith("targets=none tavern=0 minions=0 markers=0 first=none changes=0 refreshes=0 canvas=2000x1220",
+            TavernAdvisor.DiagnosticLine(1, 0, "loading", TavernAdvisor.Advise(Array.Empty<string>(), Array.Empty<OwnedCard>(), All, Lobby), PlayerCards.None,
+                0, 0, 0, null, 2000, 1220));
     }
 }

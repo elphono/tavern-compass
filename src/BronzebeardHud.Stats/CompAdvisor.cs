@@ -205,10 +205,13 @@ public static class TavernAdvisor
     /// <c>Bronzebeard HUD: tavern round=3 comps=24 (ok) playable=22 targets=[Murloc Scam 3.5; Murloc Handbuff 0.5] tavern=4 markers=1 first=#0 x=1086 y=497 w=176 h=57 canvas=2291x1360</c>.
     /// </summary>
     /// <summary>
-    /// One line per shop round in HDT's log. compsInLobby counts the compositions whose tribes are all in
-    /// the lobby (the only ones the advisor may target); board and hand count the cards read from HDT.
+    /// One line per shop round in HDT's log, written when the round ends. compsInLobby counts the
+    /// compositions whose tribes are all in the lobby (the only ones the advisor may target); board and hand
+    /// count the cards read from HDT; tavern counts Bob's row (minions and the tavern spell), minions the
+    /// minions in it; changes and refreshes come from <see cref="TavernRowTracker"/>.
     /// </summary>
-    public static string DiagnosticLine(int round, int compositionCount, string compositionState, TavernAdvice advice, PlayerCards cards, LayoutRect? firstMarker, double canvasWidth, double canvasHeight)
+    public static string DiagnosticLine(int round, int compositionCount, string compositionState, TavernAdvice advice, PlayerCards cards,
+        int minions, int changes, int refreshes, LayoutRect? firstMarker, double canvasWidth, double canvasHeight)
     {
         var inv = System.Globalization.CultureInfo.InvariantCulture;
         string N(double v) => Math.Round(v).ToString("0", inv);
@@ -221,6 +224,7 @@ public static class TavernAdvisor
             : "none";
         return $"Bronzebeard HUD: tavern round={round} comps={compositionCount} ({compositionState}) compsInLobby={advice.PlayableCompositions} " +
                $"board={cards.Board.Count} hand={cards.Hand.Count} " +
-               $"targets={targets} tavern={advice.Cards.Count} markers={advice.MarkerCount} first={first} canvas={N(canvasWidth)}x{N(canvasHeight)}";
+               $"targets={targets} tavern={advice.Cards.Count} minions={minions} markers={advice.MarkerCount} first={first} " +
+               $"changes={changes} refreshes={refreshes} canvas={N(canvasWidth)}x{N(canvasHeight)}";
     }
 }

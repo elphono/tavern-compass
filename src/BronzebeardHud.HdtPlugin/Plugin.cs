@@ -70,7 +70,9 @@ public sealed class Plugin : IPlugin
     private bool _compsLoadedThisGame;
     private string _shownKey = string.Empty;
     private string _tavernKey = string.Empty;
-    private int _diagnosticRound = -1;
+    private TavernRowTracker _rowTracker = new();
+    private int _lastMinions;
+    private LayoutRect? _lastFirstMarker;
     private CompositionPanelState _compPanel = new();
     private TavernAdvice? _lastAdvice;
     private PlayerCards _lastCards = BronzebeardHud.Stats.PlayerCards.None;
@@ -155,7 +157,7 @@ public sealed class Plugin : IPlugin
         _loggedChoice = string.Empty;
         _opponentKey = string.Empty;
         _historyKey = -1;
-        _diagnosticRound = -1;
+        _rowTracker = new TavernRowTracker();
         _compPanel = new CompositionPanelState();
         _lastAdvice = null;
         _lastCards = BronzebeardHud.Stats.PlayerCards.None;
@@ -322,7 +324,7 @@ public sealed class Plugin : IPlugin
         {
             _inHeroSelection = true;
             _compsLoadedThisGame = false;
-            _diagnosticRound = -1;
+            _rowTracker = new TavernRowTracker();
             _timeline.Reset();
             _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
         }
@@ -365,26 +367,33 @@ public sealed class Plugin : IPlugin
         {
             var cards = HdtEntityAdapter.PlayerCards(game);
             var owned = cards.All;
-            var tavern = HdtEntityAdapter.TavernCardIds(game);
-            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + string.Join(",", tavern) + "|" + _comps.Version;
-            if (key != _tavernKey || _lastAdvice == null)
+            // Bob's whole row, the tavern spell included: the game centres minions and spell together.
+            var row = HdtEntityAdapter.TavernRow(game);
+            // Followed by entity: a purchase, a reroll or an added card redraws the markers at once.
+            var rowChanged = _rowTracker.Observe(game.GetTurnNumber(), row.Select(s => s.EntityId).ToList());
+            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + _comps.Version;
+            if (rowChanged || key != _tavernKey || _lastAdvice == null)
             {
                 _tavernKey = key;
                 changed = true;
                 _lastCards = cards;
-                _lastAdvice = TavernAdvisor.Advise(tavern, owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames());
+                _lastMinions = row.Count(s => s.IsMinion);
+                _lastAdvice = TavernAdvisor.Advise(row.Select(s => s.CardId).ToList(), owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames());
                 _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _comps.Pins);
-
-                // One diagnostic line per shop round, once the tavern has cards: enough to tell from HDT's log
-                // whether compositions were loaded, what was targeted and where the first marker went.
-                var round = game.GetTurnNumber();
-                if (round != _diagnosticRound && tavern.Count > 0)
-                {
-                    _diagnosticRound = round;
-                    Log.Info(TavernAdvisor.DiagnosticLine(round, _comps.Compositions().Count, _comps.State, _lastAdvice, cards, _tavern.FirstMarker,
-                        Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
-                }
+                _lastFirstMarker = _tavern.FirstMarker;
             }
+        }
+        else if (_rowTracker.IsOpen)
+        {
+            // One diagnostic line per shop round, written when it ends: whether compositions were loaded,
+            // what was targeted, where the first marker last was, and how often Bob's row changed.
+            if (_lastAdvice is { Cards.Count: > 0 } lastAdvice)
+            {
+                Log.Info(TavernAdvisor.DiagnosticLine(_rowTracker.Round, _comps.Compositions().Count, _comps.State, lastAdvice, _lastCards,
+                    _lastMinions, _rowTracker.Changes, _rowTracker.Refreshes, _lastFirstMarker, Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
+            }
+
+            _rowTracker.Close();
         }
 
         var wasVisible = _compPanel.PanelVisible;
