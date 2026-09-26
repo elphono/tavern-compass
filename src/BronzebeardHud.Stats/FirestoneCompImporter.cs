@@ -22,8 +22,8 @@ public static class FirestoneCompImporter
     public const double AddonShare = 0.2;
     public const int MinimumBoards = 20;
 
-    /// <summary>Final boards kept per archetype as inspiration: the ones reached at the highest MMR.</summary>
-    public const int InspirationBoards = 3;
+    /// <summary>Final boards kept per archetype: the ones reached at the highest MMR, distinct (the finalBoards carry no placement).</summary>
+    public const int FinalBoardsKept = 5;
 
     // Firestone archetype ids start with the tribe ("mech_glambot", "abberation_discard" [sic]).
     private static readonly Dictionary<string, string> TribeByPrefix = new(StringComparer.Ordinal)
@@ -59,7 +59,7 @@ public static class FirestoneCompImporter
                 .SelectMany(h => h?.FinalBoards ?? new List<FsFinalBoard>())
                 .Where(b => b?.FinalComp?.Board is { Count: > 0 })
                 // Left to right by ZONE_POSITION (present on every minion of Firestone's boards, checked on 2026-09-26).
-                .Select(b => (Mmr: b.Mmr ?? 0, Cards: b.FinalComp!.Board!
+                .Select(b => (Mmr: b.Mmr ?? 0, Turn: b.FinalComp!.Turn, Cards: b.FinalComp!.Board!
                     .Where(m => !string.IsNullOrEmpty(m?.CardId))
                     .OrderBy(m => m!.Tags?.ZonePosition ?? int.MaxValue)
                     .Select(m => CardIds.Normalize(m!.CardId!)).Take(7).ToList()))
@@ -86,12 +86,12 @@ public static class FirestoneCompImporter
             var addon = shares.Where(x => x.Share >= AddonShare && x.Share < CoreShare).Select(x => x.Id).ToList();
             var prefix = comp.Archetype!.Split('_')[0];
             var tribes = TribeByPrefix.TryGetValue(prefix, out var tribe) ? new[] { tribe } : Array.Empty<string>();
-            var inspiration = finalBoards
+            var kept = finalBoards
                 .OrderByDescending(b => b.Mmr)
-                .Select(b => b.Cards)
-                .GroupBy(cards => string.Join(",", cards), StringComparer.Ordinal)
-                .Select(g => (IReadOnlyList<string>)g.First())
-                .Take(InspirationBoards)
+                .GroupBy(b => string.Join(",", b.Cards), StringComparer.Ordinal)
+                .Select(g => g.First())
+                .Take(FinalBoardsKept)
+                .Select(b => new FinalBoard(b.Mmr, b.Turn, b.Cards))
                 .ToList();
             // Reference board: the final board holding the most key pieces, then the most add-ons,
             // then reached at the highest MMR; its order is the one the panel shows.
@@ -109,10 +109,11 @@ public static class FirestoneCompImporter
                 addon,
                 comp.AveragePlacement is >= 1 and <= 8 ? comp.AveragePlacement : null,
                 comp.DataPoints,
-                inspirationBoards: inspiration,
+                finalBoards: kept,
                 referenceBoard: reference,
                 heroStats: (comp.HeroStats ?? new List<FsHeroStat>())
-                    .Where(h => !string.IsNullOrWhiteSpace(h?.HeroCardId) && h!.DataPoints is >= 1 && h.AveragePlacement is >= 1 and <= 8)
+                    // Pairs under HeroCompAffinity.MinimumGames are never used: not kept, the cache stays small.
+                    .Where(h => !string.IsNullOrWhiteSpace(h?.HeroCardId) && h!.DataPoints >= HeroCompAffinity.MinimumGames && h.AveragePlacement is >= 1 and <= 8)
                     .Select(h => new CompHeroStat(HeroIdNormalizer.Normalize(h!.HeroCardId!), h.DataPoints!.Value, h.AveragePlacement!.Value))
                     .GroupBy(h => h.HeroCardId, StringComparer.Ordinal)
                     .Select(g => g.OrderByDescending(h => h.DataPoints).First())
@@ -180,6 +181,7 @@ public static class FirestoneCompImporter
     private sealed class FsFinalComp
     {
         [JsonProperty("board")] public List<FsMinion>? Board { get; set; }
+        [JsonProperty("turn")] public int? Turn { get; set; }
     }
 
     private sealed class FsMinion

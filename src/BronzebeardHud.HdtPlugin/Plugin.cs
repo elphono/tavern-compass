@@ -44,6 +44,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _compCountGuard;
     private readonly FeatureGuard _pinsGuard;
     private readonly FeatureGuard _transitionsGuard;
+    private readonly FeatureGuard _lineupsGuard;
 
     // Pins made by click (Tavern Pinning): kept across a plugin reload within a game, forgotten at the next game.
     private readonly GamePins _gamePins = new();
@@ -76,6 +77,15 @@ public sealed class Plugin : IPlugin
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
+        _lineupsGuard = new FeatureGuard("minion-lineups", (n, e) => Disable(n, e, () =>
+        {
+            if (_tavern != null)
+            {
+                _tavern.LineupsEnabled = false;
+            }
+
+            _pinsVersion++;
+        }));
         _transitionsGuard = new FeatureGuard("comp-transitions", (n, e) => Disable(n, e, () => _shownCompStatus = "\u0000"));
         _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
@@ -124,6 +134,20 @@ public sealed class Plugin : IPlugin
         Log.Info($"Bronzebeard HUD: suggested compositions={_settings.SuggestedCompositions}");
         _selectionVersion++; // redraws the markers, the choices and the panel, in the shop and in combat
     });
+
+    /// <summary>How top players field a minion, from the compositions playable in this lobby; null if the feature failed.</summary>
+    private MinionLineups? LineupsFor(string cardId)
+    {
+        MinionLineups? lineups = null;
+        _lineupsGuard.Run(() =>
+        {
+            var playable = _lastAdvice?.Playable ?? _comps?.Compositions() ?? Array.Empty<Composition>();
+            lineups = MinionLineups.For(cardId, playable);
+            Log.Info($"Bronzebeard HUD: lineups card={lineups.CardId} position={lineups.UsualPosition?.ToString() ?? "none"} " +
+                     $"comps=[{string.Join("; ", lineups.Compositions.Select(c => c.Label))}]");
+        });
+        return lineups;
+    }
 
     /// <summary>A pin button was clicked above one of Bob's cards.</summary>
     private void TogglePin(string cardId) => _pinsGuard.Run(() =>
@@ -255,7 +279,7 @@ public sealed class Plugin : IPlugin
             Log.Warn($"Bronzebeard HUD: cannot read {SettingsPath}: {e.Message}");
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, LineupsFor);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);

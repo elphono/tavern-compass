@@ -100,7 +100,7 @@ public sealed class CompositionCacheRecoveryTests : IDisposable
     [Theory]
     [InlineData("{ \"schema\": 2, \"source\": \"firestone\", \"compositions\": [", "cache: invalid JSON")]
     [InlineData("", "cache: invalid JSON")]
-    [InlineData("{ \"schema\": \"two\", \"source\": \"firestone\", \"compositions\": [] }", "cache: schema \"two\" ≠ 3")]
+    [InlineData("{ \"schema\": \"two\", \"source\": \"firestone\", \"compositions\": [] }", "cache: schema \"two\" ≠ 4")]
     public async Task UnreadableCache_IsDownloadedAgain_AndAFailureNamesTheCacheProblem(string content, string problem)
     {
         File.WriteAllText(CachePath, content);

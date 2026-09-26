@@ -84,15 +84,21 @@ public static class TavernLayout
     public const double PinButtonGap = 4;
 
     /// <summary>
-    /// One pin button per tavern card, just above the card's slot and centred on it: never on the card, so
+    /// One pin button per tavern card, just above the card's slot, left of its centre: never on the card, so
     /// that buying (a click-and-drag on the card) is never caught by the overlay, and clear of the pin icon
     /// HDT draws on pinned cards (<see cref="HdtPinIcon"/>).
     /// </summary>
-    public static IReadOnlyList<LayoutRect> PinButtons(double width, double height, int cardCount)
+    public static IReadOnlyList<LayoutRect> PinButtons(double width, double height, int cardCount) => ButtonsAbove(width, height, cardCount, -1);
+
+    /// <summary>The "?" button beside each pin button (how top players field the minion), right of the card's centre.</summary>
+    public static IReadOnlyList<LayoutRect> LineupButtons(double width, double height, int cardCount) => ButtonsAbove(width, height, cardCount, +1);
+
+    private static IReadOnlyList<LayoutRect> ButtonsAbove(double width, double height, int cardCount, int side)
     {
         var s = Scale(height);
+        var shift = side * (PinButtonSize / 2 + PinButtonGap / 2) * s;
         return CardSlots(width, height, cardCount)
-            .Select(card => new LayoutRect(card.CenterX, card.Top - (PinButtonGap + PinButtonSize / 2) * s, PinButtonSize * s, PinButtonSize * s))
+            .Select(card => new LayoutRect(card.CenterX + shift, card.Top - (PinButtonGap + PinButtonSize / 2) * s, PinButtonSize * s, PinButtonSize * s))
             .ToList();
     }
 

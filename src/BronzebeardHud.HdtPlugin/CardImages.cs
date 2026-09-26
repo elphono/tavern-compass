@@ -24,7 +24,9 @@ internal static class CardImages
     /// Called as the cursor enters the vignette, before HDT's own handler shows the preview (handlers of one
     /// element run in the order they were added), to set where the preview goes.
     /// </param>
-    public static FrameworkElement Vignette(string cardId, bool owned, double size, double scale, double previewHeight, Action<FrameworkElement> placePreview)
+    /// <param name="onClick">When given, a click on the vignette calls it with the card id (clickable while the overlay stays locked).</param>
+    public static FrameworkElement Vignette(string cardId, bool owned, double size, double scale, double previewHeight, Action<FrameworkElement> placePreview,
+        Action<string>? onClick = null)
     {
         var image = new Image { Width = size, Height = size, Stretch = Stretch.UniformToFill };
         var frame = new Border
@@ -46,6 +48,19 @@ internal static class CardImages
         // kept inside the window (Utility/Extensions/OverlayExtensions.Tooltip.cs:34-47, 90-118;
         // Windows/OverlayWindow.Tooltips.cs:34-175). Hover-only: the game keeps every click.
         frame.MouseEnter += (_, _) => placePreview(frame);
+        if (onClick != null)
+        {
+            // Hover still shows the card: HDT raises its hover events on a hoverable element even when it is
+            // also clickable (Windows/OverlayWindow.MouseOverDetection.cs:537-548).
+            OverlayExtensions.SetIsOverlayHitTestVisible(frame, true);
+            frame.Cursor = System.Windows.Input.Cursors.Hand;
+            frame.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                onClick(cardId);
+            };
+        }
+
         OverlayExtensions.SetIsOverlayHoverVisible(frame, true);
         OverlayExtensions.SetToolTip(frame, FullCard(cardId, previewHeight));
         ToolTipService.SetInitialShowDelay(frame, 0);

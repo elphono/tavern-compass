@@ -28,6 +28,21 @@ public static class Tribes
     public const string Any = "ALL";
 }
 
+/// <summary>A real final board of a composition (Firestone finalBoards): the player's MMR, the turn, the minions left to right.</summary>
+public sealed class FinalBoard
+{
+    public FinalBoard(int mmr, int? turn, IReadOnlyList<string> cards)
+    {
+        Mmr = mmr;
+        Turn = turn;
+        Cards = cards;
+    }
+
+    public int Mmr { get; }
+    public int? Turn { get; }
+    public IReadOnlyList<string> Cards { get; }
+}
+
 /// <summary>How one hero did with one composition (Firestone comp-stats heroStats).</summary>
 public sealed class CompHeroStat
 {
@@ -55,12 +70,12 @@ public sealed class Composition
         double? averagePlacement = null,
         int? dataPoints = null,
         string? tier = null,
-        IReadOnlyList<IReadOnlyList<string>>? inspirationBoards = null,
+        IReadOnlyList<FinalBoard>? finalBoards = null,
         IReadOnlyList<string>? referenceBoard = null,
         IReadOnlyList<CompHeroStat>? heroStats = null)
     {
         HeroStats = heroStats ?? Array.Empty<CompHeroStat>();
-        InspirationBoards = inspirationBoards ?? Array.Empty<IReadOnlyList<string>>();
+        FinalBoards = finalBoards ?? Array.Empty<FinalBoard>();
         ReferenceBoard = referenceBoard;
         Id = id;
         Name = name;
@@ -87,7 +102,7 @@ public sealed class Composition
     public string? Tier { get; }
 
     /// <summary>Real final boards of this composition (card ids, left to right), best MMR first; may be empty.</summary>
-    public IReadOnlyList<IReadOnlyList<string>> InspirationBoards { get; }
+    public IReadOnlyList<FinalBoard> FinalBoards { get; }
 
     /// <summary>
     /// The composition's typical final board, positions 1 to 7 left to right; null when the source gives
@@ -105,9 +120,10 @@ public sealed class CompositionFile
     /// Raised whenever the cached format gains something older files lack, so that a cache written by an
     /// older plugin is downloaded again instead of being served for a week. 2: final-board order
     /// (<see cref="Composition.ReferenceBoard"/>), which schema 1 files never carry; 3: per-hero figures
-    /// (<see cref="Composition.HeroStats"/>).
+    /// (<see cref="Composition.HeroStats"/>); 4: five real final boards with their MMR and turn
+    /// (<see cref="Composition.FinalBoards"/>), in place of three bare ones.
     /// </summary>
-    public const int CurrentSchema = 3;
+    public const int CurrentSchema = 4;
 
     public CompositionFile(
         string source,
@@ -233,16 +249,20 @@ public static class CompositionLoader
                 throw new StatsFormatException($"{path}.tier: expected one of {string.Join(", ", AllowedTiers)}");
             }
 
-            var boards = new List<IReadOnlyList<string>>();
-            if (comp["inspirationBoards"] is { Type: not JTokenType.Null } boardsToken)
+            var boards = new List<FinalBoard>();
+            if (comp["finalBoards"] is { Type: not JTokenType.Null } boardsToken)
             {
-                if (boardsToken is not JArray boardArray || boardArray.Any(b => b is not JArray board || board.Count == 0 || board.Count > 7
-                        || board.Any(c => c.Type != JTokenType.String || string.IsNullOrWhiteSpace(c.Value<string>()))))
+                if (boardsToken is not JArray boardArray || boardArray.Any(b => b is not JObject board
+                        || board["mmr"]?.Type != JTokenType.Integer
+                        || (board["turn"] is { } turn && turn.Type is not (JTokenType.Integer or JTokenType.Null))
+                        || board["cards"] is not JArray cards || cards.Count == 0 || cards.Count > 7
+                        || cards.Any(c => c.Type != JTokenType.String || string.IsNullOrWhiteSpace(c.Value<string>()))))
                 {
-                    throw new StatsFormatException($"{path}.inspirationBoards: expected boards of 1 to 7 card ids");
+                    throw new StatsFormatException($"{path}.finalBoards: expected {{mmr, turn, cards: 1 to 7 card ids}}");
                 }
 
-                boards.AddRange(boardArray.Select(b => (IReadOnlyList<string>)b.Select(c => c.Value<string>()!).ToList()));
+                boards.AddRange(boardArray.Select(b => new FinalBoard(b.Value<int>("mmr"), b["turn"]?.Type == JTokenType.Integer ? b.Value<int>("turn") : null,
+                    b["cards"]!.Select(c => c.Value<string>()!).ToList())));
             }
 
             IReadOnlyList<string>? referenceBoard = null;
@@ -257,19 +277,20 @@ public static class CompositionLoader
                 referenceBoard = reference.Select(c => c.Value<string>()!).ToList();
             }
 
+            // Compact on purpose (about 1,800 pairs on last-patch): [heroCardId, dataPoints, averagePlacement].
             var heroStats = new List<CompHeroStat>();
             if (comp["heroStats"] is { Type: not JTokenType.Null } heroToken)
             {
-                if (heroToken is not JArray heroArray || heroArray.Any(h => h is not JObject hero
-                        || hero["heroCardId"]?.Type != JTokenType.String || string.IsNullOrWhiteSpace(hero.Value<string>("heroCardId"))
-                        || hero["dataPoints"]?.Type != JTokenType.Integer || hero.Value<int>("dataPoints") < 1
-                        || hero["averagePlacement"]?.Type is not (JTokenType.Float or JTokenType.Integer)
-                        || hero.Value<double>("averagePlacement") < 1 || hero.Value<double>("averagePlacement") > 8))
+                if (heroToken is not JArray heroArray || heroArray.Any(h => h is not JArray hero || hero.Count != 3
+                        || hero[0].Type != JTokenType.String || string.IsNullOrWhiteSpace(hero[0].Value<string>())
+                        || hero[1].Type != JTokenType.Integer || hero[1].Value<int>() < 1
+                        || hero[2].Type is not (JTokenType.Float or JTokenType.Integer)
+                        || hero[2].Value<double>() < 1 || hero[2].Value<double>() > 8))
                 {
-                    throw new StatsFormatException($"{path}.heroStats: expected {{heroCardId, dataPoints >= 1, averagePlacement in [1, 8]}}");
+                    throw new StatsFormatException($"{path}.heroStats: expected [heroCardId, dataPoints >= 1, averagePlacement in [1, 8]]");
                 }
 
-                heroStats.AddRange(heroArray.Select(h => new CompHeroStat(h.Value<string>("heroCardId")!, h.Value<int>("dataPoints"), h.Value<double>("averagePlacement"))));
+                heroStats.AddRange(heroArray.Cast<JArray>().Select(h => new CompHeroStat(h[0].Value<string>()!, h[1].Value<int>(), h[2].Value<double>())));
             }
 
             compositions.Add(new Composition(id!, name!, tribes, core, addon, averagePlacement, dataPoints, tier, boards, referenceBoard, heroStats));
@@ -296,14 +317,14 @@ public static class CompositionLoader
             ["averagePlacement"] = c.AveragePlacement.HasValue ? new JValue(c.AveragePlacement.Value) : JValue.CreateNull(),
             ["dataPoints"] = c.DataPoints.HasValue ? new JValue(c.DataPoints.Value) : JValue.CreateNull(),
             ["tier"] = c.Tier != null ? new JValue(c.Tier) : JValue.CreateNull(),
-            ["inspirationBoards"] = new JArray(c.InspirationBoards.Select(b => new JArray(b.Cast<object>().ToArray()))),
-            ["referenceBoard"] = c.ReferenceBoard != null ? new JArray(c.ReferenceBoard.Cast<object>().ToArray()) : JValue.CreateNull(),
-            ["heroStats"] = new JArray(c.HeroStats.Select(h => new JObject
+            ["finalBoards"] = new JArray(c.FinalBoards.Select(b => new JObject
             {
-                ["heroCardId"] = h.HeroCardId,
-                ["dataPoints"] = h.DataPoints,
-                ["averagePlacement"] = h.AveragePlacement,
+                ["mmr"] = b.Mmr,
+                ["turn"] = b.Turn.HasValue ? new JValue(b.Turn.Value) : JValue.CreateNull(),
+                ["cards"] = new JArray(b.Cards.Cast<object>().ToArray()),
             })),
+            ["referenceBoard"] = c.ReferenceBoard != null ? new JArray(c.ReferenceBoard.Cast<object>().ToArray()) : JValue.CreateNull(),
+            ["heroStats"] = new JArray(c.HeroStats.Select(h => new JArray(h.HeroCardId, h.DataPoints, Math.Round(h.AveragePlacement, 3)))),
         }));
         return new JObject
         {
@@ -314,7 +335,7 @@ public static class CompositionLoader
             ["fetchedAt"] = FormatDate(file.FetchedAt),
             ["timePeriod"] = file.TimePeriod != null ? new JValue(file.TimePeriod) : JValue.CreateNull(),
             ["compositions"] = compositions,
-        }.ToString(Formatting.Indented);
+        }.ToString(Formatting.None); // a cache, not a file to read: compact (tens of KB instead of hundreds)
     }
 
     private static IReadOnlyList<string> StringList(JObject obj, string name, string path, bool allowEmpty)

@@ -22,6 +22,8 @@ internal sealed class TavernAdvicePanel
     private readonly Action<string> _toggle;
     private readonly Func<int> _suggested;
     private readonly Action<string> _togglePin;
+    private readonly Func<string, MinionLineups?> _lineupsFor;
+    private MinionLineups? _lineups;
     private IReadOnlyList<bool> _minionSlots = Array.Empty<bool>();
     private readonly Action<int> _changeSuggested;
 
@@ -44,9 +46,10 @@ internal sealed class TavernAdvicePanel
     /// <param name="changeSuggested">Called with −1 or +1 when the − or + of the panel is clicked.</param>
     /// <param name="togglePin">Called with a card id when its pin button is clicked.</param>
     public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle, Func<int> suggested, Action<int> changeSuggested,
-        Action<string> togglePin)
+        Action<string> togglePin, Func<string, MinionLineups?> lineupsFor)
     {
         _togglePin = togglePin;
+        _lineupsFor = lineupsFor;
         _suggested = suggested;
         _changeSuggested = changeSuggested;
         _canvas = canvas;
@@ -67,6 +70,21 @@ internal sealed class TavernAdvicePanel
 
     /// <summary>The first marker drawn by the last layout, for the diagnostic line; null when none.</summary>
     public LayoutRect? FirstMarker { get; private set; }
+
+    /// <summary>When false, no "?" buttons nor clickable vignettes (the lineups feature was switched off by its guard).</summary>
+    public bool LineupsEnabled { get; set; } = true;
+
+    /// <summary>The panel shows how top players field this minion, until its × is clicked.</summary>
+    public void ShowLineups(string cardId)
+    {
+        if (!LineupsEnabled || _lineupsFor(cardId) is not { } lineups)
+        {
+            return;
+        }
+
+        _lineups = lineups;
+        RelayoutPanel();
+    }
 
     /// <summary>When false, no pin buttons are drawn (the pinning feature was switched off by its guard).</summary>
     public bool PinButtonsEnabled { get; set; } = true;
@@ -253,6 +271,7 @@ internal sealed class TavernAdvicePanel
         }
 
         var buttons = TavernLayout.PinButtons(width, height, _advice.Cards.Count);
+        var lineupButtons = TavernLayout.LineupButtons(width, height, _advice.Cards.Count);
         for (var i = 0; i < buttons.Count && i < _minionSlots.Count; i++)
         {
             if (!_minionSlots[i])
@@ -292,10 +311,93 @@ internal sealed class TavernAdvicePanel
             Canvas.SetTop(button, buttons[i].Top);
             OverlayLayer.Add(_canvas, button);
             _markers.Add(button);
+
+            if (LineupsEnabled)
+            {
+                var ask = RoundButton("?", lineupButtons[i], scale, filled: false);
+                ask.MouseLeftButtonUp += (_, e) =>
+                {
+                    e.Handled = true;
+                    ShowLineups(cardId);
+                };
+                Canvas.SetLeft(ask, lineupButtons[i].Left);
+                Canvas.SetTop(ask, lineupButtons[i].Top);
+                OverlayLayer.Add(_canvas, ask);
+                _markers.Add(ask);
+            }
         }
     }
 
     public static SolidColorBrush Brush(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
+
+    private static Border RoundButton(string text, LayoutRect rect, double scale, bool filled)
+    {
+        var button = new Border
+        {
+            Width = rect.Width,
+            Height = rect.Height,
+            CornerRadius = new CornerRadius(rect.Width / 2),
+            Background = filled ? Brushes.White : new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
+            BorderBrush = Brushes.White,
+            BorderThickness = new Thickness(1.5 * scale),
+            Cursor = System.Windows.Input.Cursors.Hand,
+            IsHitTestVisible = true,
+            Child = new TextBlock
+            {
+                Text = text,
+                FontSize = 14 * scale,
+                FontWeight = FontWeights.Bold,
+                Foreground = filled ? Brushes.Black : Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        OverlayExtensions.SetIsOverlayHitTestVisible(button, true);
+        return button;
+    }
+
+    /// <summary>
+    /// The lineup view: the minion's usual position, then for each composition that fields it its label and
+    /// its best final board (the minion framed), with the MMR and turn it was reached at; × goes back.
+    /// </summary>
+    private void AddLineups(StackPanel lines, MinionLineups lineups, double vignette, double scale, double height)
+    {
+        var name = Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(lineups.CardId)?.LocalizedName ?? lineups.CardId;
+        var header = new DockPanel { Margin = new Thickness(0, 4 * scale, 0, 2 * scale) };
+        var close = RoundButton("×", new LayoutRect(0, 0, 20 * scale, 20 * scale), scale, filled: false);
+        close.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _lineups = null;
+            RelayoutPanel();
+        };
+        DockPanel.SetDock(close, Dock.Right);
+        header.Children.Add(close);
+        header.Children.Add(new TextBlock { Text = $"{name}: how top boards field it", FontSize = 13 * scale, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap });
+        lines.Children.Add(header);
+        lines.Children.Add(new TextBlock { Text = lineups.Headline, FontSize = 12 * scale, Foreground = Brushes.LightGray, TextWrapping = TextWrapping.Wrap });
+        foreach (var lineup in lineups.Compositions)
+        {
+            lines.Children.Add(new TextBlock { Text = lineup.Label, FontSize = 12 * scale, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4 * scale, 0, 2 * scale) });
+            var best = lineup.Boards[0];
+            var board = new StackPanel { Orientation = Orientation.Horizontal };
+            foreach (var cardId in best.Cards)
+            {
+                var cell = CardImages.Vignette(cardId, owned: true, vignette * 0.8, scale, TavernLayout.PreviewHeight * height, PlacePreview);
+                board.Children.Add(CardIds.Normalize(cardId) == lineups.CardId
+                    ? new Border { BorderBrush = Brushes.White, BorderThickness = new Thickness(2.5 * scale), CornerRadius = new CornerRadius(4 * scale), Child = cell }
+                    : cell);
+            }
+
+            lines.Children.Add(board);
+            lines.Children.Add(new TextBlock
+            {
+                Text = $"MMR {best.Mmr.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"))}" + (best.Turn is { } turn ? $" · turn {turn}" : string.Empty),
+                FontSize = 10 * scale,
+                Foreground = Brushes.LightGray,
+            });
+        }
+    }
 
     private Border StepButton(string text, int step, double scale)
     {
@@ -390,11 +492,16 @@ internal sealed class TavernAdvicePanel
         title.Children.Add(count);
         title.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
         lines.Children.Add(title);
-        if (_rows.Count == 0)
+        if (_lineups != null)
+        {
+            AddLineups(lines, _lineups, vignette, scale, height);
+        }
+        else if (_rows.Count == 0)
         {
             lines.Children.Add(new TextBlock { Text = "No composition reachable yet", FontSize = 12 * scale, Foreground = Brushes.LightGray, Margin = new Thickness(0, 4 * scale, 0, 0) });
         }
-        foreach (var row in _rows)
+
+        foreach (var row in _lineups == null ? _rows : Array.Empty<CompositionRow>())
         {
             var colour = _selection.ColourOf(row.Composition.Id) is { } hex ? Brush(hex) : null;
             var header = $"{row.Composition.Name} · {row.PlacementText}"
@@ -432,7 +539,8 @@ internal sealed class TavernAdvicePanel
             var board = new StackPanel { Orientation = Orientation.Horizontal };
             foreach (var card in row.Vignettes)
             {
-                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale, TavernLayout.PreviewHeight * height, PlacePreview));
+                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale, TavernLayout.PreviewHeight * height, PlacePreview,
+                    LineupsEnabled ? ShowLineups : null));
             }
 
             // A ticked composition's colour also runs down the left of its board.
