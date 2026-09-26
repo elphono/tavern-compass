@@ -2,21 +2,75 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Vue d'ensemble
 
-Bronzebeard HUD is a Hearthstone Battlegrounds overlay: it tails the game's
-`Power.log`, rebuilds the game state from the log packets, and displays the
-player's board, shop and opponents in a transparent window pinned to the
-Hearthstone window.
+Bronzebeard HUD est un overlay Hearthstone Battlegrounds. **Le produit actif est un plugin
+Hearthstone Deck Tracker (HDT)** qui vise la parité avec Firestone et HSReplay-Tier7 ; il a été
+retenu le 2026-09-26 par l'étude `docs/plans/2026-09-26-etude-stack.md` (critère unique d'Ali :
+atteindre ce résultat le plus vite possible).
 
-The log file is the **only** source of truth — no memory reading, no network
-hook. Anything the overlay shows must be derivable from `Power.log` lines.
+L'app Avalonia autonome (`src/BronzebeardHud.App`, sections *Tech Stack* à *Tests* plus bas) est
+la première cible du dépôt : une réécriture C# du tracker Rust `bg_treehudder`, qui lit `Power.log`
+comme seule source de vérité. Elle reste compilée et testée, mais **n'est plus développée**.
 
-This is a C#/Avalonia rewrite of the Rust/egui tracker in
-`../bg_treehudder`. LogParser and GameState are a direct port of the Rust
-logic; the overlay app was rebuilt from scratch. The Rust repo remains the
-reference for parsing behaviour and, in particular, for
-`docs/reference/power-log-format.md` — read that before touching the lexer.
+**Le dépôt `bg_treehudder` n'existe plus en local** : tout ce qui en avait de la valeur est ici.
+
+| Ce qui venait de `bg_treehudder` | Où c'est maintenant |
+|---|---|
+| format annoté de `Power.log` (à lire avant de toucher au lexer) | `docs/reference/power-log-format.md` |
+| étude de stack | `docs/plans/2026-09-26-etude-stack.md` |
+| recherche HDT / Tier7 (inventaire, tags, mécaniques S14) | `docs/reference/recherche-hdt-tier7.md` |
+| tout le dépôt Rust : code, plans, journal, logs d'exemple, branche `rust/parite-tier7-wip` | `docs/archive/bg_treehudder.bundle`, et le remote `github.com/elphono/bg_treehudder` |
+
+Restaurer le Rust : `git clone docs/archive/bg_treehudder.bundle /tmp/rust && git -C /tmp/rust fetch
+origin 'refs/remotes/origin/*:refs/remotes/bundle/*'` (la branche WIP arrive en `bundle/rust/parite-tier7-wip`).
+
+## État du projet (au 2026-09-26)
+
+Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des décisions est dans
+`docs/journal/2026-09-26-plugin-hdt.md`.
+
+| Phase | Contenu | Livré | Vu en jeu par Ali |
+|---|---|---|---|
+| 1 | squelette du plugin, stats Firestone des héros proposés | ✓ | ✓ |
+| 2 | tranche de MMR, MMR des adversaires, **conseiller de compositions** | ✓ | ✓ compos et marqueurs de taverne |
+| 3 | tribus du lobby, trinkets, épinglage | ✓ | partiel |
+| 4 | historique des combats, graphe des PV, plateaux d'inspiration | ✓ | ✓ panneau Combats (refondu après retours) |
+| 5 | top 4 des héros, plateau vs courbe du héros, compo par héros, bilan par adversaire | ✓ | ✗ |
+| 6 | affinité compo ↔ héros, nombre de compos réglable, épinglage au clic, pivots, « comment les tops le jouent », bouton Meta | ✓ | ✗ |
+
+Ce qui reste ouvert :
+
+- **Vérifier en jeu** les phases 5 et 6 (liste exhaustive : spec § 5).
+- **Deux arbitrages d'Ali** : garder la ligne « comp ≈ » sous chaque héros (échantillons minces, 17
+  parties en médiane) ; garder le bilan par adversaire s'il doublonne l'interface du jeu.
+- **Import HSReplay jamais utilisé** : `stats\manual\` est vide, seules les 24 compos Firestone tournent.
+- Hors périmètre, tranché : notification Timewarped (mécanique absente des parties de la saison 14,
+  prouvé sur les logs), stats de quêtes (fichier Firestone vide), marqueur « prochain adversaire »
+  (déjà affiché par le jeu, retiré).
+
+## Décisions et accords à ne pas re-trancher
+
+| Sujet | Décision (Ali, 2026-09-26) |
+|---|---|
+| Stack | plugin HDT, option 3 de l'étude ; HDT lit la mémoire, le plugin jamais |
+| Stats Firestone | **accord de l'auteur de Firestone** pour récupérer ses JSON publics nous-mêmes (`static.zerotoheroes.com`), cache local, rafraîchissement modeste |
+| Stats HSReplay | usage local accepté, mais le site renvoie un challenge Cloudflare : **on ne contourne pas** une protection anti-bot ; import semi-manuel depuis le navigateur (spec § 6) |
+| Simulateur npm `simulate-bgs-battle` | usage personnel, autorisé ; inutile tant que Bob's Buddy (HDT) fait le travail |
+| MMR des adversaires | gardé tel quel. Le leaderboard EU s'arrête à 8 000 ; Ali est à ≈ 6 840 (région EU mesurée) ; plage par défaut 8 000 – 8 050 |
+| Visibilité | dépôt GitHub **privé** depuis le 2026-09-26 |
+
+## Façon de travailler sur ce projet
+
+- Ali teste en partie sous Windows ; la session **déploie elle-même** les DLL après chaque livraison
+  (build Release depuis `main`, idéalement avec `HdtInstallDir`, copie, comparaison des SHA-1), puis
+  Ali relance HDT. HDT ne recharge les plugins qu'à son démarrage (ou décocher / recocher le plugin).
+- Diagnostic : le journal d'HDT (`/mnt/c/Users/elphono/AppData/Roaming/HearthstoneDeckTracker/Logs/hdt_log.txt`)
+  porte une ligne `Bronzebeard HUD: …` par tour et par fonctionnalité ; une fonctionnalité qui lève
+  est coupée seule par `FeatureGuard` et le dit une fois. Lire cette ligne **avant** de supposer une cause.
+- Retours constants d'Ali sur l'UI : aucun texte tronqué, chaque indication alignée sur la carte ou
+  le héros qu'elle concerne, couleurs vives et distinctes, rien ne masque l'interface du jeu, ne pas
+  dupliquer ce que le jeu ou HDT affichent déjà.
 
 ## Plugin Hearthstone Deck Tracker (depuis le 2026-09-26)
 
@@ -70,8 +124,9 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   elle est connue).
 - Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
   événements réels ne se vérifient que sous Windows, avec HDT installé.
-- Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests
-  utilisent des données synthétiques.
+- Le dépôt est **privé** (il était public jusqu'au 2026-09-26) : on garde malgré tout la règle
+  qu'aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests utilisent des données
+  synthétiques.
 
 ## Tech Stack
 
@@ -209,6 +264,9 @@ Fixtures can be chained to build up a full timeline.
 
 ## Docs
 
-`docs/plans/` holds the migration design and the step-by-step implementation
-plan the port followed; the design doc is the place to look for *why* the
-C# structure mirrors the Rust one.
+| Dossier | Contenu |
+|---|---|
+| `docs/plans/` | 2026-03-08 : conception et plan du portage Rust → C# ; 2026-09-26 : étude de stack, spec et plan du plugin HDT |
+| `docs/reference/` | format de `Power.log`, recherche HDT / Tier7 |
+| `docs/journal/` | ce qui s'est décidé, séance par séance |
+| `docs/archive/` | le dépôt Rust complet, en bundle git |

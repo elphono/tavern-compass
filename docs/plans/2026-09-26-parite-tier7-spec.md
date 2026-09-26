@@ -2,8 +2,8 @@
 
 # Spec : parité Firestone / HSReplay-Tier7 par un plugin Hearthstone Deck Tracker
 
-Décision d'Ali du 2026-09-26 : option 3 de l'étude de stack (`bg_treehudder`,
-`docs/plans/2026-09-26-etude-stack.md`). Hearthstone Deck Tracker (HDT) fournit déjà l'overlay
+Décision d'Ali du 2026-09-26 : option 3 de l'étude de stack
+(`docs/plans/2026-09-26-etude-stack.md`, rapatriée de `bg_treehudder`). Hearthstone Deck Tracker (HDT) fournit déjà l'overlay
 Battlegrounds gratuit de HSReplay. Le plugin ajoute ce qui manque et **ne lit jamais la mémoire du
 jeu** : il consomme l'état que HDT lui expose, plus des données externes.
 
