@@ -110,7 +110,13 @@ public static class FirestoneCompImporter
                 comp.AveragePlacement is >= 1 and <= 8 ? comp.AveragePlacement : null,
                 comp.DataPoints,
                 inspirationBoards: inspiration,
-                referenceBoard: reference));
+                referenceBoard: reference,
+                heroStats: (comp.HeroStats ?? new List<FsHeroStat>())
+                    .Where(h => !string.IsNullOrWhiteSpace(h?.HeroCardId) && h!.DataPoints is >= 1 && h.AveragePlacement is >= 1 and <= 8)
+                    .Select(h => new CompHeroStat(HeroIdNormalizer.Normalize(h!.HeroCardId!), h.DataPoints!.Value, h.AveragePlacement!.Value))
+                    .GroupBy(h => h.HeroCardId, StringComparer.Ordinal)
+                    .Select(g => g.OrderByDescending(h => h.DataPoints).First())
+                    .ToList()));
         }
 
         if (compositions.Count == 0)
@@ -159,6 +165,9 @@ public static class FirestoneCompImporter
 
     private sealed class FsHeroStat
     {
+        [JsonProperty("heroCardId")] public string? HeroCardId { get; set; }
+        [JsonProperty("dataPoints")] public int? DataPoints { get; set; }
+        [JsonProperty("averagePlacement")] public double? AveragePlacement { get; set; }
         [JsonProperty("finalBoards")] public List<FsFinalBoard>? FinalBoards { get; set; }
     }
 

@@ -28,6 +28,21 @@ public static class Tribes
     public const string Any = "ALL";
 }
 
+/// <summary>How one hero did with one composition (Firestone comp-stats heroStats).</summary>
+public sealed class CompHeroStat
+{
+    public CompHeroStat(string heroCardId, int dataPoints, double averagePlacement)
+    {
+        HeroCardId = heroCardId;
+        DataPoints = dataPoints;
+        AveragePlacement = averagePlacement;
+    }
+
+    public string HeroCardId { get; }
+    public int DataPoints { get; }
+    public double AveragePlacement { get; }
+}
+
 /// <summary>A target end-game composition: the cards that define it, and how well it does.</summary>
 public sealed class Composition
 {
@@ -41,8 +56,10 @@ public sealed class Composition
         int? dataPoints = null,
         string? tier = null,
         IReadOnlyList<IReadOnlyList<string>>? inspirationBoards = null,
-        IReadOnlyList<string>? referenceBoard = null)
+        IReadOnlyList<string>? referenceBoard = null,
+        IReadOnlyList<CompHeroStat>? heroStats = null)
     {
+        HeroStats = heroStats ?? Array.Empty<CompHeroStat>();
         InspirationBoards = inspirationBoards ?? Array.Empty<IReadOnlyList<string>>();
         ReferenceBoard = referenceBoard;
         Id = id;
@@ -77,6 +94,9 @@ public sealed class Composition
     /// no board order (then the panel says "order unknown" rather than inventing one).
     /// </summary>
     public IReadOnlyList<string>? ReferenceBoard { get; }
+
+    /// <summary>Per-hero games and placement with this composition; empty when the source does not say.</summary>
+    public IReadOnlyList<CompHeroStat> HeroStats { get; }
 }
 
 public sealed class CompositionFile
@@ -84,9 +104,10 @@ public sealed class CompositionFile
     /// <summary>
     /// Raised whenever the cached format gains something older files lack, so that a cache written by an
     /// older plugin is downloaded again instead of being served for a week. 2: final-board order
-    /// (<see cref="Composition.ReferenceBoard"/>), which schema 1 files never carry.
+    /// (<see cref="Composition.ReferenceBoard"/>), which schema 1 files never carry; 3: per-hero figures
+    /// (<see cref="Composition.HeroStats"/>).
     /// </summary>
-    public const int CurrentSchema = 2;
+    public const int CurrentSchema = 3;
 
     public CompositionFile(
         string source,
@@ -236,7 +257,22 @@ public static class CompositionLoader
                 referenceBoard = reference.Select(c => c.Value<string>()!).ToList();
             }
 
-            compositions.Add(new Composition(id!, name!, tribes, core, addon, averagePlacement, dataPoints, tier, boards, referenceBoard));
+            var heroStats = new List<CompHeroStat>();
+            if (comp["heroStats"] is { Type: not JTokenType.Null } heroToken)
+            {
+                if (heroToken is not JArray heroArray || heroArray.Any(h => h is not JObject hero
+                        || hero["heroCardId"]?.Type != JTokenType.String || string.IsNullOrWhiteSpace(hero.Value<string>("heroCardId"))
+                        || hero["dataPoints"]?.Type != JTokenType.Integer || hero.Value<int>("dataPoints") < 1
+                        || hero["averagePlacement"]?.Type is not (JTokenType.Float or JTokenType.Integer)
+                        || hero.Value<double>("averagePlacement") < 1 || hero.Value<double>("averagePlacement") > 8))
+                {
+                    throw new StatsFormatException($"{path}.heroStats: expected {{heroCardId, dataPoints >= 1, averagePlacement in [1, 8]}}");
+                }
+
+                heroStats.AddRange(heroArray.Select(h => new CompHeroStat(h.Value<string>("heroCardId")!, h.Value<int>("dataPoints"), h.Value<double>("averagePlacement"))));
+            }
+
+            compositions.Add(new Composition(id!, name!, tribes, core, addon, averagePlacement, dataPoints, tier, boards, referenceBoard, heroStats));
         }
 
         return new CompositionFile(
@@ -262,6 +298,12 @@ public static class CompositionLoader
             ["tier"] = c.Tier != null ? new JValue(c.Tier) : JValue.CreateNull(),
             ["inspirationBoards"] = new JArray(c.InspirationBoards.Select(b => new JArray(b.Cast<object>().ToArray()))),
             ["referenceBoard"] = c.ReferenceBoard != null ? new JArray(c.ReferenceBoard.Cast<object>().ToArray()) : JValue.CreateNull(),
+            ["heroStats"] = new JArray(c.HeroStats.Select(h => new JObject
+            {
+                ["heroCardId"] = h.HeroCardId,
+                ["dataPoints"] = h.DataPoints,
+                ["averagePlacement"] = h.AveragePlacement,
+            })),
         }));
         return new JObject
         {

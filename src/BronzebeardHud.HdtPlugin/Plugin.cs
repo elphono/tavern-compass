@@ -39,6 +39,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _historyGuard;
     private readonly FeatureGuard _selectionGuard;
     private readonly FeatureGuard _warbandGuard;
+    private readonly FeatureGuard _heroCompsGuard;
     private string? _warbandLine;
     private int _warbandRound = -1;
     private int _warbandLoggedRound = -1;
@@ -58,6 +59,8 @@ public sealed class Plugin : IPlugin
         _choiceGuard = new FeatureGuard("discover-advice", (n, e) => Disable(n, e, () => _choices?.Hide()));
         _historyGuard = new FeatureGuard("history", (n, e) => Disable(n, e, () => _history?.Hide()));
         _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _tavern?.SetFooter(null)));
+        // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
+        _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _selectionGuard = new FeatureGuard("comp-selection", (n, e) => Disable(n, e, () =>
         {
             _selection.Clear();
@@ -421,12 +424,29 @@ public sealed class Plugin : IPlugin
         }
 
         var tribes = HdtEntityAdapter.LobbyTribeNames();
-        var key = string.Join(",", offered.Select(h => $"{h.EntityId}:{h.CardId}")) + "|" + _stats.Version + "|" + string.Join(",", tribes);
+        _comps?.Poll();
+        var key = string.Join(",", offered.Select(h => $"{h.EntityId}:{h.CardId}")) + "|" + _stats.Version + "|" + string.Join(",", tribes)
+                  + "|" + (_comps?.Version ?? 0);
         if (key != _shownKey)
         {
             _shownKey = key;
             var sources = _stats.Sources().Select(file => LobbyTribes.Apply(file, tribes)).ToList();
-            _panel.Show(HeroPickAdvisor.BuildRows(offered, sources), _stats.Status);
+
+            // Under each hero, the composition it does best with (plan, phase 5.3), guarded on its own.
+            IReadOnlyDictionary<int, string> compLines = new Dictionary<int, string>();
+            _heroCompsGuard.Run(() =>
+            {
+                var playable = TavernAdvisor.Playable(_comps?.Compositions() ?? Array.Empty<Composition>(), tribes);
+                compLines = offered
+                    .Select(h => (h.EntityId, Pick: HeroCompAffinity.Best(h.BaseCardId, playable)))
+                    .Where(x => x.Pick != null)
+                    .ToDictionary(x => x.EntityId, x => x.Pick!.Label);
+                if (_comps?.State == "ok")
+                {
+                    Log.Info($"Bronzebeard HUD: hero comps [{string.Join("; ", offered.Select(h => $"{h.BaseCardId}: {(compLines.TryGetValue(h.EntityId, out var l) ? l : "none")}"))}]");
+                }
+            });
+            _panel.Show(HeroPickAdvisor.BuildRows(offered, sources), _stats.Status, compLines);
         }
     }
 

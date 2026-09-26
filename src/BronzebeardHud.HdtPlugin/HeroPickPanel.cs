@@ -19,6 +19,7 @@ internal sealed class HeroPickPanel
     private readonly List<Border> _badges = new();
     private readonly TextBlock _status = new() { Foreground = Brushes.Gold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, IsHitTestVisible = false };
     private IReadOnlyList<HeroPickRow> _rows = new List<HeroPickRow>();
+    private IReadOnlyDictionary<int, string> _compLines = new Dictionary<int, string>();
     private bool _visible;
 
     public HeroPickPanel(Canvas canvas)
@@ -29,9 +30,11 @@ internal sealed class HeroPickPanel
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
-    public void Show(IReadOnlyList<HeroPickRow> rows, string? status)
+    /// <param name="compLines">Hero entity id → its best composition line (HeroCompAffinity), when known.</param>
+    public void Show(IReadOnlyList<HeroPickRow> rows, string? status, IReadOnlyDictionary<int, string>? compLines = null)
     {
         _rows = rows;
+        _compLines = compLines ?? new Dictionary<int, string>();
         foreach (var badge in _badges)
         {
             _canvas.Children.Remove(badge);
@@ -106,7 +109,13 @@ internal sealed class HeroPickPanel
             badge.Width = rect.Width;
             badge.Height = rect.Height;
             badge.Padding = new Thickness(4 * scale, 2 * scale, 4 * scale, 2 * scale);
-            badge.Child = new Viewbox { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Child = BuildContent((HeroPickRow)badge.Tag, scale) };
+            var row = (HeroPickRow)badge.Tag;
+            badge.Child = new Viewbox
+            {
+                Stretch = Stretch.Uniform,
+                StretchDirection = StretchDirection.DownOnly,
+                Child = BuildContent(row, scale, _compLines.TryGetValue(row.Hero.EntityId, out var compLine) ? compLine : null),
+            };
             Canvas.SetLeft(badge, rect.Left);
             Canvas.SetTop(badge, rect.Top);
             badge.Visibility = Visibility.Visible;
@@ -125,12 +134,13 @@ internal sealed class HeroPickPanel
         _status.Visibility = Visibility.Visible;
     }
 
-    private static UIElement BuildContent(HeroPickRow row, double scale)
+    private static UIElement BuildContent(HeroPickRow row, double scale, string? compLine)
     {
         var lines = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         if (!row.HasData)
         {
             lines.Children.Add(Text("no data", 14 * scale, Brushes.LightGray));
+            AddCompLine(lines, compLine, scale);
             return lines;
         }
 
@@ -159,7 +169,20 @@ internal sealed class HeroPickPanel
             }
         }
 
+        AddCompLine(lines, compLine, scale);
         return lines;
+    }
+
+    private static void AddCompLine(StackPanel lines, string? compLine, double scale)
+    {
+        if (compLine == null)
+        {
+            return;
+        }
+
+        var text = Text(compLine, 12 * scale, Brushes.White);
+        text.HorizontalAlignment = HorizontalAlignment.Center;
+        lines.Children.Add(text);
     }
 
     private static string SourceLabel(string source) => source == StatsSources.HsReplayManual ? "HSR" : "FS";
