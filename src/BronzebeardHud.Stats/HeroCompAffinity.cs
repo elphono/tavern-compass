@@ -23,8 +23,14 @@ public sealed class HeroCompPick
     /// <summary>Games of this hero with this composition in Firestone's data.</summary>
     public int Games { get; }
 
+    /// <summary>Places gained with this hero against the composition's own average: positive = better with this hero.</summary>
+    public double Gain => (Composition.AveragePlacement ?? Estimate) - Estimate;
+
     /// <summary>"comp ≈ Mech Volumizer 3,0 (23)": estimated placement with a decimal comma, and the number of games.</summary>
     public string Label => $"comp ≈ {Composition.Name} {Estimate.ToString("0.0", CultureInfo.GetCultureInfo("fr-FR"))} ({Games})";
+
+    /// <summary>On the composition's line in the shop: "≈ 3,5 with your hero (23)", next to its own average.</summary>
+    public string ShopText => $"≈ {Estimate.ToString("0.0", CultureInfo.GetCultureInfo("fr-FR"))} with your hero ({Games})";
 }
 
 /// <summary>
@@ -45,18 +51,41 @@ public static class HeroCompAffinity
     public const int MinimumGames = 10;
 
     /// <summary>The composition with the best estimate for this hero among the playable ones; null when none qualifies.</summary>
-    public static HeroCompPick? Best(string baseHeroCardId, IReadOnlyList<Composition> playable)
-    {
-        return playable
-            .Where(c => c.AveragePlacement.HasValue)
-            .Select(c => (Composition: c, Stat: c.HeroStats.FirstOrDefault(h => h.HeroCardId == baseHeroCardId)))
-            .Where(x => x.Stat != null && x.Stat.DataPoints >= MinimumGames)
-            .Select(x => new HeroCompPick(
-                x.Composition,
-                (x.Stat!.DataPoints * x.Stat.AveragePlacement + PriorGames * x.Composition.AveragePlacement!.Value) / (x.Stat.DataPoints + PriorGames),
-                x.Stat.DataPoints))
+    public static HeroCompPick? Best(string baseHeroCardId, IReadOnlyList<Composition> playable) =>
+        Effects(baseHeroCardId, playable).Values
             .OrderBy(p => p.Estimate)
             .ThenBy(p => p.Composition.Id, StringComparer.Ordinal)
             .FirstOrDefault();
+
+    /// <summary>The hero's estimate on one composition; null when the composition has no average or too few games with it.</summary>
+    public static HeroCompPick? Effect(string baseHeroCardId, Composition composition)
+    {
+        var stat = composition.HeroStats.FirstOrDefault(h => h.HeroCardId == baseHeroCardId);
+        if (composition.AveragePlacement is not { } average || stat == null || stat.DataPoints < MinimumGames)
+        {
+            return null;
+        }
+
+        return new HeroCompPick(composition, (stat.DataPoints * stat.AveragePlacement + PriorGames * average) / (stat.DataPoints + PriorGames), stat.DataPoints);
+    }
+
+    /// <summary>Composition id → the hero's estimate, for every composition where it qualifies.</summary>
+    public static IReadOnlyDictionary<string, HeroCompPick> Effects(string? baseHeroCardId, IReadOnlyList<Composition> compositions)
+    {
+        var effects = new Dictionary<string, HeroCompPick>(StringComparer.Ordinal);
+        if (string.IsNullOrEmpty(baseHeroCardId))
+        {
+            return effects;
+        }
+
+        foreach (var composition in compositions)
+        {
+            if (!effects.ContainsKey(composition.Id) && Effect(baseHeroCardId!, composition) is { } pick)
+            {
+                effects[composition.Id] = pick;
+            }
+        }
+
+        return effects;
     }
 }

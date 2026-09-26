@@ -278,7 +278,9 @@ internal sealed class TavernAdvicePanel
         foreach (var row in _rows)
         {
             var colour = _selection.ColourOf(row.Composition.Id) is { } hex ? Brush(hex) : null;
-            var header = $"{row.Composition.Name} · {row.PlacementText} · {row.KeyOwned}/{row.KeyTotal} key"
+            var header = $"{row.Composition.Name} · {row.PlacementText}"
+                         + (row.HeroEffect is { } heroEffect ? $" ({heroEffect.ShopText})" : string.Empty)
+                         + $" · {row.KeyOwned}/{row.KeyTotal} key"
                          + (row.IsChecked || row.IsTarget ? string.Empty : " · suggestion")
                          + (row.OrderKnown ? string.Empty : " · order unknown");
             var headerLine = new DockPanel { Margin = new Thickness(0, 4 * scale, 0, 2 * scale) };

@@ -40,6 +40,12 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _selectionGuard;
     private readonly FeatureGuard _warbandGuard;
     private readonly FeatureGuard _heroCompsGuard;
+    private readonly FeatureGuard _heroAffinityGuard;
+
+    // The hero being played on each composition (HeroCompAffinity), recomputed when the hero or the compositions change.
+    private IReadOnlyDictionary<string, HeroCompPick> _heroEffects = new Dictionary<string, HeroCompPick>();
+    private string? _heroEffectsHero;
+    private int _heroEffectsVersion = -1;
     private string? _warbandLine;
     private int _warbandRound = -1;
     private int _warbandLoggedRound = -1;
@@ -61,6 +67,11 @@ public sealed class Plugin : IPlugin
         _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _tavern?.SetFooter(null)));
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
+        _heroAffinityGuard = new FeatureGuard("hero-affinity", (n, e) => Disable(n, e, () =>
+        {
+            _heroEffects = new Dictionary<string, HeroCompPick>();
+            _tavernKey = string.Empty;
+        }));
         _selectionGuard = new FeatureGuard("comp-selection", (n, e) => Disable(n, e, () =>
         {
             _selection.Clear();
@@ -199,6 +210,9 @@ public sealed class Plugin : IPlugin
         _rowTracker = new TavernRowTracker();
         _warbandLine = null;
         _warbandRound = -1;
+        _heroEffects = new Dictionary<string, HeroCompPick>();
+        _heroEffectsHero = null;
+        _heroEffectsVersion = -1;
         _warbandLoggedRound = -1;
         _compPanel = new CompositionPanelState();
         _lastAdvice = null;
@@ -342,7 +356,7 @@ public sealed class Plugin : IPlugin
 
         _choiceKey = key;
         var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
-            _choices.TrinketStat, _stats.Bracket, _selection.Checked);
+            _choices.TrinketStat, _stats.Bracket, _selection.Checked, _heroEffects);
         if (advice.HasMarkers)
         {
             _choices.Show(advice);
@@ -474,7 +488,24 @@ public sealed class Plugin : IPlugin
             var row = HdtEntityAdapter.TavernRow(game);
             // Followed by entity: a purchase, a reroll or an added card redraws the markers at once.
             var rowChanged = _rowTracker.Observe(game.GetTurnNumber(), row.Select(s => s.EntityId).ToList());
-            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + _comps.Version + "|" + _selectionVersion;
+            var hero = HdtEntityAdapter.PlayerHeroId(game);
+            if (hero != _heroEffectsHero || _comps.Version != _heroEffectsVersion)
+            {
+                _heroEffectsHero = hero;
+                _heroEffectsVersion = _comps.Version;
+                _heroEffects = new Dictionary<string, HeroCompPick>();
+                _heroAffinityGuard.Run(() =>
+                {
+                    _heroEffects = HeroCompAffinity.Effects(hero, _comps.Compositions());
+                    if (hero != null && _comps.State == "ok")
+                    {
+                        var inv = System.Globalization.CultureInfo.InvariantCulture;
+                        Log.Info($"Bronzebeard HUD: hero affinity hero={hero} comps=[{string.Join("; ", _heroEffects.Values.OrderByDescending(e => e.Gain).Select(e => $"{e.Composition.Name} {e.ShopText} {(CompAdvisor.HeroPlacementWeight * e.Gain).ToString("+0.00;-0.00", inv)}pt"))}]");
+                    }
+                });
+            }
+
+            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + _comps.Version + "|" + _selectionVersion + "|" + hero + ":" + _heroEffects.Count;
             if (rowChanged || key != _tavernKey || _lastAdvice == null)
             {
                 _tavernKey = key;
@@ -482,7 +513,7 @@ public sealed class Plugin : IPlugin
                 _lastCards = cards;
                 _lastMinions = row.Count(s => s.IsMinion);
                 _lastAdvice = TavernAdvisor.Advise(row.Select(s => s.CardId).ToList(), owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
-                    _selection.Checked);
+                    _selection.Checked, _heroEffects);
                 _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _comps.Pins);
                 _lastFirstMarker = _tavern.FirstMarker;
             }
@@ -507,7 +538,7 @@ public sealed class Plugin : IPlugin
         IReadOnlyList<CompositionRow> BuildRows()
         {
             _rowsSelectionVersion = _selectionVersion;
-            return CompositionRows.Build(advice!.Targets, advice.Playable, ownedNow, chosen: chosen);
+            return CompositionRows.Build(advice!.Targets, advice.Playable, ownedNow, chosen: chosen, heroEffects: _heroEffects);
         }
 
         _compPanel.Update(phase, () => advice != null && (changed || _compPanel.Rows.Count == 0) ? BuildRows() : _compPanel.Rows);

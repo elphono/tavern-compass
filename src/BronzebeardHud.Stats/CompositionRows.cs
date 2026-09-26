@@ -26,9 +26,10 @@ public sealed class CompositionVignette
 public sealed class CompositionRow
 {
     public CompositionRow(Composition composition, double score, bool isTarget, int keyOwned, IReadOnlyList<CompositionVignette> vignettes, bool orderKnown,
-        bool isChecked = false)
+        bool isChecked = false, HeroCompPick? heroEffect = null)
     {
         IsChecked = isChecked;
+        HeroEffect = heroEffect;
         Composition = composition;
         Score = score;
         IsTarget = isTarget;
@@ -42,6 +43,9 @@ public sealed class CompositionRow
 
     /// <summary>Ticked by the player (<see cref="CompositionSelection"/>): shown first, whatever its rank.</summary>
     public bool IsChecked { get; }
+
+    /// <summary>The hero being played on this composition, when the data qualifies (shown as "≈ 3,5 with your hero (23)").</summary>
+    public HeroCompPick? HeroEffect { get; }
 
     /// <summary>False for a suggestion (best placement in the lobby) shown before anything is targeted.</summary>
     public bool IsTarget { get; }
@@ -75,8 +79,9 @@ public static class CompositionRows
     /// </remarks>
     public static IReadOnlyList<CompositionRow> Build(
         IReadOnlyList<CompProgress> targets, IReadOnlyList<Composition> playable, IEnumerable<OwnedCard> owned, int maxRows = MaxRows,
-        IReadOnlyList<string>? chosen = null)
+        IReadOnlyList<string>? chosen = null, IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null)
     {
+        HeroCompPick? EffectOf(Composition c) => heroEffects != null && heroEffects.TryGetValue(c.Id, out var e) ? e : null;
         var cards = owned.ToList();
         var ownedCounts = cards
             .GroupBy(c => c.CardId, StringComparer.Ordinal)
@@ -84,7 +89,7 @@ public static class CompositionRows
         var ticked = (chosen ?? Array.Empty<string>())
             .Select(id => playable.FirstOrDefault(c => c.Id == id))
             .Where(c => c != null)
-            .Select(c => Row(c!, CompAdvisor.Progress(cards, c!).Score, isTarget: true, ownedCounts, isChecked: true))
+            .Select(c => Row(c!, CompAdvisor.Progress(cards, c!).Score, isTarget: true, ownedCounts, isChecked: true, EffectOf(c!)))
             .ToList();
         var limit = ticked.Count == 0 ? maxRows : Math.Max(maxRows, ticked.Count + 1);
         var rows = new List<CompositionRow>(ticked);
@@ -92,18 +97,19 @@ public static class CompositionRows
         rows.AddRange(targets
             .Where(t => !shown.Contains(t.Composition.Id))
             .Take(limit - rows.Count)
-            .Select(t => Row(t.Composition, t.Score, isTarget: true, ownedCounts)));
+            .Select(t => Row(t.Composition, t.Score, isTarget: true, ownedCounts, heroEffect: EffectOf(t.Composition))));
         shown.UnionWith(rows.Select(r => r.Composition.Id));
         rows.AddRange(playable
             .Where(c => !shown.Contains(c.Id))
             .OrderBy(c => c.AveragePlacement ?? double.MaxValue)
             .ThenBy(c => c.Id, StringComparer.Ordinal)
             .Take(Math.Max(0, limit - rows.Count))
-            .Select(c => Row(c, 0, isTarget: false, ownedCounts)));
+            .Select(c => Row(c, 0, isTarget: false, ownedCounts, heroEffect: EffectOf(c))));
         return rows;
     }
 
-    private static CompositionRow Row(Composition composition, double score, bool isTarget, IReadOnlyDictionary<string, int> ownedCounts, bool isChecked = false)
+    private static CompositionRow Row(Composition composition, double score, bool isTarget, IReadOnlyDictionary<string, int> ownedCounts, bool isChecked = false,
+        HeroCompPick? heroEffect = null)
     {
         var orderKnown = composition.ReferenceBoard is { Count: > 0 };
         var cards = orderKnown
@@ -121,7 +127,7 @@ public static class CompositionRows
             return new CompositionVignette(index + 1, cardId, owned);
         }).ToList();
         var keyOwned = composition.CoreCards.Count(ownedCounts.ContainsKey);
-        return new CompositionRow(composition, score, isTarget, keyOwned, vignettes, orderKnown, isChecked);
+        return new CompositionRow(composition, score, isTarget, keyOwned, vignettes, orderKnown, isChecked, heroEffect);
     }
 }
 

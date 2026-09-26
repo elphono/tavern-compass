@@ -44,8 +44,9 @@ public sealed class PlayerCards
 
 public sealed class CompProgress
 {
-    public CompProgress(Composition composition, IReadOnlyList<string> coreOwned, IReadOnlyList<string> addonOwned, int tribeMatches, double score)
+    public CompProgress(Composition composition, IReadOnlyList<string> coreOwned, IReadOnlyList<string> addonOwned, int tribeMatches, double score, double heroBonus = 0)
     {
+        HeroBonus = heroBonus;
         Composition = composition;
         CoreOwned = coreOwned;
         AddonOwned = addonOwned;
@@ -57,7 +58,12 @@ public sealed class CompProgress
     public IReadOnlyList<string> CoreOwned { get; }
     public IReadOnlyList<string> AddonOwned { get; }
     public int TribeMatches { get; }
+
+    /// <summary>What the player holds (key pieces, add-ons, tribe), plus <see cref="HeroBonus"/>.</summary>
     public double Score { get; }
+
+    /// <summary>Points given or taken by the hero being played on this composition (<see cref="CompAdvisor.HeroPlacementWeight"/>).</summary>
+    public double HeroBonus { get; }
 }
 
 /// <summary>What one card offered by Bob would bring.</summary>
@@ -96,12 +102,26 @@ public static class CompAdvisor
     public const double TribeWeight = 0.5;
     public const int MaxTargets = 3;
 
-    public static IReadOnlyList<CompProgress> Rank(IEnumerable<OwnedCard> owned, IEnumerable<Composition> compositions, int maxTargets = MaxTargets)
+    /// <summary>
+    /// Points per place the hero being played gains (or loses) on a composition, from
+    /// <see cref="HeroCompAffinity"/>. Measured on last-patch (2026-09-26): 90 % of the hero effects lie
+    /// within ±0.32 place and all within ±0.76, so at 2 points a place the hero moves a composition by
+    /// ±0.6 point usually and 1.5 at most: it decides between compositions equally advanced and may pass a
+    /// single add-on (1), never a key piece (3). The hero alone never makes a composition a target.
+    /// </summary>
+    public const double HeroPlacementWeight = 2;
+
+    /// <param name="heroEffects">The hero being played on each composition (HeroCompAffinity.Effects); none before the pick.</param>
+    public static IReadOnlyList<CompProgress> Rank(IEnumerable<OwnedCard> owned, IEnumerable<Composition> compositions, int maxTargets = MaxTargets,
+        IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null)
     {
         var cards = owned.ToList();
         return compositions
             .Select(comp => Progress(cards, comp))
             .Where(p => p.Score > 0)
+            .Select(p => heroEffects != null && heroEffects.TryGetValue(p.Composition.Id, out var effect)
+                ? new CompProgress(p.Composition, p.CoreOwned, p.AddonOwned, p.TribeMatches, p.Score + HeroPlacementWeight * effect.Gain, HeroPlacementWeight * effect.Gain)
+                : p)
             .OrderByDescending(p => p.Score)
             .ThenBy(p => p.Composition.AveragePlacement ?? double.MaxValue)
             .ThenBy(p => p.Composition.Id, StringComparer.Ordinal)
@@ -185,10 +205,11 @@ public static class TavernAdvisor
         IReadOnlyList<OwnedCard> owned,
         IReadOnlyList<Composition> compositions,
         IReadOnlyCollection<string> lobbyTribes,
-        IReadOnlyList<string>? chosen = null)
+        IReadOnlyList<string>? chosen = null,
+        IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null)
     {
         var playable = Playable(compositions, lobbyTribes);
-        var targets = CompAdvisor.Rank(owned, playable);
+        var targets = CompAdvisor.Rank(owned, playable, heroEffects: heroEffects);
         var ownedIds = new HashSet<string>(owned.Select(c => c.CardId), StringComparer.Ordinal);
         var (aimed, pool) = Focus(compositions, playable, targets, owned, chosen);
         var cards = tavernCardIds.Select((rawId, position) =>

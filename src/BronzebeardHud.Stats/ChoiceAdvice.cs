@@ -277,11 +277,12 @@ public static class ChoiceAdvisor
         IReadOnlyCollection<string> lobbyTribes,
         Func<string, TrinketStat?>? trinketStat = null,
         int bracket = MmrBracket.EveryPlayer,
-        IReadOnlyList<string>? chosen = null)
+        IReadOnlyList<string>? chosen = null,
+        IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null)
     {
         var kind = ChoiceClassifier.Kind(options);
         var playable = TavernAdvisor.Playable(compositions, lobbyTribes);
-        var (targets, pool) = TavernAdvisor.Focus(compositions, playable, CompAdvisor.Rank(owned, playable), owned, chosen);
+        var (targets, pool) = TavernAdvisor.Focus(compositions, playable, CompAdvisor.Rank(owned, playable, heroEffects: heroEffects), owned, chosen);
         if (kind is ChoiceKind.None or ChoiceKind.Unsupported)
         {
             return new ChoiceAdvice(kind, Array.Empty<OptionAdvice>(), targets);
