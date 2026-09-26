@@ -97,9 +97,13 @@ reste sous `MaxRating`.
 
 ## Phase 4 : historique, graphe des PV, inspiration, quêtes
 
-`CombatHistory.cs`, `HealthGraph.cs`, `InspirationBoards.cs`, `QuestStats.cs`, testés sur des
-séquences de trois tours au moins, pour qu'un état qui se piège lui-même se voie. **Sous Windows** :
-tout le rendu.
+| Fonctionnalité | Fichiers | Tests |
+|---|---|---|
+| Historique des combats et graphe des PV (livrés) | `GameTimeline.cs` (traceur, courbes, `HistoryLayout`) ; `GameHistoryPanel.cs` | trois combats successifs (victoire, défaite, égalité) observés plusieurs fois chacun, PV d'avant combat pris en boutique, une valeur par tour, remise à zéro, échelle du graphe, panneau hors de la taverne |
+| Plateaux d'inspiration | `InspirationBoards.cs` | à venir |
+| Stats de quêtes | **coupées** : le fichier de quêtes de Firestone est vide sur le dernier patch (`questStats: []`, `dataPoints: 0`, mesuré le 2026-09-26) | — |
+
+**Sous Windows** : tout le rendu.
 
 ## Ce qui reste un arbitrage d'Ali
 

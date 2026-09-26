@@ -24,6 +24,9 @@ public sealed class Plugin : IPlugin
     private OpponentMmrPanel? _opponentMmr;
     private TrinketPickPanel? _trinkets;
     private NextOpponentMarker? _nextOpponent;
+    private GameHistoryPanel? _history;
+    private readonly GameTimeline _timeline = new();
+    private int _historyKey = -1;
     private string _nextOpponentKey = string.Empty;
     private string _trinketKey = string.Empty;
     private StatsService? _stats;
@@ -58,6 +61,7 @@ public sealed class Plugin : IPlugin
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _trinkets = new TrinketPickPanel(Core.OverlayCanvas, StatsDirectory);
         _nextOpponent = new NextOpponentMarker(Core.OverlayCanvas);
+        _history = new GameHistoryPanel(Core.OverlayCanvas);
     }
 
     public void OnUnload()
@@ -72,6 +76,8 @@ public sealed class Plugin : IPlugin
         _trinkets = null;
         _nextOpponent?.Detach();
         _nextOpponent = null;
+        _history?.Detach();
+        _history = null;
         _panel = null;
         _tavern = null;
         _stats?.Dispose();
@@ -99,6 +105,32 @@ public sealed class Plugin : IPlugin
         UpdateOpponentMmr(game);
         UpdateTrinketChoice(game);
         UpdateNextOpponent(game);
+        UpdateHistory(game);
+    }
+
+    private void UpdateHistory(GameV2 game)
+    {
+        if (_history == null || !game.IsBattlegroundsMatch || !game.IsBattlegroundsHeroPickingDone)
+        {
+            _history?.Hide();
+            return;
+        }
+
+        var heroes = HdtEntityAdapter.Heroes(game).Select(HeroHealth.From).Where(h => h != null).Select(h => h!).ToList();
+        _timeline.Observe(game.GetTurnNumber(), game.IsBattlegroundsCombatPhase, game.Player.Id, HdtEntityAdapter.NextOpponentPlayerId(game), heroes);
+        if (!game.IsBattlegroundsCombatPhase)
+        {
+            _historyKey = -1;
+            _history.Hide();
+            return;
+        }
+
+        var key = _timeline.Combats.Count * 1000 + _timeline.HealthByPlayer.Sum(c => c.Value.Count);
+        if (key != _historyKey)
+        {
+            _historyKey = key;
+            _history.Show(_timeline, game.Player.Id);
+        }
     }
 
     private void UpdateNextOpponent(GameV2 game)
@@ -202,6 +234,7 @@ public sealed class Plugin : IPlugin
         {
             _inHeroSelection = true;
             _compsLoadedThisGame = false;
+            _timeline.Reset();
             _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
         }
 
