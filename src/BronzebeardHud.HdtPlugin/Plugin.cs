@@ -193,8 +193,9 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        var heroes = HdtEntityAdapter.Heroes(game).Select(HeroHealth.From).Where(h => h != null).Select(h => h!).ToList();
-        _timeline.Observe(game.GetTurnNumber(), game.IsBattlegroundsCombatPhase, game.Player.Id, HdtEntityAdapter.NextOpponentPlayerId(game), heroes);
+        var heroes = HeroHealth.InGame(HdtEntityAdapter.Heroes(game));
+        var nextOpponent = HdtEntityAdapter.NextOpponentPlayerId(game);
+        _timeline.Observe(game.GetTurnNumber(), game.IsBattlegroundsCombatPhase, game.Player.Id, nextOpponent, heroes);
         if (!game.IsBattlegroundsCombatPhase)
         {
             _historyKey = -1;
@@ -202,11 +203,11 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        var key = _timeline.Combats.Count * 1000 + _timeline.HealthByPlayer.Sum(c => c.Value.Count);
+        var key = _timeline.Combats.Count * 1000 + _timeline.HealthByPlayer.Sum(c => c.Value.Count) + heroes.Sum(h => h.Health) * 7;
         if (key != _historyKey)
         {
             _historyKey = key;
-            _history.Show(_timeline, game.Player.Id);
+            _history.Show(_timeline, heroes, game.Player.Id, nextOpponent);
         }
     }
 

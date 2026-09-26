@@ -98,6 +98,7 @@ reste sous `MaxRating`.
 | Fonctionnalité | Fichiers | Tests |
 |---|---|---|
 | Historique des combats et graphe des PV (livrés) | `GameTimeline.cs` (traceur, courbes, `HistoryLayout`) ; `GameHistoryPanel.cs` | trois combats successifs (victoire, défaite, égalité) observés plusieurs fois chacun, PV d'avant combat pris en boutique, une valeur par tour, remise à zéro, échelle du graphe, panneau hors de la taverne |
+| Panneau Combats refondu (retour d'Ali) | `GameTimeline.cs` (`Standings`, `CombatText`, `ChartAxes`, `HistoryLayout` en haut à droite, plus large que haut) ; `GameHistoryPanel.cs` | classement avec égalités et prochain adversaire, libellés sur trois tours, graduations 40/60 PV et 3/8/15 tours, rectangle hors plateau, hors classement et hors panneau des compos, en 16:9, 21:9 et 4:3 |
 | Plateaux d'inspiration (livrés) | `inspirationBoards` dans le format des compos, tirés des plateaux finaux de Firestone ; ligne « Inspiration » dans `TavernAdvicePanel.cs` | trois plateaux au plus haut MMR, doublon écarté, aller-retour du format, plateau de 8 cartes refusé |
 | Stats de quêtes | **coupées** : le fichier de quêtes de Firestone est vide sur le dernier patch (`questStats: []`, `dataPoints: 0`, mesuré le 2026-09-26) | — |
 
