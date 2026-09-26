@@ -149,6 +149,8 @@ flowchart TB
 4. Le téléchargement réel depuis le processus HDT : proxy, TLS de .NET Framework 4.8, droits
    d'écriture dans le dossier de cache.
 5. L'absence de conflit d'assemblies dans le processus HDT, Newtonsoft.Json compris.
+6. Qu'une fonctionnalité en échec (par exemple le MMR adverse, si HearthMirror a changé) se coupe seule,
+   que les autres continuent, et que le journal HDT porte une fois `Bronzebeard HUD: feature "…" disabled`.
 
 **Vérifié par Ali le 2026-09-26, sous HDT 1.58.3** : les points 1, 3 et 4 (plugin chargé et activé,
 sélection de héros détectée, stats Firestone réelles téléchargées et affichées) ; le point 5 n'a

@@ -8,6 +8,7 @@ using BronzebeardHud.Stats;
 using Hearthstone_Deck_Tracker.API;
 using Hearthstone_Deck_Tracker.Hearthstone;
 using Hearthstone_Deck_Tracker.Plugins;
+using Hearthstone_Deck_Tracker.Utility.Logging;
 
 namespace BronzebeardHud.HdtPlugin;
 
@@ -27,6 +28,39 @@ public sealed class Plugin : IPlugin
     private GameHistoryPanel? _history;
     private readonly GameTimeline _timeline = new();
     private int _historyKey = -1;
+
+    // One guard per feature: an unexpected exception disables that feature alone (see FeatureGuard).
+    private readonly FeatureGuard _heroSelectionGuard;
+    private readonly FeatureGuard _tavernGuard;
+    private readonly FeatureGuard _opponentMmrGuard;
+    private readonly FeatureGuard _trinketGuard;
+    private readonly FeatureGuard _nextOpponentGuard;
+    private readonly FeatureGuard _historyGuard;
+
+    public Plugin()
+    {
+        _heroSelectionGuard = new FeatureGuard("hero-selection", (n, e) => Disable(n, e, () => _panel?.Hide()));
+        _tavernGuard = new FeatureGuard("tavern-advice", (n, e) => Disable(n, e, () => _tavern?.Hide()));
+        _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
+        _trinketGuard = new FeatureGuard("trinket-choice", (n, e) => Disable(n, e, () => _trinkets?.Hide()));
+        _nextOpponentGuard = new FeatureGuard("next-opponent", (n, e) => Disable(n, e, () => _nextOpponent?.Hide()));
+        _historyGuard = new FeatureGuard("history", (n, e) => Disable(n, e, () => _history?.Hide()));
+    }
+
+    /// <summary>Report a disabled feature once in HDT's log, then take its panel off the screen.</summary>
+    private static void Disable(string feature, Exception error, Action hide)
+    {
+        Log.Error($"Bronzebeard HUD: feature \"{feature}\" disabled for this session after {error.GetType().FullName}: {error.Message}");
+        Log.Error(error);
+        try
+        {
+            hide();
+        }
+        catch (Exception)
+        {
+            // The panel is already broken; the other features keep running.
+        }
+    }
     private string _nextOpponentKey = string.Empty;
     private string _trinketKey = string.Empty;
     private StatsService? _stats;
@@ -100,12 +134,12 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        UpdateHeroSelection(game);
-        UpdateTavern(game);
-        UpdateOpponentMmr(game);
-        UpdateTrinketChoice(game);
-        UpdateNextOpponent(game);
-        UpdateHistory(game);
+        _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
+        _tavernGuard.Run(() => UpdateTavern(game));
+        _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
+        _trinketGuard.Run(() => UpdateTrinketChoice(game));
+        _nextOpponentGuard.Run(() => UpdateNextOpponent(game));
+        _historyGuard.Run(() => UpdateHistory(game));
     }
 
     private void UpdateHistory(GameV2 game)
