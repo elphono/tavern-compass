@@ -43,7 +43,7 @@ public sealed class Plugin : IPlugin
     public Plugin()
     {
         _heroSelectionGuard = new FeatureGuard("hero-selection", (n, e) => Disable(n, e, () => _panel?.Hide()));
-        _tavernGuard = new FeatureGuard("tavern-advice", (n, e) => Disable(n, e, () => _tavern?.Hide()));
+        _tavernGuard = new FeatureGuard("tavern-advice", (n, e) => Disable(n, e, () => { _tavern?.HideMarkers(); _tavern?.HidePanel(); }));
         _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
         _trinketGuard = new FeatureGuard("trinket-choice", (n, e) => Disable(n, e, () => _trinkets?.Hide()));
         _nextOpponentGuard = new FeatureGuard("next-opponent", (n, e) => Disable(n, e, () => _nextOpponent?.Hide()));
@@ -73,6 +73,10 @@ public sealed class Plugin : IPlugin
     private string _shownKey = string.Empty;
     private string _tavernKey = string.Empty;
     private int _diagnosticRound = -1;
+    private readonly CompositionPanelState _compPanel = new();
+    private TavernAdvice? _lastAdvice;
+    private IReadOnlyList<OwnedCard> _lastOwned = Array.Empty<OwnedCard>();
+    private string? _shownCompStatus;
     private string _opponentKey = string.Empty;
 
     /// <summary>%LocalAppData%\BronzebeardHud\stats; hand-typed HSReplay files go in its "manual" subfolder.</summary>
@@ -337,41 +341,64 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        if (!HdtEntityAdapter.IsShopPhase(game))
-        {
-            _tavernKey = string.Empty;
-            _tavern.Hide();
-            return;
-        }
-
-        if (!_compsLoadedThisGame)
+        var phase = HdtEntityAdapter.Phase(game);
+        if (phase == OverlayPhase.Shop && !_compsLoadedThisGame)
         {
             _compsLoadedThisGame = true;
             _comps.BeginGame();
         }
 
         _comps.Poll();
-        var owned = HdtEntityAdapter.OwnedCards(game);
-        var tavern = HdtEntityAdapter.TavernCardIds(game);
-        var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + string.Join(",", tavern) + "|" + _comps.Version;
-        if (key == _tavernKey)
+        var changed = false;
+        if (phase == OverlayPhase.Shop)
         {
-            return;
+            var owned = HdtEntityAdapter.OwnedCards(game);
+            var tavern = HdtEntityAdapter.TavernCardIds(game);
+            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + string.Join(",", tavern) + "|" + _comps.Version;
+            if (key != _tavernKey || _lastAdvice == null)
+            {
+                _tavernKey = key;
+                changed = true;
+                _lastOwned = owned;
+                _lastAdvice = TavernAdvisor.Advise(tavern, owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames());
+                _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _comps.Pins);
+
+                // One diagnostic line per shop round, once the tavern has cards: enough to tell from HDT's log
+                // whether compositions were loaded, what was targeted and where the first marker went.
+                var round = game.GetTurnNumber();
+                if (round != _diagnosticRound && tavern.Count > 0)
+                {
+                    _diagnosticRound = round;
+                    Log.Info(TavernAdvisor.DiagnosticLine(round, _comps.Compositions().Count, _comps.State, _lastAdvice, _tavern.FirstMarker,
+                        Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
+                }
+            }
         }
 
-        _tavernKey = key;
-        var compositions = _comps.Compositions();
-        var advice = TavernAdvisor.Advise(tavern, owned, compositions, HdtEntityAdapter.LobbyTribeNames());
-        _tavern.Show(advice, owned.Select(c => c.CardId), _comps.Status, _comps.Pins);
-
-        // One diagnostic line per shop round, once the tavern has cards: enough to tell from HDT's log
-        // whether compositions were loaded, what was targeted and where the first marker went.
-        var round = game.GetTurnNumber();
-        if (round != _diagnosticRound && tavern.Count > 0)
+        var wasVisible = _compPanel.PanelVisible;
+        var advice = _lastAdvice;
+        var ownedNow = _lastOwned;
+        _compPanel.Update(phase, () => advice != null && (changed || _compPanel.Rows.Count == 0)
+            ? CompositionRows.Build(advice.Targets, advice.Playable, ownedNow)
+            : _compPanel.Rows);
+        if (!_compPanel.MarkersVisible)
         {
-            _diagnosticRound = round;
-            Log.Info(TavernAdvisor.DiagnosticLine(round, compositions.Count, _comps.State, advice, _tavern.FirstMarker,
-                Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
+            _tavernKey = string.Empty;
+            _tavern.HideMarkers();
+        }
+
+        if (!_compPanel.PanelVisible)
+        {
+            _tavern.HidePanel();
+            if (phase != OverlayPhase.Combat)
+            {
+                _lastAdvice = null;
+            }
+        }
+        else if (changed || !wasVisible || _comps.Status != _shownCompStatus)
+        {
+            _shownCompStatus = _comps.Status;
+            _tavern.ShowPanel(_compPanel.Rows, _comps.Status);
         }
     }
 }

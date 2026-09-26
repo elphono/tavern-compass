@@ -188,6 +188,10 @@ tier: A
 avg: 3.95
 core: Drustfallen Butcher, Handless Forsaken
 addon: Friendly Geist
+board: Mummifier, Drustfallen Butcher, Handless Forsaken, Friendly Geist
 ```
 
-Cartes par nom (anglais ou français, résolu par HearthDb) ou par identifiant ; `core:` obligatoire.
+Cartes par nom (anglais ou français, résolu par HearthDb) ou par identifiant ; `core:` obligatoire ;
+`board:` (facultatif) donne le plateau final de gauche à droite. Le panneau montre, par compo, ce plateau
+en vignettes (possédées en couleur avec ✓, manquantes grisées) ; chez Firestone l'ordre vient de
+`finalBoards[].finalComp.board[].tags.ZONE_POSITION` (plateau le plus riche en pièces clés) ; sans ordre, « order unknown ».

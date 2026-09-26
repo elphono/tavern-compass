@@ -44,20 +44,21 @@ public class TavernLayoutTests
     }
 
     [Theory]
-    [InlineData(2000, 1220)]
-    [InlineData(1440, 1080)]
-    [InlineData(3440, 1440)]
-    public void TargetPanel_StaysClearOfTheTavernTheBoardsAndTheLeaderboard(double width, double height)
+    [InlineData(1920, 1080)] // 16:9
+    [InlineData(2291, 1360)] // Ali's window
+    [InlineData(2560, 1080)] // 21:9
+    [InlineData(1600, 1200)] // 4:3
+    public void TargetPanel_Default_AvoidsBoardsLeaderboardAndHero_InsideTheWindow(double width, double height)
     {
         var panel = TavernLayout.TargetPanel(width, height);
-        var markers = TavernLayout.Markers(width, height, 7);
 
-        Assert.True(panel.Width > 0.15 * height, "panel too narrow to be read");
-        Assert.True(panel.Top > TavernLayout.PlayerRowBottom(height), "panel overlaps the player's board row");
-        Assert.True(panel.Top > markers[0].Top + markers[0].Height, "panel overlaps the tavern markers");
-        Assert.True(panel.Right <= width / 2 - 0.2 * height, "panel reaches the hero portrait");
-        Assert.True(panel.Left >= width / 2 - height * 2 / 3 + 0.12 * height * 4 / 3, "panel overlaps the leaderboard");
-        Assert.True(panel.Top + panel.Height < height, "panel leaves the window");
+        foreach (var (name, zone) in NoGoZones.For(width, height))
+        {
+            Assert.False(NoGoZones.Overlaps(panel, zone), $"target panel covers the {name}");
+        }
+
+        Assert.True(panel.Left >= 0 && panel.Top >= 0 && panel.Right <= width && panel.Top + panel.Height <= height, "outside the window");
+        Assert.True(panel.Width >= 7 * 0.052 * height, "seven vignettes do not fit");
     }
 
     [Fact]

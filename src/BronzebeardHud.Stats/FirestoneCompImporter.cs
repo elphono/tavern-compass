@@ -58,7 +58,11 @@ public static class FirestoneCompImporter
             var finalBoards = (comp.HeroStats ?? new List<FsHeroStat>())
                 .SelectMany(h => h?.FinalBoards ?? new List<FsFinalBoard>())
                 .Where(b => b?.FinalComp?.Board is { Count: > 0 })
-                .Select(b => (Mmr: b.Mmr ?? 0, Cards: b.FinalComp!.Board!.Where(m => !string.IsNullOrEmpty(m?.CardId)).Select(m => CardIds.Normalize(m.CardId!)).Take(7).ToList()))
+                // Left to right by ZONE_POSITION (present on every minion of Firestone's boards, checked on 2026-09-26).
+                .Select(b => (Mmr: b.Mmr ?? 0, Cards: b.FinalComp!.Board!
+                    .Where(m => !string.IsNullOrEmpty(m?.CardId))
+                    .OrderBy(m => m!.Tags?.ZonePosition ?? int.MaxValue)
+                    .Select(m => CardIds.Normalize(m!.CardId!)).Take(7).ToList()))
                 .Where(b => b.Cards.Count > 0)
                 .ToList();
             var boards = finalBoards.Select(b => new HashSet<string>(b.Cards, StringComparer.Ordinal)).ToList();
@@ -89,6 +93,14 @@ public static class FirestoneCompImporter
                 .Select(g => (IReadOnlyList<string>)g.First())
                 .Take(InspirationBoards)
                 .ToList();
+            // Reference board: the final board holding the most key pieces, then the most add-ons,
+            // then reached at the highest MMR; its order is the one the panel shows.
+            var reference = finalBoards
+                .OrderByDescending(b => b.Cards.Distinct().Count(core.Contains))
+                .ThenByDescending(b => b.Cards.Distinct().Count(addon.Contains))
+                .ThenByDescending(b => b.Mmr)
+                .Select(b => b.Cards)
+                .First();
             compositions.Add(new Composition(
                 comp.Archetype,
                 Humanize(comp.Archetype),
@@ -97,7 +109,8 @@ public static class FirestoneCompImporter
                 addon,
                 comp.AveragePlacement is >= 1 and <= 8 ? comp.AveragePlacement : null,
                 comp.DataPoints,
-                inspirationBoards: inspiration));
+                inspirationBoards: inspiration,
+                referenceBoard: reference));
         }
 
         if (compositions.Count == 0)
@@ -163,5 +176,11 @@ public static class FirestoneCompImporter
     private sealed class FsMinion
     {
         [JsonProperty("cardID")] public string? CardId { get; set; }
+        [JsonProperty("tags")] public FsTags? Tags { get; set; }
+    }
+
+    private sealed class FsTags
+    {
+        [JsonProperty("ZONE_POSITION")] public int? ZonePosition { get; set; }
     }
 }

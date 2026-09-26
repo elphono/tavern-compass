@@ -29,6 +29,8 @@ internal sealed class TavernAdvicePanel
     private string? _status;
     private TavernPins _pins = TavernPins.Empty;
     private bool _visible;
+    private bool _panelVisible;
+    private IReadOnlyList<CompositionRow> _rows = new List<CompositionRow>();
 
     public TavernAdvicePanel(Canvas canvas, PanelMover mover)
     {
@@ -50,20 +52,32 @@ internal sealed class TavernAdvicePanel
     /// <summary>The first marker drawn by the last layout, for the diagnostic line; null when none.</summary>
     public LayoutRect? FirstMarker { get; private set; }
 
-    public void Show(TavernAdvice advice, IEnumerable<string> ownedCardIds, string? status, TavernPins pins)
+    public void ShowMarkers(TavernAdvice advice, IEnumerable<string> ownedCardIds, TavernPins pins)
     {
         _advice = advice;
         _owned = new HashSet<string>(ownedCardIds);
-        _status = status;
         _pins = pins;
         _visible = true;
-        Relayout();
+        RelayoutMarkers();
     }
 
-    public void Hide()
+    public void HideMarkers()
     {
         _visible = false;
         ClearMarkers();
+    }
+
+    public void ShowPanel(IReadOnlyList<CompositionRow> rows, string? status)
+    {
+        _rows = rows;
+        _status = status;
+        _panelVisible = true;
+        RelayoutPanel();
+    }
+
+    public void HidePanel()
+    {
+        _panelVisible = false;
         _targets.Visibility = Visibility.Collapsed;
     }
 
@@ -74,7 +88,11 @@ internal sealed class TavernAdvicePanel
         _canvas.Children.Remove(_targets);
     }
 
-    private void OnCanvasSizeChanged(object sender, SizeChangedEventArgs e) => Relayout();
+    private void OnCanvasSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        RelayoutMarkers();
+        RelayoutPanel();
+    }
 
     private void ClearMarkers()
     {
@@ -100,7 +118,7 @@ internal sealed class TavernAdvicePanel
         return lines.Take(2).ToList();
     }
 
-    private void Relayout()
+    private void RelayoutMarkers()
     {
         ClearMarkers();
         FirstMarker = null;
@@ -178,44 +196,48 @@ internal sealed class TavernAdvicePanel
             _markers.Add(label);
             FirstMarker ??= rect;
         }
-
-        RelayoutTargets(width, height, scale);
     }
 
-    private void RelayoutTargets(double width, double height, double scale)
+    /// <summary>
+    /// One line per composition: name, average placement, key pieces n/m, then the final board as card
+    /// vignettes left to right: held cards in colour with a tick, missing ones greyed out.
+    /// </summary>
+    private void RelayoutPanel()
     {
+        if (!_panelVisible || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
+        {
+            _targets.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var width = _canvas.ActualWidth;
+        var height = _canvas.ActualHeight;
+        var scale = TavernLayout.Scale(height);
         var panel = TavernLayout.TargetPanel(width, height);
+        var vignette = TavernLayout.VignetteSize * height;
         var lines = new StackPanel { Margin = new Thickness(6 * scale) };
         lines.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray });
-        if (_advice!.Targets.Count == 0)
+        foreach (var row in _rows)
         {
-            lines.Children.Add(new TextBlock { Text = "none yet: key pieces of lobby comps are framed", FontSize = 12 * scale, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap });
-        }
-
-        foreach (var progress in _advice.Targets)
-        {
-            var comp = progress.Composition;
-            var average = comp.AveragePlacement is { } avg ? $" · avg {avg.ToString("0.00", CultureInfo.InvariantCulture)}" : string.Empty;
+            var header = $"{row.Composition.Name} · {row.PlacementText} · {row.KeyOwned}/{row.KeyTotal} key"
+                         + (row.IsTarget ? string.Empty : " · suggestion")
+                         + (row.OrderKnown ? string.Empty : " · order unknown");
             lines.Children.Add(new TextBlock
             {
-                Text = $"{comp.Name}: {progress.CoreOwned.Count}/{comp.CoreCards.Count} key pieces{average}",
-                FontSize = 14 * scale,
-                Foreground = Brushes.White,
+                Text = header,
+                FontSize = 13 * scale,
+                FontWeight = row.IsTarget ? FontWeights.Bold : FontWeights.Normal,
+                Foreground = row.IsTarget ? Brushes.White : Brushes.LightGray,
                 TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4 * scale, 0, 2 * scale),
             });
-        }
-
-        if (_advice.Targets.Count > 0 && _advice.Targets[0].Composition.InspirationBoards.Count > 0)
-        {
-            var board = _advice.Targets[0].Composition.InspirationBoards[0];
-            var names = board.Select(id => Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(id)?.LocalizedName ?? id);
-            lines.Children.Add(new TextBlock
+            var board = new StackPanel { Orientation = Orientation.Horizontal };
+            foreach (var card in row.Vignettes)
             {
-                Text = "Inspiration: " + string.Join(", ", names),
-                FontSize = 11 * scale,
-                Foreground = Brushes.LightGray,
-                TextWrapping = TextWrapping.Wrap,
-            });
+                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale));
+            }
+
+            lines.Children.Add(board);
         }
 
         if (!string.IsNullOrEmpty(_status))

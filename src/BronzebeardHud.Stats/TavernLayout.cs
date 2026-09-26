@@ -71,18 +71,22 @@ public static class TavernLayout
     /// <summary>Bottom of the player's board row: top = H/2 − 0.03 × H (OverlayWindow.Update.cs:537-538), plus the row height.</summary>
     public static double PlayerRowBottom(double height) => height / 2 - 0.03 * height + BoardRowHeight * height;
 
+    /// <summary>Vignette side, as a fraction of H; seven of them make a row of the target panel.</summary>
+    public const double VignetteSize = 0.052;
+
     /// <summary>
-    /// The "target composition" panel, bottom left: below the player's board row, left of the hero
-    /// portrait (which sits around the centre), and right of the leaderboard column (the first 12 %
-    /// of the 4:3 frame). Seven tavern minions nearly fill the 4:3 frame, so there is no room beside them.
+    /// The target composition panel's default place: the lower right part of Hearthstone's 4:3 frame,
+    /// below the player's board row (OverlayWindow.Update.cs:537-538 + MouseOverDetection.cs:38), right of
+    /// the hero and hero power (which sit within W/2 ± 0.2 × H), above the gold at the bottom. Sized for
+    /// three rows of a header and seven vignettes. It can be moved (PanelLayout).
     /// </summary>
     public static LayoutRect TargetPanel(double width, double height)
     {
-        var frameLeft = width / 2 - height * 2 / 3;
-        var left = frameLeft + 0.12 * height * 4 / 3 + 0.01 * height;
-        var right = width / 2 - 0.22 * height;
-        var top = PlayerRowBottom(height) + 0.03 * height;
-        var panelHeight = 0.12 * height;
-        return new LayoutRect((left + right) / 2, top + panelHeight / 2, Math.Max(0, right - left), panelHeight);
+        var frameRight = width / 2 + height * 2 / 3;
+        var panelWidth = 7 * VignetteSize * height * 1.08 + 0.02 * height;
+        var panelHeight = 3 * (VignetteSize * height + 0.028 * height) + 0.03 * height;
+        var right = frameRight - 0.01 * height;
+        var top = PlayerRowBottom(height) + 0.012 * height;
+        return new LayoutRect(right - panelWidth / 2, top + panelHeight / 2, panelWidth, panelHeight);
     }
 }

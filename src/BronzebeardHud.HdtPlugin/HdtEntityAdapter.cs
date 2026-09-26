@@ -65,6 +65,27 @@ internal static class HdtEntityAdapter
         }
     }
 
+    /// <summary>The phase the tavern overlay cares about.</summary>
+    public static OverlayPhase Phase(GameV2 game)
+    {
+        if (game.IsInMenu || !game.IsBattlegroundsMatch)
+        {
+            return OverlayPhase.OutOfGame;
+        }
+
+        if (IsHeroSelection(game))
+        {
+            return OverlayPhase.HeroSelection;
+        }
+
+        if (!game.IsBattlegroundsHeroPickingDone)
+        {
+            return OverlayPhase.OutOfGame;
+        }
+
+        return game.IsBattlegroundsCombatPhase ? OverlayPhase.Combat : OverlayPhase.Shop;
+    }
+
     /// <summary>Battlegrounds shopping: hero picked, not in combat.</summary>
     public static bool IsShopPhase(GameV2 game) =>
         game.IsBattlegroundsMatch && game.IsBattlegroundsHeroPickingDone && !game.IsBattlegroundsCombatPhase;

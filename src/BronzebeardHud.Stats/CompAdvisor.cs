@@ -121,12 +121,15 @@ public static class CompAdvisor
 /// <summary>What the tavern overlay shows: the target compositions and one marker entry per tavern card.</summary>
 public sealed class TavernAdvice
 {
-    public TavernAdvice(IReadOnlyList<CompProgress> targets, IReadOnlyList<ShopAdvice> cards, int playableCompositions)
+    public TavernAdvice(IReadOnlyList<CompProgress> targets, IReadOnlyList<ShopAdvice> cards, IReadOnlyList<Composition> playable)
     {
         Targets = targets;
         Cards = cards;
-        PlayableCompositions = playableCompositions;
+        Playable = playable;
     }
+
+    /// <summary>Compositions whose tribes are all in the lobby (or tribeless).</summary>
+    public IReadOnlyList<Composition> Playable { get; }
 
     public IReadOnlyList<CompProgress> Targets { get; }
 
@@ -134,7 +137,7 @@ public sealed class TavernAdvice
     public IReadOnlyList<ShopAdvice> Cards { get; }
 
     /// <summary>Compositions whose tribes are all in the lobby (or tribeless): the pool markers come from.</summary>
-    public int PlayableCompositions { get; }
+    public int PlayableCompositions => Playable.Count;
 
     public int MarkerCount => Cards.Count(c => c.Advances.Count > 0);
 }
@@ -183,7 +186,7 @@ public static class TavernAdvisor
                 .ToList();
             return new ShopAdvice(position, cardId, advances);
         }).ToList();
-        return new TavernAdvice(targets, cards, playable.Count);
+        return new TavernAdvice(targets, cards, playable);
     }
 
     /// <summary>

@@ -40,9 +40,11 @@ public sealed class Composition
         double? averagePlacement = null,
         int? dataPoints = null,
         string? tier = null,
-        IReadOnlyList<IReadOnlyList<string>>? inspirationBoards = null)
+        IReadOnlyList<IReadOnlyList<string>>? inspirationBoards = null,
+        IReadOnlyList<string>? referenceBoard = null)
     {
         InspirationBoards = inspirationBoards ?? Array.Empty<IReadOnlyList<string>>();
+        ReferenceBoard = referenceBoard;
         Id = id;
         Name = name;
         Tribes = tribes;
@@ -69,6 +71,12 @@ public sealed class Composition
 
     /// <summary>Real final boards of this composition (card ids, left to right), best MMR first; may be empty.</summary>
     public IReadOnlyList<IReadOnlyList<string>> InspirationBoards { get; }
+
+    /// <summary>
+    /// The composition's typical final board, positions 1 to 7 left to right; null when the source gives
+    /// no board order (then the panel says "order unknown" rather than inventing one).
+    /// </summary>
+    public IReadOnlyList<string>? ReferenceBoard { get; }
 }
 
 public sealed class CompositionFile
@@ -210,7 +218,19 @@ public static class CompositionLoader
                 boards.AddRange(boardArray.Select(b => (IReadOnlyList<string>)b.Select(c => c.Value<string>()!).ToList()));
             }
 
-            compositions.Add(new Composition(id!, name!, tribes, core, addon, averagePlacement, dataPoints, tier, boards));
+            IReadOnlyList<string>? referenceBoard = null;
+            if (comp["referenceBoard"] is { Type: not JTokenType.Null } referenceToken)
+            {
+                if (referenceToken is not JArray reference || reference.Count == 0 || reference.Count > 7
+                    || reference.Any(c => c.Type != JTokenType.String || string.IsNullOrWhiteSpace(c.Value<string>())))
+                {
+                    throw new StatsFormatException($"{path}.referenceBoard: expected 1 to 7 card ids, left to right");
+                }
+
+                referenceBoard = reference.Select(c => c.Value<string>()!).ToList();
+            }
+
+            compositions.Add(new Composition(id!, name!, tribes, core, addon, averagePlacement, dataPoints, tier, boards, referenceBoard));
         }
 
         return new CompositionFile(
@@ -235,6 +255,7 @@ public static class CompositionLoader
             ["dataPoints"] = c.DataPoints.HasValue ? new JValue(c.DataPoints.Value) : JValue.CreateNull(),
             ["tier"] = c.Tier != null ? new JValue(c.Tier) : JValue.CreateNull(),
             ["inspirationBoards"] = new JArray(c.InspirationBoards.Select(b => new JArray(b.Cast<object>().ToArray()))),
+            ["referenceBoard"] = c.ReferenceBoard != null ? new JArray(c.ReferenceBoard.Cast<object>().ToArray()) : JValue.CreateNull(),
         }));
         return new JObject
         {

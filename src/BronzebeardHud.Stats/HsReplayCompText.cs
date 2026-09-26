@@ -18,6 +18,7 @@ namespace BronzebeardHud.Stats;
 /// avg: 3.95
 /// core: Drustfallen Butcher, Handless Forsaken, BG28_309
 /// addon: Friendly Geist
+/// board: Mummifier, Drustfallen Butcher, Handless Forsaken, Friendly Geist
 /// </code>
 /// One block per composition, starting with <c>comp:</c>; <c>core:</c> is required. A card is
 /// written either as its id (e.g. <c>BG28_309</c>) or as its name, resolved by the caller
@@ -106,6 +107,15 @@ public static class HsReplayCompText
                 case "addon":
                     current.Addon = Cards(value, resolveCardName, lineNumber);
                     break;
+                case "board":
+                    // The final board, left to right, as HSReplay shows it; duplicates allowed (two copies).
+                    current.Board = BoardCards(value, resolveCardName, lineNumber);
+                    if (current.Board.Count > 7)
+                    {
+                        throw new StatsFormatException($"line {lineNumber}: a board holds at most 7 minions");
+                    }
+
+                    break;
                 default:
                     throw new StatsFormatException($"line {lineNumber}: unknown key \"{key}\"");
             }
@@ -125,6 +135,9 @@ public static class HsReplayCompText
         value.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).Where(s => s.Length > 0);
 
     private static List<string> Cards(string value, Func<string, string?> resolveCardName, int lineNumber) =>
+        BoardCards(value, resolveCardName, lineNumber).Distinct(StringComparer.Ordinal).ToList();
+
+    private static List<string> BoardCards(string value, Func<string, string?> resolveCardName, int lineNumber) =>
         Items(value).Select(item =>
         {
             if (CardIdPattern.IsMatch(item) && item.Any(char.IsDigit))
@@ -135,7 +148,7 @@ public static class HsReplayCompText
             return resolveCardName(item) is { } id
                 ? CardIds.Normalize(id)
                 : throw new StatsFormatException($"line {lineNumber}: unknown card \"{item}\"");
-        }).Distinct(StringComparer.Ordinal).ToList();
+        }).ToList();
 
     private sealed class Block
     {
@@ -153,6 +166,7 @@ public static class HsReplayCompText
         public List<string> Addon { get; set; } = new();
         public string? Tier { get; set; }
         public double? AveragePlacement { get; set; }
+        public List<string>? Board { get; set; }
 
         public Composition Build()
         {
@@ -162,7 +176,8 @@ public static class HsReplayCompText
             }
 
             var id = "hsr-" + Regex.Replace(_name.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
-            return new Composition(id, _name, Tribes, Core, Addon.Except(Core, StringComparer.Ordinal).ToList(), AveragePlacement, tier: Tier);
+            return new Composition(id, _name, Tribes, Core, Addon.Except(Core, StringComparer.Ordinal).ToList(), AveragePlacement, tier: Tier,
+                referenceBoard: Board is { Count: > 0 } ? Board : null);
         }
     }
 }
