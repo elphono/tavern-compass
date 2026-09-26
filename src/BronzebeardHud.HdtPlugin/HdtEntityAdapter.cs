@@ -36,12 +36,16 @@ internal static class HdtEntityAdapter
         }
     }
 
-    /// <summary>The entities of the player's pending choice (HDT: Player.OfferedEntities), in the game's order.</summary>
+    /// <summary>
+    /// The entities of the player's pending choice, in on-screen order: Player.OfferedEntityIds gives the
+    /// order, Player.OfferedEntities (creation order) the entities; see <see cref="ChoiceOrder"/>.
+    /// </summary>
     public static IReadOnlyList<EntitySnapshot> OfferedEntities(GameV2 game)
     {
         try
         {
-            return game.Player.OfferedEntities.Select(ToSnapshot).ToList();
+            var ids = game.Player.OfferedEntityIds.ToList();
+            return ChoiceOrder.Arrange(ids, game.Player.OfferedEntities.Select(ToSnapshot).ToList());
         }
         catch (InvalidOperationException)
         {

@@ -243,6 +243,12 @@ public sealed class Plugin : IPlugin
         var key = string.Join(",", offered.Select(e => e.Id)) + "|" + _stats.Bracket;
         if (key != _trinketKey || loaded)
         {
+            if (!_trinketKey.StartsWith(string.Join(",", offered.Select(e => e.Id)) + "|", StringComparison.Ordinal))
+            {
+                // Once per choice: the on-screen order HDT gave, to compare with the game.
+                Log.Info($"Bronzebeard HUD: trinket choice order={ChoiceOrder.Describe(offered)} cards=[{string.Join(",", offered.Select(e => e.CardId))}]");
+            }
+
             _trinketKey = key;
             _trinkets.Show(offered.Select(e => e.CardId!).ToList(), _stats.Bracket);
         }
