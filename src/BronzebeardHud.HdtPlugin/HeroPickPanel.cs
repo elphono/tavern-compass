@@ -9,7 +9,7 @@ using BronzebeardHud.Stats;
 namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
-/// One badge per offered hero, each centred on the grey plate under that hero's portrait, plus a
+/// One badge per offered hero, under the game's reroll button below that hero's portrait, plus a
 /// status line under the row. Positions come from <see cref="HeroPickLayout"/> and are recomputed
 /// whenever the overlay canvas changes size. Built in code rather than XAML so it compiles under WSL.
 /// </summary>
@@ -127,10 +127,11 @@ internal sealed class HeroPickPanel
             return;
         }
 
+        var status = HeroPickLayout.Status(width, height, rects);
         _status.FontSize = 12 * scale;
-        _status.Width = rects[rects.Count - 1].Right - rects[0].Left;
-        Canvas.SetLeft(_status, rects[0].Left);
-        Canvas.SetTop(_status, rects[0].Top + rects[0].Height + 4 * scale);
+        _status.Width = status.Width;
+        Canvas.SetLeft(_status, status.Left);
+        Canvas.SetTop(_status, status.Top);
         _status.Visibility = Visibility.Visible;
     }
 

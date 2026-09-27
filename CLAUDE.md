@@ -119,6 +119,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   donne la disposition par défaut (message dans le journal d'HDT) ; « Reset panel positions » la rétablit.
   Une entrée d'un panneau qui n'existe plus (celui des combats, retiré) est ignorée sans message.
   Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
+- Encart des héros proposés (sélection du héros, fixe) : sous le bouton de reroll du jeu (« Réinitialiser »,
+  0,632 → 0,718 H), de 0,725 à 0,805 H, 0,17 H de large, dans la colonne du héros (grille d'HDT, un héros tous
+  les 340/1080 H). Un encart qui approcherait à moins de 0,01 H du bouton OK (0,751 → 0,825 H) se décale de
+  côté, à l'écart (0,009 H au plus mesuré), ou passe dessous s'il faudrait plus de 0,03 H (celui du milieu à
+  trois héros : 0,835 → 0,915 H). Cotes mesurées sur la capture Hearthstone d'Ali du 2026-09-26 18:29:44
+  (2291 × 1360), fixées par `HeroPickLayoutTests` ; l'encart d'origine, centré à 0,667 H, cachait le reroll.
 - Panneau des compos, overlay verrouillé : une ligne par compo — case, nom et place moyenne, sept ovales
   (anneau vert + ✓ si tenus, pointillé clair sinon) ; survoler un ovale montre la carte entière, et la case
   fait viser la compo seule (quatre au plus, une couleur chacune, oubliées à la partie suivante). Aucun texte
