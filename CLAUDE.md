@@ -42,9 +42,8 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 Ce qui reste ouvert :
 
 - **Vérifier en jeu** les phases 5 et 6 (liste exhaustive : spec § 5), et les livraisons du 2026-09-27
-  (panneau des compos simplifié en ovales, détail au clic, lineups à part, bouton Skip combat — reconnexion
-  effective, relance directe de Hearthstone.exe hors Battle.net, état d'HDT après la mort du client :
-  `docs/journal/2026-09-27-skip-combat-et-detail-compos.md` et `docs/journal/2026-09-27-panneau-compos-simplifie.md`).
+  (panneau des compos en ovales au plancher de 12 px, détail au clic, lineups à part, surlignage en taverne,
+  Skip combat relancé par Battle.net : `docs/journal/2026-09-27-*.md`).
 - **Deux arbitrages d'Ali** : garder la ligne « comp ≈ » sous chaque héros (échantillons minces, 17
   parties en médiane) ; garder le bilan par adversaire s'il doublonne l'interface du jeu.
 - **Import HSReplay jamais utilisé** : `stats\manual\` est vide, seules les 24 compos Firestone tournent.
@@ -121,8 +120,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   Une entrée d'un panneau qui n'existe plus (celui des combats, retiré) est ignorée sans message.
   Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
 - Panneau des compos, overlay verrouillé : une ligne par compo — case, nom et place moyenne, sept ovales
-  (cerclés de vert + ✓ si tenus, de rouge sinon) ; survoler un ovale montre la carte entière, et la case
-  fait viser la compo seule (quatre au plus, une couleur chacune, oubliées à la partie suivante).
+  (anneau vert + ✓ si tenus, pointillé clair sinon) ; survoler un ovale montre la carte entière, et la case
+  fait viser la compo seule (quatre au plus, une couleur chacune, oubliées à la partie suivante). Aucun texte
+  sous 12 px en 1080p (`PanelTypography`), rien ne rétrécit : le panneau s'arrête au-dessus de l'or et montre
+  les lignes qui tiennent (« 4 of 8 shown », `PanelFit`). Maquette cliquable : `docs/mock/` (README).
   Ses − et + règlent le nombre de compos suggérées (1 à 8, 3 par défaut), gardé dans
   `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}`. Les
   suggestions sont les compos atteignables, meilleure place moyenne d'abord (avec le héros joué quand
@@ -132,7 +133,11 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   plateaux finaux par `CompDetail`, car aucune source n'a de donnée early game. Une pièce clé de tier ≤ 3
   reste dans les enablers : choix d'Ali du 2026-09-27, fixé par un test.
 - « Comment les tops le jouent » : le bouton ? au-dessus de chaque sbire de Bob (à droite du ◇) ouvre un
-  panneau à part, déplaçable (`lineups`), par défaut sur celui des compos ; fermé par son × ou en fin de taverne.
+  panneau à part, déplaçable (`lineups`), par défaut dans la colonne de droite (hors des cartes, du panneau
+  des compos et du bouton Skip combat) ; fermé par son × ou en fin de taverne.
+- Taverne : un sbire de Bob qui est pièce clé (« commit », cadre plein) ou early enabler (« enabler »,
+  pointillés) d'une compo visée est surligné dans sa couleur, l'étiquette fondue dans le marqueur existant ;
+  les compos cochées d'abord, sinon les suggestions affichées (blanc) ; commit l'emporte (`TavernHighlights`).
 - Bouton « Skip combat » (jaune, en combat seulement, panneau déplaçable `skip-combat`) : tue Hearthstone et
   le fait relancer **par Battle.net** (`--exec="launch WTCG"`, redemandé chaque seconde : ≈ 7 s mesurées),
   jamais par son exécutable (connexion refusée, mesuré) ; sans Battle.net, rien n'est tué. Un clic par combat,

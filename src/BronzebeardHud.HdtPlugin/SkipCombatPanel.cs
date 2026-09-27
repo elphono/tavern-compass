@@ -42,8 +42,8 @@ internal sealed class SkipCombatPanel
             BorderThickness = new Thickness(2),
             CornerRadius = new CornerRadius(6),
             Cursor = System.Windows.Input.Cursors.Hand,
-            // Safety net: shrink rather than clip if the text is ever wider than the button.
-            Child = new Viewbox { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Child = _label },
+            // "Skip combat" at PanelTypography.SkipCombat (15 px at 1080p) is about 95 px wide in a 130 px button: no shrinking.
+            Child = _label,
         };
         _button.MouseLeftButtonUp += (_, e) =>
         {
@@ -99,7 +99,7 @@ internal sealed class SkipCombatPanel
         var scale = TavernLayout.Scale(_canvas.ActualHeight);
         _button.Width = rect.Width;
         _button.Height = rect.Height;
-        _label.FontSize = 15 * scale;
+        _label.FontSize = PanelTypography.SkipCombat * scale;
         _label.Margin = new Thickness(6 * scale, 0, 6 * scale, 0);
         _mover.Place(_panel, "skip-combat", rect, interactive: true);
         _panel.Visibility = Visibility.Visible;

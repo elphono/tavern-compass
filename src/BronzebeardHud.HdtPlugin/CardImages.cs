@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using BronzebeardHud.Stats;
 using Hearthstone_Deck_Tracker.Hearthstone;
 using Hearthstone_Deck_Tracker.Utility.Assets;
 using Hearthstone_Deck_Tracker.Utility.Extensions;
@@ -18,34 +19,35 @@ namespace BronzebeardHud.HdtPlugin;
 /// </summary>
 internal static class CardImages
 {
-    /// <summary>Held card: green frame and a tick.</summary>
+    /// <summary>Held card: solid green ring and a tick — the signal.</summary>
     private static readonly Brush TickBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0xCC, 0x40));
 
     /// <summary>
-    /// Card still to find: a vivid red frame, no tick. Every vignette is in full colour (Ali, 2026-09-27: no more
-    /// greyed-out cards); held and missing differ by frame colour and by the tick, so the tick alone still tells
-    /// them apart for a reader who confuses red and green.
+    /// Card still to find: a light dashed ring, no tick (2026-09-27: a red ring on every missing card shouted for
+    /// nothing; the green ring and tick of held cards are the signal). Every oval is in full colour.
     /// </summary>
-    private static readonly Brush MissingBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x41, 0x36));
+    private static readonly Brush MissingBrush = new SolidColorBrush(Color.FromRgb(0xC9, 0xD1, 0xE0));
 
-    private static readonly Brush BadgeBrush = new SolidColorBrush(Color.FromArgb(0xE6, 0x00, 0x00, 0x00));
+    /// <summary>Tier badge: yellow with black text, as in the game's tavern tier star.</summary>
+    private static readonly Brush TierBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD2, 0x3F));
 
     /// <summary>
     /// One card as an oval, cut like the game's minion portraits: <paramref name="width"/> wide,
-    /// width × TavernLayout.OvalAspect tall, the art clipped to an ellipse, ringed green with a tick when held,
-    /// red when missing, all in full colour. Badges sit in the corners, outside the oval, so they hide no art.
+    /// width × TavernLayout.OvalAspect tall, the art clipped to an ellipse, in full colour; held: solid green ring
+    /// and a tick, missing: light dashed ring. Badges (tick, tier) sit on the corners, at the text floor
+    /// (PanelTypography.Badge), mostly outside the oval so they hide little of the art.
     /// </summary>
     /// <param name="placePreview">
     /// Called as the cursor enters the vignette, before HDT's own handler shows the preview (handlers of one
     /// element run in the order they were added), to set where the preview goes.
     /// </param>
     /// <param name="onClick">When given, a click on the vignette calls it with the card id (clickable while the overlay stays locked).</param>
-    /// <param name="tier">When given, a "T3" badge in the top left corner (tavern tier).</param>
+    /// <param name="tier">When given, the tavern tier in a badge on the top left corner.</param>
     public static FrameworkElement Vignette(string cardId, bool owned, double width, double scale, double previewHeight, Action<FrameworkElement> placePreview,
         Action<string>? onClick = null, int? tier = null)
     {
-        var height = width * BronzebeardHud.Stats.TavernLayout.OvalAspect;
-        var stroke = 3 * scale;
+        var height = width * TavernLayout.OvalAspect;
+        var stroke = (owned ? 3 : 2) * scale;
         var image = new Image
         {
             Width = width,
@@ -61,17 +63,20 @@ internal static class CardImages
             StrokeThickness = stroke,
             IsHitTestVisible = false,
         };
+        if (!owned)
+        {
+            ring.StrokeDashArray = new DoubleCollection { 3, 2 }; // in stroke widths: 6 on, 4 off at 1080p
+        }
 
         // The whole cell, not only the oval, catches the mouse: a transparent background makes it hit-testable.
-        var frame = new Grid
+        var cell = new Grid
         {
             Width = width,
             Height = height,
-            Margin = new Thickness(0, 0, 0.08 * width, 0),
+            Margin = new Thickness(0, 0, PanelFit.OvalGap * scale, 0),
             Background = Brushes.Transparent,
             Children = { image, ring },
         };
-        var size = width;
 
         // Hover shows the whole card, through HDT's own overlay tooltips: the overlay lets clicks through,
         // so WPF never sees the mouse, but HDT polls the cursor at 60 Hz over elements declared hoverable
@@ -79,54 +84,63 @@ internal static class CardImages
         // them, which its ToolTip attached property turns into a tooltip drawn in the overlay, flipped and
         // kept inside the window (Utility/Extensions/OverlayExtensions.Tooltip.cs:34-47, 90-118;
         // Windows/OverlayWindow.Tooltips.cs:34-175). Hover-only: the game keeps every click.
-        frame.MouseEnter += (_, _) => placePreview(frame);
+        cell.MouseEnter += (_, _) => placePreview(cell);
         if (onClick != null)
         {
             // Hover still shows the card: HDT raises its hover events on a hoverable element even when it is
             // also clickable (Windows/OverlayWindow.MouseOverDetection.cs:537-548).
-            OverlayExtensions.SetIsOverlayHitTestVisible(frame, true);
-            frame.Cursor = System.Windows.Input.Cursors.Hand;
-            frame.MouseLeftButtonUp += (_, e) =>
+            OverlayExtensions.SetIsOverlayHitTestVisible(cell, true);
+            cell.Cursor = System.Windows.Input.Cursors.Hand;
+            cell.MouseLeftButtonUp += (_, e) =>
             {
                 e.Handled = true;
                 onClick(cardId);
             };
         }
 
-        OverlayExtensions.SetIsOverlayHoverVisible(frame, true);
-        OverlayExtensions.SetToolTip(frame, FullCard(cardId, previewHeight));
-        ToolTipService.SetInitialShowDelay(frame, 0);
-        var grid = new Grid { Children = { frame } };
+        OverlayExtensions.SetIsOverlayHoverVisible(cell, true);
+        OverlayExtensions.SetToolTip(cell, FullCard(cardId, previewHeight));
+        ToolTipService.SetInitialShowDelay(cell, 0);
+        var badge = 16 * scale;
+        var badgeFont = PanelTypography.Badge * scale;
         if (owned)
         {
-            grid.Children.Add(new Border
+            cell.Children.Add(new Border
             {
+                Width = badge,
+                Height = badge,
+                CornerRadius = new CornerRadius(badge / 2),
                 Background = TickBrush,
-                CornerRadius = new CornerRadius(0.12 * size),
+                BorderBrush = Brushes.Black,
+                BorderThickness = new Thickness(1.5 * scale),
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Bottom,
-                Margin = new Thickness(0, 0, 0.08 * size, 0),
-                Padding = new Thickness(3 * scale, 0, 3 * scale, 0),
-                Child = new TextBlock { Text = "✓", FontSize = 0.3 * size, FontWeight = FontWeights.Bold, Foreground = Brushes.White },
+                Margin = new Thickness(0, 0, -3 * scale, -2 * scale),
+                IsHitTestVisible = false,
+                Child = new TextBlock { Text = "✓", FontSize = badgeFont, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
             });
         }
 
         if (tier is { } level)
         {
-            grid.Children.Add(new Border
+            cell.Children.Add(new Border
             {
-                Background = BadgeBrush,
-                CornerRadius = new CornerRadius(0.1 * size),
+                MinWidth = badge,
+                Height = badge,
+                CornerRadius = new CornerRadius(3 * scale),
+                Background = TierBrush,
+                BorderBrush = Brushes.Black,
+                BorderThickness = new Thickness(1.5 * scale),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
-                Padding = new Thickness(2 * scale, 0, 2 * scale, 0),
+                Margin = new Thickness(-3 * scale, -3 * scale, 0, 0),
                 IsHitTestVisible = false,
-                Child = new TextBlock { Text = $"T{level}", FontSize = 0.26 * size, FontWeight = FontWeights.Bold, Foreground = Brushes.White },
+                Child = new TextBlock { Text = level.ToString(System.Globalization.CultureInfo.InvariantCulture), FontSize = badgeFont, FontWeight = FontWeights.Bold, Foreground = Brushes.Black, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
             });
         }
 
         Load(AssetDownloaders.cardPortraitDownloader, cardId, image);
-        return grid;
+        return cell;
     }
 
     /// <summary>

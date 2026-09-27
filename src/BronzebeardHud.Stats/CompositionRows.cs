@@ -52,17 +52,6 @@ public sealed class CompositionRow
     /// <summary>The hero being played on this composition, when the data qualifies (shown as "≈ 3,5 with your hero (23)").</summary>
     public HeroCompPick? HeroEffect { get; }
 
-    /// <summary>
-    /// Where the player stands on this composition, for its detail view (the list line only shows name and
-    /// placement): "Ticked target · 1/2 key pieces held · ≈ 3,2 with your hero (60)", or "Suggestion · …", then
-    /// " · board order unknown" when the source gives none.
-    /// </summary>
-    public string Status =>
-        (IsSuggestion ? "Suggestion" : "Ticked target")
-        + $" · {KeyOwned}/{KeyTotal} key pieces held"
-        + (HeroEffect is { } heroEffect ? $" · {heroEffect.ShopText}" : string.Empty)
-        + (OrderKnown ? string.Empty : " · board order unknown");
-
     public int KeyOwned { get; }
     public int KeyTotal => Composition.CoreCards.Count;
     public IReadOnlyList<CompositionVignette> Vignettes { get; }

@@ -84,17 +84,15 @@ public class CompositionRowsTests
         };
         var shown = CompAdvisor.Suggest(owned, Lobby, 3);
 
-        // Nothing ticked: every row is a suggestion, and its status says so.
+        // Nothing ticked: every row is a suggestion (drawn plain, light grey; a ticked one is bold, in its colour).
         var untouched = CompositionRows.Build(shown, owned);
         Assert.Equal(3, untouched.Count);
-        Assert.All(untouched, r => Assert.True(r.IsSuggestion && !r.IsChecked && r.Status.StartsWith("Suggestion · "), r.Status));
+        Assert.All(untouched, r => Assert.True(r.IsSuggestion && !r.IsChecked, r.Composition.Id));
 
         // One ticked: exactly that row is the target, the other two stay suggestions.
         var ticked = CompositionRows.Build(shown, owned, chosen: new[] { "undead_butcher" });
         Assert.Equal(new[] { "undead_butcher" }, ticked.Where(r => r.IsChecked).Select(r => r.Composition.Id));
         Assert.Equal(new[] { "hsr-beasts", "pirate_discover" }, ticked.Where(r => r.IsSuggestion).Select(r => r.Composition.Id));
-        Assert.Equal("Ticked target · 1/2 key pieces held", ticked.Single(r => r.IsChecked).Status);
-        Assert.Equal("Suggestion · 1/2 key pieces held · board order unknown", ticked.Single(r => r.Composition.Id == "hsr-beasts").Status);
     }
 
     [Fact]

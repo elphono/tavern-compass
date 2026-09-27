@@ -71,8 +71,41 @@ public sealed class CompDetail
     public string? TypicalFinalTurnText =>
         TypicalFinalTurn is { } turn ? "Typical final turn: " + turn.ToString("0.#", CultureInfo.GetCultureInfo("fr-FR")) : null;
 
-    /// <summary>Where the sections come from, shown under them so that nothing passes for an expert guide.</summary>
+    /// <summary>Where the sections come from, behind the ⓘ of the detail view, so that nothing passes for an expert guide.</summary>
     public string SourceNote { get; }
+
+    /// <summary>
+    /// The detail view's one meta line, under the name and placement it does not repeat:
+    /// "Undead, Beast · 1 234 games · tier A · final turn ≈ 11,5", absent parts left out.
+    /// </summary>
+    public string Meta
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (Composition.Tribes.Count > 0)
+            {
+                parts.Add(string.Join(", ", Composition.Tribes.Select(t => t.Substring(0, 1) + t.Substring(1).ToLowerInvariant())));
+            }
+
+            if (Composition.DataPoints is { } games)
+            {
+                parts.Add(games.ToString("#,0", CultureInfo.InvariantCulture).Replace(",", " ") + " games");
+            }
+
+            if (!string.IsNullOrEmpty(Composition.Tier))
+            {
+                parts.Add("tier " + Composition.Tier);
+            }
+
+            if (TypicalFinalTurn is { } turn)
+            {
+                parts.Add("final turn ≈ " + turn.ToString("0.#", CultureInfo.GetCultureInfo("fr-FR")));
+            }
+
+            return string.Join(" · ", parts);
+        }
+    }
 
     /// <param name="techLevel">Tavern tier of a card id; null (or 0) when unknown. In the plugin it comes from HearthDb.</param>
     public static CompDetail For(Composition composition, Func<string, int?> techLevel, int maxEnablers = DefaultMaxEnablers)

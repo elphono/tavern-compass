@@ -118,22 +118,11 @@ public static class TavernLayout
     /// <summary>Bottom of the player's board row: top = H/2 − 0.03 × H (OverlayWindow.Update.cs:537-538), plus the row height.</summary>
     public static double PlayerRowBottom(double height) => height / 2 - 0.03 * height + BoardRowHeight * height;
 
-    /// <summary>Vignette width in the detail and lineups views, as a fraction of H.</summary>
-    public const double VignetteSize = 0.052;
-
     /// <summary>
-    /// Card vignettes are ovals, cut like the game's minion portraits: height = width × <see cref="OvalAspect"/>.
+    /// Card vignettes are ovals, cut like the game's minion portraits: height = width × <see cref="OvalAspect"/>
+    /// (PanelFit.OvalWidth).
     /// </summary>
-    public const double OvalAspect = 1.25;
-
-    /// <summary>Oval width on a composition's line of the target panel, × H: seven of them, after its name.</summary>
-    public const double RowOvalWidth = 0.040;
-
-    /// <summary>Width of the name and placement column of a composition's line, × H; the text wraps inside it.</summary>
-    public const double NameColumn = 0.10;
-
-    /// <summary>Width of the tick box column, × H.</summary>
-    public const double BoxColumn = 0.025;
+    public const double OvalAspect = 1.2;
 
     /// <summary>
     /// Height of the full-card preview shown when a vignette is hovered: HDT draws a Battlegrounds card
@@ -210,23 +199,17 @@ public static class TavernLayout
     /// The target composition panel's default place: the lower right part of Hearthstone's 4:3 frame,
     /// below the player's board row (OverlayWindow.Update.cs:537-538 + MouseOverDetection.cs:38), right of
     /// the hero and hero power (which sit within W/2 ± 0.2 × H), above the gold at the bottom. Sized for
-    /// three composition lines, each a tick box, a name column and seven ovals. It can be moved (PanelLayout).
+    /// three composition lines with the warband line under them (PanelFit); the list may grow below that, down
+    /// to PanelFit.BottomLimit. It can be moved (PanelLayout).
     /// </summary>
     public static LayoutRect TargetPanel(double width, double height)
     {
+        var s = Scale(height);
         var frameRight = width / 2 + height * 2 / 3;
-        var panelWidth = (0.02 + BoxColumn + NameColumn + 7 * RowOvalWidth * 1.08) * height;
-        var panelHeight = 3 * (RowOvalWidth * OvalAspect * height + 0.012 * height) + 0.03 * height;
+        var panelWidth = PanelFit.PanelWidth * s;
+        var panelHeight = PanelFit.ListHeight(3, footer: true, status: false) * s;
         var right = frameRight - 0.01 * height;
         var top = PlayerRowBottom(height) + 0.012 * height;
         return new LayoutRect(right - panelWidth / 2, top + panelHeight / 2, panelWidth, panelHeight);
     }
-
-    /// <summary>
-    /// The "how top boards field it" panel's default place: over the target composition panel's default place,
-    /// the one area the plugin already takes below the boards. It opens on a click and closes on its × or when
-    /// the shop ends, so covering the target panel for that time hides nothing of the game. It can be moved
-    /// (PanelLayout, id "lineups").
-    /// </summary>
-    public static LayoutRect LineupsPanel(double width, double height) => TargetPanel(width, height);
 }

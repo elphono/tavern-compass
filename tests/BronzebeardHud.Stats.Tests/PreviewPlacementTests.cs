@@ -8,8 +8,8 @@ public class PreviewPlacementTests
     /// <summary>A vignette of the panel's second line, fourth position, as the panel lays them out.</summary>
     private static LayoutRect Vignette(LayoutRect panel, double height)
     {
-        var size = TavernLayout.VignetteSize * height;
-        return new LayoutRect(panel.Left + 0.01 * height + 3.5 * size * 1.08, panel.Top + panel.Height * 0.55, size, size);
+        var size = PanelFit.OvalWidth * height / 1080;
+        return new LayoutRect(panel.Left + 0.01 * height + 3.5 * size * 1.08, panel.Top + panel.Height * 0.55, size, size * TavernLayout.OvalAspect);
     }
 
     public static IEnumerable<object[]> Panels() =>

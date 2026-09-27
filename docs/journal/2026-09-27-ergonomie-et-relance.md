@@ -15,3 +15,15 @@ Bug d'Ali : « il kill, il relance, mais la fenêtre relancée disparaît ». Es
 Une relance directe réutilise le jeton de connexion du client tué : éliminée. Le plugin demande à Battle.net
 (le parent du client, sinon un Battle.net en cours), puis redemande chaque seconde, 12 fois au plus ; sans
 Battle.net, rien n'est tué. Le journal d'HDT dit les demandes, le nouveau pid et s'il vit 3 s après.
+
+## Ergonomie (Ali : « le panneau devient illisible rapidement »)
+
+| Règle | Mécanisme |
+|---|---|
+| aucun texte sous 12 px en 1080p | `PanelTypography` (test du plancher) ; plus de Viewbox dans ces panneaux ; `docs/mock/floor.py` mesure la maquette |
+| trop de contenu : en montrer moins | `PanelFit.Rows` (« 4 of 8 shown »), pivots du détail selon la place, compos des lineups selon la place |
+| rien ne masque le jeu | panneaux arrêtés au-dessus de l'or (0,945 H) ; lineups dans la colonne de droite, tests de non-recouvrement |
+| carte utile en taverne | `TavernHighlights` : « commit » (cadre plein) ou « enabler » (pointillés) dans le marqueur ; cochées d'abord, commit gagne |
+
+Carte manquante : anneau pointillé clair (le vert + ✓ est le signal). Panneau Combats retiré (Ali : « inutile ») ;
+une entrée « combats » d'un ancien `layout.json` est ignorée sans message. Maquette : `docs/mock/`.

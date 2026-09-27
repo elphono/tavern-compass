@@ -44,6 +44,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _metaGuard;
     private readonly FeatureGuard _compDetailGuard;
     private readonly FeatureGuard _skipCombatGuard;
+    private readonly FeatureGuard _highlightsGuard;
 
     // "How top boards field it", opened by the "?" above one of Bob's minions.
     private LineupsPanel? _lineupsPanel;
@@ -102,6 +103,8 @@ public sealed class Plugin : IPlugin
             _pinsVersion++;
         }));
         _transitionsGuard = new FeatureGuard("comp-transitions", (n, e) => Disable(n, e, () => _shownCompStatus = "\u0000"));
+        // Its highlights are drawn with the tavern markers; once switched off, the markers are drawn as before.
+        _highlightsGuard = new FeatureGuard("tavern-highlights", (n, e) => Disable(n, e, () => _tavernKey = string.Empty));
         _compDetailGuard = new FeatureGuard("comp-detail", (n, e) => Disable(n, e, () =>
         {
             if (_tavern != null)
@@ -187,10 +190,16 @@ public sealed class Plugin : IPlugin
     /// </summary>
     private CompDetail? DetailFor(Composition composition)
     {
+        if (_details.TryGetValue(composition, out var known))
+        {
+            return known;
+        }
+
         CompDetail? detail = null;
         _compDetailGuard.Run(() =>
         {
             detail = CompDetail.For(composition, id => Database.GetCardFromId(id)?.TechLevel);
+            _details[composition] = detail;
             static string Cards(IEnumerable<CompDetailCard> cards) =>
                 string.Join(",", cards.Select(c => $"{c.CardId}:T{c.TechLevel?.ToString() ?? "?"}x{c.FinalBoards}"));
             Log.Info($"Bronzebeard HUD: comp detail id={composition.Id} boards={composition.FinalBoards.Count} " +
@@ -198,6 +207,32 @@ public sealed class Plugin : IPlugin
                      $"turn={detail.TypicalFinalTurn?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none"}");
         });
         return detail;
+    }
+
+    // Each composition's detail, computed and logged once (compositions are the same objects until the cache is reloaded).
+    private readonly Dictionary<Composition, CompDetail> _details = new();
+    private string _loggedHighlights = string.Empty;
+
+    /// <summary>
+    /// Bob's cards that matter for the compositions aimed at (TavernHighlights), under their own guard; null if the
+    /// feature failed. One log line whenever the highlights change.
+    /// </summary>
+    private IReadOnlyList<TavernHighlight>? HighlightsFor(IReadOnlyList<string> bob, IReadOnlyList<Composition> ticked, IReadOnlyList<Composition> suggestions)
+    {
+        IReadOnlyList<TavernHighlight>? highlights = null;
+        _highlightsGuard.Run(() =>
+        {
+            highlights = TavernHighlights.For(bob, ticked, suggestions, DetailFor, _selection.ColourOf);
+            var line = string.Join(",", bob.Zip(highlights, (card, h) => (card, h))
+                .Where(x => x.h.Kind != HighlightKind.None)
+                .Select(x => $"{x.card}:{x.h.Tag}:{x.h.Composition!.Id}"));
+            if (line != _loggedHighlights)
+            {
+                _loggedHighlights = line;
+                Log.Info($"Bronzebeard HUD: tavern highlights=[{line}] from {(ticked.Count > 0 ? "ticked" : "suggested")} compositions");
+            }
+        });
+        return highlights;
     }
 
     /// <summary>Shows the "Skip combat" button in combat only, and not again in a combat already skipped.</summary>
@@ -553,7 +588,7 @@ public sealed class Plugin : IPlugin
             Log.Warn($"Bronzebeard HUD: cannot read {SettingsPath}: {e.Message}");
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, OpenLineups, OpenMetaSnapshot, DetailFor);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, OpenLineups, OpenMetaSnapshot, DetailFor, HighlightsFor);
         _lineupsPanel = new LineupsPanel(Core.OverlayCanvas, _mover); // added after the target panel: drawn over it
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);

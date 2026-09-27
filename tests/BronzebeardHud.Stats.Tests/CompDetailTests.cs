@@ -88,6 +88,7 @@ public class CompDetailTests
         var detail = CompDetail.For(Comp, TierOf);
 
         Assert.Equal("Undead Test · Undead, Beast · avg place 3,8 · 1 234 games · tier A", detail.Header);
+        Assert.Equal("Undead, Beast · 1 234 games · tier A · final turn ≈ 11,5", detail.Meta);
         Assert.Equal("Derived from 5 top final boards (Firestone) and the comp's card lists; the source has no early-game guide.", detail.SourceNote);
     }
 
@@ -103,6 +104,7 @@ public class CompDetailTests
         Assert.Null(detail.TypicalFinalTurn);
         Assert.Null(detail.TypicalFinalTurnText);
         Assert.Equal("Beasts · Beast", detail.Header);
+        Assert.Equal("Beast", detail.Meta);
         Assert.Equal("Derived from the comp's card lists; the source has no final boards and no early-game guide.", detail.SourceNote);
     }
 
