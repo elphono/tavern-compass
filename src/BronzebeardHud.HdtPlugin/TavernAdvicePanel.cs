@@ -26,8 +26,9 @@ internal sealed class TavernAdvicePanel
     private readonly Action _openMeta;
     private readonly Func<Composition, CompDetail?> _detailFor;
 
-    // The one composition whose detail block is open (its ▸ was clicked), and that detail; null when none.
-    private CompDetail? _expanded;
+    // The list, or one composition's detail in its place (TargetPanelView), and that detail once computed.
+    private readonly TargetPanelView _view = new();
+    private CompDetail? _detail;
     private IReadOnlyList<bool> _minionSlots = Array.Empty<bool>();
     private readonly Action<int> _changeSuggested;
 
@@ -50,7 +51,7 @@ internal sealed class TavernAdvicePanel
     /// <param name="changeSuggested">Called with −1 or +1 when the − or + of the panel is clicked.</param>
     /// <param name="togglePin">Called with a card id when its pin button is clicked.</param>
     /// <param name="openLineups">Called with a card id when the "?" above one of Bob's minions is clicked (LineupsPanel).</param>
-    /// <param name="detailFor">The detail block of a composition, computed when its ▸ is clicked; null if that feature failed.</param>
+    /// <param name="detailFor">A composition's detail, computed when its line is clicked; null if that feature failed.</param>
     public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle, Func<int> suggested, Action<int> changeSuggested,
         Action<string> togglePin, Action<string> openLineups, Action openMeta, Func<Composition, CompDetail?> detailFor)
     {
@@ -85,18 +86,8 @@ internal sealed class TavernAdvicePanel
     /// <summary>When false, no "?" buttons above Bob's minions (the lineups feature was switched off by its guard).</summary>
     public bool LineupsEnabled { get; set; } = true;
 
-    /// <summary>When false, no ▸ buttons and no detail block (the comp-detail feature was switched off by its guard).</summary>
+    /// <summary>When false, a composition's line opens nothing (the comp-detail feature was switched off by its guard).</summary>
     public bool DetailEnabled { get; set; } = true;
-
-    /// <summary>
-    /// The ▸ of a composition: opens its detail block under its line, closing any other; ▾ closes it. Only
-    /// one is open at a time.
-    /// </summary>
-    private void ToggleDetail(Composition composition)
-    {
-        _expanded = _expanded?.Composition.Id == composition.Id ? null : _detailFor(composition);
-        RelayoutPanel();
-    }
 
     /// <summary>When false, no pin buttons are drawn (the pinning feature was switched off by its guard).</summary>
     public bool PinButtonsEnabled { get; set; } = true;
@@ -146,6 +137,8 @@ internal sealed class TavernAdvicePanel
     public void HidePanel()
     {
         _panelVisible = false;
+        _view.Back(); // out of the game: the next game starts on the list
+        _detail = null;
         _targets.Visibility = Visibility.Collapsed;
     }
 
@@ -390,96 +383,188 @@ internal sealed class TavernAdvicePanel
         return button;
     }
 
-    /// <summary>▸ (closed) or ▾ (open) left of a composition's name, clickable while the overlay stays locked, like the boxes.</summary>
-    private Border DetailButton(Composition composition, bool open, double scale)
+    /// <summary>
+    /// A composition's line was clicked (its name or one of its ovals): its detail replaces the list
+    /// (TargetPanelView), computed once here; the list stays if that computation failed.
+    /// </summary>
+    private void OpenDetail(Composition composition)
     {
-        var button = new Border
+        if (!DetailEnabled || !_view.LineClicked(composition.Id))
         {
-            Width = 20 * scale,
-            Height = 20 * scale,
-            CornerRadius = new CornerRadius(4 * scale),
-            Margin = new Thickness(0, 0, 4 * scale, 0),
-            Background = open ? Brushes.White : new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x44)),
-            BorderBrush = Brushes.White,
-            BorderThickness = new Thickness(1),
-            VerticalAlignment = VerticalAlignment.Center,
-            Cursor = System.Windows.Input.Cursors.Hand,
-            Child = new TextBlock
+            return;
+        }
+
+        _detail = _detailFor(composition);
+        if (_detail == null)
+        {
+            _view.Back();
+        }
+
+        RelayoutPanel();
+    }
+
+    /// <summary>"← back": the list again.</summary>
+    private void CloseDetail()
+    {
+        _view.Back();
+        _detail = null;
+        RelayoutPanel();
+    }
+
+    private static TextBlock Text(string text, double size, double scale, Brush brush, bool bold = false, bool italic = false) => new()
+    {
+        Text = text,
+        FontSize = size * scale,
+        Foreground = brush,
+        FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+        FontStyle = italic ? FontStyles.Italic : FontStyles.Normal,
+        TextWrapping = TextWrapping.Wrap,
+        Margin = new Thickness(0, 3 * scale, 0, 1 * scale),
+    };
+
+    /// <summary>
+    /// One composition, one line: its tick box, its name above its average placement (bold and in its colour once
+    /// ticked, plain light grey for a suggestion), then its final board as seven ovals, held ones ringed green
+    /// with a tick, missing ones red. The name and every oval open the composition's detail; hover shows the card.
+    /// </summary>
+    private FrameworkElement CompositionLine(CompositionRow row, double scale, double height)
+    {
+        var colour = _selection.ColourOf(row.Composition.Id) is { } hex ? Brush(hex) : null;
+        var line = new Grid { Margin = new Thickness(0, 3 * scale, 0, 3 * scale) };
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(TavernLayout.BoxColumn * height) });
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(TavernLayout.NameColumn * height) });
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        if (SelectionEnabled)
+        {
+            var id = row.Composition.Id;
+            var box = new CheckBox
             {
-                Text = open ? "▾" : "▸",
-                FontSize = 14 * scale,
-                FontWeight = FontWeights.Bold,
-                Foreground = open ? Brushes.Black : Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Center,
+                IsChecked = row.IsChecked,
                 VerticalAlignment = VerticalAlignment.Center,
-            },
-        };
-        button.MouseLeftButtonUp += (_, e) =>
+                HorizontalAlignment = HorizontalAlignment.Left,
+                LayoutTransform = new ScaleTransform(scale, scale),
+                Cursor = System.Windows.Input.Cursors.Hand,
+            };
+            box.Click += (_, _) => _toggle(id);
+            OverlayExtensions.SetIsOverlayHitTestVisible(box, true);
+            line.Children.Add(box);
+        }
+
+        Action<string>? open = DetailEnabled ? _ => OpenDetail(row.Composition) : null;
+        var name = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Background = Brushes.Transparent, Margin = new Thickness(0, 0, 4 * scale, 0) };
+        name.Children.Add(new TextBlock
         {
-            e.Handled = true;
-            ToggleDetail(composition);
-        };
-        OverlayExtensions.SetIsOverlayHitTestVisible(button, true);
-        return button;
+            Text = row.Composition.Name,
+            FontSize = 13 * scale,
+            FontWeight = row.IsChecked ? FontWeights.Bold : FontWeights.Normal,
+            Foreground = colour ?? (row.IsChecked ? Brushes.White : Brushes.LightGray),
+            TextWrapping = TextWrapping.Wrap,
+        });
+        name.Children.Add(new TextBlock { Text = "avg " + row.PlacementText, FontSize = 11 * scale, Foreground = Brushes.LightGray, TextWrapping = TextWrapping.Wrap });
+        if (open != null)
+        {
+            name.Cursor = System.Windows.Input.Cursors.Hand;
+            name.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                OpenDetail(row.Composition);
+            };
+            OverlayExtensions.SetIsOverlayHitTestVisible(name, true);
+        }
+
+        Grid.SetColumn(name, 1);
+        line.Children.Add(name);
+        var ovals = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        foreach (var card in row.Vignettes)
+        {
+            ovals.Children.Add(CardImages.Vignette(card.CardId, card.Owned, TavernLayout.RowOvalWidth * height, scale, TavernLayout.PreviewHeight * height, PlacePreview, open));
+        }
+
+        Grid.SetColumn(ovals, 2);
+        line.Children.Add(ovals);
+        return line;
     }
 
     /// <summary>
-    /// A composition's detail block, under its line: a header, the early enablers and the key pieces as colour
-    /// vignettes with their tier (whole card on hover), the typical final turn, and where it all comes from.
-    /// Every text wraps within the panel's width; nothing is cut.
+    /// One composition's detail, in place of the list: "← back" and its name, where it stands (tribes, placement,
+    /// games, tier) and where the player stands on it, the early enablers and the key pieces as ovals with their
+    /// tier, where it can pivot to and through which cards, the typical final turn, and what all of it is
+    /// derived from. Every text wraps within the panel's width; nothing is cut.
     /// </summary>
-    private FrameworkElement DetailBlock(CompDetail detail, double vignette, double scale, double height)
+    private void AddDetail(StackPanel lines, CompDetail detail, double scale, double height)
     {
-        TextBlock Text(string text, double size, Brush brush, bool bold = false, bool italic = false) => new()
+        var oval = TavernLayout.VignetteSize * 0.85 * height;
+        FrameworkElement Cards(IEnumerable<string> cardIds, Func<string, int?> tier)
         {
-            Text = text,
-            FontSize = size * scale,
-            Foreground = brush,
-            FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
-            FontStyle = italic ? FontStyles.Italic : FontStyles.Normal,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 3 * scale, 0, 1 * scale),
-        };
-
-        FrameworkElement Cards(IReadOnlyList<CompDetailCard> cards)
-        {
-            if (cards.Count == 0)
+            var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
+            foreach (var cardId in cardIds)
             {
-                return Text("none with a known tier", 11, Brushes.LightGray, italic: true);
+                wrap.Children.Add(CardImages.Vignette(cardId, _owned.Contains(cardId), oval, scale, TavernLayout.PreviewHeight * height, PlacePreview, tier: tier(cardId)));
             }
 
-            var line = new WrapPanel { Orientation = Orientation.Horizontal };
-            foreach (var card in cards)
-            {
-                line.Children.Add(CardImages.Vignette(card.CardId, _owned.Contains(card.CardId), vignette * 0.85, scale, TavernLayout.PreviewHeight * height, PlacePreview,
-                    tier: card.TechLevel));
-            }
-
-            return line;
+            return wrap;
         }
 
-        var block = new StackPanel();
-        block.Children.Add(Text(detail.Header, 12, Brushes.White, bold: true));
-        block.Children.Add(Text($"Early enablers: tier {CompDetail.MaxEarlyTier} or lower, most seen on top final boards first", 11, Brushes.LightGray));
-        block.Children.Add(Cards(detail.EarlyEnablers));
-        block.Children.Add(Text("When to commit: once these key pieces show up", 11, Brushes.LightGray));
-        block.Children.Add(Cards(detail.CommitCards));
+        FrameworkElement DetailCards(IReadOnlyList<CompDetailCard> cards) =>
+            cards.Count == 0
+                ? Text("none with a known tier", 11, scale, Brushes.LightGray, italic: true)
+                : Cards(cards.Select(c => c.CardId), id => cards.First(c => c.CardId == id).TechLevel);
+
+        var id = detail.Composition.Id;
+        var colour = _selection.ColourOf(id) is { } hex ? Brush(hex) : null;
+        var header = new DockPanel { Margin = new Thickness(0, 4 * scale, 0, 0) };
+        var back = new Border
+        {
+            Height = 22 * scale,
+            CornerRadius = new CornerRadius(4 * scale),
+            Background = Brushes.White,
+            BorderBrush = Brushes.White,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(6 * scale, 0, 6 * scale, 0),
+            Margin = new Thickness(0, 0, 6 * scale, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            Cursor = System.Windows.Input.Cursors.Hand,
+            Child = new TextBlock { Text = "← back", FontSize = 12 * scale, FontWeight = FontWeights.Bold, Foreground = Brushes.Black, VerticalAlignment = VerticalAlignment.Center },
+        };
+        back.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            CloseDetail();
+        };
+        OverlayExtensions.SetIsOverlayHitTestVisible(back, true);
+        DockPanel.SetDock(back, Dock.Left);
+        header.Children.Add(back);
+        header.Children.Add(Text(detail.Composition.Name, 13, scale, colour ?? Brushes.White, bold: true));
+        lines.Children.Add(header);
+        lines.Children.Add(Text(detail.Header, 11, scale, Brushes.LightGray));
+        if (_rows.FirstOrDefault(r => r.Composition.Id == id) is { } row)
+        {
+            lines.Children.Add(Text(row.Status, 11, scale, Brushes.White));
+        }
+
+        lines.Children.Add(Text($"Early enablers: tier {CompDetail.MaxEarlyTier} or lower, most seen on top final boards first", 11, scale, Brushes.LightGray));
+        lines.Children.Add(DetailCards(detail.EarlyEnablers));
+        lines.Children.Add(Text("When to commit: once these key pieces show up", 11, scale, Brushes.LightGray));
+        lines.Children.Add(DetailCards(detail.CommitCards));
+
+        // Where it can pivot to, and through which cards (CompTransitions, among the compositions playable here).
+        if (_transitions.TryGetValue(id, out var transitions))
+        {
+            lines.Children.Add(Text(transitions.Count == 0 ? "Pivots: none among this lobby's compositions" : "Pivots: where it can turn, through the cards they share",
+                11, scale, Brushes.LightGray));
+            foreach (var transition in transitions)
+            {
+                lines.Children.Add(Text($"→ {transition.To.Name} ({transition.Shared.Count} shared)", 11, scale, Brushes.White));
+                lines.Children.Add(Cards(transition.Shared, _ => null));
+            }
+        }
+
         if (detail.TypicalFinalTurnText is { } turn)
         {
-            block.Children.Add(Text(turn, 11, Brushes.White));
+            lines.Children.Add(Text(turn, 11, scale, Brushes.White));
         }
 
-        block.Children.Add(Text(detail.SourceNote, 10, Brushes.LightGray, italic: true));
-        return new Border
-        {
-            Background = new SolidColorBrush(Color.FromArgb(0xF0, 0x24, 0x24, 0x34)),
-            BorderBrush = Brushes.White,
-            BorderThickness = new Thickness(1.5 * scale),
-            CornerRadius = new CornerRadius(4 * scale),
-            Padding = new Thickness(5 * scale, 2 * scale, 5 * scale, 4 * scale),
-            Margin = new Thickness(0, 3 * scale, 0, 3 * scale),
-            Child = block,
-        };
+        lines.Children.Add(Text(detail.SourceNote, 10, scale, Brushes.LightGray, italic: true));
     }
 
     /// <summary>The whole-card preview beside this panel (PreviewPlacer).</summary>
@@ -489,12 +574,11 @@ internal sealed class TavernAdvicePanel
     public bool SelectionEnabled { get; set; } = true;
 
     /// <summary>
-    /// One line per composition: a box to tick it (clickable while the overlay stays locked: HDT makes its
-    /// window catch the mouse only while the cursor is over an element declared with IsOverlayHitTestVisible,
-    /// Windows/OverlayWindow.MouseOverDetection.cs:489-491, registered at OverlayWindow.xaml.cs:194-200), a ▸
-    /// that opens its detail block, its name (bold, in its colour, once ticked; plain and marked "suggestion"
-    /// otherwise), average placement, key pieces n/m, then the final board as colour card vignettes left to
-    /// right: held cards framed green with a tick, missing ones framed red, the whole card shown on hover.
+    /// The title (− n +, Meta), then either one line per composition (CompositionLine) or, once a line was
+    /// clicked, that composition's detail in place of the list (AddDetail). The tick boxes, the name and the
+    /// ovals are clickable while the overlay stays locked: HDT makes its window catch the mouse only while the
+    /// cursor is over an element declared with IsOverlayHitTestVisible (Windows/OverlayWindow.MouseOverDetection.cs:489-491,
+    /// registered at OverlayWindow.xaml.cs:194-200). Under them, the warband line and the loading status.
     /// </summary>
     private void RelayoutPanel()
     {
@@ -508,7 +592,6 @@ internal sealed class TavernAdvicePanel
         var height = _canvas.ActualHeight;
         var scale = TavernLayout.Scale(height);
         var panel = TavernLayout.TargetPanel(width, height);
-        var vignette = TavernLayout.VignetteSize * height;
         var lines = new StackPanel { Margin = new Thickness(6 * scale) };
         // Title, and how many suggestions to show: − n +, clickable while the overlay stays locked, like the boxes.
         var title = new DockPanel();
@@ -551,89 +634,23 @@ internal sealed class TavernAdvicePanel
         title.Children.Add(count);
         title.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
         lines.Children.Add(title);
-        if (_rows.Count == 0)
+
+        if (DetailEnabled && _view.ShowsDetail && _detail != null)
         {
-            lines.Children.Add(new TextBlock { Text = "No composition reachable yet", FontSize = 12 * scale, Foreground = Brushes.LightGray, Margin = new Thickness(0, 4 * scale, 0, 0) });
+            AddDetail(lines, _detail, scale, height);
         }
-
-        if (_expanded != null && !_rows.Any(r => r.Composition.Id == _expanded.Composition.Id))
+        else
         {
-            _expanded = null; // its composition is no longer shown
-        }
-
-        foreach (var row in _rows)
-        {
-            var colour = _selection.ColourOf(row.Composition.Id) is { } hex ? Brush(hex) : null;
-            var open = DetailEnabled && _expanded?.Composition.Id == row.Composition.Id;
-            var headerLine = new DockPanel { Margin = new Thickness(0, 4 * scale, 0, 2 * scale) };
-            if (SelectionEnabled)
+            _view.Back();
+            _detail = null;
+            if (_rows.Count == 0)
             {
-                var id = row.Composition.Id;
-                var box = new CheckBox
-                {
-                    IsChecked = row.IsChecked,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 4 * scale, 0),
-                    LayoutTransform = new ScaleTransform(scale, scale),
-                    Cursor = System.Windows.Input.Cursors.Hand,
-                };
-                box.Click += (_, _) => _toggle(id);
-                OverlayExtensions.SetIsOverlayHitTestVisible(box, true);
-                headerLine.Children.Add(box);
+                lines.Children.Add(new TextBlock { Text = "No composition reachable yet", FontSize = 12 * scale, Foreground = Brushes.LightGray, Margin = new Thickness(0, 4 * scale, 0, 0) });
             }
 
-            if (DetailEnabled)
+            foreach (var row in _rows)
             {
-                headerLine.Children.Add(DetailButton(row.Composition, open, scale));
-            }
-
-            // A ticked composition is bold, in its colour; a suggestion is plain, light grey, and says so (CompositionRow.Header).
-            headerLine.Children.Add(new TextBlock
-            {
-                Text = row.Header,
-                FontSize = 13 * scale,
-                FontWeight = row.IsChecked ? FontWeights.Bold : FontWeights.Normal,
-                Foreground = colour ?? (row.IsChecked ? Brushes.White : Brushes.LightGray),
-                TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-            lines.Children.Add(headerLine);
-            var board = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var card in row.Vignettes)
-            {
-                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale, TavernLayout.PreviewHeight * height, PlacePreview));
-            }
-
-            // A ticked composition's colour also runs down the left of its board.
-            lines.Children.Add(colour == null
-                ? board
-                : new Border { BorderBrush = colour, BorderThickness = new Thickness(4 * scale, 0, 0, 0), Padding = new Thickness(4 * scale, 0, 0, 0), Child = board });
-
-            // Where this composition can pivot to, and the cards in common (hoverable like the others).
-            if (_transitions.TryGetValue(row.Composition.Id, out var transitions) && CompTransitions.Text(transitions) is { } pivot)
-            {
-                var line = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2 * scale, 0, 0) };
-                line.Children.Add(new TextBlock
-                {
-                    Text = pivot,
-                    FontSize = 11 * scale,
-                    FontStyle = FontStyles.Italic,
-                    Foreground = Brushes.LightGray,
-                    TextWrapping = TextWrapping.Wrap,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 4 * scale, 0),
-                });
-                foreach (var shared in transitions.SelectMany(t => t.Shared).Distinct().Take(7))
-                {
-                    line.Children.Add(CardImages.Vignette(shared, _owned.Contains(shared), vignette * 0.6, scale, TavernLayout.PreviewHeight * height, PlacePreview));
-                }
-
-                lines.Children.Add(line);
-            }
-
-            if (open)
-            {
-                lines.Children.Add(DetailBlock(_expanded!, vignette, scale, height));
+                lines.Children.Add(CompositionLine(row, scale, height));
             }
         }
 
@@ -651,7 +668,7 @@ internal sealed class TavernAdvicePanel
         _targets.MinHeight = panel.Height;
         _mover.Place(_targets, "target-compositions", panel, interactive: true);
 
-        // More lines (up to 8 suggestions, their pivots) must not run off the bottom of the window: the
+        // More lines (up to 8 suggestions, or a long detail) must not run off the bottom of the window: the
         // content shrinks to the room left under the panel's top, never gets cut.
         lines.Width = panel.Width - 2 * 6 * scale - 4;
         var room = Math.Max(panel.Height, height - Canvas.GetTop(_targets) - 0.005 * height);

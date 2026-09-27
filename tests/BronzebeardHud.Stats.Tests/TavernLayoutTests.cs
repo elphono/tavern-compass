@@ -58,7 +58,8 @@ public class TavernLayoutTests
         }
 
         Assert.True(panel.Left >= 0 && panel.Top >= 0 && panel.Right <= width && panel.Top + panel.Height <= height, "outside the window");
-        Assert.True(panel.Width >= 7 * 0.052 * height, "seven vignettes do not fit");
+        Assert.True(panel.Width >= (TavernLayout.BoxColumn + TavernLayout.NameColumn + 7 * TavernLayout.RowOvalWidth * 1.08) * height,
+            "a tick box, a name column and seven ovals do not fit on one line");
     }
 
     [Theory]

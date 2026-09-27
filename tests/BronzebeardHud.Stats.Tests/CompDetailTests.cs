@@ -38,6 +38,17 @@ public class CompDetailTests
         Assert.Equal(new int?[] { 1, 3, 3, 2, 2, 1 }, detail.EarlyEnablers.Select(c => c.TechLevel));
     }
 
+    // Ali's decision of 2026-09-27: a key piece of tier ≤ 3 stays among the early enablers, even though it is also listed under "When to commit". Not an oversight.
+    [Fact]
+    public void EarlyEnablers_KeepKeyPiecesOfTierThreeOrLess_ByDesign()
+    {
+        var detail = CompDetail.For(Comp, TierOf);
+
+        Assert.Contains("KEY_T3", detail.CommitCards.Select(c => c.CardId));
+        Assert.Contains("KEY_T3", detail.EarlyEnablers.Select(c => c.CardId));
+        Assert.DoesNotContain("KEY_T5", detail.EarlyEnablers.Select(c => c.CardId)); // tier 5: a key piece, not an early one
+    }
+
     [Fact]
     public void EarlyEnablers_AreCappedAfterSorting()
     {

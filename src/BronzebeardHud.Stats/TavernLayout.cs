@@ -118,8 +118,22 @@ public static class TavernLayout
     /// <summary>Bottom of the player's board row: top = H/2 − 0.03 × H (OverlayWindow.Update.cs:537-538), plus the row height.</summary>
     public static double PlayerRowBottom(double height) => height / 2 - 0.03 * height + BoardRowHeight * height;
 
-    /// <summary>Vignette side, as a fraction of H; seven of them make a row of the target panel.</summary>
+    /// <summary>Vignette width in the detail and lineups views, as a fraction of H.</summary>
     public const double VignetteSize = 0.052;
+
+    /// <summary>
+    /// Card vignettes are ovals, cut like the game's minion portraits: height = width × <see cref="OvalAspect"/>.
+    /// </summary>
+    public const double OvalAspect = 1.25;
+
+    /// <summary>Oval width on a composition's line of the target panel, × H: seven of them, after its name.</summary>
+    public const double RowOvalWidth = 0.040;
+
+    /// <summary>Width of the name and placement column of a composition's line, × H; the text wraps inside it.</summary>
+    public const double NameColumn = 0.10;
+
+    /// <summary>Width of the tick box column, × H.</summary>
+    public const double BoxColumn = 0.025;
 
     /// <summary>
     /// Height of the full-card preview shown when a vignette is hovered: HDT draws a Battlegrounds card
@@ -196,13 +210,13 @@ public static class TavernLayout
     /// The target composition panel's default place: the lower right part of Hearthstone's 4:3 frame,
     /// below the player's board row (OverlayWindow.Update.cs:537-538 + MouseOverDetection.cs:38), right of
     /// the hero and hero power (which sit within W/2 ± 0.2 × H), above the gold at the bottom. Sized for
-    /// three rows of a header and seven vignettes. It can be moved (PanelLayout).
+    /// three composition lines, each a tick box, a name column and seven ovals. It can be moved (PanelLayout).
     /// </summary>
     public static LayoutRect TargetPanel(double width, double height)
     {
         var frameRight = width / 2 + height * 2 / 3;
-        var panelWidth = 7 * VignetteSize * height * 1.08 + 0.02 * height;
-        var panelHeight = 3 * (VignetteSize * height + 0.028 * height) + 0.03 * height;
+        var panelWidth = (0.02 + BoxColumn + NameColumn + 7 * RowOvalWidth * 1.08) * height;
+        var panelHeight = 3 * (RowOvalWidth * OvalAspect * height + 0.012 * height) + 0.03 * height;
         var right = frameRight - 0.01 * height;
         var top = PlayerRowBottom(height) + 0.012 * height;
         return new LayoutRect(right - panelWidth / 2, top + panelHeight / 2, panelWidth, panelHeight);

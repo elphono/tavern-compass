@@ -30,27 +30,48 @@ internal static class CardImages
 
     private static readonly Brush BadgeBrush = new SolidColorBrush(Color.FromArgb(0xE6, 0x00, 0x00, 0x00));
 
+    /// <summary>
+    /// One card as an oval, cut like the game's minion portraits: <paramref name="width"/> wide,
+    /// width × TavernLayout.OvalAspect tall, the art clipped to an ellipse, ringed green with a tick when held,
+    /// red when missing, all in full colour. Badges sit in the corners, outside the oval, so they hide no art.
+    /// </summary>
     /// <param name="placePreview">
     /// Called as the cursor enters the vignette, before HDT's own handler shows the preview (handlers of one
     /// element run in the order they were added), to set where the preview goes.
     /// </param>
     /// <param name="onClick">When given, a click on the vignette calls it with the card id (clickable while the overlay stays locked).</param>
     /// <param name="tier">When given, a "T3" badge in the top left corner (tavern tier).</param>
-    public static FrameworkElement Vignette(string cardId, bool owned, double size, double scale, double previewHeight, Action<FrameworkElement> placePreview,
+    public static FrameworkElement Vignette(string cardId, bool owned, double width, double scale, double previewHeight, Action<FrameworkElement> placePreview,
         Action<string>? onClick = null, int? tier = null)
     {
-        var image = new Image { Width = size, Height = size, Stretch = Stretch.UniformToFill };
-        var frame = new Border
+        var height = width * BronzebeardHud.Stats.TavernLayout.OvalAspect;
+        var stroke = 3 * scale;
+        var image = new Image
         {
-            Width = size,
-            Height = size,
-            Margin = new Thickness(0, 0, 0.08 * size, 0),
-            CornerRadius = new CornerRadius(0.15 * size),
-            BorderThickness = new Thickness(3 * scale),
-            BorderBrush = owned ? TickBrush : MissingBrush,
-            ClipToBounds = true,
-            Child = image,
+            Width = width,
+            Height = height,
+            Stretch = Stretch.UniformToFill,
+            Clip = new EllipseGeometry(new Point(width / 2, height / 2), width / 2 - stroke / 2, height / 2 - stroke / 2),
         };
+        var ring = new System.Windows.Shapes.Ellipse
+        {
+            Width = width,
+            Height = height,
+            Stroke = owned ? TickBrush : MissingBrush,
+            StrokeThickness = stroke,
+            IsHitTestVisible = false,
+        };
+
+        // The whole cell, not only the oval, catches the mouse: a transparent background makes it hit-testable.
+        var frame = new Grid
+        {
+            Width = width,
+            Height = height,
+            Margin = new Thickness(0, 0, 0.08 * width, 0),
+            Background = Brushes.Transparent,
+            Children = { image, ring },
+        };
+        var size = width;
 
         // Hover shows the whole card, through HDT's own overlay tooltips: the overlay lets clicks through,
         // so WPF never sees the mouse, but HDT polls the cursor at 60 Hz over elements declared hoverable

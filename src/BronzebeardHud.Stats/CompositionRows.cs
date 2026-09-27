@@ -53,15 +53,15 @@ public sealed class CompositionRow
     public HeroCompPick? HeroEffect { get; }
 
     /// <summary>
-    /// The row's header, as the panel prints it: "Undead Butcher · 3,8 (≈ 3,2 with your hero (60)) · 1/2 key · suggestion",
-    /// the last mark only on suggestions, then " · order unknown" when the source gives no board order.
+    /// Where the player stands on this composition, for its detail view (the list line only shows name and
+    /// placement): "Ticked target · 1/2 key pieces held · ≈ 3,2 with your hero (60)", or "Suggestion · …", then
+    /// " · board order unknown" when the source gives none.
     /// </summary>
-    public string Header =>
-        $"{Composition.Name} · {PlacementText}"
-        + (HeroEffect is { } heroEffect ? $" ({heroEffect.ShopText})" : string.Empty)
-        + $" · {KeyOwned}/{KeyTotal} key"
-        + (IsSuggestion ? " · suggestion" : string.Empty)
-        + (OrderKnown ? string.Empty : " · order unknown");
+    public string Status =>
+        (IsSuggestion ? "Suggestion" : "Ticked target")
+        + $" · {KeyOwned}/{KeyTotal} key pieces held"
+        + (HeroEffect is { } heroEffect ? $" · {heroEffect.ShopText}" : string.Empty)
+        + (OrderKnown ? string.Empty : " · board order unknown");
 
     public int KeyOwned { get; }
     public int KeyTotal => Composition.CoreCards.Count;
