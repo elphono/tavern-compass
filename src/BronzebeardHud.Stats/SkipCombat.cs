@@ -39,29 +39,61 @@ public sealed class SkipCombatState
     }
 }
 
+/// <summary>How the client is started again after the kill; <see cref="Refusal"/> set when it cannot be, and then nothing is killed.</summary>
+public sealed class RelaunchPlan
+{
+    private RelaunchPlan(string? file, string arguments, string source, string? refusal)
+    {
+        File = file;
+        Arguments = arguments;
+        Source = source;
+        Refusal = refusal;
+    }
+
+    public string? File { get; }
+    public string Arguments { get; }
+
+    /// <summary>Where the Battle.net path came from, for the log line.</summary>
+    public string Source { get; }
+
+    public string? Refusal { get; }
+
+    public static RelaunchPlan Through(string file, string source) => new(file, SkipCombatPlan.LaunchArguments, source, null);
+    public static RelaunchPlan Refused(string reason) => new(null, string.Empty, "nowhere", reason);
+}
+
 public static class SkipCombatPlan
 {
-    public const string ExecutableName = "Hearthstone.exe";
+    public const string BattleNetExecutable = "Battle.net.exe";
+
+    /// <summary>What HDT itself hands Battle.net to start Hearthstone (Utility/HearthstoneRunner.cs:54).</summary>
+    public const string LaunchArguments = "--exec=\"launch WTCG\"";
 
     /// <summary>
-    /// Which executable to start again, chosen BEFORE the process is killed: the running process's own file
-    /// (Process.MainModule.FileName) when it could be read, else HDT's configured Hearthstone folder
-    /// (Config.HearthstoneDirectory) plus Hearthstone.exe; null when neither is known, and then nothing is killed.
-    /// Windows paths, joined with a backslash whatever the platform the tests run on.
+    /// The client is always started again THROUGH Battle.net, never by its own executable. Measured on
+    /// 2026-09-27 on Ali's machine: a client started directly — with or without its original "-launch -uid
+    /// hs_beta" — reuses the one-time login token of the killed client and is refused ("A repeated token was
+    /// retrieved when disallowed", "Failed to get token to respond to login challenge", Login.log), which shows
+    /// the "could not connect to Blizzard services" screen: worse than no skip at all. Battle.net is the killed
+    /// client's parent when it launched it (read before the kill), else a running Battle.net.exe; with neither,
+    /// the skip is refused and Hearthstone is left running.
     /// </summary>
-    public static (string? Path, string Source) Executable(string? fromProcess, string? hdtHearthstoneDirectory)
+    /// <param name="parentName">The running client's parent process name (WMI ParentProcessId).</param>
+    /// <param name="parentPath">That parent's executable path.</param>
+    /// <param name="runningBattleNet">The executable of a running Battle.net.exe, when one could be read.</param>
+    public static RelaunchPlan Relaunch(string? parentName, string? parentPath, string? runningBattleNet)
     {
-        if (!string.IsNullOrWhiteSpace(fromProcess))
+        if (string.Equals(parentName, BattleNetExecutable, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(parentPath))
         {
-            return (fromProcess, "process");
+            return RelaunchPlan.Through(parentPath!, "Battle.net, the client's parent");
         }
 
-        if (!string.IsNullOrWhiteSpace(hdtHearthstoneDirectory))
+        if (!string.IsNullOrWhiteSpace(runningBattleNet))
         {
-            return (hdtHearthstoneDirectory!.TrimEnd('\\', '/') + "\\" + ExecutableName, "HDT config");
+            return RelaunchPlan.Through(runningBattleNet!, "a running Battle.net");
         }
 
-        return (null, "nowhere");
+        return RelaunchPlan.Refused("no Battle.net to start Hearthstone again (a direct start cannot log in); Hearthstone left running");
     }
 }
 

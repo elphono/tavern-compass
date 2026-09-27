@@ -43,13 +43,26 @@ public class SkipCombatTests
     }
 
     [Fact]
-    public void Executable_FromTheProcessFirst_ThenHdtConfig_ElseNothingIsKilled()
+    public void Relaunch_AlwaysThroughBattleNet_TheParentFirst_ThenARunningOne()
     {
-        Assert.Equal((@"D:\Games\HS\Hearthstone.exe", "process"),
-            SkipCombatPlan.Executable(@"D:\Games\HS\Hearthstone.exe", @"E:\JEUX\Hearthstone"));
-        Assert.Equal((@"E:\JEUX\Hearthstone\Hearthstone.exe", "HDT config"), SkipCombatPlan.Executable(null, @"E:\JEUX\Hearthstone"));
-        Assert.Equal((@"E:\JEUX\Hearthstone\Hearthstone.exe", "HDT config"), SkipCombatPlan.Executable(" ", @"E:\JEUX\Hearthstone\"));
-        Assert.Equal((null, "nowhere"), SkipCombatPlan.Executable(null, ""));
+        var fromParent = SkipCombatPlan.Relaunch("Battle.net.exe", @"E:\JEUX\Battle.net\Battle.net.exe", @"C:\Other\Battle.net.exe");
+        Assert.Equal((@"E:\JEUX\Battle.net\Battle.net.exe", "--exec=\"launch WTCG\"", (string?)null), (fromParent.File, fromParent.Arguments, fromParent.Refusal));
+
+        // Started by something else (a shortcut, HDT): the running Battle.net, never the game's own executable.
+        var fromRunning = SkipCombatPlan.Relaunch("explorer.exe", @"C:\Windows\explorer.exe", @"C:\Other\Battle.net.exe");
+        Assert.Equal((@"C:\Other\Battle.net.exe", "--exec=\"launch WTCG\""), (fromRunning.File, fromRunning.Arguments));
+        Assert.Equal(@"C:\Other\Battle.net.exe", SkipCombatPlan.Relaunch("BATTLE.NET.EXE", "", @"C:\Other\Battle.net.exe").File);
+    }
+
+    [Fact]
+    public void Relaunch_WithoutBattleNet_IsRefused_SoNothingIsKilled()
+    {
+        // A direct start of Hearthstone.exe cannot log in (measured 2026-09-27): no Battle.net, no skip.
+        var refused = SkipCombatPlan.Relaunch("explorer.exe", @"C:\Windows\explorer.exe", runningBattleNet: null);
+
+        Assert.Null(refused.File);
+        Assert.NotNull(refused.Refusal);
+        Assert.Null(SkipCombatPlan.Relaunch(null, null, "  ").File);
     }
 
     [Theory]

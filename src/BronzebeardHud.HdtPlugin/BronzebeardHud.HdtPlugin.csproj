@@ -34,6 +34,8 @@
     <Reference Include="WindowsBase" />
     <Reference Include="System.Xaml" />
     <Reference Include="System.Net.Http" />
+    <!-- .NET Framework assembly (not a package): Skip combat reads the client's parent process through WMI. -->
+    <Reference Include="System.Management" />
     <!-- Provided by HDT at runtime: never copied next to the plugin. -->
     <Reference Include="HearthstoneDeckTracker">
       <HintPath>$(HdtExe)</HintPath>

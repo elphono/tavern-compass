@@ -219,14 +219,16 @@ public sealed class Plugin : IPlugin
     }
 
     /// <summary>
-    /// The "Skip combat" button: closes Hearthstone and starts it again at once, the reconnection landing after
-    /// the combat animation (a known Battlegrounds trick). A local action on the process: no game memory is
-    /// read. The executable is chosen before the kill (the process's own file, else HDT's Hearthstone folder),
-    /// and nothing is killed unless that file exists, so that the client can always be started again. No wait
-    /// between the two (Ali, 2026-09-27: instant): as soon as Kill() returns without an exception, the client is
-    /// started again. Kill() only asks Windows to end the process, so the old client may still be exiting then;
-    /// the log line says whether it had. One line per click, with what was measured: pid, executable and where
-    /// it came from, how long Kill() took, the time from Kill() to Start(), the new pid, or the exception.
+    /// The "Skip combat" button: closes Hearthstone and has Battle.net start it again at once, the reconnection
+    /// landing after the combat animation (a known Battlegrounds trick). A local action on processes: no game
+    /// memory is read. The client is always started again through Battle.net (SkipCombatPlan.Relaunch): measured
+    /// on 2026-09-27, a client started directly cannot log in and shows "could not connect to Blizzard services".
+    /// Battle.net is found BEFORE the kill (the client's parent, else a running Battle.net.exe); without it nothing
+    /// is killed. After Kill(), at most <see cref="ExitWaitMs"/> for the old client to be gone (it took 100 to
+    /// 416 ms on Ali's machine), then Battle.net is asked, again every second until it starts the client
+    /// (AskBattleNet, off the UI thread). Log lines with the measures: pid, parent, relaunch command and where it
+    /// came from, Kill() time, exit time, the asks and when the new client appeared, whether it is still alive
+    /// 3 s later, or the exception.
     /// </summary>
     private void SkipCombat() => _skipCombatGuard.Run(() =>
     {
@@ -250,22 +252,13 @@ public sealed class Plugin : IPlugin
 
             var target = processes.FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero) ?? processes[0];
             var pid = target.Id;
-            string? fromProcess = null;
-            var moduleError = string.Empty;
-            try
+            var (parentName, parentPath, parentNote) = ParentOf(pid);
+            var plan = SkipCombatPlan.Relaunch(parentName, parentPath, RunningBattleNet());
+            var what = $"pid={pid} ({processes.Length} Hearthstone process{(processes.Length > 1 ? "es" : string.Empty)}) parent={parentName ?? "?"}{parentNote} " +
+                       $"relaunch=[{plan.File ?? "none"} {plan.Arguments}] (from {plan.Source})";
+            if (plan.Refusal != null || !File.Exists(plan.File))
             {
-                fromProcess = target.MainModule?.FileName;
-            }
-            catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException)
-            {
-                moduleError = $"; MainModule unreadable: {e.GetType().Name}: {e.Message}";
-            }
-
-            var (exe, source) = SkipCombatPlan.Executable(fromProcess, Hearthstone_Deck_Tracker.Config.Instance.HearthstoneDirectory);
-            var what = $"pid={pid} ({processes.Length} Hearthstone process{(processes.Length > 1 ? "es" : string.Empty)}) exe={exe ?? "unknown"} (from {source}{moduleError})";
-            if (exe == null || !File.Exists(exe))
-            {
-                Log.Warn($"Bronzebeard HUD: skip combat {what}: executable {(exe == null ? "unknown" : "not found")}; Hearthstone left running");
+                Log.Warn($"Bronzebeard HUD: skip combat {what}: {plan.Refusal ?? "Battle.net.exe not found on disk; Hearthstone left running"}");
                 return;
             }
 
@@ -282,35 +275,10 @@ public sealed class Plugin : IPlugin
             }
 
             var killMs = watch.ElapsedMilliseconds;
-            bool? exitedAtStart = null; // measured, not waited for: did the old client exit before the new one starts?
-            try
-            {
-                exitedAtStart = target.HasExited;
-            }
-            catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
-            {
-                // Unknown; the line says so.
-            }
-
-            var startAtMs = watch.ElapsedMilliseconds;
-            var timing = $"Kill() returned in {killMs} ms, Start() called {startAtMs} ms after Kill(), old process exited by then: {exitedAtStart?.ToString() ?? "unknown"}";
-            Process? started;
-            try
-            {
-                started = Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = Path.GetDirectoryName(exe), UseShellExecute = false });
-            }
-            catch (Exception e)
-            {
-                Log.Error($"Bronzebeard HUD: skip combat {what}: {timing}; restart FAILED: {e.GetType().Name}: {e.Message}; start Hearthstone by hand");
-                logged = true;
-                throw;
-            }
-
-            using (started)
-            {
-                Log.Info($"Bronzebeard HUD: skip combat {what}: {timing}; restarted pid={started?.Id.ToString() ?? "none"} " +
-                         $"(Process.Start returned {watch.ElapsedMilliseconds - startAtMs} ms later)");
-            }
+            var exited = target.WaitForExit(ExitWaitMs);
+            var timing = $"Kill() returned in {killMs} ms, old client exited: {exited} (at {watch.ElapsedMilliseconds} ms, bound {ExitWaitMs} ms)";
+            Log.Info($"Bronzebeard HUD: skip combat {what}: {timing}; asking Battle.net");
+            AskBattleNet(plan.File!, plan.Arguments, pid);
         }
         catch (Exception e) when (!logged)
         {
@@ -324,6 +292,125 @@ public sealed class Plugin : IPlugin
             {
                 process.Dispose();
             }
+        }
+    });
+
+    /// <summary>How long to wait for the killed client to be gone before asking Battle.net (measured: 350 to 416 ms).</summary>
+    private const int ExitWaitMs = 1500;
+
+    /// <summary>
+    /// Asking Battle.net again while no new client appears: every <see cref="AskEveryMs"/>, <see cref="MaxAsks"/>
+    /// times at most (12 s). Measured 2026-09-27: Battle.net ignored the asks made 0.1, 2.2 and 4.2 s after the
+    /// kill and took the one at 6.2 s, the client appearing 0.5 s later; asking every second gets it at the first
+    /// second Battle.net accepts.
+    /// </summary>
+    private const int AskEveryMs = 1000;
+    private const int MaxAsks = 12;
+
+    /// <summary>After the new client appeared, how long before checking it is still alive.</summary>
+    private const int AliveCheckMs = 3000;
+
+    /// <summary>The running client's parent process (WMI: ParentProcessId, then that process's name and path).</summary>
+    private static (string? Name, string? Path, string Note) ParentOf(int pid)
+    {
+        try
+        {
+            using var child = new System.Management.ManagementObjectSearcher($"SELECT ParentProcessId FROM Win32_Process WHERE ProcessId={pid}");
+            var parentId = child.Get().Cast<System.Management.ManagementObject>().Select(o => (uint?)o["ParentProcessId"]).FirstOrDefault();
+            if (parentId == null)
+            {
+                return (null, null, " (no WMI entry)");
+            }
+
+            using var parent = new System.Management.ManagementObjectSearcher($"SELECT Name, ExecutablePath FROM Win32_Process WHERE ProcessId={parentId}");
+            var row = parent.Get().Cast<System.Management.ManagementObject>().FirstOrDefault();
+            return row == null ? (null, null, $" (parent {parentId} gone)") : ((string?)row["Name"], (string?)row["ExecutablePath"], string.Empty);
+        }
+        catch (Exception e) when (e is System.Management.ManagementException or System.Runtime.InteropServices.COMException or UnauthorizedAccessException)
+        {
+            return (null, null, $" (WMI: {e.GetType().Name}: {e.Message})");
+        }
+    }
+
+    /// <summary>The executable of a running Battle.net.exe, when one can be read; null otherwise.</summary>
+    private static string? RunningBattleNet()
+    {
+        foreach (var process in Process.GetProcessesByName("Battle.net"))
+        {
+            using (process)
+            {
+                try
+                {
+                    return process.MainModule?.FileName;
+                }
+                catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException)
+                {
+                    // Next one, if any.
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>A Hearthstone process other than the killed one; null when there is none yet.</summary>
+    private static int? NewClient(int oldPid)
+    {
+        var processes = Process.GetProcessesByName("Hearthstone");
+        try
+        {
+            return processes.Select(p => p.Id).Where(id => id != oldPid).Select(id => (int?)id).FirstOrDefault();
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// From a background task, off HDT's UI thread: asks Battle.net to start Hearthstone, and again every
+    /// <see cref="AskEveryMs"/> while no new client appears (measured 2026-09-27: asked 112 ms after the kill,
+    /// Battle.net started nothing within 50 s; asked again every 2 s, it started it after the ask at 6.2 s; asked
+    /// when idle, it started it in 582 ms). One log line with the number
+    /// of asks and when the new client appeared, or that it did not; then whether it is still alive
+    /// <see cref="AliveCheckMs"/> later.
+    /// </summary>
+    private static void AskBattleNet(string battleNet, string arguments, int oldPid) => System.Threading.Tasks.Task.Run(async () =>
+    {
+        var clock = Stopwatch.StartNew();
+        var asks = 0;
+        int? fresh = null;
+        try
+        {
+            while (fresh == null && asks < MaxAsks)
+            {
+                using (Process.Start(new ProcessStartInfo(battleNet, arguments) { WorkingDirectory = Path.GetDirectoryName(battleNet), UseShellExecute = false }))
+                {
+                }
+
+                asks++;
+                var until = clock.ElapsedMilliseconds + AskEveryMs;
+                while (clock.ElapsedMilliseconds < until && (fresh = NewClient(oldPid)) == null)
+                {
+                    await System.Threading.Tasks.Task.Delay(100).ConfigureAwait(false);
+                }
+            }
+
+            Log.Info($"Bronzebeard HUD: skip combat: Battle.net asked {asks} time(s); " + (fresh is { } pid
+                ? $"new client pid={pid} appeared {clock.ElapsedMilliseconds} ms after the first ask"
+                : $"no new client after {clock.ElapsedMilliseconds} ms — start Hearthstone from Battle.net"));
+            if (fresh is { } started)
+            {
+                await System.Threading.Tasks.Task.Delay(AliveCheckMs).ConfigureAwait(false);
+                Log.Info($"Bronzebeard HUD: skip combat: restarted pid={started} still alive after {AliveCheckMs} ms: {NewClient(oldPid) == started}");
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Error($"Bronzebeard HUD: skip combat: asking Battle.net failed after {asks} ask(s), {clock.ElapsedMilliseconds} ms: {e.GetType().Name}: {e.Message}; start Hearthstone from Battle.net");
         }
     });
 
