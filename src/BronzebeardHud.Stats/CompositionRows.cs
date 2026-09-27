@@ -25,14 +25,13 @@ public sealed class CompositionVignette
 /// <summary>One line of the target composition panel.</summary>
 public sealed class CompositionRow
 {
-    public CompositionRow(Composition composition, double score, bool isTarget, int keyOwned, IReadOnlyList<CompositionVignette> vignettes, bool orderKnown,
+    public CompositionRow(Composition composition, double score, int keyOwned, IReadOnlyList<CompositionVignette> vignettes, bool orderKnown,
         bool isChecked = false, HeroCompPick? heroEffect = null)
     {
         IsChecked = isChecked;
         HeroEffect = heroEffect;
         Composition = composition;
         Score = score;
-        IsTarget = isTarget;
         KeyOwned = keyOwned;
         Vignettes = vignettes;
         OrderKnown = orderKnown;
@@ -44,11 +43,25 @@ public sealed class CompositionRow
     /// <summary>Ticked by the player (<see cref="CompositionSelection"/>): shown first, whatever its rank.</summary>
     public bool IsChecked { get; }
 
+    /// <summary>
+    /// Not ticked: one of the automatic suggestions (reachable, best placement first). A ticked row is a target
+    /// the player chose; every other row is a suggestion, and the panel must tell them apart.
+    /// </summary>
+    public bool IsSuggestion => !IsChecked;
+
     /// <summary>The hero being played on this composition, when the data qualifies (shown as "≈ 3,5 with your hero (23)").</summary>
     public HeroCompPick? HeroEffect { get; }
 
-    /// <summary>False for a suggestion (best placement in the lobby) shown before anything is targeted.</summary>
-    public bool IsTarget { get; }
+    /// <summary>
+    /// The row's header, as the panel prints it: "Undead Butcher · 3,8 (≈ 3,2 with your hero (60)) · 1/2 key · suggestion",
+    /// the last mark only on suggestions, then " · order unknown" when the source gives no board order.
+    /// </summary>
+    public string Header =>
+        $"{Composition.Name} · {PlacementText}"
+        + (HeroEffect is { } heroEffect ? $" ({heroEffect.ShopText})" : string.Empty)
+        + $" · {KeyOwned}/{KeyTotal} key"
+        + (IsSuggestion ? " · suggestion" : string.Empty)
+        + (OrderKnown ? string.Empty : " · order unknown");
 
     public int KeyOwned { get; }
     public int KeyTotal => Composition.CoreCards.Count;
@@ -81,13 +94,13 @@ public static class CompositionRows
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
         var ticked = new HashSet<string>(chosen ?? Array.Empty<string>(), StringComparer.Ordinal);
         return shown
-            .Select(p => Row(p.Composition, p.Score, isTarget: true, ownedCounts, ticked.Contains(p.Composition.Id),
+            .Select(p => Row(p.Composition, p.Score, ownedCounts, ticked.Contains(p.Composition.Id),
                 heroEffects != null && heroEffects.TryGetValue(p.Composition.Id, out var effect) ? effect : null))
             .ToList();
     }
 
-    private static CompositionRow Row(Composition composition, double score, bool isTarget, IReadOnlyDictionary<string, int> ownedCounts, bool isChecked = false,
-        HeroCompPick? heroEffect = null)
+    private static CompositionRow Row(Composition composition, double score, IReadOnlyDictionary<string, int> ownedCounts, bool isChecked,
+        HeroCompPick? heroEffect)
     {
         var orderKnown = composition.ReferenceBoard is { Count: > 0 };
         var cards = orderKnown
@@ -105,7 +118,7 @@ public static class CompositionRows
             return new CompositionVignette(index + 1, cardId, owned);
         }).ToList();
         var keyOwned = composition.CoreCards.Count(ownedCounts.ContainsKey);
-        return new CompositionRow(composition, score, isTarget, keyOwned, vignettes, orderKnown, isChecked, heroEffect);
+        return new CompositionRow(composition, score, keyOwned, vignettes, orderKnown, isChecked, heroEffect);
     }
 }
 

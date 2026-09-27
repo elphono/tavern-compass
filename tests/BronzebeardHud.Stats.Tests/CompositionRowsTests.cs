@@ -70,9 +70,31 @@ public class CompositionRowsTests
         var rows = CompositionRows.Build(CompAdvisor.Suggest(owned, Lobby, 3), owned);
 
         Assert.Equal(3, rows.Count);
-        Assert.All(rows, r => Assert.True(r.IsTarget));
         Assert.Equal(new[] { "hsr-beasts", "undead_butcher", "pirate_discover" }, rows.Select(r => r.Composition.Id)); // all 3.5: best placement first
         Assert.Equal(new[] { ("BG31_808", true), ("BG30_002", false), ("BG29_300", false) }, Board(rows[0]));
+    }
+
+    [Fact]
+    public void Suggestions_AreToldApartFromTheTickedTarget()
+    {
+        var owned = new[]
+        {
+            new OwnedCard("BG32_324", "UNDEAD"), new OwnedCard("BG26_817", "PIRATE"),
+            new OwnedCard("BG25_040", "MECHANICAL"), new OwnedCard("BG31_808", "BEAST"),
+        };
+        var shown = CompAdvisor.Suggest(owned, Lobby, 3);
+
+        // Nothing ticked: every row is a suggestion, and its header says so.
+        var untouched = CompositionRows.Build(shown, owned);
+        Assert.Equal(3, untouched.Count);
+        Assert.All(untouched, r => Assert.True(r.IsSuggestion && !r.IsChecked && r.Header.Contains(" · suggestion"), r.Header));
+
+        // One ticked: exactly that row is the target, the other two stay suggestions.
+        var ticked = CompositionRows.Build(shown, owned, chosen: new[] { "undead_butcher" });
+        Assert.Equal(new[] { "undead_butcher" }, ticked.Where(r => r.IsChecked).Select(r => r.Composition.Id));
+        Assert.Equal(new[] { "hsr-beasts", "pirate_discover" }, ticked.Where(r => r.IsSuggestion).Select(r => r.Composition.Id));
+        Assert.Equal("Undead Butcher · 3,8 · 1/2 key", ticked.Single(r => r.IsChecked).Header);
+        Assert.Equal("Beasts · 3,5 · 1/2 key · suggestion · order unknown", ticked.Single(r => r.Composition.Id == "hsr-beasts").Header);
     }
 
     [Fact]

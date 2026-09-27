@@ -18,15 +18,26 @@ namespace BronzebeardHud.HdtPlugin;
 /// </summary>
 internal static class CardImages
 {
+    /// <summary>Held card: green frame and a tick.</summary>
     private static readonly Brush TickBrush = new SolidColorBrush(Color.FromRgb(0x2E, 0xCC, 0x40));
+
+    /// <summary>
+    /// Card still to find: a vivid red frame, no tick. Every vignette is in full colour (Ali, 2026-09-27: no more
+    /// greyed-out cards); held and missing differ by frame colour and by the tick, so the tick alone still tells
+    /// them apart for a reader who confuses red and green.
+    /// </summary>
+    private static readonly Brush MissingBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x41, 0x36));
+
+    private static readonly Brush BadgeBrush = new SolidColorBrush(Color.FromArgb(0xE6, 0x00, 0x00, 0x00));
 
     /// <param name="placePreview">
     /// Called as the cursor enters the vignette, before HDT's own handler shows the preview (handlers of one
     /// element run in the order they were added), to set where the preview goes.
     /// </param>
     /// <param name="onClick">When given, a click on the vignette calls it with the card id (clickable while the overlay stays locked).</param>
+    /// <param name="tier">When given, a "T3" badge in the top left corner (tavern tier).</param>
     public static FrameworkElement Vignette(string cardId, bool owned, double size, double scale, double previewHeight, Action<FrameworkElement> placePreview,
-        Action<string>? onClick = null)
+        Action<string>? onClick = null, int? tier = null)
     {
         var image = new Image { Width = size, Height = size, Stretch = Stretch.UniformToFill };
         var frame = new Border
@@ -35,8 +46,8 @@ internal static class CardImages
             Height = size,
             Margin = new Thickness(0, 0, 0.08 * size, 0),
             CornerRadius = new CornerRadius(0.15 * size),
-            BorderThickness = new Thickness(2 * scale),
-            BorderBrush = owned ? TickBrush : Brushes.DimGray,
+            BorderThickness = new Thickness(3 * scale),
+            BorderBrush = owned ? TickBrush : MissingBrush,
             ClipToBounds = true,
             Child = image,
         };
@@ -78,12 +89,22 @@ internal static class CardImages
                 Child = new TextBlock { Text = "✓", FontSize = 0.3 * size, FontWeight = FontWeights.Bold, Foreground = Brushes.White },
             });
         }
-        else
+
+        if (tier is { } level)
         {
-            image.Opacity = 0.45;
+            grid.Children.Add(new Border
+            {
+                Background = BadgeBrush,
+                CornerRadius = new CornerRadius(0.1 * size),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Padding = new Thickness(2 * scale, 0, 2 * scale, 0),
+                IsHitTestVisible = false,
+                Child = new TextBlock { Text = $"T{level}", FontSize = 0.26 * size, FontWeight = FontWeights.Bold, Foreground = Brushes.White },
+            });
         }
 
-        Load(AssetDownloaders.cardPortraitDownloader, cardId, image, grey: !owned);
+        Load(AssetDownloaders.cardPortraitDownloader, cardId, image);
         return grid;
     }
 
@@ -101,7 +122,7 @@ internal static class CardImages
             if (!loaded)
             {
                 loaded = true;
-                Load(AssetDownloaders.cardImageDownloader, cardId, image, grey: false);
+                Load(AssetDownloaders.cardImageDownloader, cardId, image);
             }
         };
         return image;
@@ -110,11 +131,11 @@ internal static class CardImages
     public static Image Hero(string heroCardId, double size)
     {
         var image = new Image { Width = size, Height = size, Stretch = Stretch.UniformToFill };
-        Load(AssetDownloaders.heroImageDownloader, heroCardId, image, grey: false);
+        Load(AssetDownloaders.heroImageDownloader, heroCardId, image);
         return image;
     }
 
-    private static async void Load(AssetDownloader<HdtCard, BitmapImage>? downloader, string cardId, Image target, bool grey)
+    private static async void Load(AssetDownloader<HdtCard, BitmapImage>? downloader, string cardId, Image target)
     {
         // async void: every failure must be caught here, or it would take HDT down.
         try
@@ -131,7 +152,7 @@ internal static class CardImages
                 return;
             }
 
-            target.Source = grey ? new FormatConvertedBitmap(bitmap, PixelFormats.Gray8, null, 0) : bitmap;
+            target.Source = bitmap;
         }
         catch (Exception)
         {

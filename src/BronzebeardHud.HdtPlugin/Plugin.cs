@@ -46,6 +46,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _transitionsGuard;
     private readonly FeatureGuard _lineupsGuard;
     private readonly FeatureGuard _metaGuard;
+    private readonly FeatureGuard _compDetailGuard;
 
     // Pins made by click (Tavern Pinning): kept across a plugin reload within a game, forgotten at the next game.
     private readonly GamePins _gamePins = new();
@@ -97,6 +98,15 @@ public sealed class Plugin : IPlugin
             _pinsVersion++;
         }));
         _transitionsGuard = new FeatureGuard("comp-transitions", (n, e) => Disable(n, e, () => _shownCompStatus = "\u0000"));
+        _compDetailGuard = new FeatureGuard("comp-detail", (n, e) => Disable(n, e, () =>
+        {
+            if (_tavern != null)
+            {
+                _tavern.DetailEnabled = false;
+            }
+
+            _shownCompStatus = "\u0000";
+        }));
         _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
             if (_tavern != null)
@@ -164,6 +174,25 @@ public sealed class Plugin : IPlugin
                      $"comps=[{string.Join("; ", lineups.Compositions.Select(c => c.Label))}]");
         });
         return lineups;
+    }
+
+    /// <summary>
+    /// A composition's detail block (its ▸ in the target panel), derived from its card lists and final boards;
+    /// null if the feature failed. Tiers come from HearthDb through HDT (0 = no TECH_LEVEL, counted as unknown).
+    /// </summary>
+    private CompDetail? DetailFor(Composition composition)
+    {
+        CompDetail? detail = null;
+        _compDetailGuard.Run(() =>
+        {
+            detail = CompDetail.For(composition, id => Database.GetCardFromId(id)?.TechLevel);
+            static string Cards(IEnumerable<CompDetailCard> cards) =>
+                string.Join(",", cards.Select(c => $"{c.CardId}:T{c.TechLevel?.ToString() ?? "?"}x{c.FinalBoards}"));
+            Log.Info($"Bronzebeard HUD: comp detail id={composition.Id} boards={composition.FinalBoards.Count} " +
+                     $"enablers=[{Cards(detail.EarlyEnablers)}] commit=[{Cards(detail.CommitCards)}] " +
+                     $"turn={detail.TypicalFinalTurn?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none"}");
+        });
+        return detail;
     }
 
     /// <summary>A pin button was clicked above one of Bob's cards.</summary>
@@ -296,7 +325,7 @@ public sealed class Plugin : IPlugin
             Log.Warn($"Bronzebeard HUD: cannot read {SettingsPath}: {e.Message}");
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, LineupsFor, OpenMetaSnapshot);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, LineupsFor, OpenMetaSnapshot, DetailFor);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
