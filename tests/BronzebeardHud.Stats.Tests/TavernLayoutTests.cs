@@ -61,6 +61,27 @@ public class TavernLayoutTests
         Assert.True(panel.Width >= 7 * 0.052 * height, "seven vignettes do not fit");
     }
 
+    [Theory]
+    [InlineData(1600, 900)]
+    [InlineData(1920, 1080)]
+    [InlineData(2560, 1440)]
+    public void LineupButtons_NeverTouchAPinButton_NorACard_OnAllSevenSlots(double width, double height)
+    {
+        var pins = TavernLayout.PinButtons(width, height, 7);
+        var lineups = TavernLayout.LineupButtons(width, height, 7);
+        var slots = TavernLayout.CardSlots(width, height, 7);
+
+        Assert.Equal(7, lineups.Count);
+        for (var i = 0; i < 7; i++)
+        {
+            for (var j = 0; j < 7; j++)
+            {
+                Assert.False(NoGoZones.Overlaps(lineups[i], pins[j]), $"{height}: lineup button {i} touches pin button {j}");
+                Assert.False(NoGoZones.Overlaps(lineups[i], slots[j]), $"{height}: lineup button {i} covers card {j}");
+            }
+        }
+    }
+
     [Fact]
     public void NothingToLayOut_IsEmpty()
     {

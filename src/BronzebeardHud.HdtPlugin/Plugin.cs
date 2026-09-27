@@ -49,6 +49,9 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _compDetailGuard;
     private readonly FeatureGuard _skipCombatGuard;
 
+    // "How top boards field it", opened by the "?" above one of Bob's minions.
+    private LineupsPanel? _lineupsPanel;
+
     // The "Skip combat" button: shown in combat, acts once per combat (SkipCombatState).
     private SkipCombatPanel? _skipCombat;
     private readonly SkipCombatState _skipState = new();
@@ -103,6 +106,7 @@ public sealed class Plugin : IPlugin
                 _tavern.LineupsEnabled = false;
             }
 
+            _lineupsPanel?.Hide();
             _pinsVersion++;
         }));
         _transitionsGuard = new FeatureGuard("comp-transitions", (n, e) => Disable(n, e, () => _shownCompStatus = "\u0000"));
@@ -323,6 +327,15 @@ public sealed class Plugin : IPlugin
         }
     });
 
+    /// <summary>The "?" above one of Bob's minions: its own panel shows how top boards field that minion.</summary>
+    private void OpenLineups(string cardId)
+    {
+        if (_lineupsPanel != null && LineupsFor(cardId) is { } lineups)
+        {
+            _lineupsGuard.Run(() => _lineupsPanel.Show(lineups, _lastCards.All.Select(c => c.CardId)));
+        }
+    }
+
     /// <summary>A pin button was clicked above one of Bob's cards.</summary>
     private void TogglePin(string cardId) => _pinsGuard.Run(() =>
     {
@@ -453,7 +466,8 @@ public sealed class Plugin : IPlugin
             Log.Warn($"Bronzebeard HUD: cannot read {SettingsPath}: {e.Message}");
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, LineupsFor, OpenMetaSnapshot, DetailFor);
+        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, OpenLineups, OpenMetaSnapshot, DetailFor);
+        _lineupsPanel = new LineupsPanel(Core.OverlayCanvas, _mover); // added after the target panel: drawn over it
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
@@ -497,6 +511,8 @@ public sealed class Plugin : IPlugin
         _history = null;
         _skipCombat?.Detach();
         _skipCombat = null;
+        _lineupsPanel?.Detach();
+        _lineupsPanel = null;
         _panel = null;
         _tavern = null;
         _stats?.Dispose();
@@ -822,6 +838,7 @@ public sealed class Plugin : IPlugin
         {
             _tavernKey = string.Empty;
             _tavern.HideMarkers();
+            _lineupsPanel?.Hide(); // about Bob's minions: gone with the shop
         }
 
         if (!_compPanel.PanelVisible)

@@ -22,10 +22,9 @@ internal sealed class TavernAdvicePanel
     private readonly Action<string> _toggle;
     private readonly Func<int> _suggested;
     private readonly Action<string> _togglePin;
-    private readonly Func<string, MinionLineups?> _lineupsFor;
+    private readonly Action<string> _openLineups;
     private readonly Action _openMeta;
     private readonly Func<Composition, CompDetail?> _detailFor;
-    private MinionLineups? _lineups;
 
     // The one composition whose detail block is open (its ▸ was clicked), and that detail; null when none.
     private CompDetail? _expanded;
@@ -50,14 +49,15 @@ internal sealed class TavernAdvicePanel
     /// <param name="suggested">How many suggestions the panel shows (settings.json).</param>
     /// <param name="changeSuggested">Called with −1 or +1 when the − or + of the panel is clicked.</param>
     /// <param name="togglePin">Called with a card id when its pin button is clicked.</param>
+    /// <param name="openLineups">Called with a card id when the "?" above one of Bob's minions is clicked (LineupsPanel).</param>
     /// <param name="detailFor">The detail block of a composition, computed when its ▸ is clicked; null if that feature failed.</param>
     public TavernAdvicePanel(Canvas canvas, PanelMover mover, CompositionSelection selection, Action<string> toggle, Func<int> suggested, Action<int> changeSuggested,
-        Action<string> togglePin, Func<string, MinionLineups?> lineupsFor, Action openMeta, Func<Composition, CompDetail?> detailFor)
+        Action<string> togglePin, Action<string> openLineups, Action openMeta, Func<Composition, CompDetail?> detailFor)
     {
         _detailFor = detailFor;
         _openMeta = openMeta;
         _togglePin = togglePin;
-        _lineupsFor = lineupsFor;
+        _openLineups = openLineups;
         _suggested = suggested;
         _changeSuggested = changeSuggested;
         _canvas = canvas;
@@ -82,7 +82,7 @@ internal sealed class TavernAdvicePanel
     /// <summary>When false, no "Meta" button (the meta-snapshot feature was switched off by its guard).</summary>
     public bool MetaEnabled { get; set; } = true;
 
-    /// <summary>When false, no "?" buttons nor clickable vignettes (the lineups feature was switched off by its guard).</summary>
+    /// <summary>When false, no "?" buttons above Bob's minions (the lineups feature was switched off by its guard).</summary>
     public bool LineupsEnabled { get; set; } = true;
 
     /// <summary>When false, no ▸ buttons and no detail block (the comp-detail feature was switched off by its guard).</summary>
@@ -95,18 +95,6 @@ internal sealed class TavernAdvicePanel
     private void ToggleDetail(Composition composition)
     {
         _expanded = _expanded?.Composition.Id == composition.Id ? null : _detailFor(composition);
-        RelayoutPanel();
-    }
-
-    /// <summary>The panel shows how top players field this minion, until its × is clicked.</summary>
-    public void ShowLineups(string cardId)
-    {
-        if (!LineupsEnabled || _lineupsFor(cardId) is not { } lineups)
-        {
-            return;
-        }
-
-        _lineups = lineups;
         RelayoutPanel();
     }
 
@@ -342,7 +330,7 @@ internal sealed class TavernAdvicePanel
                 ask.MouseLeftButtonUp += (_, e) =>
                 {
                     e.Handled = true;
-                    ShowLineups(cardId);
+                    _openLineups(cardId);
                 };
                 Canvas.SetLeft(ask, lineupButtons[i].Left);
                 Canvas.SetTop(ask, lineupButtons[i].Top);
@@ -378,49 +366,6 @@ internal sealed class TavernAdvicePanel
         };
         OverlayExtensions.SetIsOverlayHitTestVisible(button, true);
         return button;
-    }
-
-    /// <summary>
-    /// The lineup view: the minion's usual position, then for each composition that fields it its label and
-    /// its best final board (the minion framed), with the MMR and turn it was reached at; × goes back.
-    /// </summary>
-    private void AddLineups(StackPanel lines, MinionLineups lineups, double vignette, double scale, double height)
-    {
-        var name = Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(lineups.CardId)?.LocalizedName ?? lineups.CardId;
-        var header = new DockPanel { Margin = new Thickness(0, 4 * scale, 0, 2 * scale) };
-        var close = RoundButton("×", new LayoutRect(0, 0, 20 * scale, 20 * scale), scale, filled: false);
-        close.MouseLeftButtonUp += (_, e) =>
-        {
-            e.Handled = true;
-            _lineups = null;
-            RelayoutPanel();
-        };
-        DockPanel.SetDock(close, Dock.Right);
-        header.Children.Add(close);
-        header.Children.Add(new TextBlock { Text = $"{name}: how top boards field it", FontSize = 13 * scale, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap });
-        lines.Children.Add(header);
-        lines.Children.Add(new TextBlock { Text = lineups.Headline, FontSize = 12 * scale, Foreground = Brushes.LightGray, TextWrapping = TextWrapping.Wrap });
-        foreach (var lineup in lineups.Compositions)
-        {
-            lines.Children.Add(new TextBlock { Text = lineup.Label, FontSize = 12 * scale, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4 * scale, 0, 2 * scale) });
-            var best = lineup.Boards[0];
-            var board = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var cardId in best.Cards)
-            {
-                var cell = CardImages.Vignette(cardId, _owned.Contains(CardIds.Normalize(cardId)), vignette * 0.8, scale, TavernLayout.PreviewHeight * height, PlacePreview);
-                board.Children.Add(CardIds.Normalize(cardId) == lineups.CardId
-                    ? new Border { BorderBrush = Brushes.White, BorderThickness = new Thickness(2.5 * scale), CornerRadius = new CornerRadius(4 * scale), Child = cell }
-                    : cell);
-            }
-
-            lines.Children.Add(board);
-            lines.Children.Add(new TextBlock
-            {
-                Text = $"MMR {best.Mmr.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"))}" + (best.Turn is { } turn ? $" · turn {turn}" : string.Empty),
-                FontSize = 10 * scale,
-                Foreground = Brushes.LightGray,
-            });
-        }
     }
 
     private Border StepButton(string text, int step, double scale)
@@ -537,34 +482,8 @@ internal sealed class TavernAdvicePanel
         };
     }
 
-    /// <summary>
-    /// Beside the panel wherever it was moved, inside the window (TavernLayout.PreviewRect), handed to HDT's
-    /// tooltip as a placement and offsets (TavernLayout.HdtTooltipOffsets).
-    /// </summary>
-    private void PlacePreview(FrameworkElement vignette)
-    {
-        if (_canvas.ActualWidth <= 0 || double.IsNaN(Canvas.GetLeft(_targets)) || double.IsNaN(Canvas.GetTop(_targets)))
-        {
-            return;
-        }
-
-        // Bounds as drawn: the panel's content may be shrunk to fit the window, and HDT measures the scaled size.
-        var bounds = vignette.TransformToAncestor(_canvas).TransformBounds(new Rect(0, 0, vignette.ActualWidth, vignette.ActualHeight));
-        var target = new LayoutRect(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2, bounds.Width, bounds.Height);
-        var panel = new LayoutRect(Canvas.GetLeft(_targets) + _targets.ActualWidth / 2, Canvas.GetTop(_targets) + _targets.ActualHeight / 2,
-            _targets.ActualWidth, _targets.ActualHeight);
-        var (side, preview) = TavernLayout.PreviewRect(panel, target, _canvas.ActualWidth, _canvas.ActualHeight);
-        var (offsetX, offsetY) = TavernLayout.HdtTooltipOffsets(side, preview, target);
-        ToolTipService.SetPlacement(vignette, side switch
-        {
-            PreviewSide.Left => System.Windows.Controls.Primitives.PlacementMode.Left,
-            PreviewSide.Right => System.Windows.Controls.Primitives.PlacementMode.Right,
-            PreviewSide.Above => System.Windows.Controls.Primitives.PlacementMode.Top,
-            _ => System.Windows.Controls.Primitives.PlacementMode.Bottom,
-        });
-        ToolTipService.SetHorizontalOffset(vignette, offsetX);
-        ToolTipService.SetVerticalOffset(vignette, offsetY);
-    }
+    /// <summary>The whole-card preview beside this panel (PreviewPlacer).</summary>
+    private void PlacePreview(FrameworkElement vignette) => PreviewPlacer.Place(_canvas, _targets, vignette);
 
     /// <summary>When false, the panel draws no boxes (the selection feature was switched off by its guard).</summary>
     public bool SelectionEnabled { get; set; } = true;
@@ -632,11 +551,7 @@ internal sealed class TavernAdvicePanel
         title.Children.Add(count);
         title.Children.Add(new TextBlock { Text = "Target compositions", FontSize = 12 * scale, Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
         lines.Children.Add(title);
-        if (_lineups != null)
-        {
-            AddLineups(lines, _lineups, vignette, scale, height);
-        }
-        else if (_rows.Count == 0)
+        if (_rows.Count == 0)
         {
             lines.Children.Add(new TextBlock { Text = "No composition reachable yet", FontSize = 12 * scale, Foreground = Brushes.LightGray, Margin = new Thickness(0, 4 * scale, 0, 0) });
         }
@@ -646,7 +561,7 @@ internal sealed class TavernAdvicePanel
             _expanded = null; // its composition is no longer shown
         }
 
-        foreach (var row in _lineups == null ? _rows : Array.Empty<CompositionRow>())
+        foreach (var row in _rows)
         {
             var colour = _selection.ColourOf(row.Composition.Id) is { } hex ? Brush(hex) : null;
             var open = DetailEnabled && _expanded?.Composition.Id == row.Composition.Id;
@@ -686,8 +601,7 @@ internal sealed class TavernAdvicePanel
             var board = new StackPanel { Orientation = Orientation.Horizontal };
             foreach (var card in row.Vignettes)
             {
-                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale, TavernLayout.PreviewHeight * height, PlacePreview,
-                    LineupsEnabled ? ShowLineups : null));
+                board.Children.Add(CardImages.Vignette(card.CardId, card.Owned, vignette, scale, TavernLayout.PreviewHeight * height, PlacePreview));
             }
 
             // A ticked composition's colour also runs down the left of its board.

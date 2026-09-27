@@ -207,4 +207,12 @@ public static class TavernLayout
         var top = PlayerRowBottom(height) + 0.012 * height;
         return new LayoutRect(right - panelWidth / 2, top + panelHeight / 2, panelWidth, panelHeight);
     }
+
+    /// <summary>
+    /// The "how top boards field it" panel's default place: over the target composition panel's default place,
+    /// the one area the plugin already takes below the boards. It opens on a click and closes on its × or when
+    /// the shop ends, so covering the target panel for that time hides nothing of the game. It can be moved
+    /// (PanelLayout, id "lineups").
+    /// </summary>
+    public static LayoutRect LineupsPanel(double width, double height) => TargetPanel(width, height);
 }

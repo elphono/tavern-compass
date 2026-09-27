@@ -127,6 +127,8 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 - Détail d'une compo : son bouton ▸ déplie sous sa ligne un bloc (un seul à la fois) — enablers de tier
   ≤ 3, pièces clés, tour final médian — **dérivé** des cartes et plateaux finaux par `CompDetail`, car
   aucune source n'a de donnée early game ; vignettes en couleur, cadre vert + ✓ tenue, rouge manquante.
+- « Comment les tops le jouent » : le bouton ? au-dessus de chaque sbire de Bob (à droite du ◇) ouvre un
+  panneau à part, déplaçable (`lineups`), par défaut sur celui des compos ; fermé par son × ou en fin de taverne.
 - Bouton « Skip combat » (jaune, en combat seulement, panneau déplaçable `skip-combat`) : tue Hearthstone
   et le relance, la reconnexion sautant l'animation ; un clic par combat, ligne `Bronzebeard HUD: skip combat …`.
 - Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
