@@ -56,7 +56,7 @@ Ce qui reste ouvert :
 | Sujet | Décision (Ali, 2026-09-26) |
 |---|---|
 | Stack | plugin HDT, option 3 de l'étude ; HDT lit la mémoire, le plugin jamais |
-| Stats Firestone | **accord de l'auteur de Firestone** pour récupérer ses JSON publics nous-mêmes (`static.zerotoheroes.com`), cache local, rafraîchissement modeste |
+| Stats Firestone | **accord de l'auteur de Firestone**, étendu le 2026-09-27 à **toutes ses données publiques**, pour tous nos usages, pas seulement les JSON de stats (`static.zerotoheroes.com`) : aussi card-stats, battlegrounds-strategies, perfect-games, card-rules ; cache local, rafraîchissement modeste. Inchangé : aucune donnée réelle dans le dépôt, tests sur données synthétiques |
 | Stats HSReplay | usage local accepté, mais le site renvoie un challenge Cloudflare : **on ne contourne pas** une protection anti-bot ; import semi-manuel depuis le navigateur (spec § 6) |
 | Simulateur npm `simulate-bgs-battle` | usage personnel, autorisé ; inutile tant que Bob's Buddy (HDT) fait le travail |
 | MMR des adversaires | gardé tel quel. Le leaderboard EU s'arrête à 8 000 ; Ali est à ≈ 6 840 (région EU mesurée) ; plage par défaut 8 000 – 8 050 |
