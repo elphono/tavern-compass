@@ -67,22 +67,6 @@ internal static class HdtEntityAdapter
         }
     }
 
-    /// <summary>The player's NEXT_OPPONENT_PLAYER_ID, read where HDT reads it: on the player entity.</summary>
-    public static int NextOpponentPlayerId(GameV2 game) => game.PlayerEntity?.GetTag(GameTag.NEXT_OPPONENT_PLAYER_ID) ?? 0;
-
-    /// <summary>Every hero entity of the game.</summary>
-    public static IReadOnlyList<EntitySnapshot> Heroes(GameV2 game)
-    {
-        try
-        {
-            return game.Entities.Values.Where(e => e.IsHero).Select(ToSnapshot).ToList();
-        }
-        catch (InvalidOperationException)
-        {
-            return Array.Empty<EntitySnapshot>();
-        }
-    }
-
     /// <summary>The phase the tavern overlay cares about.</summary>
     public static OverlayPhase Phase(GameV2 game)
     {

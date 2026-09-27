@@ -35,7 +35,7 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 | 1 | squelette du plugin, stats Firestone des héros proposés | ✓ | ✓ |
 | 2 | tranche de MMR, MMR des adversaires, **conseiller de compositions** | ✓ | ✓ compos et marqueurs de taverne |
 | 3 | tribus du lobby, trinkets, épinglage | ✓ | partiel |
-| 4 | historique des combats, graphe des PV, plateaux d'inspiration | ✓ | ✓ panneau Combats (refondu après retours) |
+| 4 | historique des combats, graphe des PV, plateaux d'inspiration | ✓ puis **retiré le 2026-09-27** (Ali : « l'onglet combat est inutile ») | — |
 | 5 | top 4 des héros, plateau vs courbe du héros, compo par héros, bilan par adversaire | ✓ | ✗ |
 | 6 | affinité compo ↔ héros, nombre de compos réglable, épinglage au clic, pivots, « comment les tops le jouent », bouton Meta | ✓ | ✗ |
 
@@ -113,11 +113,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   si ce téléchargement échoue, la ligne `Bronzebeard HUD: tavern …` du journal d'HDT dit pourquoi
   (`comps=0 (cache: schema 3 ≠ 4, redownload failed: …)`). On ne supprime jamais le cache à la main. Le
   cache des compositions est du JSON compact (≈ 77 Ko sur last-patch).
-- Panneaux déplaçables (compos visées, combats) : menu Plugins d'HDT › Bronzebeard HUD › « Move panels »
+- Panneaux déplaçables (compos visées, lineups, Skip combat) : menu Plugins d'HDT › Bronzebeard HUD › « Move panels »
   (ou le bouton du plugin dans les options). Hors de ce mode, rien n'est cliquable au-dessus du jeu. Les
   positions sont gardées dans `%LocalAppData%\BronzebeardHud\layout.json`, en fractions de la taille de
-  l'overlay : `{"schema": 1, "panels": {"combats": {"left": 0.70, "top": 0.05}}}`. Un fichier illisible
+  l'overlay : `{"schema": 1, "panels": {"lineups": {"left": 0.76, "top": 0.07}}}`. Un fichier illisible
   donne la disposition par défaut (message dans le journal d'HDT) ; « Reset panel positions » la rétablit.
+  Une entrée d'un panneau qui n'existe plus (celui des combats, retiré) est ignorée sans message.
   Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
 - Panneau des compos, overlay verrouillé : une ligne par compo — case, nom et place moyenne, sept ovales
   (cerclés de vert + ✓ si tenus, de rouge sinon) ; survoler un ovale montre la carte entière, et la case

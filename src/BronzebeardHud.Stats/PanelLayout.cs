@@ -18,6 +18,13 @@ public sealed class PanelLayout
 {
     public const int CurrentSchema = 1;
 
+    /// <summary>
+    /// The movable panels that exist. An entry for any other name in the file is ignored without a word: the
+    /// combats panel, removed on 2026-09-27 (Ali: "l'onglet combat est inutile"), may still sit in an existing
+    /// layout.json, and it must neither break the others nor raise a warning. It disappears at the next save.
+    /// </summary>
+    public static readonly IReadOnlyCollection<string> KnownPanels = new[] { "target-compositions", "lineups", "skip-combat" };
+
     private readonly Dictionary<string, (double Left, double Top)> _positions;
 
     private PanelLayout(Dictionary<string, (double Left, double Top)> positions) => _positions = positions;
@@ -50,6 +57,11 @@ public sealed class PanelLayout
             var positions = new Dictionary<string, (double, double)>(StringComparer.Ordinal);
             foreach (var panel in panels.Properties())
             {
+                if (!KnownPanels.Contains(panel.Name))
+                {
+                    continue; // a panel that no longer exists (see KnownPanels): ignored, never reported
+                }
+
                 if (panel.Value is not JObject position
                     || position["left"]?.Type is not (JTokenType.Float or JTokenType.Integer)
                     || position["top"]?.Type is not (JTokenType.Float or JTokenType.Integer))

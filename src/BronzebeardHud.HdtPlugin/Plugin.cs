@@ -27,16 +27,12 @@ public sealed class Plugin : IPlugin
     private TavernAdvicePanel? _tavern;
     private OpponentMmrPanel? _opponentMmr;
     private ChoiceAdvicePanel? _choices;
-    private GameHistoryPanel? _history;
-    private readonly GameTimeline _timeline = new();
-    private int _historyKey = -1;
 
     // One guard per feature: an unexpected exception disables that feature alone (see FeatureGuard).
     private readonly FeatureGuard _heroSelectionGuard;
     private readonly FeatureGuard _tavernGuard;
     private readonly FeatureGuard _opponentMmrGuard;
     private readonly FeatureGuard _choiceGuard;
-    private readonly FeatureGuard _historyGuard;
     private readonly FeatureGuard _selectionGuard;
     private readonly FeatureGuard _warbandGuard;
     private readonly FeatureGuard _heroCompsGuard;
@@ -82,7 +78,6 @@ public sealed class Plugin : IPlugin
         _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
         // Replaces "trinket-choice": trinkets are now one kind of choice among discovers and Dark Gifts.
         _choiceGuard = new FeatureGuard("discover-advice", (n, e) => Disable(n, e, () => _choices?.Hide()));
-        _historyGuard = new FeatureGuard("history", (n, e) => Disable(n, e, () => _history?.Hide()));
         _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _tavern?.SetFooter(null)));
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
@@ -475,7 +470,6 @@ public sealed class Plugin : IPlugin
         _lineupsPanel = new LineupsPanel(Core.OverlayCanvas, _mover); // added after the target panel: drawn over it
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
-        _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
         _skipCombat = new SkipCombatPanel(Core.OverlayCanvas, _mover, SkipCombat);
     }
 
@@ -488,7 +482,6 @@ public sealed class Plugin : IPlugin
         _choiceKey = string.Empty;
         _loggedChoice = string.Empty;
         _opponentKey = string.Empty;
-        _historyKey = -1;
         _rowTracker = new TavernRowTracker();
         _warbandLine = null;
         _warbandRound = -1;
@@ -512,8 +505,6 @@ public sealed class Plugin : IPlugin
         _choices?.Detach();
         _choices?.Dispose();
         _choices = null;
-        _history?.Detach();
-        _history = null;
         _skipCombat?.Detach();
         _skipCombat = null;
         _lineupsPanel?.Detach();
@@ -540,7 +531,6 @@ public sealed class Plugin : IPlugin
         _tavernGuard.Run(() => UpdateTavern(game));
         _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
         _choiceGuard.Run(() => UpdateChoice(game));
-        _historyGuard.Run(() => UpdateHistory(game));
         _warbandGuard.Run(() => UpdateWarband(game));
         _skipCombatGuard.Run(() => UpdateSkipCombat(game));
     }
@@ -584,32 +574,6 @@ public sealed class Plugin : IPlugin
         _warbandRound = round;
         _warbandLine = comparison.Line;
         _tavern.SetFooter(comparison.Line);
-    }
-
-    private void UpdateHistory(GameV2 game)
-    {
-        if (_history == null || !game.IsBattlegroundsMatch || !game.IsBattlegroundsHeroPickingDone)
-        {
-            _history?.Hide();
-            return;
-        }
-
-        var heroes = HeroHealth.InGame(HdtEntityAdapter.Heroes(game));
-        var nextOpponent = HdtEntityAdapter.NextOpponentPlayerId(game);
-        _timeline.Observe(game.GetTurnNumber(), game.IsBattlegroundsCombatPhase, game.Player.Id, nextOpponent, heroes);
-        if (!game.IsBattlegroundsCombatPhase)
-        {
-            _historyKey = -1;
-            _history.Hide();
-            return;
-        }
-
-        var key = _timeline.Combats.Count * 1000 + _timeline.HealthByPlayer.Sum(c => c.Value.Count) + heroes.Sum(h => h.Health) * 7;
-        if (key != _historyKey)
-        {
-            _historyKey = key;
-            _history.Show(_timeline, heroes, game.Player.Id, nextOpponent);
-        }
     }
 
     /// <summary>
@@ -713,7 +677,6 @@ public sealed class Plugin : IPlugin
             _gamePins.BeginGame(_gameNumber);
             _selectionVersion++;
             _rowTracker = new TavernRowTracker();
-            _timeline.Reset();
             _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
         }
 

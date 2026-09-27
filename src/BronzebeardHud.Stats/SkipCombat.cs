@@ -68,8 +68,8 @@ public static class SkipCombatPlan
 /// <summary>
 /// The "Skip combat" button's default place: in combat, at the right end of the player's board row, inside
 /// Hearthstone's 4:3 frame and right of seven minions (a board card every 138 design units, TavernLayout),
-/// over the board's decoration; above the target composition panel (TavernLayout.TargetPanel) and well below
-/// the combats panel (HistoryLayout). It can be moved (PanelLayout, id "skip-combat").
+/// over the board's decoration; above the target composition panel (TavernLayout.TargetPanel). It can be moved
+/// (PanelLayout, id "skip-combat").
 /// </summary>
 public static class SkipCombatLayout
 {

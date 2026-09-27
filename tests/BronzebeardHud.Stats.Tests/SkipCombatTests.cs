@@ -57,7 +57,7 @@ public class SkipCombatTests
     [InlineData(1440, 1080)]
     [InlineData(2560, 1440)]
     [InlineData(3440, 1440)]
-    public void DefaultPlace_RightOfSevenMinions_InsideTheFrame_ClearOfThePluginPanels(double width, double height)
+    public void DefaultPlace_RightOfSevenMinions_InsideTheFrame_ClearOfTheTargetPanel(double width, double height)
     {
         var button = SkipCombatLayout.Button(width, height);
         var s = TavernLayout.Scale(height);
@@ -68,7 +68,5 @@ public class SkipCombatTests
 
         var targets = TavernLayout.TargetPanel(width, height);
         Assert.True(button.Top + button.Height < targets.Top, "above the target composition panel");
-        var combats = HistoryLayout.Panel(width, height);
-        Assert.True(button.Top > combats.Top + combats.Height, "below the combats panel");
     }
 }
