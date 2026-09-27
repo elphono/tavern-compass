@@ -119,7 +119,7 @@ internal sealed class ChoiceAdvicePanel : IDisposable
         var width = _canvas.ActualWidth;
         var height = _canvas.ActualHeight;
         var scale = TavernLayout.Scale(height);
-        var fontSize = TavernLayout.MarkerFontSize * scale;
+        var fontSize = PanelTypography.Px(PanelTypography.Marker, height);
         var cardWidth = ChoiceLayout.Cards(advice.Kind, advice.Options.Count, width, height).FirstOrDefault().Width;
         var maxChars = MarkerText.MaxChars(cardWidth, fontSize, TavernLayout.MarkerPadding * scale);
         var lines = advice.Options.Select(o => ChoiceAdvisor.Lines(o, maxChars, TrinketStatsLoaded)).ToList();
@@ -134,7 +134,7 @@ internal sealed class ChoiceAdvicePanel : IDisposable
                 : option.Effects.Count == 0 ? NeutralBrush
                 : TavernAdvicePanel.Brush(_selection.MarkerColour(option.Effects.Select(e => e.Composition.Id)));
             var foreground = background == TrinketBrush || background == NeutralBrush ? Brushes.White : Brushes.Black;
-            var text = new StackPanel();
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             foreach (var line in lines[i])
             {
                 text.Children.Add(new TextBlock
@@ -157,8 +157,8 @@ internal sealed class ChoiceAdvicePanel : IDisposable
                 CornerRadius = new CornerRadius(5 * scale),
                 Padding = new Thickness(TavernLayout.MarkerPadding * scale, 0, TavernLayout.MarkerPadding * scale, 0),
                 IsHitTestVisible = false,
-                // Safety net: if the glyph-width estimate is ever short, shrink rather than clip.
-                Child = new Viewbox { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, Child = text },
+                // The lines were cut to fit (MarkerText, generous glyph width): drawn at their size, never shrunk.
+                Child = text,
             };
             Canvas.SetLeft(label, rects[i].Left);
             Canvas.SetTop(label, rects[i].Top);

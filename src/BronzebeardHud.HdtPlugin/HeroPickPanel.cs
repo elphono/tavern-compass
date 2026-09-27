@@ -47,7 +47,6 @@ internal sealed class HeroPickPanel
             {
                 Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F)),
-                BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(6),
                 IsHitTestVisible = false,
                 Tag = row,
@@ -108,14 +107,10 @@ internal sealed class HeroPickPanel
             var rect = rects[i];
             badge.Width = rect.Width;
             badge.Height = rect.Height;
-            badge.Padding = new Thickness(4 * scale, 2 * scale, 4 * scale, 2 * scale);
+            badge.BorderThickness = new Thickness(HeroPickLayout.BadgeBorder * scale);
+            badge.Padding = new Thickness(HeroPickLayout.BadgePaddingX * scale, HeroPickLayout.BadgePaddingY * scale, HeroPickLayout.BadgePaddingX * scale, HeroPickLayout.BadgePaddingY * scale);
             var row = (HeroPickRow)badge.Tag;
-            badge.Child = new Viewbox
-            {
-                Stretch = Stretch.Uniform,
-                StretchDirection = StretchDirection.DownOnly,
-                Child = BuildContent(row, scale, _compLines.TryGetValue(row.Hero.EntityId, out var compLine) ? compLine : null),
-            };
+            badge.Child = BuildContent(row, scale, _compLines.TryGetValue(row.Hero.EntityId, out var compLine) ? compLine : null);
             Canvas.SetLeft(badge, rect.Left);
             Canvas.SetTop(badge, rect.Top);
             badge.Visibility = Visibility.Visible;
@@ -128,74 +123,84 @@ internal sealed class HeroPickPanel
         }
 
         var status = HeroPickLayout.Status(width, height, rects);
-        _status.FontSize = 12 * scale;
+        _status.FontSize = PanelTypography.Small * scale;
         _status.Width = status.Width;
         Canvas.SetLeft(_status, status.Left);
         Canvas.SetTop(_status, status.Top);
         _status.Visibility = Visibility.Visible;
     }
 
+    /// <summary>
+    /// The badge's lines at their own size (<see cref="PanelTypography"/>, 12 px at least in 1080p): one per source
+    /// (two at most), the odds under the first, then the comp line, wrapped. What does not fit the badge is left
+    /// out (<see cref="HeroPickLayout.ItemsThatFit"/>), never shrunk.
+    /// </summary>
     private static UIElement BuildContent(HeroPickRow row, double scale, string? compLine)
     {
-        var lines = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        var items = new List<(double Height, UIElement[] Lines)>();
         if (!row.HasData)
         {
-            lines.Children.Add(Text("no data", 14 * scale, Brushes.LightGray));
-            AddCompLine(lines, compLine, scale);
-            return lines;
+            items.Add((HeroPickLayout.NoDataLine, new UIElement[] { Line("no data", PanelTypography.HeroNoData, HeroPickLayout.NoDataLine, scale, Brushes.LightGray) }));
         }
-
-        // One compact line per source (two at most, the plate is small), and under the first source its
-        // top-4 and first-place shares: MMR is won in the top 4.
-        foreach (var (figures, index) in row.Figures.Take(2).Select((f, i) => (f, i)))
+        else
         {
-            var line = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-            line.Children.Add(Text(figures.Tier ?? "–", 22 * scale, TierBrush(figures.Tier), FontWeights.Bold));
-            var detail = figures.AveragePlacement.ToString("0.00", CultureInfo.InvariantCulture);
-            if (figures.PickRate is { } pickRate)
+            // One compact line per source, and under the first source its top-4 and first-place shares: MMR is
+            // won in the top 4.
+            foreach (var (figures, index) in row.Figures.Take(2).Select((f, i) => (f, i)))
             {
-                detail += $" · {(pickRate * 100).ToString("0", CultureInfo.InvariantCulture)}%";
-            }
+                var line = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Height = HeroPickLayout.SourceLine * scale };
+                line.Children.Add(Line(figures.Tier ?? "–", PanelTypography.HeroTier, HeroPickLayout.SourceLine, scale, TierBrush(figures.Tier), FontWeights.Bold));
+                var detail = figures.AveragePlacement.ToString("0.00", CultureInfo.InvariantCulture);
+                if (figures.PickRate is { } pickRate)
+                {
+                    detail += $" · {(pickRate * 100).ToString("0", CultureInfo.InvariantCulture)}%";
+                }
 
-            var bracket = figures.MmrPercentile is { } percentile && percentile < MmrBracket.EveryPlayer ? $" {percentile}%" : string.Empty;
-            var label = Text($" {detail} {SourceLabel(figures.Source)}{bracket}", 13 * scale, Brushes.White);
-            label.VerticalAlignment = VerticalAlignment.Center;
-            line.Children.Add(label);
-            lines.Children.Add(line);
-            if (index == 0 && figures.OddsText is { } odds)
-            {
-                var oddsLine = Text(odds, 13 * scale, Brushes.LightGray);
-                oddsLine.HorizontalAlignment = HorizontalAlignment.Center;
-                lines.Children.Add(oddsLine);
+                var bracket = figures.MmrPercentile is { } percentile && percentile < MmrBracket.EveryPlayer ? $" {percentile}%" : string.Empty;
+                var label = Line($" {detail} {SourceLabel(figures.Source)}{bracket}", PanelTypography.Body, HeroPickLayout.BodyLine, scale, Brushes.White);
+                label.VerticalAlignment = VerticalAlignment.Center;
+                line.Children.Add(label);
+                items.Add((HeroPickLayout.SourceLine, new UIElement[] { line }));
+                if (index == 0 && figures.OddsText is { } odds)
+                {
+                    items.Add((HeroPickLayout.BodyLine, new UIElement[] { Line(odds, PanelTypography.Body, HeroPickLayout.BodyLine, scale, Brushes.LightGray) }));
+                }
             }
         }
 
-        AddCompLine(lines, compLine, scale);
+        var maxChars = MarkerText.MaxChars(HeroPickLayout.ContentWidth, PanelTypography.Small, 0);
+        if (compLine != null && HeroPickLayout.Wrap(compLine, maxChars) is { Count: > 0 } wrapped)
+        {
+            items.Add((wrapped.Count * HeroPickLayout.SmallLine, wrapped.Select(l => (UIElement)Line(l, PanelTypography.Small, HeroPickLayout.SmallLine, scale, Brushes.White)).ToArray()));
+        }
+
+        var lines = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        foreach (var index in HeroPickLayout.ItemsThatFit(items.Select(i => i.Height).ToList(), HeroPickLayout.ContentHeight))
+        {
+            foreach (var line in items[index].Lines)
+            {
+                lines.Children.Add(line);
+            }
+        }
+
         return lines;
     }
 
-    private static void AddCompLine(StackPanel lines, string? compLine, double scale)
-    {
-        if (compLine == null)
-        {
-            return;
-        }
-
-        var text = Text(compLine, 12 * scale, Brushes.White);
-        text.HorizontalAlignment = HorizontalAlignment.Center;
-        lines.Children.Add(text);
-    }
-
-    private static string SourceLabel(string source) => source == StatsSources.HsReplayManual ? "HSR" : "FS";
-
-    private static TextBlock Text(string text, double size, Brush brush, FontWeight? weight = null) => new()
+    /// <summary>One line of text, exactly <paramref name="lineHeight"/> design pixels tall, centred.</summary>
+    private static TextBlock Line(string text, double size, double lineHeight, double scale, Brush brush, FontWeight? weight = null) => new()
     {
         Text = text,
-        FontSize = size,
+        FontSize = size * scale,
+        LineHeight = lineHeight * scale,
+        LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
         Foreground = brush,
         FontWeight = weight ?? FontWeights.Normal,
+        HorizontalAlignment = HorizontalAlignment.Center,
+        TextAlignment = TextAlignment.Center,
         IsHitTestVisible = false,
     };
+
+    private static string SourceLabel(string source) => source == StatsSources.HsReplayManual ? "HSR" : "FS";
 
     private static Brush TierBrush(string? tier) => tier switch
     {

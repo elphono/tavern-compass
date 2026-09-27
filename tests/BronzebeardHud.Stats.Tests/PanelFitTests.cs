@@ -12,6 +12,52 @@ public class PanelFitTests
         Assert.Equal(12, PanelTypography.Px(PanelTypography.Floor, 1080), precision: 9);
     }
 
+    [Fact]
+    public void Floor_TheHeroBadgesTheMmrLabelsAndTheChoiceMarkers_UseTheSizesOfTheFloor()
+    {
+        var sizes = new[] { PanelTypography.HeroTier, PanelTypography.HeroNoData, PanelTypography.Body, PanelTypography.Small, PanelTypography.Marker };
+
+        Assert.All(sizes, size => Assert.Contains(size, PanelTypography.All));
+        Assert.All(sizes, size => Assert.True(PanelTypography.Px(size, 1080) >= 12, $"{size} px at 1080p"));
+    }
+
+    /// <summary>
+    /// The plugin never shrinks text to make it fit (no Viewbox) and takes every font size from PanelTypography
+    /// (no FontSize written as a number): the floor holds only if nothing gets around it. Reads the plugin's sources,
+    /// which the test project does not compile (the plugin targets net48 and HDT).
+    /// </summary>
+    [Fact]
+    public void Floor_PluginSources_ShrinkNoText_AndWriteNoFontSizeAsANumber()
+    {
+        var sources = Directory.GetFiles(Path.Combine(RepositoryRoot(), "src", "BronzebeardHud.HdtPlugin"), "*.cs");
+        var literalSize = new System.Text.RegularExpressions.Regex(@"FontSize\s*=\s*[0-9]");
+
+        Assert.True(sources.Length >= 10, $"only {sources.Length} plugin sources found");
+        foreach (var file in sources)
+        {
+            var lines = File.ReadAllLines(file);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var where = $"{Path.GetFileName(file)}:{i + 1}: {lines[i].Trim()}";
+                Assert.False(lines[i].Contains("Viewbox"), where);
+                Assert.False(literalSize.IsMatch(lines[i]), where);
+            }
+        }
+    }
+
+    private static string RepositoryRoot()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "BronzebeardHud.sln")))
+            {
+                return dir.FullName;
+            }
+        }
+
+        throw new InvalidOperationException($"BronzebeardHud.sln not found above {AppContext.BaseDirectory}");
+    }
+
     [Theory]
     [InlineData(1600, 900)]
     [InlineData(1920, 1080)]

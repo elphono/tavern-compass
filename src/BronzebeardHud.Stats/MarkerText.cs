@@ -12,7 +12,7 @@ public static class MarkerText
 {
     /// <summary>
     /// Average advance of a bold UI glyph, in em. Deliberately generous (Segoe UI bold averages about
-    /// 0.55), so the estimate errs on the short side; the plugin also shrinks, never clips, as a safety net.
+    /// 0.55), so the estimate errs on the short side: the plugin draws the text at its size, never shrunk.
     /// </summary>
     public const double GlyphWidthEm = 0.62;
 

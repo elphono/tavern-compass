@@ -116,6 +116,19 @@ public sealed class LeaderboardTests : IDisposable
         Assert.Equal((2614, 8045), (opponents[1].Row!.Rank, opponents[1].Row!.Rating));
     }
 
+    [Theory]
+    [InlineData(8045, 2614, "8045 · #2614")]
+    [InlineData(8045, 12614, "8045")]
+    [InlineData(10312, 7, "10312 · #7")]
+    public void MmrText_ShowsTheRank_OnlyWhenItFitsTheLabelAtTwelvePixels(int rating, int rank, string expected)
+    {
+        Assert.Equal(expected, LeaderboardLayout.MmrText(rating, rank));
+
+        // "8045 · #2614" is the longest that fits: 12 average glyphs of 12 px in the 94 px inside the label.
+        var inside = LeaderboardLayout.LabelWidth * 1080 - 2 * LeaderboardLayout.LabelBorder;
+        Assert.True(MarkerText.DisplayLength(expected) * PanelTypography.Small * MarkerText.GlyphWidthEm <= inside, $"{expected} is wider than {inside} px");
+    }
+
     [Fact]
     public void LeaderboardLayout_OneLabelPerTile_RightOfIt_WithoutOverlap()
     {

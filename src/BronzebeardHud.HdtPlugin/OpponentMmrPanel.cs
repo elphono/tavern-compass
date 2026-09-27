@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -110,7 +109,7 @@ internal sealed class OpponentMmrPanel : IDisposable
             return;
         }
 
-        var scale = _canvas.ActualHeight / 1080;
+        var scale = TavernLayout.Scale(_canvas.ActualHeight);
         foreach (var opponent in _opponents)
         {
             if (opponent.Row is not { } row)
@@ -125,20 +124,17 @@ internal sealed class OpponentMmrPanel : IDisposable
                 Height = rect.Height,
                 Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0x4D, 0xA6, 0xFF)),
-                BorderThickness = new Thickness(1.5 * scale),
+                BorderThickness = new Thickness(LeaderboardLayout.LabelBorder * scale),
                 CornerRadius = new CornerRadius(4 * scale),
                 IsHitTestVisible = false,
-                // "8045 · #2614" can be wider than the label at small scales: shrink, never clip.
-                Child = new Viewbox
+                // "8045 · #2614", or the rating alone when the rank would not fit: less, never smaller.
+                Child = new TextBlock
                 {
-                    Stretch = Stretch.Uniform,
-                    StretchDirection = StretchDirection.DownOnly,
-                    Child = new TextBlock
-                    {
-                        Text = $"{row.Rating.ToString(CultureInfo.InvariantCulture)} · #{row.Rank.ToString(CultureInfo.InvariantCulture)}",
-                        FontSize = 12 * scale,
-                        Foreground = Brushes.White,
-                    },
+                    Text = LeaderboardLayout.MmrText(row.Rating, row.Rank),
+                    FontSize = PanelTypography.Small * scale,
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
                 },
             };
             Canvas.SetLeft(label, rect.Left);

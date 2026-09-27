@@ -58,8 +58,8 @@ public static class HeroPickLayout
     public const double BadgeTop = 0.725;
 
     /// <summary>
-    /// Badge size, as fractions of the overlay height: the width of before; the height fits the content (a
-    /// source line, the odds line, the comp line on up to two lines) at its own size, nothing shrunk.
+    /// Badge size, as fractions of the overlay height: the width of before; the height holds a source line,
+    /// the odds line and the comp line on two lines at their own size (<see cref="ContentHeight"/>), nothing shrunk.
     /// </summary>
     public const double BadgeWidth = 0.17;
     public const double BadgeHeight = 0.08;
@@ -125,6 +125,82 @@ public static class HeroPickLayout
         var ok = OkButton(width, height);
         var top = badges.Select(b => b.Top + b.Height).Append(ok.Top + ok.Height).Max() + Margin * height;
         return FromEdges(width / 2 - 0.2 * height, top, width / 2 + 0.2 * height, top + 0.04 * height);
+    }
+
+    /// <summary>Badge frame, in design pixels (× scale): border and padding on each side.</summary>
+    public const double BadgeBorder = 2;
+    public const double BadgePaddingX = 4;
+    public const double BadgePaddingY = 2;
+
+    /// <summary>
+    /// Line heights inside a badge, in design pixels (× scale): a source line (its <see cref="PanelTypography.HeroTier"/>
+    /// tier letter), a <see cref="PanelTypography.Body"/> line, a <see cref="PanelTypography.Small"/> line, "no data".
+    /// </summary>
+    public const double SourceLine = 28;
+    public const double BodyLine = 17;
+    public const double SmallLine = 16;
+    public const double NoDataLine = 18;
+
+    /// <summary>Room for the lines inside a badge, in design pixels.</summary>
+    public static double ContentHeight => BadgeHeight * DesignHeight - 2 * (BadgeBorder + BadgePaddingY);
+
+    /// <summary>Width of a line inside a badge, in design pixels.</summary>
+    public static double ContentWidth => BadgeWidth * DesignHeight - 2 * (BadgeBorder + BadgePaddingX);
+
+    /// <summary>
+    /// Which of a badge's items (a line, or a wrapped line and its continuation) to show, in order, given each
+    /// one's height and the room inside the badge: every item that still fits, the others left out. Nothing is
+    /// ever shrunk.
+    /// </summary>
+    public static IReadOnlyList<int> ItemsThatFit(IReadOnlyList<double> itemHeights, double room)
+    {
+        var shown = new List<int>();
+        var used = 0.0;
+        for (var i = 0; i < itemHeights.Count; i++)
+        {
+            if (used + itemHeights[i] <= room + 1e-9)
+            {
+                used += itemHeights[i];
+                shown.Add(i);
+            }
+        }
+
+        return shown;
+    }
+
+    /// <summary>
+    /// <paramref name="text"/> cut between words into lines of at most <paramref name="maxChars"/> characters
+    /// (<see cref="MarkerText.DisplayLength"/>); null when a single word is longer than that, since it could only
+    /// be cut or shrunk.
+    /// </summary>
+    public static IReadOnlyList<string>? Wrap(string text, int maxChars)
+    {
+        var lines = new List<string>();
+        var current = string.Empty;
+        foreach (var word in text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (MarkerText.DisplayLength(word) > maxChars)
+            {
+                return null;
+            }
+
+            var joined = current.Length == 0 ? word : current + " " + word;
+            if (MarkerText.DisplayLength(joined) <= maxChars)
+            {
+                current = joined;
+                continue;
+            }
+
+            lines.Add(current);
+            current = word;
+        }
+
+        if (current.Length > 0)
+        {
+            lines.Add(current);
+        }
+
+        return lines;
     }
 
     private static bool Overlaps(LayoutRect a, LayoutRect b) =>

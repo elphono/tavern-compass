@@ -176,6 +176,50 @@ public class HeroPickLayoutTests
         Assert.Empty(HeroPickLayout.HeroCenters(width, height, heroes));
     }
 
+    [Fact]
+    public void Badge_HoldsASourceTheOddsAndATwoLineCompLine_AtTheirOwnSize()
+    {
+        var items = new[] { HeroPickLayout.SourceLine, HeroPickLayout.BodyLine, 2 * HeroPickLayout.SmallLine };
+
+        Assert.Equal(new[] { 0, 1, 2 }, HeroPickLayout.ItemsThatFit(items, HeroPickLayout.ContentHeight));
+    }
+
+    [Fact]
+    public void Badge_EveryLineIsTallerThanItsFont()
+    {
+        Assert.True(HeroPickLayout.SourceLine >= 1.25 * PanelTypography.HeroTier);
+        Assert.True(HeroPickLayout.BodyLine >= 1.25 * PanelTypography.Body);
+        Assert.True(HeroPickLayout.SmallLine >= 1.25 * PanelTypography.Small);
+        Assert.True(HeroPickLayout.NoDataLine >= 1.25 * PanelTypography.HeroNoData);
+    }
+
+    [Fact]
+    public void ItemsThatFit_LeavesOutWhatNoLongerFits_AndKeepsALaterItemThatStillDoes()
+    {
+        // Two sources: the second source line fits, the comp line after it no longer does.
+        var twoSources = new[] { 28.0, 17, 28, 16 };
+        Assert.Equal(new[] { 0, 1, 2 }, HeroPickLayout.ItemsThatFit(twoSources, 78.4));
+
+        // A comp line on three lines is left out whole, never cut; a smaller item after it still shows.
+        Assert.Equal(new[] { 0, 1, 3 }, HeroPickLayout.ItemsThatFit(new[] { 28.0, 17, 48, 18 }, 78.4));
+        Assert.Empty(HeroPickLayout.ItemsThatFit(new[] { 80.0 }, 78.4));
+    }
+
+    [Fact]
+    public void Wrap_CutsBetweenWords_WithinTheWidth_AndGivesUpOnAWordTooLong()
+    {
+        var maxChars = MarkerText.MaxChars(HeroPickLayout.ContentWidth, PanelTypography.Small, 0);
+        const string label = "comp ≈ Undead Butcher Rylak 3,4 (140)";
+
+        var lines = HeroPickLayout.Wrap(label, maxChars)!;
+
+        Assert.Equal(23, maxChars);
+        Assert.Equal(new[] { "comp ≈ Undead Butcher", "Rylak 3,4 (140)" }, lines);
+        Assert.All(lines, line => Assert.True(MarkerText.DisplayLength(line) <= maxChars, line));
+        Assert.Equal(new[] { "short line" }, HeroPickLayout.Wrap("short line", maxChars));
+        Assert.Null(HeroPickLayout.Wrap("comp ≈ Quilboarbloodgemaegisbuffers", maxChars));
+    }
+
     private static IEnumerable<(string Name, LayoutRect Zone)> VisibleZones(double width, double height, int heroes)
     {
         var s = height / 1080;

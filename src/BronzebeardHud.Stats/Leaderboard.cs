@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -217,6 +218,22 @@ public static class LeaderboardLayout
     public const double Top = 0.15;
     public const double TileSize = 0.69 / 8;
 
+    /// <summary>An MMR label: width and height × H, border in design pixels.</summary>
+    public const double LabelWidth = 0.09;
+    public const double LabelHeight = 0.028;
+    public const double LabelBorder = 1.5;
+
+    /// <summary>
+    /// "8045 · #2614" when it fits the label at <see cref="PanelTypography.Small"/>, else the rating alone: less
+    /// is shown, nothing is shrunk. Every size scales with H, so the choice does not depend on the window.
+    /// </summary>
+    public static string MmrText(int rating, int rank)
+    {
+        var maxChars = MarkerText.MaxChars(LabelWidth * HeroPickLayout.DesignHeight - 2 * LabelBorder, PanelTypography.Small, 0);
+        var full = $"{rating.ToString(CultureInfo.InvariantCulture)} · #{rank.ToString(CultureInfo.InvariantCulture)}";
+        return MarkerText.DisplayLength(full) <= maxChars ? full : rating.ToString(CultureInfo.InvariantCulture);
+    }
+
     public static LayoutRect MmrLabel(double width, double height, int place)
     {
         var frameWidth = height * 4 / 3;
@@ -224,8 +241,8 @@ public static class LeaderboardLayout
         var tile = TileSize * height;
         var tileLeft = frameLeft + frameWidth * 0.001 * (8 - place);
         var tileTop = Top * height + tile * (place - 1);
-        var labelWidth = 0.09 * height;
-        var labelHeight = 0.028 * height;
+        var labelWidth = LabelWidth * height;
+        var labelHeight = LabelHeight * height;
         return new LayoutRect(tileLeft + tile + 0.004 * height + labelWidth / 2, tileTop + tile / 2, labelWidth, labelHeight);
     }
 }

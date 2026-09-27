@@ -125,6 +125,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   côté, à l'écart (0,009 H au plus mesuré), ou passe dessous s'il faudrait plus de 0,03 H (celui du milieu à
   trois héros : 0,835 → 0,915 H). Cotes mesurées sur la capture Hearthstone d'Ali du 2026-09-26 18:29:44
   (2291 × 1360), fixées par `HeroPickLayoutTests` ; l'encart d'origine, centré à 0,667 H, cachait le reroll.
+- Aucun texte du plugin sous 12 px en 1080p (`PanelTypography`) et aucun `Viewbox` : ce qui ne tient pas est
+  omis, jamais rétréci (encart des héros : la ligne « comp ≈ » passe sur deux lignes ou disparaît ; MMR des
+  adversaires : le rang disparaît, la cote reste). Un test lit les sources du plugin et y refuse `Viewbox` et
+  `FontSize = <nombre>`.
 - Panneau des compos, overlay verrouillé : une ligne par compo — case, nom et place moyenne, sept ovales
   (anneau vert + ✓ si tenus, pointillé clair sinon) ; survoler un ovale montre la carte entière, et la case
   fait viser la compo seule (quatre au plus, une couleur chacune, oubliées à la partie suivante). Aucun texte

@@ -5,8 +5,9 @@ using System.Linq;
 namespace BronzebeardHud.Stats;
 
 /// <summary>
-/// Every font size of the target composition panel, the lineups panel, the tavern markers and the Skip combat
-/// button, in design pixels at 1080p (× TavernLayout.Scale). Ali, 2026-09-27: no text under 12 px at 1080p,
+/// Every font size of the plugin's text: the target composition panel, the lineups panel, the tavern and choice
+/// markers, the Skip combat button, the hero badges and the opponents' MMR, in design pixels at 1080p
+/// (× TavernLayout.Scale). Ali, 2026-09-27: no text under 12 px at 1080p,
 /// after any scaling. Nothing is ever shrunk to fit any more: when content runs out of room, less is shown
 /// (PanelFit), never smaller.
 /// </summary>
@@ -19,10 +20,13 @@ public static class PanelTypography
     public const double CompositionName = 14;
     public const double Button = 13;
 
-    /// <summary>Body text: lineups headings, "No composition reachable yet".</summary>
+    /// <summary>Body text: lineups headings, "No composition reachable yet", a hero badge's figures and odds.</summary>
     public const double Body = 13;
 
-    /// <summary>Placement, counts, section titles and hints, pivots, the meta line, MMR lines, footer, status.</summary>
+    /// <summary>
+    /// Placement, counts, section titles and hints, pivots, the meta line, MMR lines, footer, status; the opponents'
+    /// MMR labels, a hero badge's composition line and the hero status line.
+    /// </summary>
     public const double Small = 12;
 
     /// <summary>The tick and the tier on an oval.</summary>
@@ -32,7 +36,11 @@ public static class PanelTypography
     public const double RoundButton = 14;
     public const double SkipCombat = 15;
 
-    public static readonly IReadOnlyList<double> All = new[] { PanelTitle, CompositionName, Button, Body, Small, Badge, Marker, RoundButton, SkipCombat };
+    /// <summary>A hero badge's tier letter, and its "no data".</summary>
+    public const double HeroTier = 22;
+    public const double HeroNoData = 14;
+
+    public static readonly IReadOnlyList<double> All = new[] { PanelTitle, CompositionName, Button, Body, Small, Badge, Marker, RoundButton, SkipCombat, HeroTier, HeroNoData };
 
     /// <summary>A size in overlay pixels for a window <paramref name="height"/> tall.</summary>
     public static double Px(double size, double height) => size * TavernLayout.Scale(height);
