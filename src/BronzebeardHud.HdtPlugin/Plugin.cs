@@ -56,9 +56,6 @@ public sealed class Plugin : IPlugin
     private SkipCombatPanel? _skipCombat;
     private readonly SkipCombatState _skipState = new();
 
-    /// <summary>How long to wait for Hearthstone to exit after Kill() before giving up (and not restarting it).</summary>
-    private const int KillTimeoutMs = 5000;
-
     // Pins made by click (Tavern Pinning): kept across a plugin reload within a game, forgotten at the next game.
     private readonly GamePins _gamePins = new();
     private int _pinsVersion;
@@ -230,9 +227,11 @@ public sealed class Plugin : IPlugin
     /// The "Skip combat" button: closes Hearthstone and starts it again at once, the reconnection landing after
     /// the combat animation (a known Battlegrounds trick). A local action on the process: no game memory is
     /// read. The executable is chosen before the kill (the process's own file, else HDT's Hearthstone folder),
-    /// and nothing is killed unless that file exists, so that the client can always be started again. One log
-    /// line per click, with what was measured: pid, executable and where it came from, time to exit, new pid,
-    /// or the exception.
+    /// and nothing is killed unless that file exists, so that the client can always be started again. No wait
+    /// between the two (Ali, 2026-09-27: instant): as soon as Kill() returns without an exception, the client is
+    /// started again. Kill() only asks Windows to end the process, so the old client may still be exiting then;
+    /// the log line says whether it had. One line per click, with what was measured: pid, executable and where
+    /// it came from, how long Kill() took, the time from Kill() to Start(), the new pid, or the exception.
     /// </summary>
     private void SkipCombat() => _skipCombatGuard.Run(() =>
     {
@@ -287,13 +286,19 @@ public sealed class Plugin : IPlugin
                 throw;
             }
 
-            if (!target.WaitForExit(KillTimeoutMs))
+            var killMs = watch.ElapsedMilliseconds;
+            bool? exitedAtStart = null; // measured, not waited for: did the old client exit before the new one starts?
+            try
             {
-                Log.Error($"Bronzebeard HUD: skip combat {what}: still running {KillTimeoutMs} ms after Kill(); not restarted, to avoid two clients");
-                return;
+                exitedAtStart = target.HasExited;
+            }
+            catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+            {
+                // Unknown; the line says so.
             }
 
-            var exitedMs = watch.ElapsedMilliseconds;
+            var startAtMs = watch.ElapsedMilliseconds;
+            var timing = $"Kill() returned in {killMs} ms, Start() called {startAtMs} ms after Kill(), old process exited by then: {exitedAtStart?.ToString() ?? "unknown"}";
             Process? started;
             try
             {
@@ -301,20 +306,20 @@ public sealed class Plugin : IPlugin
             }
             catch (Exception e)
             {
-                Log.Error($"Bronzebeard HUD: skip combat {what}: exited {exitedMs} ms after Kill(), restart FAILED: {e.GetType().Name}: {e.Message}; start Hearthstone by hand");
+                Log.Error($"Bronzebeard HUD: skip combat {what}: {timing}; restart FAILED: {e.GetType().Name}: {e.Message}; start Hearthstone by hand");
                 logged = true;
                 throw;
             }
 
             using (started)
             {
-                Log.Info($"Bronzebeard HUD: skip combat {what}: exited {exitedMs} ms after Kill(), restarted pid={started?.Id.ToString() ?? "none"} " +
-                         $"(Process.Start returned after {watch.ElapsedMilliseconds - exitedMs} ms)");
+                Log.Info($"Bronzebeard HUD: skip combat {what}: {timing}; restarted pid={started?.Id.ToString() ?? "none"} " +
+                         $"(Process.Start returned {watch.ElapsedMilliseconds - startAtMs} ms later)");
             }
         }
         catch (Exception e) when (!logged)
         {
-            // Anything else (a process gone while it was being read, WaitForExit failing): still one line with what is known.
+            // Anything else (a process gone while it was being read, say): still one line with what is known.
             Log.Error($"Bronzebeard HUD: skip combat failed ({processes.Length} Hearthstone process(es) found): {e.GetType().Name}: {e.Message}");
             throw;
         }

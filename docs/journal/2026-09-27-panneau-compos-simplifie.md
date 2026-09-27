@@ -19,3 +19,8 @@ Arbitrage d'Ali : une pièce clé de tier ≤ 3 reste dans les enablers, test `�
 cartes de Bob : par carte, seulement l'icône clé sur la carte (`BattlegroundsMinionPinningCard.xaml:73-86`,
 Top 99 / Right 0) et un encart au survol 90 unités au-dessus (l.87-100) ; le bouton Inspiration est
 en haut à droite de la fenêtre (`OverlayWindow.xaml:488-492`). Le ? reste à droite du ◇.
+
+**Skip combat instantané** (demande d'Ali) : plus d'attente `WaitForExit` ; dès que `Kill()` revient, relance.
+`Kill()` ne fait que demander la fin du processus : l'ancien client peut ne pas être sorti au moment du
+`Start()`. La ligne de journal le mesure (`old process exited by then: True/False`) ; si Hearthstone refuse
+une seconde instance, c'est là que ça se verra.

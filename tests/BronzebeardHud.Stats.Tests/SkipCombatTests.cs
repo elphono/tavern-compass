@@ -30,8 +30,8 @@ public class SkipCombatTests
     [Fact]
     public void ASkipThatLeftTheGameRunning_TheNextCombatAfterTheShopShowsItAgain_OverThreeCombats()
     {
-        // Nothing was killed (executable not found, no process, still running after Kill): HDT never resets, the
-        // game goes on from combat to shop; the button must come back at the next combat all the same.
+        // Nothing was killed (executable not found, no process, Kill() refused): HDT never resets, the game goes
+        // on from combat to shop; the button must come back at the next combat all the same.
         var state = new SkipCombatState();
         for (var combat = 1; combat <= 3; combat++)
         {
