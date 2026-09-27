@@ -7,3 +7,20 @@ obj/
 
 # Third-party assemblies downloaded at build time (HDT), never committed
 lib/
+
+# Mock-up: only its sources are committed; card data, image cache, builds and captures are rebuilt locally
+# (real card data and art, about 9 MB)
+docs/mock/*
+!docs/mock/template.html
+!docs/mock/build.py
+!docs/mock/data.py
+!docs/mock/shots.py
+!docs/mock/floor.py
+!docs/mock/README.md
+docs/mock/*
+!docs/mock/template.html
+!docs/mock/build.py
+!docs/mock/data.py
+!docs/mock/shots.py
+!docs/mock/floor.py
+!docs/mock/README.md

@@ -1,0 +1,753 @@
+<title>Maquette compos visées</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #f3f1ee; --surface: #ffffff; --ink: #1f1c1a; --muted: #6a625b; --line: #d9d3cc;
+  --accent: #b83d0b; --chip-on: #e8f7ea; --chip-on-line: #2ecc40;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #151412; --surface: #1f1d1a; --ink: #ece7e1; --muted: #a39b92; --line: #3a3632;
+    --accent: #ff7a3d; --chip-on: #173a1d; --chip-on-line: #2ecc40;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #151412; --surface: #1f1d1a; --ink: #ece7e1; --muted: #a39b92; --line: #3a3632;
+  --accent: #ff7a3d; --chip-on: #173a1d; --chip-on-line: #2ecc40;
+}
+body { background: var(--ground); color: var(--ink); font: 14px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+.page { padding-inline: 16px; padding-block: 16px 32px; max-width: 1960px; margin: 0 auto; display: grid; gap: 14px; }
+.intro h1 { font-size: 20px; margin: 0; font-weight: 600; text-wrap: balance; }
+.intro p { margin: 4px 0 0; color: var(--muted); max-width: 80ch; }
+code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; }
+
+/* ================= simulated game screen: fixed dark, 1920 x 1080 design pixels ================= */
+#viewport { position: relative; width: 100%; overflow-y: hidden; border-radius: 4px; background: #0b0907; }
+#stage {
+  position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden;
+  font-family: "Segoe UI", "Segoe UI Variable", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  background:
+    radial-gradient(ellipse 760px 470px at 960px 560px, #4a3a28 0%, #33271b 55%, rgba(26,19,13,0) 100%),
+    linear-gradient(90deg, #120d09 0, #120d09 240px, #21180f 240px, #21180f 1680px, #120d09 1680px);
+}
+.layer { position: absolute; inset: 0; }
+#overlay { pointer-events: none; }
+#overlay > * { pointer-events: auto; }
+.abs { position: absolute; box-sizing: border-box; }
+.bg-shop { border-radius: 16px; overflow: hidden; }
+.bg-shop img { width: 100%; height: 100%; object-fit: contain; display: block; max-width: none; }
+.bg-minion { border-radius: 50% / 58%; background: radial-gradient(circle at 50% 40%, #6b5a45, #2a2016); box-shadow: 0 0 0 3px #8a6d44; }
+.bg-enemy { border-radius: 50% / 58%; background: radial-gradient(circle at 50% 40%, #5b3a3a, #2a1616); box-shadow: 0 0 0 3px #8a4444; }
+.bg-hero { border-radius: 50%; background: radial-gradient(circle at 50% 40%, #6d4e30, #22170e); box-shadow: 0 0 0 5px #b08a4a; }
+.bg-bob { border-radius: 50%; background: radial-gradient(circle at 50% 40%, #7a5a36, #2b1d10); box-shadow: 0 0 0 5px #c9a24f; }
+.bg-gold { border-radius: 50%; background: radial-gradient(circle at 40% 35%, #ffe28a, #b8860b); box-shadow: 0 0 0 2px #5a3f08; }
+.bg-label { color: rgba(255,240,220,.32); font: 600 20px/1 "IBM Plex Sans", sans-serif; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+
+/* ---- tavern markers (frame + label under the card) and buttons above Bob's cards ---- */
+.mk-frame { pointer-events: none; border-radius: 10px; }
+.mk-label { border: 1.5px solid #000; display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: none; border-radius: 5px; }
+.mk-label span { font-size: 13px; font-weight: 700; color: #000; line-height: 1.3; white-space: nowrap; }
+.round {
+  border-radius: 50%; border: 1.5px solid #fff; background: rgba(20,20,30,.902); color: #fff; font-weight: 700; font-size: 14px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1; font-family: inherit;
+}
+.round.filled { background: #fff; color: #000; }
+.round:hover { box-shadow: 0 0 0 3px rgba(255,255,255,.25); }
+
+/* ---- target composition panel (TavernAdvicePanel.cs): no scaling, fewer lines when they do not fit ---- */
+#panel { background: rgba(20,20,30,0.92); border: 2px solid #D9480F; border-radius: 6px; overflow: hidden; }
+.lines { padding: 8px; display: flex; flex-direction: column; }
+.titlebar { display: flex; align-items: center; gap: 6px; height: 26px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,.19); }
+.titlebar .title { flex: 1; font-size: 14px; font-weight: 700; color: #fff; }
+.count { display: flex; align-items: center; gap: 5px; }
+.count .n { font-size: 12px; color: #C8CDD8; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pbtn {
+  box-sizing: border-box; height: 22px; min-width: 22px; border-radius: 4px; background: #3A3A44; border: 1px solid #C8CDD8; color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none; font: 700 13px/1 inherit; padding: 0 5px;
+}
+.pbtn.light { background: #fff; color: #000; border-color: #fff; }
+.pbtn:disabled { opacity: .35; cursor: default; }
+.row { display: grid; grid-template-columns: 24px 118px 1fr; height: 50px; margin-top: 6px; align-items: center; }
+.aim {
+  width: 18px; height: 18px; border-radius: 4px; border: 2px solid #C8CDD8; background: transparent; cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center; color: #000; font-size: 12px; font-weight: 900; line-height: 1;
+}
+.aim[aria-pressed="true"] { border-color: var(--aim); background: var(--aim); }
+.aim.full { opacity: .35; cursor: not-allowed; }
+.cname { padding-right: 6px; cursor: pointer; min-width: 0; }
+.cname .nm { font-size: 14px; line-height: 16.5px; color: #C8CDD8; overflow-wrap: anywhere; }
+.cname .nm.aimed { font-weight: 700; color: var(--aim); }
+.cname .av { font-size: 12px; line-height: 15px; color: #C8CDD8; font-variant-numeric: tabular-nums; }
+.ovals { display: flex; align-items: center; }
+.small { font-size: 12px; color: #C8CDD8; }
+.footer { font-size: 12px; line-height: 16px; color: #fff; font-weight: 700; margin-top: 4px; }
+
+/* oval minion portrait (CardImages.Vignette): held = solid green ring + tick; missing = light dashed ring */
+.ov { position: relative; flex: none; margin-right: 4px; }
+.ov .pic { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; }
+.ov img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; display: block; max-width: none; }
+.ov .ring { position: absolute; inset: 0; border-radius: 50%; box-sizing: border-box; pointer-events: none; }
+.ov.owned .ring { border: 3px solid #2ECC40; }
+.ov.missing .ring { border: 2px dashed #C9D1E0; }
+.ov .tick {
+  position: absolute; right: -3px; bottom: -2px; width: 16px; height: 16px; border-radius: 50%; background: #2ECC40; color: #fff;
+  font-size: 12px; font-weight: 900; display: flex; align-items: center; justify-content: center; border: 1.5px solid #000; box-sizing: border-box; line-height: 1;
+}
+.ov .tier {
+  position: absolute; left: -3px; top: -3px; min-width: 16px; height: 16px; border-radius: 3px; background: #FFD23F; color: #000;
+  font-size: 12px; font-weight: 900; display: flex; align-items: center; justify-content: center; border: 1.5px solid #000; box-sizing: border-box; line-height: 1;
+}
+.ov.hit { box-shadow: 0 0 0 3px #fff; border-radius: 50%; }
+.ov.clickable { cursor: pointer; }
+.ov.clickable:hover .ring { box-shadow: 0 0 0 3px rgba(255,255,255,.35); }
+
+/* detail view (in place of the list) */
+.dhead { display: flex; align-items: center; gap: 8px; height: 36px; }
+.dhead .nm { flex: 1; font-size: 14px; font-weight: 700; color: #fff; overflow-wrap: anywhere; line-height: 1.2; }
+.dhead .av { font-size: 12px; font-weight: 700; color: #fff; }
+.meta { display: flex; gap: 6px; align-items: flex-start; min-height: 16px; }
+.meta .t { flex: 1; font-size: 12px; color: #C8CDD8; }
+.info { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.2px solid #C8CDD8; box-sizing: border-box; color: #C8CDD8; font: 700 12px/1 inherit; display: flex; align-items: center; justify-content: center; cursor: help; }
+.sec { font-size: 12px; line-height: 16px; color: #C8CDD8; margin: 3px 0 2px; }
+.sec b { font-weight: 700; }
+.sec.en b { color: #5CE1FF; } .sec.co b { color: #FFD23F; }
+.pivot { display: grid; grid-template-columns: 142px 1fr; height: 50px; margin-top: 4px; align-items: center; }
+.pivot .lb { font-size: 12px; color: #C8CDD8; padding-right: 6px; }
+.pivot .lb b { color: #FF9F43; } .pivot .lb strong { color: #fff; }
+
+/* lineups panel (LineupsPanel.cs): its own panel, right-hand column, white border */
+#lineups { background: rgba(20,20,30,.94); border: 2px solid #fff; border-radius: 6px; overflow: hidden; }
+#lineups .lines { gap: 0; }
+#lineups .lh { display: flex; gap: 8px; align-items: flex-start; }
+#lineups .lh .t { flex: 1; font-size: 13px; font-weight: 700; color: #fff; overflow-wrap: anywhere; }
+#lineups .hl { font-size: 12px; color: #C8CDD8; margin-top: 2px; }
+#lineups .lab { font-size: 12px; color: #fff; margin-top: 6px; font-weight: 700; }
+#lineups .ovals { flex-wrap: wrap; row-gap: 6px; margin-top: 2px; }
+#lineups .mmr { font-size: 12px; color: #C8CDD8; }
+
+/* skip combat (SkipCombatPanel.cs) */
+#skip { background: #FFDC00; border: 2px solid #000; border-radius: 6px; color: #000; font-weight: 700; font-size: 15px; cursor: pointer; font-family: inherit; padding: 0 6px; }
+#skip:hover { background: #FFE84D; }
+#reconnect { position: absolute; inset: 0; background: rgba(0,0,0,.88); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 30; }
+#reconnect .big { color: #F3E3B5; font: 700 44px/1 Georgia, "Times New Roman", serif; letter-spacing: .02em; }
+#reconnect .small { color: #b9ad90; font: 16px/1.4 "IBM Plex Mono", monospace; }
+
+#preview { position: absolute; pointer-events: none; z-index: 20; }
+#preview img { width: 100%; height: 100%; object-fit: contain; display: block; max-width: none; }
+
+/* ================= mock-up controls ================= */
+.ctl { background: var(--surface); border: 1px dashed var(--line); border-radius: 6px; padding: 12px 14px; display: grid; gap: 12px; }
+.ctl h2 { margin: 0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.ctl-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.ctl-row > .lbl { color: var(--muted); font-size: 13px; min-width: 9em; }
+.ctl button, .ctl label.t {
+  font: inherit; font-size: 13px; color: var(--ink); background: var(--ground); border: 1px solid var(--line); border-radius: 4px; padding: 3px 9px; cursor: pointer;
+}
+.ctl button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.ctl label.t { display: inline-flex; gap: 6px; align-items: center; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#stage button:focus-visible, #stage a:focus-visible { outline: 2px solid #fff; }
+.groups { display: grid; gap: 8px; }
+.group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.group .gname { width: 11em; font-size: 12px; color: var(--muted); flex: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 2px 8px 2px 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--ground); color: var(--ink); cursor: pointer; }
+.chip img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; opacity: .55; }
+.chip .c { font-family: "IBM Plex Mono", monospace; color: var(--muted); }
+.chip.on { background: var(--chip-on); border-color: var(--chip-on-line); }
+.chip.on img { opacity: 1; }
+.chip.on .c { color: var(--ink); font-weight: 500; }
+#log { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; margin: 0; white-space: pre-wrap; }
+@media (max-width: 640px) { .group .gname { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="page">
+  <div class="intro">
+    <h1>Maquette compos visées</h1>
+    <p>Banc d'essai du panneau « Target compositions » et de ce qui l'entoure, sur un écran 1920 × 1080 simulé, avec les mêmes règles que le plugin : aucun texte sous 12 px, rien ne rétrécit, le panneau montre moins de lignes quand la place manque. Un clic sur le nom ou un portrait d'une compo ouvre son détail ; le « ? » au-dessus d'une carte de Bob ouvre « How top boards field it » dans la colonne de droite ; les cartes de Bob utiles aux compos visées sont surlignées (« commit » ou « enabler »). En phase Combat, le bouton jaune simule la relance par Battle.net. Données synthétiques.</p>
+  </div>
+
+  <div id="viewport"><div id="stage">
+    <div class="layer" id="board"></div>
+    <div class="layer" id="overlay"></div>
+    <div id="preview" hidden><img alt=""></div>
+  </div></div>
+
+  <section class="ctl" aria-label="contrôles de la maquette">
+    <h2>Contrôles de la maquette — hors du jeu</h2>
+    <div class="ctl-row">
+      <span class="lbl">Phase</span>
+      <button type="button" id="ph-shop" aria-pressed="true">Taverne</button>
+      <button type="button" id="ph-combat" aria-pressed="false">Combat</button>
+      <span class="lbl" style="min-width:auto;margin-left:12px">Cartes chez Bob</span>
+      <button type="button" id="bob-less" aria-label="une carte de moins">−</button>
+      <span id="bob-n" style="font-variant-numeric:tabular-nums">6</span>
+      <button type="button" id="bob-more" aria-label="une carte de plus">+</button>
+      <button type="button" id="bob-roll">Nouvelle taverne</button>
+    </div>
+    <div class="ctl-row">
+      <span class="lbl">Échelle</span>
+      <button type="button" id="zoom-fit" aria-pressed="true">Ajustée à la largeur</button>
+      <button type="button" id="zoom-real" aria-pressed="false">Taille réelle</button>
+      <label class="t"><input type="checkbox" id="opt-footer" checked> ligne du plateau vs courbe</label>
+    </div>
+    <div class="ctl-row">
+      <span class="lbl">Cartes possédées</span>
+      <button type="button" id="own-none">Rien</button>
+      <button type="button" id="own-preset">Préréglage tour 7</button>
+      <button type="button" id="own-all">Tout, un exemplaire</button>
+      <span style="color:var(--muted);font-size:12px">Un clic sur une carte : 0 → 1 → 2 → 3 exemplaires → 0.</span>
+    </div>
+    <div class="groups" id="groups"></div>
+    <pre id="log" aria-live="polite"></pre>
+  </section>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+// ---------- constants: BronzebeardHud.Stats (PanelFit, PanelTypography, TavernLayout), 1080p design pixels ----------
+const W = 1920, H = 1080;
+const OVAL_W = 40, OVAL_H = 48, OVAL_GAP = 4;                       // PanelFit.OvalWidth, TavernLayout.OvalAspect 1.2
+const PANEL_W = 488, BORDER = 2, PAD = 8, TITLE_BAR = 32, ROW_H = 50, ROW_GAP = 6, FOOTER_LINE = 20, BOTTOM_LIMIT = 0.945;
+const DETAIL_HEADER = 36, DETAIL_META = 34, DETAIL_SECTION = 69, PIVOT_LINE = 54;
+const LINEUPS_HEADER = 2 * BORDER + 2 * PAD + 36 + 32, LINEUP_LABEL = 32, LINEUP_MMR = 16;
+const PREVIEW_H = 0.36 * H, PREVIEW_ASPECT = 256 / 388, PREVIEW_GAP = 0.008 * H;
+const PALETTE = ["#FF2BD6", "#B8FF1F", "#2EA8FF", "#FFFFFF"], SUGGESTION_COLOUR = "#FFFFFF";
+const MIN_SUGGESTED = 1, MAX_SUGGESTED = 8, DEFAULT_SUGGESTED = 3;
+const META_URL = "https://www.firestoneapp.com/battlegrounds/comps";
+const KEY_W = 3, ADDON_W = 1, TRIBE_W = 0.5, MAX_EARLY_TIER = 3, MAX_ENABLERS = 6;
+const FOOTER = "Board 142 · hero avg 168 at turn 7 · −15%";
+const SHOP_W = 138, SHOP_H = 190, PIN = 24, PIN_GAP = 4, MARKER_FONT = 13, MARKER_PAD = 4;
+
+const fr1 = v => v.toFixed(1).replace(".", ",");
+const frInt = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202F");
+const title = t => t.charAt(0) + t.slice(1).toLowerCase();
+const byId = Object.fromEntries(DATA.comps.map(c => [c.id, c]));
+const ALL_IDS = Object.keys(DATA.cards);
+
+// ---------- state ----------
+const PRESET = { BG25_354: 1, BG25_008: 1, BG26_354: 1, BG23_008: 1, BG26_805: 1, BGS_061: 1, BG27_514: 1 };
+const BOB = ["BG25_008", "BG26_171", "BGS_115", "BG22_202", "BG26_805", "BGS_061", "BG24_500"];
+const state = {
+  owned: { ...PRESET }, checked: [], slots: {}, suggested: DEFAULT_SUGGESTED,
+  footer: true, zoom: "fit", phase: "shop", bob: BOB.slice(0, 6), pins: new Set(),
+  detail: null, lineups: null, skipArmed: true, reconnecting: false, turn: 7, visible: [],
+};
+
+// ---------- log (the lines HDT's journal would get) ----------
+const logLines = [];
+function log(msg) {
+  logLines.push("Bronzebeard HUD: " + msg);
+  while (logLines.length > 6) logLines.shift();
+  document.getElementById("log").textContent = logLines.join("\n");
+}
+
+// ---------- CompositionSelection ----------
+function toggleAim(id) {
+  if (id in state.slots) {
+    delete state.slots[id];
+    state.checked = state.checked.filter(x => x !== id);
+  } else if (state.checked.length >= PALETTE.length) {
+    log(`${id} not ticked, four compositions already are`);
+    return;
+  } else {
+    const used = new Set(Object.values(state.slots));
+    state.slots[id] = [0, 1, 2, 3].find(s => !used.has(s));
+    state.checked.push(id);
+  }
+  log(`ticked compositions=[${state.checked.join(",")}]`);
+}
+const colourOf = id => (id in state.slots ? PALETTE[state.slots[id]] : null);
+
+// ---------- advisor (CompAdvisor.Progress / Suggest, TavernAdvisor.Aim) ----------
+function ownedList() { const o = []; for (const [id, n] of Object.entries(state.owned)) for (let i = 0; i < n; i++) o.push(id); return o; }
+const isHeld = id => (state.owned[id] || 0) > 0;
+function progress(comp) {
+  const owned = ownedList(), ids = new Set(owned);
+  const core = comp.core.filter(x => ids.has(x)).length, addon = comp.addon.filter(x => ids.has(x)).length;
+  const tribes = owned.filter(x => DATA.cards[x].races.some(r => comp.tribes.includes(r) || r === "ALL")).length;
+  return { comp, score: KEY_W * core + ADDON_W * addon + TRIBE_W * tribes };
+}
+const placementFor = c => (c.hero ? c.hero.est : c.place);
+function focus() {
+  const ticked = state.checked.map(id => byId[id]);
+  const suggestions = DATA.comps.map(progress)
+    .filter(p => p.score > 0 && !state.checked.includes(p.comp.id))
+    .sort((a, b) => placementFor(a.comp) - placementFor(b.comp) || b.score - a.score || (a.comp.id < b.comp.id ? -1 : 1))
+    .slice(0, state.suggested).map(p => p.comp);
+  return { shown: ticked.concat(suggestions), ticked, suggestions, aimed: ticked.length ? ticked : suggestions };
+}
+function rowCards(comp) {
+  const cards = comp.board && comp.board.length ? comp.board : comp.core.concat(comp.addon).slice(0, 7);
+  const left = { ...state.owned };
+  return cards.map(id => { const owned = (left[id] || 0) > 0; if (owned) left[id]--; return { id, owned }; });
+}
+const keyOwned = c => c.core.filter(isHeld).length;
+
+// ---------- CompTransitions ----------
+const cardsOf = c => [...new Set(c.core.concat(c.addon, c.board || []))];
+function transitions(from) {
+  const mine = cardsOf(from);
+  return DATA.comps.filter(c => c.id !== from.id)
+    .map(c => { const theirs = new Set(cardsOf(c)); return { to: c, shared: mine.filter(x => theirs.has(x)) }; })
+    .filter(t => t.shared.length >= 2)
+    .sort((a, b) => b.shared.length - a.shared.length || a.to.place - b.to.place || (a.to.id < b.to.id ? -1 : 1))
+    .slice(0, 2);
+}
+
+// ---------- CompDetail.For ----------
+function compDetail(comp) {
+  const boards = comp.finalBoards.map(b => new Set(b.cards));
+  const freq = id => boards.filter(b => b.has(id)).length;
+  const card = id => ({ id, tier: DATA.cards[id].tier, boards: freq(id) });
+  const firstSeen = [...new Set(comp.addon.concat(comp.finalBoards.flatMap(b => b.cards)))];
+  const enablers = firstSeen.map(card).filter(c => c.tier && c.tier <= MAX_EARLY_TIER)
+    .map((c, i) => ({ c, i })).sort((a, b) => b.c.boards - a.c.boards || a.i - b.i).map(x => x.c).slice(0, MAX_ENABLERS);
+  const commit = [...new Set(comp.core)].map(card);
+  const turns = comp.finalBoards.map(b => b.turn).sort((a, b) => a - b);
+  const median = turns.length % 2 ? turns[(turns.length - 1) / 2] : (turns[turns.length / 2 - 1] + turns[turns.length / 2]) / 2;
+  const meta = [comp.tribes.map(title).join(", "), frInt(comp.games) + " games", "tier " + comp.tier, "final turn ≈ " + String(median).replace(".", ",")]
+    .concat(comp.hero ? [`≈ ${fr1(comp.hero.est)} with your hero (${comp.hero.games})`] : []).join(" · ");
+  return { meta, enablers, commit, note: `Derived from ${comp.finalBoards.length} top final boards (Firestone) and the comp's card lists; the source has no early-game guide.` };
+}
+
+// ---------- TavernHighlights.For: ticked first, else the suggestions on screen; commit wins over enabler ----------
+function highlights(cards, ticked, suggestions) {
+  const fromTicked = ticked.length > 0;
+  const aimed = (fromTicked ? ticked : suggestions).map(c => ({ c, d: compDetail(c) }));
+  const colour = c => (fromTicked ? colourOf(c.id) || SUGGESTION_COLOUR : SUGGESTION_COLOUR);
+  return cards.map(id => {
+    for (const { c, d } of aimed) if (d.commit.some(x => x.id === id)) return { kind: "commit", comp: c, colour: colour(c) };
+    for (const { c, d } of aimed) if (d.enablers.some(x => x.id === id)) return { kind: "enabler", comp: c, colour: colour(c) };
+    return { kind: "none" };
+  });
+}
+
+// ---------- MinionLineups.For ----------
+function lineupsFor(cardId) {
+  const comps = DATA.comps.map(c => ({ c, boards: c.finalBoards.filter(b => b.cards.includes(cardId)).sort((a, b) => b.mmr - a.mmr), kept: c.finalBoards.length }))
+    .filter(l => l.boards.length > 0)
+    .sort((a, b) => b.boards.length - a.boards.length || a.c.place - b.c.place || (a.c.id < b.c.id ? -1 : 1)).slice(0, 3);
+  const counts = {};
+  comps.forEach(l => l.boards.forEach(b => b.cards.forEach((x, i) => { if (x === cardId) counts[i + 1] = (counts[i + 1] || 0) + 1; })));
+  const pos = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+  const headline = pos
+    ? `Usually in position ${pos[0]} of 7 · in ${comps.length} composition${comps.length > 1 ? "s" : ""}`
+    : "In no top final board of the compositions in this lobby";
+  return { cardId, comps, headline };
+}
+
+// ---------- geometry (TavernLayout, PanelFit, SkipCombatLayout) ----------
+function cardSlots(n) {
+  return Array.from({ length: n }, (_, i) => {
+    const cx = W / 2 + (i + 0.5 - n / 2) * SHOP_W, cy = H / 2 - 290 / 2;
+    return { cx, cy, left: cx - SHOP_W / 2, top: cy - SHOP_H / 2, width: SHOP_W, height: SHOP_H };
+  });
+}
+const chrome = footer => 2 * BORDER + 2 * PAD + TITLE_BAR + (footer ? FOOTER_LINE : 0);
+const listHeight = (rows, footer) => chrome(footer) + rows * ROW_H + Math.max(0, rows - 1) * ROW_GAP;
+function targetPanel() {
+  const right = W / 2 + H * 2 / 3 - 0.01 * H, top = H / 2 - 0.03 * H + 0.158 * H + 0.012 * H;
+  return { left: right - PANEL_W, top, width: PANEL_W, height: listHeight(3, true) };
+}
+const room = top => BOTTOM_LIMIT * H - top;
+const rowsThatFit = (top, wanted, footer) => wanted <= 0 ? 0 : Math.max(1, Math.min(wanted, Math.floor((room(top) - chrome(footer) + ROW_GAP) / (ROW_H + ROW_GAP))));
+const pivotsThatFit = (top, n) => Math.max(0, Math.min(n, Math.floor((room(top) - chrome(false) - DETAIL_HEADER - DETAIL_META - 2 * DETAIL_SECTION) / PIVOT_LINE)));
+function skipRect() {
+  const right = W / 2 + H * 2 / 3 - 0.01 * H, rowTop = H / 2 - 0.03 * H, rowBottom = rowTop + 0.158 * H;
+  const w = 0.12 * H, h = 0.036 * H;
+  return { left: right - w, top: (rowTop + rowBottom) / 2 - h / 2, width: w, height: h };
+}
+function lineupsRect() {
+  const left = W / 2 + 3.5 * SHOP_W + 8, right = Math.min(W - 0.01 * H, W / 2 + H * 2 / 3 - 0.01 * H + 0.25 * H);
+  const top = 0.07 * H, bottom = skipRect().top - 0.01 * H;
+  return { left, top, width: right - left, height: bottom - top };
+}
+const ovalsPerLine = width => Math.max(1, Math.floor((width - 2 * BORDER - 2 * PAD) / (OVAL_W + OVAL_GAP)));
+function lineupsThatFit(rect, sizes) {
+  const perLine = ovalsPerLine(rect.width);
+  let left = rect.height - LINEUPS_HEADER, shown = 0;
+  for (const n of sizes) {
+    const need = LINEUP_LABEL + Math.ceil(Math.max(1, n) / perLine) * (OVAL_H + ROW_GAP) + LINEUP_MMR;
+    if (need > left) break;
+    left -= need; shown++;
+  }
+  return shown;
+}
+
+// ---------- DOM helpers ----------
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function place(e, r) { Object.assign(e.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" }); return e; }
+
+// Oval minion portrait (CardImages.Vignette): colour always; held = solid green ring + tick, missing = light dashed ring.
+function oval(cardId, owned, opts = {}) {
+  const o = el("div", "ov " + (owned ? "owned" : "missing") + (opts.onClick ? " clickable" : "") + (opts.hit ? " hit" : ""));
+  o.style.width = OVAL_W + "px"; o.style.height = OVAL_H + "px";
+  const pic = el("div", "pic");
+  const img = document.createElement("img"); img.src = DATA.cards[cardId].art; img.alt = DATA.cards[cardId].name;
+  pic.appendChild(img); o.appendChild(pic); o.appendChild(el("div", "ring"));
+  if (owned) o.appendChild(el("div", "tick", "✓"));
+  if (opts.tier) o.appendChild(el("div", "tier", String(opts.tier)));
+  o.title = DATA.cards[cardId].name + (owned ? " — held" : " — missing") + (opts.tier ? ` — tier ${opts.tier}` : "");
+  o.addEventListener("mouseenter", () => showPreview(o, cardId, opts.panel || panelEl));
+  o.addEventListener("mouseleave", hidePreview);
+  if (opts.onClick) o.addEventListener("click", () => { hidePreview(); opts.onClick(cardId); });
+  return o;
+}
+
+// ---------- preview (TavernLayout.PreviewRect) ----------
+const stage = document.getElementById("stage"), overlay = document.getElementById("overlay"), boardLayer = document.getElementById("board");
+const preview = document.getElementById("preview");
+let stageScale = 1, panelEl = null;
+function stageRect(node) {
+  const sr = stage.getBoundingClientRect(), r = node.getBoundingClientRect();
+  return { left: (r.left - sr.left) / stageScale, top: (r.top - sr.top) / stageScale, width: r.width / stageScale, height: r.height / stageScale };
+}
+function showPreview(node, cardId, host) {
+  if (!host) return;
+  const v = stageRect(node), p = stageRect(host);
+  const h = PREVIEW_H, w = h * PREVIEW_ASPECT, gap = PREVIEW_GAP;
+  const vcx = v.left + v.width / 2, vcy = v.top + v.height / 2, pr = p.left + p.width;
+  const top = Math.max(0, Math.min(H - h, vcy - h / 2));
+  const leftFits = p.left - gap - w >= 0, rightFits = pr + gap + w <= W, towardsLeft = p.left + p.width / 2 > W / 2;
+  let x, y = top;
+  if (towardsLeft ? leftFits : rightFits) x = towardsLeft ? p.left - gap - w : pr + gap;
+  else if (towardsLeft ? rightFits : leftFits) x = towardsLeft ? pr + gap : p.left - gap - w;
+  else {
+    const l = Math.max(0, Math.min(W - w, vcx - w / 2));
+    if (p.top - gap - h >= 0) { x = l; y = p.top - gap - h; }
+    else if (p.top + p.height + gap + h <= H) { x = l; y = p.top + p.height + gap; }
+    else x = p.left > W - pr ? Math.max(0, p.left - gap - w) : Math.min(W - w, pr + gap);
+  }
+  place(preview, { left: x, top: y, width: w, height: h });
+  preview.firstElementChild.src = DATA.cards[cardId].full;
+  preview.hidden = false;
+}
+function hidePreview() { preview.hidden = true; }
+
+// ---------- the simulated game underneath ----------
+function drawBoard() {
+  boardLayer.replaceChildren();
+  const add = (cls, r, text) => boardLayer.appendChild(place(el("div", "abs " + cls, text), r));
+  const rowTop = H / 2 - 0.03 * H, rowH = 0.158 * H;
+  add("bg-hero", { left: W / 2 - 80, top: 870, width: 160, height: 180 });
+  add("bg-hero", { left: W / 2 + 120, top: 915, width: 90, height: 90 });
+  for (let i = 0; i < 7; i++) add("bg-gold", { left: 1180 + i * 34, top: 1030, width: 26, height: 26 });
+  for (let i = 0; i < 5; i++) add("bg-minion", { left: W / 2 + (i + 0.5 - 2.5) * 140 - 55, top: rowTop + rowH / 2 - 68, width: 110, height: 136 });
+  if (state.phase === "shop") {
+    add("bg-bob", { left: W / 2 - 75, top: 40, width: 150, height: 170 });
+    for (const [i, s] of cardSlots(state.bob.length).entries()) {
+      const c = add("bg-shop", { left: s.left + 3, top: s.top - 6, width: s.width - 6, height: s.height + 12 });
+      const img = document.createElement("img"); img.src = DATA.cards[state.bob[i]].full; img.alt = DATA.cards[state.bob[i]].name; c.appendChild(img);
+    }
+    add("bg-label", { left: 260, top: 40, width: 500, height: 24 }, `taverne de Bob · tour ${state.turn}`);
+  } else {
+    add("bg-hero", { left: W / 2 - 75, top: 40, width: 150, height: 170 });
+    for (let i = 0; i < 6; i++) add("bg-enemy", { left: W / 2 + (i + 0.5 - 3) * 140 - 55, top: 300, width: 110, height: 136 });
+    add("bg-label", { left: 260, top: 40, width: 500, height: 24 }, `combat · tour ${state.turn}`);
+  }
+}
+
+// ---------- MarkerText.Label ----------
+function markerLabel(mark, name, count, maxChars) {
+  const len = t => t.length + (t.match(/★/g) || []).length;
+  const words = name.split(" ");
+  const join = (...p) => p.filter(Boolean).join(" ");
+  const cands = [join(mark, name, count)];
+  if (words.length > 1) cands.push(join(mark, words.slice(0, -1).map(w => w[0].toUpperCase() + ".").join(" ") + " " + words[words.length - 1], count));
+  cands.push(join(mark, words.map(w => w[0].toUpperCase()).join(""), count), join(mark, count), mark + count);
+  return cands.find(c => len(c) <= maxChars) || cands[cands.length - 1];
+}
+
+// ---------- tavern: highlights and markers on Bob's cards, ◇ and ? above each (TavernAdvicePanel.RelayoutMarkers) ----------
+function drawTavern(f) {
+  const slots = cardSlots(state.bob.length);
+  const maxChars = Math.max(3, Math.floor((slots[0].width * 0.95 - 2 * MARKER_PAD) / (MARKER_FONT * 0.62)));
+  const ownedIds = new Set(ownedList());
+  const suggestionsOnScreen = f.suggestions.filter(c => state.visible.includes(c.id));
+  const hl = highlights(state.bob, f.ticked, suggestionsOnScreen);
+  const marked = state.bob.map((id, i) => {
+    const adv = f.aimed.filter(c => c.core.includes(id) || (c.addon.includes(id) && !ownedIds.has(id)));
+    const h = hl[i], lines = [];
+    if (state.pins.has(id)) lines.push("◆ pinned");
+    if (h.kind !== "none") lines.push(markerLabel(h.kind, h.comp.name, h.kind === "commit" ? `${keyOwned(h.comp)}/${h.comp.core.length}` : "", maxChars));
+    const others = adv.filter(c => h.kind === "none" || c.id !== h.comp.id);
+    const room = 2 - lines.length;
+    if (room > 0 && others.length) {
+      const all = others.map(c => markerLabel(c.core.includes(id) ? "★" : "+", c.name, `${keyOwned(c)}/${c.core.length}`, maxChars));
+      lines.push(...(all.length <= room ? all : all.slice(0, room - 1).concat([`+${all.length - (room - 1)} more`])));
+    }
+    return { i, id, adv, h, lines: lines.slice(0, 2) };
+  }).filter(m => m.lines.length > 0);
+  const lineCount = Math.max(1, ...marked.map(m => m.lines.length));
+  for (const m of marked) {
+    const s = slots[m.i];
+    const colour = m.h.kind !== "none" ? m.h.colour : (m.adv.map(c => colourOf(c.id)).find(Boolean) || "#FFFFFF");
+    const frame = place(el("div", "abs mk-frame"), s);
+    const style = m.h.kind === "commit" ? "6px solid" : m.h.kind === "enabler" ? "5px dashed" : "4px solid";
+    frame.style.border = `${style} ${colour}`;
+    frame.dataset.kind = m.h.kind;
+    overlay.appendChild(frame);
+    const mh = lineCount * MARKER_FONT * 1.3 + 2 * MARKER_PAD, mw = s.width * 0.95;
+    const label = place(el("div", "abs mk-label"), { left: s.cx - mw / 2, top: s.top + s.height - mh / 2, width: mw, height: mh });
+    label.style.background = colour;
+    m.lines.forEach(t => label.appendChild(el("span", "", t)));
+    overlay.appendChild(label);
+  }
+  // Two round buttons above the card, never on it: ◇ left of the centre, ? right of it (TavernLayout.PinButtons / LineupButtons).
+  for (const [i, s] of slots.entries()) {
+    const id = state.bob[i];
+    const y = s.top - (PIN_GAP + PIN / 2) - PIN / 2;
+    const pinned = state.pins.has(id);
+    const pin = place(el("button", "abs round" + (pinned ? " filled" : ""), pinned ? "◆" : "◇"), { left: s.cx - (PIN / 2 + PIN_GAP / 2) - PIN / 2, top: y, width: PIN, height: PIN });
+    pin.type = "button"; pin.title = pinned ? "Unpin" : "Pin for this game";
+    pin.addEventListener("click", () => { pinned ? state.pins.delete(id) : state.pins.add(id); log(`pinned=[${[...state.pins].join(",")}]`); render(); });
+    const open = state.lineups === id;
+    const ask = place(el("button", "abs round" + (open ? " filled" : ""), "?"), { left: s.cx + (PIN / 2 + PIN_GAP / 2) - PIN / 2, top: y, width: PIN, height: PIN });
+    ask.type = "button"; ask.title = "How top boards field it";
+    ask.addEventListener("click", () => {
+      state.lineups = open ? null : id;
+      if (!open) { const l = lineupsFor(id); log(`lineups card=${id} comps=[${l.comps.map(x => x.c.name).join("; ")}]`); }
+      render();
+    });
+    overlay.appendChild(pin); overlay.appendChild(ask);
+  }
+  const hlLog = hl.map((h, i) => h.kind === "none" ? null : `${state.bob[i]}:${h.kind}:${h.comp.id}`).filter(Boolean).join(",");
+  if (hlLog !== state.lastHl) { state.lastHl = hlLog; log(`tavern highlights=[${hlLog}]`); }
+}
+
+// ---------- lineups panel: its own panel, right-hand column (PanelFit.LineupsPanel) ----------
+function drawLineups() {
+  if (!state.bob.includes(state.lineups)) { state.lineups = null; return; }
+  const r = lineupsRect(), l = lineupsFor(state.lineups);
+  const box = place(el("div", "abs"), { ...r, height: 0 }); box.id = "lineups";
+  Object.assign(box.style, { height: "", maxHeight: r.height + "px" });
+  const lines = el("div", "lines");
+  const head = el("div", "lh");
+  head.appendChild(el("div", "t", `${DATA.cards[l.cardId].name}: how top boards field it`));
+  const close = el("button", "round", "×"); close.type = "button"; close.title = "Close";
+  Object.assign(close.style, { width: "22px", height: "22px", flex: "none" });
+  close.addEventListener("click", () => { state.lineups = null; render(); });
+  head.appendChild(close);
+  lines.appendChild(head);
+  const shown = lineupsThatFit(r, l.comps.map(x => x.boards[0].cards.length));
+  lines.appendChild(el("div", "hl", l.headline + (shown < l.comps.length ? ` · ${shown} shown` : "")));
+  for (const x of l.comps.slice(0, shown)) {
+    lines.appendChild(el("div", "lab", `${x.c.name} ${fr1(x.c.place)} · in ${x.boards.length} of ${x.kept} top boards`));
+    const best = x.boards[0], row = el("div", "ovals");
+    best.cards.forEach(id => row.appendChild(oval(id, isHeld(id), { hit: id === l.cardId, panel: box })));
+    lines.appendChild(row);
+    lines.appendChild(el("div", "mmr", `MMR ${frInt(best.mmr)} · turn ${best.turn}`));
+  }
+  box.appendChild(lines);
+  overlay.appendChild(box);
+}
+
+// ---------- the target composition panel ----------
+function pbtn(text, onClick, opts = {}) {
+  const b = el("button", "pbtn" + (opts.light ? " light" : ""), text); b.type = "button";
+  if (opts.title) b.title = opts.title;
+  if (opts.disabled) b.disabled = true;
+  b.addEventListener("click", onClick);
+  return b;
+}
+function stepButton(text, step) {
+  return pbtn(text, () => {
+    state.suggested = Math.max(MIN_SUGGESTED, Math.min(MAX_SUGGESTED, state.suggested + step));
+    log(`suggested compositions=${state.suggested}`); render();
+  }, { title: step < 0 ? "One suggestion less" : "One suggestion more", disabled: step < 0 ? state.suggested <= MIN_SUGGESTED : state.suggested >= MAX_SUGGESTED });
+}
+function compLine(comp) {
+  const colour = colourOf(comp.id);
+  const row = el("div", "row");
+  if (colour) row.style.setProperty("--aim", colour);
+  const aim = el("button", "aim" + (!colour && state.checked.length >= 4 ? " full" : ""), colour ? "✓" : "");
+  aim.type = "button"; aim.setAttribute("aria-pressed", String(!!colour));
+  aim.title = colour ? "Stop aiming at this composition" : state.checked.length >= 4 ? "Four compositions are already aimed at" : "Aim at this composition";
+  aim.addEventListener("click", () => { toggleAim(comp.id); render(); });
+  row.appendChild(aim);
+  const name = el("div", "cname");
+  name.appendChild(el("div", "nm" + (colour ? " aimed" : ""), comp.name));
+  name.appendChild(el("div", "av", "avg " + fr1(comp.place)));
+  name.title = "Open this composition's detail";
+  name.addEventListener("click", () => openDetail(comp.id));
+  row.appendChild(name);
+  const ovals = el("div", "ovals");
+  rowCards(comp).forEach(v => ovals.appendChild(oval(v.id, v.owned, { onClick: () => openDetail(comp.id) })));
+  row.appendChild(ovals);
+  return row;
+}
+function openDetail(id) {
+  if (state.detail) return;                         // TargetPanelView.LineClicked: ignored in the detail
+  state.detail = id;
+  const d = compDetail(byId[id]);
+  log(`comp detail id=${id} enablers=[${d.enablers.map(c => c.id).join(",")}] commit=[${d.commit.map(c => c.id).join(",")}]`);
+  render();
+}
+function addDetail(lines, comp, top) {
+  const d = compDetail(comp), colour = colourOf(comp.id);
+  const head = el("div", "dhead");
+  head.appendChild(pbtn("← back", () => { state.detail = null; render(); }, { light: true, title: "Back to the compositions" }));
+  const nm = el("div", "nm", comp.name); if (colour) nm.style.color = colour;
+  head.appendChild(nm);
+  head.appendChild(el("div", "av", "avg " + fr1(comp.place)));
+  lines.appendChild(head);
+  const meta = el("div", "meta");
+  meta.appendChild(el("div", "t", d.meta));
+  const info = el("div", "info", "i"); info.title = d.note; info.setAttribute("aria-label", d.note);
+  meta.appendChild(info);
+  lines.appendChild(meta);
+  const section = (cls, name, hint) => { const s = el("div", "sec " + cls); s.appendChild(el("b", "", name.toUpperCase())); s.appendChild(document.createTextNode("  " + hint)); return s; };
+  const cells = cards => { const row = el("div", "ovals"); cards.slice(0, 7).forEach(c => row.appendChild(oval(c.id, isHeld(c.id), { tier: c.tier }))); return row; };
+  lines.appendChild(section("en", "Early enablers", `tier ≤ ${MAX_EARLY_TIER}, most seen on top boards first`));
+  lines.appendChild(d.enablers.length ? cells(d.enablers) : el("div", "small", "none with a known tier"));
+  lines.appendChild(section("co", "When to commit", "once these key pieces show up"));
+  lines.appendChild(cells(d.commit));
+  const ts = transitions(comp), shown = pivotsThatFit(top, ts.length);
+  for (const t of ts.slice(0, shown)) {
+    const line = el("div", "pivot"), lb = el("div", "lb");
+    lb.appendChild(el("b", "", "PIVOT → ")); lb.appendChild(el("strong", "", t.to.name)); lb.appendChild(document.createTextNode(` · ${t.shared.length} shared`));
+    line.appendChild(lb);
+    const o = el("div", "ovals"); t.shared.slice(0, 7).forEach(id => o.appendChild(oval(id, isHeld(id)))); line.appendChild(o);
+    lines.appendChild(line);
+  }
+}
+function drawPanel(f) {
+  const p = targetPanel();
+  const box = place(el("div", "abs"), { ...p, height: 0 }); box.id = "panel"; panelEl = box;
+  Object.assign(box.style, { height: "", minHeight: p.height + "px", maxHeight: room(p.top) + "px" });
+  const lines = el("div", "lines");
+  const showDetail = !!state.detail;
+  const shown = showDetail ? 0 : rowsThatFit(p.top, f.shown.length, state.footer);
+  const tb = el("div", "titlebar");
+  tb.appendChild(el("div", "title", "Target compositions"));
+  const count = el("div", "count");
+  const meta = el("a", "pbtn", "Meta ↗"); meta.href = META_URL; meta.target = "_blank"; meta.rel = "noopener"; meta.title = "Firestone's composition tier list";
+  meta.style.marginRight = "3px";
+  meta.addEventListener("click", () => log(`meta snapshot opened ${META_URL}`));
+  count.appendChild(meta);
+  count.appendChild(stepButton("−", -1));
+  count.appendChild(el("div", "n", !showDetail && f.shown.length > shown ? `${shown} of ${f.shown.length} shown` : `${state.suggested} suggested`));
+  count.appendChild(stepButton("+", +1));
+  tb.appendChild(count);
+  lines.appendChild(tb);
+  if (showDetail) {
+    addDetail(lines, byId[state.detail], p.top);
+  } else {
+    if (f.shown.length === 0) lines.appendChild(el("div", "small", "No composition reachable yet"));
+    const visible = f.shown.slice(0, shown);
+    visible.forEach(c => lines.appendChild(compLine(c)));
+    state.visible = visible.map(c => c.id);
+    if (state.footer) lines.appendChild(el("div", "footer", FOOTER));
+  }
+  box.appendChild(lines);
+  overlay.appendChild(box);
+}
+
+// ---------- skip combat: kill, Battle.net starts the client again, reconnection ----------
+function drawSkip() {
+  const b = place(el("button", "abs", "Skip combat"), skipRect()); b.id = "skip"; b.type = "button";
+  b.title = "Close Hearthstone and have Battle.net start it again at once";
+  b.addEventListener("click", skipCombat);
+  overlay.appendChild(b);
+}
+function skipCombat() {
+  if (state.phase !== "combat" || !state.skipArmed) { log("skip combat ignored: not in combat, or this combat was already skipped"); return; }
+  state.skipArmed = false; state.reconnecting = true; state.lineups = null;
+  log(`skip combat pid=18244 parent=Battle.net.exe relaunch=[E:\\JEUX\\Battle.net\\Battle.net.exe --exec="launch WTCG"] (from Battle.net, the client's parent)`);
+  render();
+  setTimeout(() => {
+    log(`skip combat: Kill() returned in 0 ms, old client exited: True; Battle.net asked`);
+    setTimeout(() => {
+      state.reconnecting = false; state.phase = "shop"; state.turn += 1; state.skipArmed = true;
+      log(`reconnected: combat over, shop of turn ${state.turn}`);
+      syncPhaseButtons(); render();
+    }, 1800);
+  }, 120);
+}
+
+// ---------- render ----------
+function render() {
+  hidePreview();
+  drawBoard();
+  overlay.replaceChildren(); panelEl = null;
+  const old = document.getElementById("reconnect"); if (old) old.remove();
+  if (state.reconnecting) {
+    const r = el("div"); r.id = "reconnect";
+    r.appendChild(el("div", "big", "Reconnecting…"));
+    r.appendChild(el("div", "small", "simulated: Hearthstone killed, Battle.net starts it again — the overlay is hidden while its window is gone"));
+    stage.appendChild(r);
+    renderControls();
+    return;
+  }
+  const f = focus();
+  drawPanel(f);                                     // first: the tavern highlights follow the suggestions it shows
+  if (state.phase === "shop") { drawTavern(f); if (state.lineups) drawLineups(); }
+  if (state.phase === "combat" && state.skipArmed) drawSkip();
+  renderControls();
+}
+
+// ---------- controls ----------
+function renderControls() {
+  document.getElementById("bob-n").textContent = state.bob.length;
+  const groups = document.getElementById("groups"); groups.replaceChildren();
+  const seen = new Set();
+  for (const c of DATA.comps) {
+    const ids = cardsOf(c).filter(x => !seen.has(x)); if (!ids.length) continue;
+    ids.forEach(x => seen.add(x));
+    const g = el("div", "group"); g.appendChild(el("span", "gname", c.name));
+    for (const id of ids) {
+      const n = state.owned[id] || 0, chip = el("button", "chip" + (n > 0 ? " on" : "")); chip.type = "button"; chip.title = id;
+      const im = document.createElement("img"); im.src = DATA.cards[id].art; im.alt = ""; chip.appendChild(im);
+      chip.appendChild(el("span", "", DATA.cards[id].name)); chip.appendChild(el("span", "c", "×" + n));
+      chip.addEventListener("click", () => { const next = (n + 1) % 4; if (next) state.owned[id] = next; else delete state.owned[id]; render(); });
+      g.appendChild(chip);
+    }
+    groups.appendChild(g);
+  }
+}
+const viewport = document.getElementById("viewport");
+function fit() {
+  stageScale = state.zoom === "fit" ? Math.min(1, viewport.clientWidth / W) : 1;
+  stage.style.transform = `scale(${stageScale})`;
+  viewport.style.height = H * stageScale + "px";
+  viewport.style.overflowX = state.zoom === "fit" ? "hidden" : "auto";
+  let spacer = viewport.querySelector(".spacer");
+  if (!spacer) { spacer = el("div", "spacer"); spacer.style.height = "1px"; viewport.appendChild(spacer); }
+  spacer.style.width = state.zoom === "fit" ? "" : W + "px";
+}
+function syncPhaseButtons() {
+  document.getElementById("ph-shop").setAttribute("aria-pressed", String(state.phase === "shop"));
+  document.getElementById("ph-combat").setAttribute("aria-pressed", String(state.phase === "combat"));
+}
+function setPhase(p) {
+  if (state.reconnecting || state.phase === p) return;
+  state.phase = p;
+  if (p === "shop") { state.turn += 1; state.skipArmed = true; }   // leaving combat re-arms the button (SkipCombatState)
+  else state.lineups = null;                                      // the lineups panel goes with the shop
+  syncPhaseButtons(); render();
+}
+const on = (id, fn) => document.getElementById(id).addEventListener("click", fn);
+on("ph-shop", () => setPhase("shop"));
+on("ph-combat", () => setPhase("combat"));
+on("bob-less", () => { if (state.bob.length > 3) { state.bob.pop(); render(); } });
+on("bob-more", () => { if (state.bob.length < 7) { state.bob.push(ALL_IDS.filter(x => !state.bob.includes(x))[Math.floor(Math.random() * 20)]); render(); } });
+on("bob-roll", () => {
+  const pool = ALL_IDS.slice().sort(() => Math.random() - 0.5); state.bob = pool.slice(0, state.bob.length); state.lineups = null; render();
+});
+on("zoom-fit", e => { state.zoom = "fit"; e.target.setAttribute("aria-pressed", "true"); document.getElementById("zoom-real").setAttribute("aria-pressed", "false"); fit(); });
+on("zoom-real", e => { state.zoom = "real"; e.target.setAttribute("aria-pressed", "true"); document.getElementById("zoom-fit").setAttribute("aria-pressed", "false"); fit(); });
+document.getElementById("opt-footer").addEventListener("change", e => { state.footer = e.target.checked; render(); });
+on("own-none", () => { state.owned = {}; render(); });
+on("own-preset", () => { state.owned = { ...PRESET }; render(); });
+on("own-all", () => { state.owned = Object.fromEntries(ALL_IDS.map(id => [id, 1])); render(); });
+window.addEventListener("resize", fit);
+
+fit();
+render();
+log("ready — shop of turn 7, 3 suggested, nothing aimed at");
+</script>
