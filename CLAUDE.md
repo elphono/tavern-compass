@@ -42,7 +42,8 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 Ce qui reste ouvert :
 
 - **Vérifier en jeu** les phases 5 et 6 (liste exhaustive : spec § 5), et les livraisons du 2026-09-27
-  (vignettes en couleur, détail des compos : `docs/journal/2026-09-27-skip-combat-et-detail-compos.md`).
+  (vignettes en couleur, détail des compos, bouton Skip combat — reconnexion effective, relance directe de
+  Hearthstone.exe hors Battle.net, état d'HDT après la mort du client : `docs/journal/2026-09-27-skip-combat-et-detail-compos.md`).
 - **Deux arbitrages d'Ali** : garder la ligne « comp ≈ » sous chaque héros (échantillons minces, 17
   parties en médiane) ; garder le bilan par adversaire s'il doublonne l'interface du jeu.
 - **Import HSReplay jamais utilisé** : `stats\manual\` est vide, seules les 24 compos Firestone tournent.
@@ -126,6 +127,8 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 - Détail d'une compo : son bouton ▸ déplie sous sa ligne un bloc (un seul à la fois) — enablers de tier
   ≤ 3, pièces clés, tour final médian — **dérivé** des cartes et plateaux finaux par `CompDetail`, car
   aucune source n'a de donnée early game ; vignettes en couleur, cadre vert + ✓ tenue, rouge manquante.
+- Bouton « Skip combat » (jaune, en combat seulement, panneau déplaçable `skip-combat`) : tue Hearthstone
+  et le relance, la reconnexion sautant l'animation ; un clic par combat, ligne `Bronzebeard HUD: skip combat …`.
 - Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
   événements réels ne se vérifient que sous Windows, avec HDT installé.
 - Le dépôt est **privé** (il était public jusqu'au 2026-09-26) : on garde malgré tout la règle

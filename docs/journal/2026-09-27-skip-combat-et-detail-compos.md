@@ -17,3 +17,18 @@ Le JSON Firestone (schema 4) et le format HSReplay manuel n'ont **aucune** donn�
   d'abord, six au plus. Une pièce clé de tier ≤ 3 y figure aussi (lecture littérale de la demande).
 - When to commit : les pièces clés, avec leur tier. Typical final turn : médiane des `turn` des plateaux.
 - Tier : HearthDb via HDT (`Card.TechLevel`, 0 = inconnu, écarté des enablers).
+
+## B. Bouton « Skip combat »
+
+En combat seulement, un bouton jaune tue Hearthstone et le relance ; la reconnexion saute l'animation.
+Panneau déplaçable à part (`skip-combat`), par défaut au bout droit de la rangée du joueur, à droite de sept
+sbires. Exécutable retenu **avant** le kill (`MainModule`, sinon `HearthstoneDirectory` d'HDT) ; rien n'est
+tué s'il n'existe pas. Un clic par combat. Une ligne `Bronzebeard HUD: skip combat …` cite pid, exécutable,
+temps de sortie, nouveau pid ou l'exception.
+
+| Mesuré le 2026-09-27 | Valeur |
+|---|---|
+| `config.xml` d'HDT | `CloseWithHearthstone=false`, `HearthstoneDirectory=E:\JEUX\Hearthstone` |
+| bitness (`file`) | Hearthstone.exe et HDT 1.58.3 : x86-64 tous deux, donc pas de refus 32/64 bits attendu sur `MainModule` |
+| HDT à la mort du client (lu dans `Core.cs`, master) | `Reset()` puis `IsInMenu = true` : les panneaux du plugin devraient se vider jusqu'à la reconnexion |
+| HDT lançant lui-même le jeu (`HearthstoneRunner.cs`) | via Battle.net `--exec="launch WTCG"`, pas Hearthstone.exe |

@@ -47,6 +47,14 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _lineupsGuard;
     private readonly FeatureGuard _metaGuard;
     private readonly FeatureGuard _compDetailGuard;
+    private readonly FeatureGuard _skipCombatGuard;
+
+    // The "Skip combat" button: shown in combat, acts once per combat (SkipCombatState).
+    private SkipCombatPanel? _skipCombat;
+    private readonly SkipCombatState _skipState = new();
+
+    /// <summary>How long to wait for Hearthstone to exit after Kill() before giving up (and not restarting it).</summary>
+    private const int KillTimeoutMs = 5000;
 
     // Pins made by click (Tavern Pinning): kept across a plugin reload within a game, forgotten at the next game.
     private readonly GamePins _gamePins = new();
@@ -107,7 +115,8 @@ public sealed class Plugin : IPlugin
 
             _shownCompStatus = "\u0000";
         }));
-        _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
+        _skipCombatGuard = new FeatureGuard("skip-combat", (n, e) => Disable(n, e, () => _skipCombat?.Hide()));
+        _pinsGuard =new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
             if (_tavern != null)
             {
@@ -194,6 +203,125 @@ public sealed class Plugin : IPlugin
         });
         return detail;
     }
+
+    /// <summary>Shows the "Skip combat" button in combat only, and not again in a combat already skipped.</summary>
+    private void UpdateSkipCombat(GameV2 game)
+    {
+        if (_skipCombat == null)
+        {
+            return;
+        }
+
+        if (_skipState.Observe(HdtEntityAdapter.Phase(game)))
+        {
+            _skipCombat.Show();
+        }
+        else
+        {
+            _skipCombat.Hide();
+        }
+    }
+
+    /// <summary>
+    /// The "Skip combat" button: closes Hearthstone and starts it again at once, the reconnection landing after
+    /// the combat animation (a known Battlegrounds trick). A local action on the process: no game memory is
+    /// read. The executable is chosen before the kill (the process's own file, else HDT's Hearthstone folder),
+    /// and nothing is killed unless that file exists, so that the client can always be started again. One log
+    /// line per click, with what was measured: pid, executable and where it came from, time to exit, new pid,
+    /// or the exception.
+    /// </summary>
+    private void SkipCombat() => _skipCombatGuard.Run(() =>
+    {
+        if (!_skipState.TryBegin())
+        {
+            Log.Info("Bronzebeard HUD: skip combat ignored: not in combat, or this combat was already skipped");
+            return;
+        }
+
+        _skipCombat?.Hide();
+        var processes = Array.Empty<Process>();
+        var logged = false; // the steps below log their own failure with its context
+        try
+        {
+            processes = Process.GetProcessesByName("Hearthstone");
+            if (processes.Length == 0)
+            {
+                Log.Warn("Bronzebeard HUD: skip combat: GetProcessesByName(\"Hearthstone\") found no process; nothing done");
+                return;
+            }
+
+            var target = processes.FirstOrDefault(p => p.MainWindowHandle != IntPtr.Zero) ?? processes[0];
+            var pid = target.Id;
+            string? fromProcess = null;
+            var moduleError = string.Empty;
+            try
+            {
+                fromProcess = target.MainModule?.FileName;
+            }
+            catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or NotSupportedException)
+            {
+                moduleError = $"; MainModule unreadable: {e.GetType().Name}: {e.Message}";
+            }
+
+            var (exe, source) = SkipCombatPlan.Executable(fromProcess, Hearthstone_Deck_Tracker.Config.Instance.HearthstoneDirectory);
+            var what = $"pid={pid} ({processes.Length} Hearthstone process{(processes.Length > 1 ? "es" : string.Empty)}) exe={exe ?? "unknown"} (from {source}{moduleError})";
+            if (exe == null || !File.Exists(exe))
+            {
+                Log.Warn($"Bronzebeard HUD: skip combat {what}: executable {(exe == null ? "unknown" : "not found")}; Hearthstone left running");
+                return;
+            }
+
+            var watch = Stopwatch.StartNew();
+            try
+            {
+                target.Kill();
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Bronzebeard HUD: skip combat {what}: Kill() failed after {watch.ElapsedMilliseconds} ms: {e.GetType().Name}: {e.Message}");
+                logged = true;
+                throw;
+            }
+
+            if (!target.WaitForExit(KillTimeoutMs))
+            {
+                Log.Error($"Bronzebeard HUD: skip combat {what}: still running {KillTimeoutMs} ms after Kill(); not restarted, to avoid two clients");
+                return;
+            }
+
+            var exitedMs = watch.ElapsedMilliseconds;
+            Process? started;
+            try
+            {
+                started = Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = Path.GetDirectoryName(exe), UseShellExecute = false });
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Bronzebeard HUD: skip combat {what}: exited {exitedMs} ms after Kill(), restart FAILED: {e.GetType().Name}: {e.Message}; start Hearthstone by hand");
+                logged = true;
+                throw;
+            }
+
+            using (started)
+            {
+                Log.Info($"Bronzebeard HUD: skip combat {what}: exited {exitedMs} ms after Kill(), restarted pid={started?.Id.ToString() ?? "none"} " +
+                         $"(Process.Start returned after {watch.ElapsedMilliseconds - exitedMs} ms)");
+            }
+        }
+        catch (Exception e) when (!logged)
+        {
+            // Anything else (a process gone while it was being read, WaitForExit failing): still one line with what is known.
+            Log.Error($"Bronzebeard HUD: skip combat failed ({processes.Length} Hearthstone process(es) found): {e.GetType().Name}: {e.Message}");
+            throw;
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+    });
 
     /// <summary>A pin button was clicked above one of Bob's cards.</summary>
     private void TogglePin(string cardId) => _pinsGuard.Run(() =>
@@ -329,6 +457,7 @@ public sealed class Plugin : IPlugin
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
         _history = new GameHistoryPanel(Core.OverlayCanvas, _mover);
+        _skipCombat = new SkipCombatPanel(Core.OverlayCanvas, _mover, SkipCombat);
     }
 
     private void ResetSessionState()
@@ -366,6 +495,8 @@ public sealed class Plugin : IPlugin
         _choices = null;
         _history?.Detach();
         _history = null;
+        _skipCombat?.Detach();
+        _skipCombat = null;
         _panel = null;
         _tavern = null;
         _stats?.Dispose();
@@ -390,6 +521,7 @@ public sealed class Plugin : IPlugin
         _choiceGuard.Run(() => UpdateChoice(game));
         _historyGuard.Run(() => UpdateHistory(game));
         _warbandGuard.Run(() => UpdateWarband(game));
+        _skipCombatGuard.Run(() => UpdateSkipCombat(game));
     }
 
     /// <summary>
