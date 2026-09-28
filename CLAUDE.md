@@ -103,7 +103,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   `%AppData%\HearthstoneDeckTracker\Plugins\BronzebeardHud\`, **sans** `Newtonsoft.Json.dll` : HDT
   charge la sienne, dans la même version (13.0.3).
 - Données : `%LocalAppData%\BronzebeardHud\stats\`, qui contient le cache Firestone (héros et
-  trinkets : 24 h ; compositions : 7 jours). Dans son sous-dossier `manual\`, les fichiers écrits à la
+  trinkets : 24 h ; compositions : 7 jours). **Au démarrage du plugin**, chaque fichier est redemandé au
+  serveur quel que soit son âge, en requête conditionnelle (ETag dans `*.etag` : `304` s'il n'a pas changé) ;
+  les âges ne valent qu'ensuite, dans la session. Une ligne `Bronzebeard HUD: data …` par chargement dit
+  `downloaded`, `unchanged (304)`, `cached` ou `FAILED` et la date des données. Dans son sous-dossier `manual\`, les fichiers écrits à la
   main : `*.json` (stats de héros HSReplay, spec § 2), `*.comps.txt` (compositions HSReplay, spec § 6)
   et `pins.txt` (sbires à signaler en taverne, un par ligne ; en partie, le bouton ◇ au-dessus d'une carte
   de Bob l'épingle ou la désépingle pour la partie, sans toucher au fichier). Un cache d'un format antérieur (champ

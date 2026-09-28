@@ -60,7 +60,7 @@ internal sealed class StatsService : IDisposable
         }
 
         var mine = await _cache.GetHeroStatsAsync(bracket, TimePeriod, RefreshPolicy.HeroStats, CancellationToken.None).ConfigureAwait(false);
-        return mine.File != null ? mine : new CacheResult(all.File, all.Downloaded, mine.Error);
+        return mine.File != null ? mine : new CacheResult(all.File, all.Downloaded, mine.Error, all.Unchanged);
     }
 
     /// <summary>
@@ -87,7 +87,12 @@ internal sealed class StatsService : IDisposable
             : new CacheResult(_firestone?.File, downloaded: false, error: done.Exception?.GetBaseException().Message);
         _refresh = null;
         Version++;
+        PendingLogLine = DataRefresh.Line($"hero-stats mmr-{Bracket} {TimePeriod}", _firestone.Downloaded, _firestone.Unchanged,
+            _firestone.Error, _firestone.File?.FetchedAt);
     }
+
+    /// <summary>The diagnostic line of the last finished load, until the plugin logs it; see <see cref="DataRefresh"/>.</summary>
+    public string? PendingLogLine { get; set; }
 
     /// <summary>The player's MMR bracket as last resolved (100 = every player until known).</summary>
     public int Bracket => _firestone?.File?.MmrPercentile ?? MmrBracket.EveryPlayer;

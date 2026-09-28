@@ -15,7 +15,7 @@ namespace BronzebeardHud.HdtPlugin;
 /// the compositions in reach, and for a trinket its Firestone placement, adjusted when it suits them.
 /// Text from <see cref="ChoiceAdvisor.Lines"/>, positions from <see cref="ChoiceLayout"/> (HDT's constants),
 /// both recomputed when the overlay is resized. Trinket stats come from the daily cache, fetched off the
-/// UI thread on the first trinket choice.
+/// UI thread from the plugin's start on (the first fetch always asks Firestone's server, see StatsCache).
 /// </summary>
 internal sealed class ChoiceAdvicePanel : IDisposable
 {
@@ -28,7 +28,7 @@ internal sealed class ChoiceAdvicePanel : IDisposable
     private readonly HttpStatsFetcher _fetcher = new();
     private readonly StatsCache _cache;
     private readonly List<UIElement> _labels = new();
-    private Task<(TrinketStatsFile? File, bool Downloaded, string? Error)>? _download;
+    private Task<(TrinketStatsFile? File, bool Downloaded, string? Error, bool Unchanged)>? _download;
     private TrinketStatsFile? _stats;
     private ChoiceAdvice? _advice;
 
@@ -52,6 +52,9 @@ internal sealed class ChoiceAdvicePanel : IDisposable
 
     public TrinketStat? TrinketStat(string cardId) => _stats?.Find(cardId);
 
+    /// <summary>The diagnostic line of the finished load, until the plugin logs it; see <see cref="DataRefresh"/>.</summary>
+    public string? PendingLogLine { get; set; }
+
     /// <summary>Starts the trinket download on first call; true when stats became available since the last call.</summary>
     public bool PollTrinketStats()
     {
@@ -65,10 +68,13 @@ internal sealed class ChoiceAdvicePanel : IDisposable
         {
             _stats = _download.Result.File;
             TrinketError = _download.Result.Error;
+            PendingLogLine = DataRefresh.Line("trinket-stats last-patch", _download.Result.Downloaded, _download.Result.Unchanged,
+                TrinketError, _stats?.FetchedAt);
         }
         else
         {
             TrinketError = _download.Exception?.GetBaseException().Message;
+            PendingLogLine = DataRefresh.Line("trinket-stats last-patch", false, false, TrinketError ?? "cancelled", null);
         }
 
         return true;

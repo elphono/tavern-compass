@@ -100,7 +100,9 @@ C < μ+σ ≤ D < μ+2σ ≤ E ≤ 8.
 | Âge maximal du cache, héros | 24 h | Firestone régénère toutes les heures, mais une stat « dernier patch » bouge peu en une journée ; environ 0,5 Mo par jour |
 | Âge maximal du cache, compositions | 7 jours | 31,5 Mo par téléchargement, dont 2,4 Mo de plateaux finaux par archétype |
 | Délai après un échec | 1 h | pas de nouvel essai à chaque sélection de héros quand le réseau manque |
-| Déclencheur | ouverture de la sélection de héros, jamais en tâche de fond | on ne télécharge que ce que l'écran va montrer |
+| **Démarrage du plugin** (depuis le 2026-09-28) | héros (tranche « tous »), compos et trinkets chargés dès le 1er tick d'HDT ; le **1er accès de la session à chaque fichier demande toujours au serveur**, quel que soit l'âge du cache ou un échec récent, en requête conditionnelle (ETag gardé dans `*.etag`) | Ali veut les données les plus fraîches à chaque lancement ; un fichier inchangé coûte un `304` sans corps (mesuré sur `static.zerotoheroes.com` le 2026-09-28), un fichier changé ≈ 3,9 Mo compressés pour les compos |
+| Déclencheur ensuite | sélection de héros (tranche du joueur), début de partie (compos) ; âge maximal et délai après échec s'appliquent | on ne retélécharge pas en cours de session ce qui vient d'être confirmé |
+| Journal | une ligne `Bronzebeard HUD: data <fichier>: downloaded / unchanged (304) / cached / FAILED…, fetched <date>` par chargement | savoir d'un coup d'œil si les données sont fraîches |
 | Écriture | fichier temporaire, puis renommage | un téléchargement raté ou malformé n'écrase jamais un cache valide |
 | Périmètre | la seule combinaison tranche × période affichée | aucun moissonnage des autres combinaisons |
 

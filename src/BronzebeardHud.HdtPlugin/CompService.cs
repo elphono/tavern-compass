@@ -11,8 +11,8 @@ namespace BronzebeardHud.HdtPlugin;
 /// <summary>
 /// The compositions the tavern advisor aims at: hand-typed HSReplay files first
 /// (<c>stats\manual\*.comps.txt</c>, format in the spec), then Firestone's composition stats
-/// from the 7-day cache. Reloaded at each game, off the UI thread, and loaded by the first
-/// <see cref="Poll"/> when no game start was seen (plugin re-enabled, or HDT started mid-game).
+/// from the 7-day cache. Loaded by the first <see cref="Poll"/>, which the plugin makes right after its
+/// start, and that first load always asks Firestone's server (StatsCache); reloaded at each game, off the UI thread.
 /// </summary>
 internal sealed class CompService : IDisposable
 {
@@ -58,8 +58,13 @@ internal sealed class CompService : IDisposable
         if (_refresh.Poll())
         {
             Version++;
+            var last = _refresh.Last!;
+            PendingLogLine = DataRefresh.Line($"comp-stats {TimePeriod}", last.Downloaded, last.Unchanged, last.Error, last.File?.FetchedAt);
         }
     }
+
+    /// <summary>The diagnostic line of the last finished load, until the plugin logs it; see <see cref="DataRefresh"/>.</summary>
+    public string? PendingLogLine { get; set; }
 
     public IReadOnlyList<Composition> Compositions() =>
         _refresh.Last?.File is { } firestone ? _manual.Concat(firestone.Compositions).ToList() : _manual;

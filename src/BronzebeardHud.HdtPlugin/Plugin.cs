@@ -45,6 +45,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _compDetailGuard;
     private readonly FeatureGuard _skipCombatGuard;
     private readonly FeatureGuard _highlightsGuard;
+    private readonly FeatureGuard _dataGuard;
 
     // "How top boards field it", opened by the "?" above one of Bob's minions.
     private LineupsPanel? _lineupsPanel;
@@ -75,6 +76,8 @@ public sealed class Plugin : IPlugin
     public Plugin()
     {
         _heroSelectionGuard = new FeatureGuard("hero-selection", (n, e) => Disable(n, e, () => _panel?.Hide()));
+        // Without it the features still load their data themselves, only later (at hero pick, shop, trinket choice).
+        _dataGuard = new FeatureGuard("data-refresh", (n, e) => Disable(n, e, () => { }));
         _tavernGuard = new FeatureGuard("tavern-advice", (n, e) => Disable(n, e, () => { _tavern?.HideMarkers(); _tavern?.HidePanel(); }));
         _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
         // Replaces "trinket-choice": trinkets are now one kind of choice among discovers and Dark Gifts.
@@ -649,12 +652,43 @@ public sealed class Plugin : IPlugin
             return;
         }
 
+        _dataGuard.Run(() => RefreshData(game));
         _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
         _tavernGuard.Run(() => UpdateTavern(game));
         _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
         _choiceGuard.Run(() => UpdateChoice(game));
         _warbandGuard.Run(() => UpdateWarband(game));
         _skipCombatGuard.Run(() => UpdateSkipCombat(game));
+    }
+
+    /// <summary>
+    /// From the first update after the plugin starts, in or out of a game: load every Firestone file (hero stats,
+    /// compositions, trinkets). Each one's first load in a plugin session asks Firestone's server whatever the
+    /// age of the cache (StatsCache), so starting HDT brings the freshest data; later loads keep the age rules.
+    /// One line in HDT's log per finished load (DataRefresh).
+    /// </summary>
+    private void RefreshData(GameV2 game)
+    {
+        if (_stats == null || _comps == null || _choices == null)
+        {
+            return;
+        }
+
+        _stats.EnsureStarted(game.CurrentBattlegroundsRating);
+        _stats.Poll();
+        _comps.Poll();
+        _choices.PollTrinketStats();
+        foreach (var line in new[] { _stats.PendingLogLine, _comps.PendingLogLine, _choices.PendingLogLine })
+        {
+            if (line != null)
+            {
+                Log.Info(line);
+            }
+        }
+
+        _stats.PendingLogLine = null;
+        _comps.PendingLogLine = null;
+        _choices.PendingLogLine = null;
     }
 
     /// <summary>

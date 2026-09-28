@@ -98,20 +98,20 @@ public sealed class WarbandCurveTests : IDisposable
         Assert.StartsWith("cache: schema 1 ≠ 2, redownload failed: Response status code does not indicate success: 503", failed.Error);
     }
 
-    private sealed class Fetcher : IStatsFetcher
+    private sealed class Fetcher : IConditionalFetcher
     {
         private readonly Func<string> _response;
         public Fetcher(Func<string> response) => _response = response;
 
-        public Task<string> FetchAsync(string url, CancellationToken cancellationToken)
+        public Task<FetchedText> FetchAsync(string url, string? ifNoneMatch, CancellationToken cancellationToken)
         {
             try
             {
-                return Task.FromResult(_response());
+                return Task.FromResult(FetchedText.Changed(_response(), etag: null));
             }
             catch (Exception e)
             {
-                return Task.FromException<string>(e);
+                return Task.FromException<FetchedText>(e);
             }
         }
     }

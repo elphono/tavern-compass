@@ -19,8 +19,11 @@ public sealed class CompositionCacheTests : IDisposable
         Assert.Empty(_violations);
     }
 
+    private StatsCache? _session;
+
+    /// <summary>One plugin session for the whole test: only its first use bypasses the age and retry rules.</summary>
     private Task<CompositionCacheResult> Get() =>
-        new StatsCache(_directory, new Fetcher(this), () => _now)
+        (_session ??= new StatsCache(_directory, new Fetcher(this), () => _now))
             .GetCompositionsAsync("past-seven", RefreshPolicy.CompStats, CancellationToken.None);
 
     /// <summary>A payload with one archetype whose only key piece is <paramref name="keyPiece"/> (20 boards).</summary>
@@ -60,12 +63,12 @@ public sealed class CompositionCacheTests : IDisposable
         Assert.Equal(new[] { ExpectedUrl, ExpectedUrl, ExpectedUrl }, _urls);
     }
 
-    private sealed class Fetcher : IStatsFetcher
+    private sealed class Fetcher : IConditionalFetcher
     {
         private readonly CompositionCacheTests _test;
         public Fetcher(CompositionCacheTests test) => _test = test;
 
-        public Task<string> FetchAsync(string url, CancellationToken cancellationToken)
+        public Task<FetchedText> FetchAsync(string url, string? ifNoneMatch, CancellationToken cancellationToken)
         {
             _test._urls.Add(url);
             if (url != ExpectedUrl)
@@ -76,16 +79,16 @@ public sealed class CompositionCacheTests : IDisposable
             if (_test._responses.Count == 0)
             {
                 _test._violations.Add($"unexpected download #{_test._urls.Count}");
-                return Task.FromException<string>(new InvalidOperationException("no response queued"));
+                return Task.FromException<FetchedText>(new InvalidOperationException("no response queued"));
             }
 
             try
             {
-                return Task.FromResult(_test._responses.Dequeue()());
+                return Task.FromResult(FetchedText.Changed(_test._responses.Dequeue()(), etag: null));
             }
             catch (Exception e)
             {
-                return Task.FromException<string>(e);
+                return Task.FromException<FetchedText>(e);
             }
         }
     }

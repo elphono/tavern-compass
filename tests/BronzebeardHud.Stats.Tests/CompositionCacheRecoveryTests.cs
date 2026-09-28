@@ -34,8 +34,11 @@ public sealed class CompositionCacheRecoveryTests : IDisposable
 
     private string CachePath => Path.Combine(_directory, "firestone-comp-stats-last-patch.json");
 
+    private StatsCache? _session;
+
+    /// <summary>One plugin session for the whole test: only its first use bypasses the age and retry rules.</summary>
     private Task<CompositionCacheResult> Get() =>
-        new StatsCache(_directory, new Fetcher(this), () => _now)
+        (_session ??= new StatsCache(_directory, new Fetcher(this), () => _now))
             .GetCompositionsAsync("last-patch", RefreshPolicy.CompStats, CancellationToken.None);
 
     /// <summary>One composition whose final boards list their minions out of order: only ZONE_POSITION gives the order.</summary>
@@ -117,12 +120,12 @@ public sealed class CompositionCacheRecoveryTests : IDisposable
         Assert.Equal(CompositionFile.CurrentSchema, SchemaOnDisk());
     }
 
-    private sealed class Fetcher : IStatsFetcher
+    private sealed class Fetcher : IConditionalFetcher
     {
         private readonly CompositionCacheRecoveryTests _test;
         public Fetcher(CompositionCacheRecoveryTests test) => _test = test;
 
-        public Task<string> FetchAsync(string url, CancellationToken cancellationToken)
+        public Task<FetchedText> FetchAsync(string url, string? ifNoneMatch, CancellationToken cancellationToken)
         {
             _test._urls.Add(url);
             if (url != Url)
@@ -133,16 +136,16 @@ public sealed class CompositionCacheRecoveryTests : IDisposable
             if (_test._responses.Count == 0)
             {
                 _test._violations.Add($"unexpected download #{_test._urls.Count}");
-                return Task.FromException<string>(new InvalidOperationException("no response queued"));
+                return Task.FromException<FetchedText>(new InvalidOperationException("no response queued"));
             }
 
             try
             {
-                return Task.FromResult(_test._responses.Dequeue()());
+                return Task.FromResult(FetchedText.Changed(_test._responses.Dequeue()(), etag: null));
             }
             catch (Exception e)
             {
-                return Task.FromException<string>(e);
+                return Task.FromException<FetchedText>(e);
             }
         }
     }
