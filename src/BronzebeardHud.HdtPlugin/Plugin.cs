@@ -753,9 +753,15 @@ public sealed class Plugin : IPlugin
         }
 
         _comps.Poll();
-        var loaded = kind == ChoiceKind.Trinket && _choices.PollTrinketStats();
         var ids = string.Join(",", options.Select(o => o.EntityId));
-        var key = $"{ids}|{_comps.Version}|{_stats.Bracket}|{_choices.TrinketStatsLoaded}|{_selectionVersion}";
+        if (kind == ChoiceKind.Trinket)
+        {
+            // Entity ids restart with each game: the game number keeps two games' choices apart.
+            _choices.BeginTrinketChoice($"{_gameNumber}:{ids}");
+        }
+
+        var loaded = kind == ChoiceKind.Trinket && _choices.PollTrinketStats();
+        var key = $"{ids}|{_comps.Version}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_selectionVersion}";
         if (key == _choiceKey && !loaded)
         {
             return;

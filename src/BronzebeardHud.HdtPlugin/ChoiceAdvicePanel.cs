@@ -15,7 +15,8 @@ namespace BronzebeardHud.HdtPlugin;
 /// the compositions in reach, and for a trinket its Firestone placement, adjusted when it suits them.
 /// Text from <see cref="ChoiceAdvisor.Lines"/>, positions from <see cref="ChoiceLayout"/> (HDT's constants),
 /// both recomputed when the overlay is resized. Trinket stats come from the daily cache, fetched off the
-/// UI thread from the plugin's start on (the first fetch always asks Firestone's server, see StatsCache).
+/// UI thread from the plugin's start on (the first fetch always asks Firestone's server, see StatsCache), then
+/// asked again at each trinket choice so that the daily rule holds in a long session (TrinketStatsRefresh).
 /// </summary>
 internal sealed class ChoiceAdvicePanel : IDisposable
 {
@@ -28,8 +29,7 @@ internal sealed class ChoiceAdvicePanel : IDisposable
     private readonly HttpStatsFetcher _fetcher = new();
     private readonly StatsCache _cache;
     private readonly List<UIElement> _labels = new();
-    private Task<(TrinketStatsFile? File, bool Downloaded, string? Error, bool Unchanged)>? _download;
-    private TrinketStatsFile? _stats;
+    private readonly TrinketStatsRefresh _trinkets;
     private ChoiceAdvice? _advice;
 
     public ChoiceAdvicePanel(Canvas canvas, string statsDirectory, CompositionSelection selection)
@@ -37,12 +37,17 @@ internal sealed class ChoiceAdvicePanel : IDisposable
         _canvas = canvas;
         _selection = selection;
         _cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
+        _trinkets = new TrinketStatsRefresh("trinket-stats last-patch",
+            () => Task.Run(() => _cache.GetTrinketStatsAsync("last-patch", RefreshPolicy.HeroStats, CancellationToken.None)));
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
-    public string? TrinketError { get; private set; }
+    public string? TrinketError => _trinkets.Error;
 
-    public bool TrinketStatsLoaded => _stats != null || _download is { IsCompleted: true };
+    public bool TrinketStatsLoaded => _trinkets.Loaded;
+
+    /// <summary>Changes each time a trinket load finishes, so that a choice on screen is advised again with its result.</summary>
+    public int TrinketStatsVersion => _trinkets.Version;
 
     /// <summary>The first label drawn by the last layout, for the diagnostic line; null when none.</summary>
     public LayoutRect? FirstLabel { get; private set; }
@@ -50,33 +55,23 @@ internal sealed class ChoiceAdvicePanel : IDisposable
     /// <summary>The lines drawn above each option by the last layout.</summary>
     public IReadOnlyList<IReadOnlyList<string>> LastLines { get; private set; } = Array.Empty<IReadOnlyList<string>>();
 
-    public TrinketStat? TrinketStat(string cardId) => _stats?.Find(cardId);
+    public TrinketStat? TrinketStat(string cardId) => _trinkets.File?.Find(cardId);
 
     /// <summary>The diagnostic line of the finished load, until the plugin logs it; see <see cref="DataRefresh"/>.</summary>
     public string? PendingLogLine { get; set; }
 
-    /// <summary>Starts the trinket download on first call; true when stats became available since the last call.</summary>
+    /// <summary>A trinket choice is on screen, named by an id unique to it: asks the cache again, once per choice.</summary>
+    public void BeginTrinketChoice(string choiceId) => _trinkets.BeginChoice(choiceId);
+
+    /// <summary>Starts the first trinket load on first call; true when a load finished since the last call.</summary>
     public bool PollTrinketStats()
     {
-        _download ??= Task.Run(() => _cache.GetTrinketStatsAsync("last-patch", RefreshPolicy.HeroStats, CancellationToken.None));
-        if (_stats != null || !_download.IsCompleted)
+        if (!_trinkets.Poll())
         {
             return false;
         }
 
-        if (_download.Status == TaskStatus.RanToCompletion)
-        {
-            _stats = _download.Result.File;
-            TrinketError = _download.Result.Error;
-            PendingLogLine = DataRefresh.Line("trinket-stats last-patch", _download.Result.Downloaded, _download.Result.Unchanged,
-                TrinketError, _stats?.FetchedAt);
-        }
-        else
-        {
-            TrinketError = _download.Exception?.GetBaseException().Message;
-            PendingLogLine = DataRefresh.Line("trinket-stats last-patch", false, false, TrinketError ?? "cancelled", null);
-        }
-
+        PendingLogLine = _trinkets.LastLine;
         return true;
     }
 
