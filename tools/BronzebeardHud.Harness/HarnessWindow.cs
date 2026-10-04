@@ -74,6 +74,99 @@ internal sealed class HarnessWindow : Window
 
     public ChoiceAdvicePanel Choices => _choices;
 
+    /// <summary>
+    /// What the guide popup is told of the cursor when a line raises MouseLeave (is it still within the line?); null: the
+    /// real cursor (GuidePopup.IsCursorOver). The self-test sets it: a parked window never has the real cursor over it, and
+    /// "still over" is the case HDT's click-through window produces.
+    /// </summary>
+    public Func<FrameworkElement, bool>? CursorInside { get; set; }
+
+    /// <summary>Whether the Skip combat button shows (in combat in the plugin; the bar's check box here).</summary>
+    public bool SkipCombatShown => _skipShown;
+
+    /// <summary>
+    /// Switches move mode on or off (the bar's check box). Switching it off saves the layout (PanelMover); a layout file
+    /// that did not exist before is removed again, so that a headless run leaves C:\temp\BronzebeardHarness-ci\layout.json
+    /// unwritten, as its README says.
+    /// </summary>
+    public void SetMoveMode(bool on)
+    {
+        if (_mover.MoveMode == on)
+        {
+            return;
+        }
+
+        var existed = File.Exists(LayoutPath);
+        _mover.ToggleMoveMode();
+        if (!existed && File.Exists(LayoutPath))
+        {
+            File.Delete(LayoutPath);
+        }
+    }
+
+    /// <summary>Shows or hides the Skip combat button, as the bar's check box does (it shows in combat only in the plugin).</summary>
+    public void ShowSkipCombat(bool shown)
+    {
+        _skipShown = shown;
+        if (shown)
+        {
+            _skip.Show();
+        }
+        else
+        {
+            _skip.Hide();
+        }
+    }
+
+    /// <summary>A guide of the scene: a target's rank ("1") or a guide's name; null when there is none.</summary>
+    public CompGuide? GuideOf(string which) =>
+        int.TryParse(which, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank)
+            ? _tracker.Targets.FirstOrDefault(t => t.Rank == rank)?.Guide
+            : _guides.All.FirstOrDefault(g => string.Equals(g.Name, which, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Raises MouseEnter on the line of a guide of the list, as HDT's probe does when the cursor enters it: its popup
+    /// shows after the delay. Throws when the line is not shown: a capture of the wrong view is worse than none.
+    /// </summary>
+    public FrameworkElement Hover(string which)
+    {
+        var line = LineOf(which);
+        line.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount) { RoutedEvent = MouseEnterEvent });
+        return line;
+    }
+
+    /// <summary>
+    /// The line of a guide of the list as drawn now: the panel rebuilds its lines at every redraw (card names arriving
+    /// redraw the scene), so a line found earlier may be gone.
+    /// </summary>
+    public FrameworkElement LineOf(string which)
+    {
+        var guide = GuideOf(which);
+        if (guide == null || !Comps.ShownLines.TryGetValue(guide.Id, out var line))
+        {
+            throw new ArgumentException($"--hover {which}: no such line in the list (targets: {CompTargets.Summary(_tracker.Targets)})");
+        }
+
+        return line;
+    }
+
+    /// <summary>The card ovals of a line of the list, left to right: what shows a card's preview on hover.</summary>
+    public static IReadOnlyList<FrameworkElement> Ovals(FrameworkElement line) =>
+        Descendants(line).OfType<Grid>().Where(g => g.IsHitTestVisible && g.Background == Brushes.Transparent && g.Children.OfType<Image>().Any()).ToList();
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            yield return child;
+            foreach (var inner in Descendants(child))
+            {
+                yield return inner;
+            }
+        }
+    }
+
     public HarnessWindow(Options options)
     {
         _folder = Path.Combine(Path.GetTempPath(), "BronzebeardHarness");
@@ -92,7 +185,8 @@ internal sealed class HarnessWindow : Window
         Comps = new CompsPanel(Overlay, _mover, ToggleGuide, () => _count, ChangeCount, () => Log.Info("Meta clicked"),
             guide => GuidePivots.For(guide, _guides, Held()),
             (guide, fit) => Log.Info($"comp detail id={guide.Id} sections={fit.Shown.Count} of {fit.Total}"),
-            action => action());
+            action => action(),
+            element => CursorInside?.Invoke(element) ?? GuidePopup.IsCursorOver(element));
         Markers = new TavernMarkers(Overlay, id => Log.Info($"pin toggled: {id}"));
         _skip = new SkipCombatPanel(Overlay, _mover, () => Log.Info("Skip combat clicked (nothing is killed here)"));
         // Its own trinket stats cache is never polled here, so it never fetches: the harness hands ChoiceAdvisor synthetic

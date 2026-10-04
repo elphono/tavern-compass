@@ -10,7 +10,9 @@ namespace BronzebeardHud.Harness;
 /// without anyone at the keyboard (the window is parked far off screen), write their result under <c>--out</c> and
 /// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--tick a,b</c> ticks guides,
 /// <c>--choice k</c> opens a choice above the scene (discover, dark-gift, trinket) and <c>--detail x</c> opens a guide's
-/// detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name).
+/// detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name). <c>--hover x</c> hovers a guide's
+/// line (move mode off) so that its popup shows in the screenshot, <c>--hover-card k</c> also hovers the k-th oval of that
+/// line (its card preview), and <c>--no-skip</c> hides the Skip combat button, as in the tavern.
 /// </summary>
 internal sealed class Options
 {
@@ -31,6 +33,15 @@ internal sealed class Options
 
     /// <summary>The choice open above the scene, as ChoiceClassifier names it (discover, dark-gift, trinket); null: none.</summary>
     public string? Choice { get; private set; }
+
+    /// <summary>A guide whose line is hovered before the screenshot (its popup shows): a target's rank or a guide's name; null: none.</summary>
+    public string? Hover { get; private set; }
+
+    /// <summary>With <see cref="Hover"/>, the oval of that line also hovered, from 1: its card preview shows too; 0: none.</summary>
+    public int HoverCard { get; private set; }
+
+    /// <summary>The Skip combat button hidden, as in the tavern (it shows in combat only in the plugin).</summary>
+    public bool NoSkip { get; private set; }
 
     /// <summary>Milliseconds the screenshot waits for card names and pictures, which arrive asynchronously.</summary>
     public int Wait { get; private set; } = 8000;
@@ -67,6 +78,15 @@ internal sealed class Options
                     break;
                 case "--choice" when i + 1 < args.Length:
                     options.Choice = args[++i];
+                    break;
+                case "--hover" when i + 1 < args.Length:
+                    options.Hover = args[++i];
+                    break;
+                case "--hover-card" when i + 1 < args.Length:
+                    options.HoverCard = int.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "--no-skip":
+                    options.NoSkip = true;
                     break;
                 case "--wait" when i + 1 < args.Length:
                     options.Wait = int.Parse(args[++i]);
@@ -137,7 +157,37 @@ internal static class Headless
                     window.OpenDetail(options.Detail);
                 }
 
+                if (options.NoSkip)
+                {
+                    window.ShowSkipCombat(false);
+                }
+
+                if (options.Hover != null)
+                {
+                    window.SetMoveMode(false); // no popup in move mode
+                    window.UpdateLayout();
+                    window.Hover(options.Hover);
+                }
+
                 Pump(options.Wait);
+                if (options.Hover != null && options.HoverCard > 0)
+                {
+                    window.UpdateLayout();
+                    var ovals = HarnessWindow.Ovals(window.LineOf(options.Hover)); // drawn again meanwhile: the line as it is now
+                    if (options.HoverCard > ovals.Count)
+                    {
+                        throw new ArgumentException($"--hover-card {options.HoverCard}: the line has {ovals.Count} ovals");
+                    }
+
+                    ovals[options.HoverCard - 1].RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount) { RoutedEvent = UIElement.MouseEnterEvent });
+                    Pump(Math.Min(options.Wait, 5000)); // the whole card's picture
+                }
+
+                if (options.Hover != null && !window.Comps.Popup.IsVisible)
+                {
+                    throw new InvalidOperationException($"--hover {options.Hover}: the popup did not show (see the log)");
+                }
+
                 Capture(window.Overlay, Path.Combine(options.Out, "shot.png"));
             }
         }
@@ -150,8 +200,8 @@ internal static class Headless
         return exit;
     }
 
-    /// <summary>Lets the window work (downloads land, panels redraw) for a while, then comes back.</summary>
-    private static void Pump(int milliseconds)
+    /// <summary>Lets the window work (downloads land, panels redraw, timers tick) for a while, then comes back.</summary>
+    internal static void Pump(int milliseconds)
     {
         var frame = new DispatcherFrame();
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(milliseconds) };

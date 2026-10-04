@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using BronzebeardHud.Stats;
+using BronzebeardHud.Stats.Tests;
 using Rectangle = System.Windows.Shapes.Rectangle;
 
 namespace BronzebeardHud.Harness;
@@ -12,8 +13,10 @@ namespace BronzebeardHud.Harness;
 /// (Compositions, Skip combat) are on the overlay and inside it, move mode shows one handle and one frame (the
 /// Compositions panel is the only resizable one), a click on a guide's name opens its detail and "← All comp guides"
 /// brings the list back, no text of the panel is under the 12 px floor or cut (list and detail), the scenarios give
-/// the targets they are named for, Bob's cards carry the frames TavernHighlights asks for, nothing was logged as a
-/// warning or an error, and the layout file is the harness's own, never the real plugin's.
+/// the targets they are named for, Bob's cards carry the frames TavernHighlights asks for, hovering a guide line shows
+/// its popup where it covers nothing and hides it as it should (HoverChecks), nothing was logged as a warning or an
+/// error (the log read once the dispatcher has delivered it), and the layout file is the harness's own, never the real
+/// plugin's.
 /// </summary>
 internal static class SelfTest
 {
@@ -127,9 +130,14 @@ internal static class SelfTest
             CompTargets.Summary(window.Targets));
 
         ChoiceChecks(window, Check);
+        HoverChecks(window, Check);
 
+        // The log lines reach the window through Dispatcher.BeginInvoke (HarnessWindow): read before they land, the list was
+        // empty and the check passed on nothing. Let the dispatcher run what is queued first, then require lines.
+        FlushLog(window);
         var bad = window.LogLines.Where(l => l.Contains("|Warning|") || l.Contains("|Error|")).ToList();
-        Check("nothing logged as a warning or an error", bad.Count == 0, bad.Count == 0 ? $"{window.LogLines.Count} log lines" : string.Join(" | ", bad));
+        Check("nothing logged as a warning or an error", window.LogLines.Count > 0 && bad.Count == 0,
+            $"{window.LogLines.Count} log lines read" + (bad.Count == 0 ? string.Empty : ": " + string.Join(" | ", bad)));
 
         Check("the layout file is the harness's own", window.LayoutPath.Contains("BronzebeardHarness") && !window.LayoutPath.Contains(@"AppData\Local\BronzebeardHud"), window.LayoutPath);
 
@@ -241,6 +249,177 @@ internal static class SelfTest
         var left = canvas.Children.OfType<Border>().Count(b => b.Child is StackPanel && drawnRects.Any(r => Math.Abs(Canvas.GetLeft(b) - r.Left) < 0.5 && Math.Abs(Canvas.GetTop(b) - r.Top) < 0.5));
         var cards = canvas.Children.OfType<Border>().Count(b => Equals(b.Tag, "choice"));
         check("closing the choice takes its labels and options away", left == 0 && cards == 0 && window.Choice == null, $"{left} labels and {cards} options left");
+    }
+
+    private static readonly string[] SectionOrder = { "HOW TO PLAY", "CORE CARDS", "ADDON CARDS", "WHEN TO COMMIT", "COMMON ENABLERS", "PIVOTS" };
+
+    /// <summary>Runs what the dispatcher has queued (the log lines, posted by Dispatcher.BeginInvoke) before coming back.</summary>
+    private static void FlushLog(HarnessWindow window) =>
+        window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
+
+    private static void Raise(FrameworkElement element, RoutedEvent routed) =>
+        element.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, Environment.TickCount) { RoutedEvent = routed });
+
+    private static Rect RectOf(FrameworkElement element) =>
+        new(Canvas.GetLeft(element), Canvas.GetTop(element), element.ActualWidth, element.ActualHeight);
+
+    private static Rect RectOf(LayoutRect rect) => new(rect.Left, rect.Top, rect.Width, rect.Height);
+
+    /// <summary>Overlap of more than half a pixel: two rectangles that touch do not overlap.</summary>
+    private static bool Overlap(Rect a, Rect b) => a.Left < b.Right - 0.5 && b.Left < a.Right - 0.5 && a.Top < b.Bottom - 0.5 && b.Top < a.Bottom - 0.5;
+
+    private static string Describe(Rect r) => $"({r.Left:0},{r.Top:0} {r.Width:0}x{r.Height:0})";
+
+    /// <summary>The section titles drawn in an element, top to bottom, and its "k of n sections" line if any.</summary>
+    private static (List<string> Drawn, string? More) Sections(DependencyObject root)
+    {
+        var texts = Texts(root).Where(t => t.IsVisible).Select(Content).ToList();
+        var drawn = texts.Select(c => SectionOrder.FirstOrDefault(title => c.StartsWith(title, StringComparison.Ordinal))).Where(title => title != null).Select(t => t!).ToList();
+        return (drawn, texts.FirstOrDefault(c => c.EndsWith(" sections", StringComparison.Ordinal)));
+    }
+
+    /// <summary>The element of the canvas (a panel) that holds a text, found by what it says, not by what the plugin calls it.</summary>
+    private static FrameworkElement? CanvasChildSaying(Canvas canvas, string content) =>
+        canvas.Children.OfType<FrameworkElement>().FirstOrDefault(e => e.IsVisible && Texts(e).Any(t => t.IsVisible && Content(t) == content));
+
+    /// <summary>
+    /// The popup of a hovered guide line (GuidePopup), driven as HDT's probe drives it: MouseEnter and MouseLeave raised on
+    /// the line, the real 250 ms delay let run (the dispatcher pumped). Move mode off, as no popup shows in move mode. The
+    /// cursor is said to be outside every line (CursorInside) unless a check says otherwise: the real one is never over a
+    /// window parked off screen. In the tavern first (no Skip combat button), then in combat (the button shows).
+    /// </summary>
+    private static void HoverChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var canvas = window.Overlay;
+        var scale = TavernLayout.Scale(canvas.ActualHeight);
+        var comps = window.Comps;
+        var popup = comps.Popup;
+        window.SetMoveMode(false);
+        window.ShowSkipCombat(false);
+        window.CursorInside = _ => false;
+        window.UpdateLayout();
+        FlushLog(window);
+        var logStart = window.LogLines.Count;
+
+        // A target whose guide has all six sections (the first such), else the first target.
+        var guide = window.Targets.Select(t => t.Guide).FirstOrDefault(g => ExpectedSections(g, window) == SectionOrder.Length) ?? window.Targets.First().Guide;
+        var line = comps.ShownLines[guide.Id];
+
+        // (e) left before the delay: never shown.
+        var shows = popup.Shows;
+        Raise(line, UIElement.MouseEnterEvent);
+        Headless.Pump(100);
+        Raise(line, UIElement.MouseLeaveEvent);
+        Headless.Pump(400);
+        check("hover: a line left before the 250 ms delay never shows its popup", popup.Shows == shows && !popup.IsVisible,
+            $"shown {popup.Shows - shows} times, visible: {popup.IsVisible}");
+
+        // A second enter (HDT's probe, then WPF's) does not restart the delay: shown once, about 250 ms after the first.
+        Raise(line, UIElement.MouseEnterEvent);
+        Headless.Pump(150);
+        Raise(line, UIElement.MouseEnterEvent);
+        Headless.Pump(170);
+        window.UpdateLayout();
+        check("hover: after the delay the popup shows, once; a second MouseEnter on the line changes nothing",
+            popup.IsVisible && popup.Shows == shows + 1 && popup.ShownGuide == guide.Id,
+            $"\"{guide.Name}\": visible {popup.IsVisible} 320 ms after the first enter (170 after the second), shown {popup.Shows - shows} time(s)");
+
+        // (a) where it is.
+        var rect = RectOf(popup.Element);
+        var panel = RectOf(comps.Element);
+        var zones = NoGoZones.For(canvas.ActualWidth, canvas.ActualHeight).Where(z => Overlap(rect, RectOf(z.Rect))).Select(z => z.Name).ToList();
+        var inside = rect.Left >= -0.5 && rect.Top >= -0.5 && rect.Right <= canvas.ActualWidth + 0.5 && rect.Bottom <= canvas.ActualHeight + 0.5;
+        check("hover: the popup is inside the overlay, on no zone of the game (NoGoZones), off the panel",
+            popup.IsVisible && rect.Width > 0 && inside && zones.Count == 0 && !Overlap(rect, panel),
+            $"popup {Describe(rect)}, panel {Describe(panel)}, zones covered: [{string.Join(", ", zones)}]");
+
+        // (b) its texts.
+        var texts = TextProblems(popup.Element, scale);
+        check("hover: popup: no text under 12 px, none cut", texts.Checked > 0 && texts.Problems.Count == 0, $"{texts.Checked} texts checked" + Problems(texts.Problems));
+
+        // (c) its sections, all of them in the tavern.
+        var expected = ExpectedSections(guide, window);
+        var (drawn, more) = Sections(popup.Element);
+        check("hover: the popup shows the guide's sections in HDT's order, all six for a guide that has them",
+            expected == SectionOrder.Length && drawn.SequenceEqual(SectionOrder) && more == null,
+            $"{string.Join(", ", drawn)} ({more ?? $"no \"k of n\" line"}; the guide has {expected})");
+
+        FlushLog(window);
+        var logged = window.LogLines.Skip(logStart).Where(l => l.Contains("guide popup")).ToList();
+        check("hover: one log line per popup shown, saying where and how many sections",
+            logged.Count == 1 && logged[0].Contains($"guide popup {guide.Name} shown at (") && logged[0].Contains($"sections={drawn.Count}/{expected}"),
+            string.Join(" | ", logged));
+
+        // (f) an oval of the same line hovered too: the line is still entered, the popup stays, the card shows elsewhere.
+        var ovals = HarnessWindow.Ovals(line);
+        if (ovals.Count > 0)
+        {
+            Raise(ovals[0], UIElement.MouseEnterEvent);
+        }
+
+        window.UpdateLayout();
+        var preview = HdtTooltip.ShowingRect(canvas);
+        check("hover: an oval of the line shows its card while the popup stays, neither covering the other nor the panel",
+            ovals.Count > 0 && preview is { } p && p.Width > 0 && popup.IsVisible && !Overlap(p, rect) && !Overlap(p, panel),
+            $"{ovals.Count} ovals; card preview {(preview is { } q ? Describe(q) : "none")}, popup {Describe(rect)}, panel {Describe(panel)}, popup visible {popup.IsVisible}");
+        if (ovals.Count > 0)
+        {
+            Raise(ovals[0], UIElement.MouseLeaveEvent);
+        }
+
+        check("hover: leaving the oval takes its card away, the popup stays", HdtTooltip.Showing(canvas) == null && popup.IsVisible,
+            $"card still shown: {HdtTooltip.Showing(canvas) != null}, popup visible: {popup.IsVisible}");
+
+        // WPF's MouseLeave as HDT's window turns click-through again, the cursor still on the line: ignored.
+        window.CursorInside = element => ReferenceEquals(element, line);
+        Raise(line, UIElement.MouseLeaveEvent);
+        check("hover: a MouseLeave with the cursor still on the line keeps the popup", popup.IsVisible, $"visible {popup.IsVisible}");
+
+        // (d) the cursor really left.
+        window.CursorInside = _ => false;
+        Raise(line, UIElement.MouseLeaveEvent);
+        check("hover: MouseLeave hides the popup", !popup.IsVisible, $"visible {popup.IsVisible}");
+
+        // In combat the Skip combat button shows: the popup goes around it.
+        window.ShowSkipCombat(true);
+        window.UpdateLayout();
+        Raise(line, UIElement.MouseEnterEvent);
+        Headless.Pump(400);
+        window.UpdateLayout();
+        var skip = CanvasChildSaying(canvas, "Skip combat");
+        var inCombat = RectOf(popup.Element);
+        var combatZones = NoGoZones.For(canvas.ActualWidth, canvas.ActualHeight).Where(z => Overlap(inCombat, RectOf(z.Rect))).Select(z => z.Name).ToList();
+        var (combatDrawn, combatMore) = Sections(popup.Element);
+        var combatCounted = combatMore == null ? combatDrawn.Count == expected : combatMore == $"{combatDrawn.Count} of {expected} sections";
+        check("hover, in combat: the popup covers neither the Skip combat button nor a zone; its sections in order, counted when some are left out",
+            popup.IsVisible && skip != null && !Overlap(inCombat, RectOf(skip)) && combatZones.Count == 0 && !Overlap(inCombat, panel)
+            && combatDrawn.Count >= 1 && combatDrawn.SequenceEqual(SectionOrder.Where(combatDrawn.Contains)) && combatCounted,
+            $"popup {Describe(inCombat)}, Skip combat {(skip != null ? Describe(RectOf(skip)) : "not found")}, zones [{string.Join(", ", combatZones)}]; "
+            + $"{string.Join(", ", combatDrawn)} ({combatMore ?? $"all {expected}"})");
+
+        // (g) a click on the line's name opens the detail and hides the popup.
+        var clicked = Click(comps.Element, guide.Name);
+        window.UpdateLayout();
+        check("hover: a click on the line's name opens the detail and hides the popup", clicked && comps.ShowsDetail && !popup.IsVisible,
+            $"clicked {clicked}, detail {comps.ShowsDetail}, popup visible {popup.IsVisible}");
+        Click(comps.Element, "← All comp guides");
+        window.UpdateLayout();
+
+        // Move mode hides it, and no line shows one in move mode.
+        line = comps.ShownLines[guide.Id];
+        Raise(line, UIElement.MouseEnterEvent);
+        Headless.Pump(400);
+        var shownBefore = popup.IsVisible;
+        window.SetMoveMode(true);
+        var hiddenByMove = !popup.IsVisible;
+        line = comps.ShownLines[guide.Id];
+        Raise(line, UIElement.MouseLeaveEvent);
+        Raise(line, UIElement.MouseEnterEvent);
+        Headless.Pump(400);
+        check("hover: move mode hides the popup, and a line hovered in move mode shows none", shownBefore && hiddenByMove && !popup.IsVisible,
+            $"shown before {shownBefore}, hidden by move mode {hiddenByMove}, shown in move mode {popup.IsVisible}");
+
+        window.CursorInside = null;
     }
 
     /// <summary>The sections a guide's detail has: how to play when it has a text, core cards, then each list it has.</summary>
