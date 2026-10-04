@@ -44,6 +44,12 @@ internal sealed class HarnessWindow : Window
     private readonly List<string> _lines = new();
     private readonly string _folder;
     private CompGuideSet _guides = CompGuideSet.Empty(CompGuideSources.HdtFree);
+
+    // The bridge to the synthetic Firestone compositions and the hero's figures on them, as Plugin.UpdateBridge computes them.
+    private IReadOnlyDictionary<string, GuideEvidence>? _bridge;
+    private readonly IReadOnlyDictionary<string, HeroCompPick> _heroEffects = HeroCompAffinity.Effects(HarnessData.Hero, HarnessData.FirestoneComps);
+    private string _bridgeKey = string.Empty;
+    private string _loggedHighlights = string.Empty;
     private int _count = HudSettings.DefaultSuggested;
     private int _scenario;
     private bool _skipShown = true;
@@ -62,6 +68,9 @@ internal sealed class HarnessWindow : Window
     public int Count => _count;
 
     public IReadOnlyList<TavernHighlight> Highlights { get; private set; } = Array.Empty<TavernHighlight>();
+
+    /// <summary>Guide id → its synthetic Firestone composition (GuideBridge), as the plugin passes it; null before the first refresh.</summary>
+    public IReadOnlyDictionary<string, GuideEvidence>? Bridge => _bridge;
 
     /// <summary>The choice open above the scene; None when there is none.</summary>
     public ChoiceKind ChoiceKind => _choiceKind;
@@ -185,6 +194,7 @@ internal sealed class HarnessWindow : Window
         Comps = new CompsPanel(Overlay, _mover, ToggleGuide, () => _count, ChangeCount, () => Log.Info("Meta clicked"),
             guide => GuidePivots.For(guide, _guides, Held()),
             (guide, fit) => Log.Info($"comp detail id={guide.Id} sections={fit.Shown.Count} of {fit.Total}"),
+            guide => TargetContext.For(guide, _bridge, _heroEffects),
             action => action(),
             element => CursorInside?.Invoke(element) ?? GuidePopup.IsCursorOver(element));
         Markers = new TavernMarkers(Overlay, id => Log.Info($"pin toggled: {id}"));
@@ -239,13 +249,21 @@ internal sealed class HarnessWindow : Window
     private void Refresh()
     {
         _guides = HarnessData.Guides(id => Database.GetCardFromId(id)?.LocalizedName ?? id);
+        UpdateBridge();
         var cards = HarnessData.Scenarios[_scenario].Cards;
         var board = CompGuideMatch.Rank(_guides, cards, _count);
         var targets = _tracker.Next(board, _count);
         Comps.Show(board, targets, cards.All.Select(c => c.CardId), CompGuideSources.HdtFree, null);
         Comps.SetFooter("Board 142 · hero avg 120 at turn 8 · +18%");
         DrawScene(); // Bob's cards by name, once the names are known
-        Highlights = TavernHighlights.For(HarnessData.Shop, targets);
+        Highlights = TavernHighlights.For(HarnessData.Shop, targets, _bridge);
+        var line = TavernHighlights.Summary(HarnessData.Shop, Highlights);
+        if (line != _loggedHighlights)
+        {
+            _loggedHighlights = line;
+            Log.Info($"Bronzebeard HUD: tavern highlights=[{line}] targets={CompTargets.Summary(targets)}");
+        }
+
         Markers.Show(HarnessData.Shop, Highlights, HarnessData.Pins, HarnessData.Shop.Select(_ => true).ToList());
         if (_skipShown)
         {
@@ -256,9 +274,28 @@ internal sealed class HarnessWindow : Window
     }
 
     /// <summary>
+    /// The bridge, as Plugin.UpdateBridge computes it: again when the guides change (their ids, here), with the plugin's log
+    /// line, against the synthetic Firestone compositions (HarnessData.FirestoneComps).
+    /// </summary>
+    private void UpdateBridge()
+    {
+        var key = string.Join(",", _guides.All.Select(g => g.Id));
+        if (key == _bridgeKey)
+        {
+            return;
+        }
+
+        _bridgeKey = key;
+        var comps = HarnessData.FirestoneComps;
+        _bridge = GuideBridge.For(_guides, comps);
+        var bridged = _guides.All.Count(g => _bridge.ContainsKey(g.Id));
+        Log.Info(GuideBridge.Line(_guides, _bridge) + $" ({bridged}/{_guides.Count} guides bridged, against {comps.Count} compositions; Firestone synthetic)");
+    }
+
+    /// <summary>
     /// The choice open above the scene, advised as Plugin.UpdateChoice advises it: ChoiceAdvisor on the board and hand, the
-    /// targets and HDT's guides, then the panel, then the plugin's diagnostic line. The lobby's tribes are unknown here
-    /// (empty: no guide is left out), and the trinket stats are the harness's (HarnessData.TrinketStat, for HarnessData.Bracket).
+    /// targets, HDT's guides and the bridge, then the panel, then the plugin's diagnostic line. The lobby's tribes are unknown
+    /// here (empty: no guide is left out), and the trinket stats are the harness's (HarnessData.TrinketStat, for HarnessData.Bracket).
     /// </summary>
     private void UpdateChoice(IReadOnlyList<CompTarget> targets, PlayerCards cards)
     {
@@ -270,7 +307,7 @@ internal sealed class HarnessWindow : Window
             return;
         }
 
-        var advice = ChoiceAdvisor.Advise(options, cards.All, targets, _guides, Array.Empty<string>(), HarnessData.TrinketStat, HarnessData.Bracket);
+        var advice = ChoiceAdvisor.Advise(options, cards.All, targets, _guides, Array.Empty<string>(), HarnessData.TrinketStat, HarnessData.Bracket, _bridge);
         Choice = advice;
         if (advice.HasMarkers)
         {

@@ -36,6 +36,23 @@ internal static class GuideView
         TextWrapping = TextWrapping.Wrap,
     };
 
+    /// <summary>
+    /// The line of Firestone context under a guide's header, in its detail and its popup (TargetContext: "≈ 3,4 with your
+    /// hero (23) · final turn ≈ 14 · 5 top boards"): small and muted, wrapped rather than cut; null when the guide has none
+    /// (no Firestone comp bridged to it).
+    /// </summary>
+    public static TextBlock? Context(string? text, double scale)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return null;
+        }
+
+        var line = Text(text!, PanelTypography.Small, scale, MutedBrush);
+        line.Margin = new Thickness(0, 3 * scale, 0, 0);
+        return line;
+    }
+
     /// <summary>One line of a guide's text, card names in bold as HDT draws them (CompGuideText).</summary>
     public static TextBlock Runs(IReadOnlyList<CompGuideTextRun> runs, double size, double scale, Brush brush)
     {

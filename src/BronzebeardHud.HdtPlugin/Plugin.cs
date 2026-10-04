@@ -46,12 +46,22 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _metaGuard;
     private readonly FeatureGuard _compDetailGuard;
     private readonly FeatureGuard _skipCombatGuard;
+    private readonly FeatureGuard _bridgeGuard;
 
     // HDT's own comp guides (HdtCompGuides), as last read.
     private string? _guidesState;
     private object? _guidesList;
     private HdtCompGuidesSnapshot? _guides;
     private int _guidesVersion;
+
+    // Firestone's compositions bridged to HDT's guides (GuideBridge), and the hero being played on each composition
+    // (HeroCompAffinity): what the labels of choices, the frames on Bob's cards and a guide's context line draw on. Null
+    // bridge: the labels and frames of before the bridge, word for word. _bridgeVersion changes whenever either changes.
+    private IReadOnlyDictionary<string, GuideEvidence>? _bridge;
+    private IReadOnlyDictionary<string, HeroCompPick>? _heroEffects;
+    private string _bridgeKey = string.Empty;
+    private string _heroEffectsKey = string.Empty;
+    private int _bridgeVersion;
 
     // The targets: ticks and colours kept across a plugin reload within a game, forgotten at the next game.
     private readonly CompTargetTracker _tracker = new();
@@ -119,6 +129,13 @@ public sealed class Plugin : IPlugin
             _compsKey = string.Empty;
         }));
         _skipCombatGuard = new FeatureGuard("skip-combat", (n, e) => Disable(n, e, () => _skipCombat?.Hide()));
+        // Once switched off: no bridge, so the labels of choices and the frames are those of before it, and no context line.
+        _bridgeGuard = new FeatureGuard("guide-bridge", (n, e) => Disable(n, e, () =>
+        {
+            _bridge = null;
+            _heroEffects = null;
+            _bridgeVersion++;
+        }));
         _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
             if (_markers != null)
@@ -208,8 +225,9 @@ public sealed class Plugin : IPlugin
 
     /// <summary>
     /// In the shop: Bob's cards that serve the targets (TavernHighlights: core card → solid frame, enabler or add-on →
-    /// dotted frame, in the target's colour), the pins, and a pin button above each minion. Redrawn when Bob's row, the
-    /// targets or the pins change; one log line whenever the highlights change.
+    /// dotted frame, in the target's colour; with the bridge, a card on at least two top boards of a target's Firestone
+    /// comp → dotted "+ T 3/5"), the pins, and a pin button above each minion. Redrawn when Bob's row, the targets, the
+    /// pins or the bridge change; one log line whenever the highlights change (TavernHighlights.Summary).
     /// </summary>
     private void UpdateTavern(GameV2 game)
     {
@@ -228,7 +246,7 @@ public sealed class Plugin : IPlugin
         // Bob's whole row, the tavern spell included: the game centres minions and spell together. Followed by entity:
         // a purchase, a reroll or an added card redraws the markers at once.
         var row = HdtEntityAdapter.TavernRow(game);
-        var key = string.Join(",", row.Select(s => $"{s.EntityId}:{s.CardId}")) + "|" + _targetsVersion + "|" + _pinsVersion;
+        var key = string.Join(",", row.Select(s => $"{s.EntityId}:{s.CardId}")) + "|" + _targetsVersion + "|" + _pinsVersion + "|" + _bridgeVersion;
         if (key == _tavernKey)
         {
             return;
@@ -237,10 +255,9 @@ public sealed class Plugin : IPlugin
         _tavernKey = key;
         var bob = row.Select(s => s.CardId).ToList();
         var targets = _tracker.Targets;
-        var highlights = TavernHighlights.For(bob, targets);
-        var line = string.Join(",", bob.Zip(highlights, (card, h) => (card, h))
-            .Where(x => x.h.Effect != null)
-            .Select(x => $"{x.card}:{x.h.Effect!.Role.ToString().ToLowerInvariant()}:{x.h.Effect.Target.Guide.Id}"));
+        var highlights = TavernHighlights.For(bob, targets, _bridge);
+        // The top-board frames too ("card:boards 3/5:guide"): written by role alone, they were invisible in the log.
+        var line = TavernHighlights.Summary(bob, highlights);
         if (line != _loggedHighlights)
         {
             _loggedHighlights = line;
@@ -575,7 +592,7 @@ public sealed class Plugin : IPlugin
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
         _compsPanel = new CompsPanel(Core.OverlayCanvas, _mover, ToggleGuide, () => _settings.SuggestedCompositions, ChangeSuggested, OpenMetaSnapshot,
-            PivotsFor, DetailShown, action => _compsGuard.Run(action));
+            PivotsFor, DetailShown, guide => TargetContext.For(guide, _bridge, _heroEffects), action => _compsGuard.Run(action));
         _markers = new TavernMarkers(Core.OverlayCanvas, TogglePin);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory);
@@ -604,6 +621,10 @@ public sealed class Plugin : IPlugin
         _compsCards = BronzebeardHud.Stats.PlayerCards.None;
         _compsRound = -1;
         _compsPhase = OverlayPhase.OutOfGame;
+        _bridge = null;
+        _heroEffects = null;
+        _bridgeKey = string.Empty;
+        _heroEffectsKey = string.Empty;
     }
 
     public void OnUnload()
@@ -691,6 +712,8 @@ public sealed class Plugin : IPlugin
                 : $"Bronzebeard HUD: comp guides: none from HDT (state {_guides.State}){(_guides.Error != null ? ": " + _guides.Error : string.Empty)}");
         }
 
+        _bridgeGuard.Run(() => UpdateBridge(game));
+
         var cards = _compsCards;
         if (phase == OverlayPhase.Shop)
         {
@@ -709,7 +732,8 @@ public sealed class Plugin : IPlugin
         }
 
         var count = _settings.SuggestedCompositions;
-        var key = string.Join(",", cards.All.Select(c => c.CardId).OrderBy(id => id, StringComparer.Ordinal)) + "|" + _guidesVersion + "|" + _selectionVersion + "|" + count;
+        var key = string.Join(",", cards.All.Select(c => c.CardId).OrderBy(id => id, StringComparer.Ordinal)) + "|" + _guidesVersion + "|" + _selectionVersion + "|" + count
+                  + "|" + _bridgeVersion; // a guide's context line (detail, popup) follows the bridge and the hero
         if (key == _compsKey && _compsPanel.IsVisible)
         {
             return;
@@ -721,6 +745,50 @@ public sealed class Plugin : IPlugin
         _tracker.Next(_compsBoard, count);
         _targetsVersion++;
         _compsPanel.Show(_compsBoard, _tracker.Targets, cards.All.Select(c => c.CardId), _guides.Guides?.Source, CompGuidesStatus(_guides));
+    }
+
+    /// <summary>
+    /// Bridges HDT's guides to the known compositions (GuideBridge: Firestone's, and hand-typed ones if any) whenever either
+    /// changes — a new list of guides, a composition load —, with one log line each time: every guide and its composition or
+    /// "no match", then how many were bridged and against what ("(2/23 guides bridged, against 24 compositions; Firestone
+    /// ok)"), so that the match can be judged on real data. Without guides from HDT, no bridge (null). The hero being played
+    /// on each composition (HeroCompAffinity, for the context line) follows the hero and the compositions. Either change
+    /// bumps _bridgeVersion: the panel, the frames and the labels of choices are drawn again.
+    /// </summary>
+    private void UpdateBridge(GameV2 game)
+    {
+        if (_comps == null)
+        {
+            return;
+        }
+
+        var key = _guidesVersion + "|" + _comps.Version;
+        if (key != _bridgeKey)
+        {
+            _bridgeKey = key;
+            if (_guides?.Guides is { } guides)
+            {
+                var comps = _comps.Compositions();
+                _bridge = GuideBridge.For(guides, comps);
+                var bridged = guides.All.Count(g => _bridge.ContainsKey(g.Id));
+                Log.Info(GuideBridge.Line(guides, _bridge) + $" ({bridged}/{guides.Count} guides bridged, against {comps.Count} compositions; Firestone {_comps.State})");
+            }
+            else
+            {
+                _bridge = null;
+            }
+
+            _bridgeVersion++;
+        }
+
+        var hero = HdtEntityAdapter.PlayerHeroId(game);
+        var heroKey = hero + "|" + _comps.Version;
+        if (heroKey != _heroEffectsKey)
+        {
+            _heroEffectsKey = heroKey;
+            _heroEffects = HeroCompAffinity.Effects(hero, _comps.Compositions());
+            _bridgeVersion++;
+        }
     }
 
     /// <summary>The line the panel shows when HDT gives no guides, in HDT's own terms; null when it gives some.</summary>
@@ -763,7 +831,8 @@ public sealed class Plugin : IPlugin
     /// age of the cache (StatsCache), so starting HDT brings the freshest data; later loads keep the age rules; the
     /// compositions are asked again at each game's first shop. One line in HDT's log per finished load (DataRefresh).
     /// Firestone's compositions are no longer shown (HDT's guides replaced them on 2026-10-04): the hero badges still use
-    /// them, and the hand-typed pins of stats\manual\pins.txt come with them.
+    /// them, the bridge to HDT's guides draws on them (UpdateBridge), and the hand-typed pins of stats\manual\pins.txt
+    /// come with them.
     /// </summary>
     private void RefreshData(GameV2 game)
     {
@@ -849,8 +918,9 @@ public sealed class Plugin : IPlugin
 
     /// <summary>
     /// Any choice of the player (discover, Dark Gift, trinket): a label above each option, from the targets
-    /// (ChoiceAdvisor), in the colour of the first target the option serves. One line in HDT's log per choice,
-    /// including the ones without a known layout, so that uncovered kinds show up.
+    /// (ChoiceAdvisor, with the bridge: "· 4/5 boards", "+ T 3/5 boards", "pivot → G (S)"), in the colour of the first
+    /// target the option serves. One line in HDT's log per choice, including the ones without a known layout, so that
+    /// uncovered kinds show up.
     /// </summary>
     private void UpdateChoice(GameV2 game)
     {
@@ -876,7 +946,7 @@ public sealed class Plugin : IPlugin
         }
 
         var loaded = kind == ChoiceKind.Trinket && _choices.PollTrinketStats();
-        var key = $"{ids}|{_targetsVersion}|{_stats.Bracket}|{_choices.TrinketStatsVersion}";
+        var key = $"{ids}|{_targetsVersion}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_bridgeVersion}";
         if (key == _choiceKey && !loaded)
         {
             return;
@@ -885,7 +955,7 @@ public sealed class Plugin : IPlugin
         _choiceKey = key;
         var guides = _guides?.Guides;
         var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _tracker.Targets, guides, HdtEntityAdapter.LobbyTribeNames(),
-            _choices.TrinketStat, _stats.Bracket);
+            _choices.TrinketStat, _stats.Bracket, _bridge);
         if (advice.HasMarkers)
         {
             _choices.Show(advice);

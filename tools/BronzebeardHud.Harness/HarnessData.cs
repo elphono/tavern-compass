@@ -174,6 +174,53 @@ internal static class HarnessData
     public static TrinketStat? TrinketStat(string cardId) => TrinketStats.TryGetValue(cardId, out var stat) ? stat : null;
 
     /// <summary>
+    /// The hero the harness plays, for the hero piece of a guide's context line (HeroCompAffinity on <see cref="FirestoneComps"/>).
+    /// A Battlegrounds hero id; nothing is fetched for it, and its figures below are invented.
+    /// </summary>
+    public const string Hero = "TB_BaconShop_HERO_16";
+
+    /// <summary>
+    /// Invented Firestone compositions (nothing comes from Firestone), on the guides' card ids, for the bridge (GuideBridge),
+    /// with the third scenario's targets (Pirate Discover, Mech Magnet, Mech Divine Shield):
+    /// - pirate_fs is Pirate Discover's (its core cards 6, 7, 8 and its add-on 11 in common, all four of its core cards on the
+    ///   boards); 11 stands on 3 of its 5 final boards: "+ Pirate Discover · 3/5 boards" over a choice offering it;
+    /// - mech_fs is Mech Magnet's (13, 14, 15: both its core cards and an add-on). It shares the same three with Mech Divine
+    ///   Shield, but they are 3 of its 7 core cards, under half: Mech Divine Shield is bridged to nothing, the counter-example
+    ///   the log line names "no match". No other card of Mech Divine Shield's lists is on its boards, or it would bridge.
+    ///   46 (an enabler of Elemental Cycle, in no list of a target) stands on 3 of its 5 boards: "+ Mech Magnet 3/5 boards"
+    ///   over a choice offering it; 57 (a core card of Dragon Shields, no target) too: a dotted "+ Mech Magnet 3/5" frame on
+    ///   Bob's card.
+    /// Each has a figure for <see cref="Hero"/>, so that the context line has its three pieces.
+    /// </summary>
+    public static IReadOnlyList<Composition> FirestoneComps { get; } = new[]
+    {
+        new Composition("pirate_fs", "Pirates (synthetic)", new[] { "PIRATE" }, Cards(6, 7, 8), Cards(11), averagePlacement: 3.9, dataPoints: 1800,
+            finalBoards: new[]
+            {
+                Board(12, 6, 7, 8, 11, 9, 10),
+                Board(14, 6, 7, 11, 9),
+                Board(13, 7, 8, 9, 6),
+                Board(13, 6, 8, 11, 10),
+                Board(11, 7, 9, 10),
+            },
+            heroStats: new[] { new CompHeroStat(Hero, 23, 2.9) }),
+        new Composition("mech_fs", "Mechs (synthetic)", new[] { "MECHANICAL" }, Cards(13, 14), Cards(15), averagePlacement: 4.1, dataPoints: 1200,
+            finalBoards: new[]
+            {
+                Board(10, 13, 14, 15, 46, 57),
+                Board(12, 13, 14, 57, 46),
+                Board(11, 14, 15, 57, 3),
+                Board(12, 13, 15, 46),
+                Board(13, 13, 14, 15),
+            },
+            heroStats: new[] { new CompHeroStat(Hero, 14, 4.4) }),
+    };
+
+    private static string[] Cards(params int[] indices) => indices.Select(i => Pool[i]).ToArray();
+
+    private static FinalBoard Board(int turn, params int[] indices) => new(8000, turn, Cards(indices));
+
+    /// <summary>
     /// The comp guides HDT would show, with their texts written in HSReplay's markup (<c>[[Name||dbf]]</c>, the dbf id
     /// standing for an index into <see cref="Pool"/> here) so that they go through the same parsing as HDT's, card names
     /// in bold. <paramref name="nameOf"/> gives a card's name (HearthstoneJSON's once loaded, else its id).

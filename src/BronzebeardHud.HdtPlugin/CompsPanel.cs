@@ -64,6 +64,7 @@ internal sealed class CompsPanel
     private readonly Action _openMeta;
     private readonly Func<CompGuide, IReadOnlyList<GuidePivot>?> _pivotsFor;
     private readonly Action<CompGuide, SectionFit> _detailShown;
+    private readonly Func<CompGuide, string?> _contextFor;
     private readonly Action<Action> _run;
     private readonly TargetPanelView _view = new();
     private readonly GuidePopup _popup;
@@ -82,14 +83,18 @@ internal sealed class CompsPanel
     /// <param name="changeCount">Called with −1 or +1 when − or + is clicked.</param>
     /// <param name="pivotsFor">A guide's pivots (GuidePivots), under their own guard; null when that feature failed.</param>
     /// <param name="detailShown">Called once each time a guide's detail is opened, with what of it fits (the log line).</param>
+    /// <param name="contextFor">
+    /// A guide's line of Firestone context (TargetContext.For, on the bridge and the hero being played), under its header in
+    /// the detail and the popup; null: no line.
+    /// </param>
     /// <param name="run">Runs what a click or a resize triggers, under the panel's feature guard (a WPF handler is under none).</param>
     /// <param name="cursorOver">
     /// Whether the cursor is within an element, for the guide popup's MouseLeave (GuidePopup.IsCursorOver when null; the
     /// simulation's self-test swaps it).
     /// </param>
     public CompsPanel(Canvas canvas, PanelMover mover, Action<string> toggle, Func<int> count, Action<int> changeCount, Action openMeta,
-        Func<CompGuide, IReadOnlyList<GuidePivot>?> pivotsFor, Action<CompGuide, SectionFit> detailShown, Action<Action> run,
-        Func<FrameworkElement, bool>? cursorOver = null)
+        Func<CompGuide, IReadOnlyList<GuidePivot>?> pivotsFor, Action<CompGuide, SectionFit> detailShown, Func<CompGuide, string?> contextFor,
+        Action<Action> run, Func<FrameworkElement, bool>? cursorOver = null)
     {
         _canvas = canvas;
         _mover = mover;
@@ -99,6 +104,7 @@ internal sealed class CompsPanel
         _openMeta = openMeta;
         _pivotsFor = pivotsFor;
         _detailShown = detailShown;
+        _contextFor = contextFor;
         _run = run;
         _panel = new Border
         {
@@ -204,7 +210,7 @@ internal sealed class CompsPanel
         }
 
         var panel = new LayoutRect(left + _panel.ActualWidth / 2, top + _panel.ActualHeight / 2, _panel.ActualWidth, _panel.ActualHeight);
-        return new GuidePopupContent(guide, CompTargets.Find(_targets, guide), _held, _pivotsFor(guide), panel, _mover.VisiblePanels(except: _panel));
+        return new GuidePopupContent(guide, CompTargets.Find(_targets, guide), _held, _pivotsFor(guide), _contextFor(guide), panel, _mover.VisiblePanels(except: _panel));
     }
 
     /// <summary>Opens a guide's detail in place of the list, as a click on its name does; false when it is not listed.</summary>
@@ -608,9 +614,9 @@ internal sealed class CompsPanel
     }
 
     /// <summary>
-    /// One guide's detail, in place of the list: "← All comp guides" in the title bar, its tick box, name and badges, then its sections in
-    /// HDT's order, as many as fit, a section that does not fit left out whole (CompGuideLayout.Sections). Returns the
-    /// height used.
+    /// One guide's detail, in place of the list: "← All comp guides" in the title bar, its tick box, name and badges, its
+    /// line of Firestone context when it has one, then its sections in HDT's order, as many as fit, a section that does not
+    /// fit left out whole (CompGuideLayout.Sections). Returns the height used.
     /// </summary>
     private double LayoutDetail(StackPanel lines, CompGuide guide, double scale, double height, double inner, double room)
     {
@@ -646,6 +652,10 @@ internal sealed class CompsPanel
         name.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(name);
         chrome.Add(header);
+        if (GuideView.Context(_contextFor(guide), scale) is { } context)
+        {
+            chrome.Add(context);
+        }
 
         // Hover on an oval of the detail shows the card (beside the panel); a click on it does nothing.
         var sections = GuideView.Sections(guide, _held, _pivotsFor(guide), scale, card => Oval(card, scale, height, onClick: null));

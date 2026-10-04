@@ -16,13 +16,14 @@ namespace BronzebeardHud.HdtPlugin;
 /// <summary>What the popup needs to draw one guide, asked of the panel when the delay elapses.</summary>
 internal sealed class GuidePopupContent
 {
-    public GuidePopupContent(CompGuide guide, CompTarget? target, ICollection<string> held, IReadOnlyList<GuidePivot>? pivots, LayoutRect panel,
-        IReadOnlyList<LayoutRect> avoid)
+    public GuidePopupContent(CompGuide guide, CompTarget? target, ICollection<string> held, IReadOnlyList<GuidePivot>? pivots, string? context,
+        LayoutRect panel, IReadOnlyList<LayoutRect> avoid)
     {
         Guide = guide;
         Target = target;
         Held = held;
         Pivots = pivots;
+        Context = context;
         Panel = panel;
         Avoid = avoid;
     }
@@ -31,6 +32,9 @@ internal sealed class GuidePopupContent
     public CompTarget? Target { get; }
     public ICollection<string> Held { get; }
     public IReadOnlyList<GuidePivot>? Pivots { get; }
+
+    /// <summary>The guide's line of Firestone context (TargetContext), under its name; null: none.</summary>
+    public string? Context { get; }
 
     /// <summary>The panel's rectangle on the canvas: the popup goes above it, or below.</summary>
     public LayoutRect Panel { get; }
@@ -42,7 +46,8 @@ internal sealed class GuidePopupContent
 /// <summary>
 /// The whole guide of a hovered line of the "Compositions" panel, in a box of its own beside the panel (Ali, 2026-10-04:
 /// "the full guide, as in HDT, in a popup on hover"): the name (in the target's colour, else white), the tier and
-/// difficulty badges, then the six sections in HDT's order (GuideView.Sections), free of the panel's box. Where it goes:
+/// difficulty badges, the line of Firestone context when the guide is bridged to a Firestone comp (GuideView.Context), then
+/// the six sections in HDT's order (GuideView.Sections), free of the panel's box. Where it goes:
 /// GuidePopupLayout.Place (above the panel, right of the boards; below it when there is no room above; nothing, and one
 /// log line per game, when there is room on neither side). What does not fit is left out whole, the last sections first,
 /// with "k of n sections".
@@ -200,11 +205,17 @@ internal sealed class GuidePopup
         var lines = new StackPanel { Margin = new Thickness(PanelFit.Padding * scale, VerticalPadding * scale, PanelFit.Padding * scale, VerticalPadding * scale), Width = inner };
 
         var guide = content.Guide;
-        var header = Header(guide, content.Target, scale);
+        // The name and badges, then the line of Firestone context when the guide has one: always shown, never left out.
+        var head = new List<FrameworkElement> { Header(guide, content.Target, scale) };
+        if (GuideView.Context(content.Context, scale) is { } context)
+        {
+            head.Add(context);
+        }
+
         var sections = GuideView.Sections(guide, content.Held, content.Pivots, scale,
             card => CardImages.Vignette(card, content.Held.Contains(card), PanelFit.OvalWidth * scale, scale, 0, placePreview: null, onClick: null, CompsPanel.TierOf(card)));
         var more = GuideView.MoreSections(scale);
-        foreach (var element in sections.Prepend(header).Append(more))
+        foreach (var element in head.Concat(sections).Append(more))
         {
             lines.Children.Add(element);
         }
@@ -215,7 +226,7 @@ internal sealed class GuidePopup
         _popup.Visibility = Visibility.Visible;
         lines.Measure(new Size(inner, double.PositiveInfinity));
 
-        var chrome = header.DesiredSize.Height;
+        var chrome = head.Sum(e => e.DesiredSize.Height);
         var heights = sections.Select(s => s.DesiredSize.Height).ToList();
         var whole = frame + chrome + heights.Sum();
         var least = frame + chrome + more.DesiredSize.Height + (heights.Count > 0 ? heights.Min() : 0);
@@ -234,7 +245,11 @@ internal sealed class GuidePopup
 
         var fit = CompGuideLayout.Sections(heights, room.Height - frame - chrome, more.DesiredSize.Height);
         lines.Children.Clear();
-        lines.Children.Add(header);
+        foreach (var element in head)
+        {
+            lines.Children.Add(element);
+        }
+
         var used = frame + chrome;
         foreach (var index in fit.Shown)
         {
