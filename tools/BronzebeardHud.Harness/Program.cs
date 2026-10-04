@@ -8,7 +8,8 @@ namespace BronzebeardHud.Harness;
 /// <summary>
 /// Command line. Without argument: the window, for hands-on debugging. <c>--selftest</c> and <c>--screenshot</c> run
 /// without anyone at the keyboard (the window is parked far off screen), write their result under <c>--out</c> and
-/// exit: 0 when everything passed.
+/// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--detail x</c> opens a guide's detail
+/// before the screenshot (x: a target's rank, "1", or a guide's name).
 /// </summary>
 internal sealed class Options
 {
@@ -17,6 +18,12 @@ internal sealed class Options
     public string Out { get; private set; } = Path.Combine(Path.GetTempPath(), "BronzebeardHarness", "out");
     public (int Width, int Height) Size { get; private set; } = (1920, 1080);
     public string? Layout { get; private set; }
+
+    /// <summary>The board held (HarnessData.Scenarios): 2, three targets, by default.</summary>
+    public int Scenario { get; private set; } = 2;
+
+    /// <summary>A guide whose detail is opened before the screenshot: a target's rank ("1") or a guide's name; null: the list.</summary>
+    public string? Detail { get; private set; }
 
     /// <summary>Milliseconds the screenshot waits for card names and pictures, which arrive asynchronously.</summary>
     public int Wait { get; private set; } = 8000;
@@ -41,6 +48,12 @@ internal sealed class Options
                     break;
                 case "--layout" when i + 1 < args.Length:
                     options.Layout = args[++i];
+                    break;
+                case "--scenario" when i + 1 < args.Length:
+                    options.Scenario = int.Parse(args[++i]);
+                    break;
+                case "--detail" when i + 1 < args.Length:
+                    options.Detail = args[++i];
                     break;
                 case "--wait" when i + 1 < args.Length:
                     options.Wait = int.Parse(args[++i]);
@@ -95,6 +108,11 @@ internal static class Headless
 
             if (options.Screenshot)
             {
+                if (options.Detail != null)
+                {
+                    window.OpenDetail(options.Detail);
+                }
+
                 Pump(options.Wait);
                 Capture(window.Overlay, Path.Combine(options.Out, "shot.png"));
             }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -12,10 +13,12 @@ using Hearthstone_Deck_Tracker.Utility.Logging;
 namespace BronzebeardHud.Harness;
 
 /// <summary>
-/// The plugin's four movable panels on a canvas the size of a Hearthstone window, fed with synthetic data, as HDT's
-/// overlay would hold them. Move mode is on at the start. The zones a panel must not cover (the boards, the
-/// leaderboard, the hero) are drawn under the panels in red. The plugin's own log lines show in the pane on the right.
-/// The layout is saved in the harness's own file, never in the plugin's layout.json.
+/// The plugin's two movable panels (Compositions, Skip combat) and the frames on Bob's cards, on a canvas the size of a
+/// Hearthstone window, fed with synthetic data as HDT's overlay would hold them. Bob's seven cards are drawn as grey
+/// boxes where the game draws them (TavernLayout.CardSlots), so that the frames and labels land on something. Move mode
+/// is on at the start. The zones a panel must not cover (the boards, the leaderboard, the hero) are drawn under the
+/// panels in red. The plugin's own log lines show in the pane on the right. The layout is saved in the harness's own
+/// file, never in the plugin's layout.json.
 /// </summary>
 internal sealed class HarnessWindow : Window
 {
@@ -29,43 +32,48 @@ internal sealed class HarnessWindow : Window
     };
 
     private readonly PanelMover _mover;
-    private readonly TavernAdvicePanel _tavern;
-    private readonly LineupsPanel _lineups;
-    private readonly CompGuidesPanel _guides;
     private readonly SkipCombatPanel _skip;
-    private readonly CompositionSelection _selection = new();
+    private readonly CompTargetTracker _tracker = new();
     private readonly TextBox _log = new() { IsReadOnly = true, FontFamily = new FontFamily("Consolas"), FontSize = 12, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.NoWrap };
     private readonly List<string> _lines = new();
     private readonly string _folder;
-    private int _suggested = 5;
-    private int _scenario = 2;
+    private CompGuideSet _guides = CompGuideSet.Empty(CompGuideSources.HdtFree);
+    private int _count = HudSettings.DefaultSuggested;
+    private int _scenario;
     private bool _skipShown = true;
 
     public Canvas Overlay { get; }
+    public CompsPanel Comps { get; }
+    public TavernMarkers Markers { get; }
     public bool MoveMode => _mover.MoveMode;
     public string LayoutPath { get; }
     public IReadOnlyList<string> LogLines => _lines;
+
+    /// <summary>The targets of the scene as it stands (the panel's colours).</summary>
+    public IReadOnlyList<CompTarget> Targets => _tracker.Targets;
+
+    public IReadOnlyList<TavernHighlight> Highlights { get; private set; } = Array.Empty<TavernHighlight>();
 
     public HarnessWindow(Options options)
     {
         _folder = Path.Combine(Path.GetTempPath(), "BronzebeardHarness");
         Directory.CreateDirectory(_folder);
         LayoutPath = options.Layout ?? Path.Combine(_folder, "layout.json");
+        _scenario = Math.Max(0, Math.Min(HarnessData.Scenarios.Count - 1, options.Scenario));
 
         Log.Written += line => Dispatcher.BeginInvoke(new Action(() => AppendLog(line)));
         AssetDownloaders.Initialize(Path.Combine(_folder, "images"));
         HarnessCards.Install();
 
         Overlay = new Canvas { Width = options.Size.Width, Height = options.Size.Height, Background = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30)), ClipToBounds = true };
-        Overlay.SizeChanged += (_, _) => DrawZones();
+        Overlay.SizeChanged += (_, _) => DrawScene();
 
         _mover = new PanelMover(Overlay, LayoutPath);
-        _tavern = new TavernAdvicePanel(Overlay, _mover, _selection, ToggleComposition, () => _suggested, ChangeSuggested,
-            id => Log.Info($"pin toggled: {id}"), ShowLineups, () => Log.Info("Meta clicked"),
-            composition => CompDetail.For(composition, id => Database.GetCardFromId(id)?.TechLevel),
-            (_, _, _) => null);
-        _lineups = new LineupsPanel(Overlay, _mover); // added after the target panel: drawn over it, as in the plugin
-        _guides = new CompGuidesPanel(Overlay, _mover);
+        Comps = new CompsPanel(Overlay, _mover, ToggleGuide, () => _count, ChangeCount, () => Log.Info("Meta clicked"),
+            guide => GuidePivots.For(guide, _guides, Held()),
+            (guide, fit) => Log.Info($"comp detail id={guide.Id} sections={fit.Shown.Count} of {fit.Total}"),
+            action => action());
+        Markers = new TavernMarkers(Overlay, id => Log.Info($"pin toggled: {id}"));
         _skip = new SkipCombatPanel(Overlay, _mover, () => Log.Info("Skip combat clicked (nothing is killed here)"));
         _mover.ToggleMoveMode(); // move mode on from the start: the harness is for moving and resizing
 
@@ -74,49 +82,72 @@ internal sealed class HarnessWindow : Window
         Height = 960;
         Content = BuildContent(options);
         Refresh();
-        ShowLineups(HarnessData.Pool[3]);
         if (!options.SelfTest)
         {
             HarnessCards.Load(Path.Combine(_folder, "cache"), Refresh);
         }
     }
 
-    /// <summary>Shows the three panels again from the current board, count and ticks: what a game update does in the plugin.</summary>
-    private void Refresh()
+    /// <summary>How many pivots a guide's detail lists (GuidePivots, as the panel asks them).</summary>
+    public int PivotCount(CompGuide guide) => GuidePivots.For(guide, _guides, Held()).Count;
+
+    private HashSet<string> Held() => new(HarnessData.Scenarios[_scenario].Cards.All.Select(c => c.CardId), StringComparer.Ordinal);
+
+    /// <summary>The targets a scenario gives with the current ticks and count, without changing the scene (the self-test asks).</summary>
+    public int TargetCount(int scenario)
     {
-        var cards = HarnessData.Scenarios[_scenario].Cards;
-        var owned = cards.All;
-        var chosen = _selection.Checked;
-        var shown = TavernAdvisor.Aim(HarnessData.Lobby, HarnessData.Lobby, owned, chosen, _suggested, null).Shown;
-        var rows = CompositionRows.Build(shown, owned, chosen, null);
-        var transitions = rows.GroupBy(r => r.Composition.Id)
-            .ToDictionary(g => g.Key, g => CompTransitions.For(g.First().Composition, HarnessData.Lobby));
-        _tavern.ShowPanel(rows, null, transitions);
-        _tavern.SetFooter("Warband 19 · hero avg 17 at turn 3 · +10%");
-        _guides.Show(CompGuideMatch.Rank(HarnessData.Guides, cards), CompGuideSources.HdtFree, null);
-        if (_lineups.IsOpen)
+        var probe = new CompTargetTracker();
+        foreach (var id in _tracker.Ticked)
         {
-            ShowLineups(HarnessData.Pool[3]);
+            probe.Toggle(id);
         }
 
+        return probe.Next(CompGuideMatch.Rank(_guides, HarnessData.Scenarios[scenario].Cards, _count), _count).Count;
+    }
+
+    /// <summary>Shows the panel and the markers again from the current board, count and ticks: what a game update does in the plugin.</summary>
+    private void Refresh()
+    {
+        _guides = HarnessData.Guides(id => Database.GetCardFromId(id)?.LocalizedName ?? id);
+        var cards = HarnessData.Scenarios[_scenario].Cards;
+        var board = CompGuideMatch.Rank(_guides, cards, _count);
+        var targets = _tracker.Next(board, _count);
+        Comps.Show(board, targets, cards.All.Select(c => c.CardId), CompGuideSources.HdtFree, null);
+        Comps.SetFooter("Board 142 · hero avg 120 at turn 8 · +18%");
+        DrawScene(); // Bob's cards by name, once the names are known
+        Highlights = TavernHighlights.For(HarnessData.Shop, targets);
+        Markers.Show(HarnessData.Shop, Highlights, HarnessData.Pins, HarnessData.Shop.Select(_ => true).ToList());
         if (_skipShown)
         {
             _skip.Show();
         }
     }
 
-    private void ShowLineups(string cardId) =>
-        _lineups.Show(MinionLineups.For(cardId, HarnessData.Lobby, 3), HarnessData.Scenarios[_scenario].Cards.All.Select(c => c.CardId));
-
-    private void ToggleComposition(string id)
+    /// <summary>
+    /// Opens a guide's detail: <paramref name="which"/> is a target's rank (1 for the first target) or a guide's name.
+    /// Throws when there is no such guide: a capture of the wrong view is worse than none.
+    /// </summary>
+    public void OpenDetail(string which)
     {
-        _selection.Toggle(id);
+        var guide = int.TryParse(which, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank)
+            ? _tracker.Targets.FirstOrDefault(t => t.Rank == rank)?.Guide
+            : _guides.All.FirstOrDefault(g => string.Equals(g.Name, which, StringComparison.OrdinalIgnoreCase));
+        if (guide == null || !Comps.OpenDetail(guide.Id))
+        {
+            throw new ArgumentException($"--detail {which}: no such target or guide (targets: {CompTargets.Summary(_tracker.Targets)})");
+        }
+    }
+
+    private void ToggleGuide(string id)
+    {
+        Log.Info(_tracker.ToggleLine(id, _tracker.Toggle(id)));
         Refresh();
     }
 
-    private void ChangeSuggested(int step)
+    private void ChangeCount(int step)
     {
-        _suggested = Math.Max(1, Math.Min(8, _suggested + step));
+        _count = Math.Max(HudSettings.MinSuggested, Math.Min(HudSettings.MaxSuggested, _count + step));
+        Log.Info($"suggested compositions={_count}");
         Refresh();
     }
 
@@ -156,16 +187,20 @@ internal sealed class HarnessWindow : Window
             }
         };
 
-        var lineups = new Button { Content = "Open / close lineups", Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(0, 0, 14, 0) };
-        lineups.Click += (_, _) =>
+        var detail = new Button { Content = "Detail of target 1 / list", Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(0, 0, 14, 0) };
+        detail.Click += (_, _) =>
         {
-            if (_lineups.IsOpen)
+            if (Comps.ShowsDetail)
             {
-                _lineups.Hide();
+                Comps.CloseDetail();
+            }
+            else if (_tracker.Targets.Count > 0)
+            {
+                OpenDetail("1");
             }
             else
             {
-                ShowLineups(HarnessData.Pool[3]);
+                Log.Info("no target in this scenario: click a guide's name instead");
             }
         };
 
@@ -177,7 +212,7 @@ internal sealed class HarnessWindow : Window
         };
 
         var bar = new WrapPanel { Margin = new Thickness(8) };
-        foreach (var element in new UIElement[] { move, reset, size, board, skip, lineups, clear })
+        foreach (var element in new UIElement[] { move, reset, size, board, skip, detail, clear })
         {
             bar.Children.Add(element);
         }
@@ -217,10 +252,13 @@ internal sealed class HarnessWindow : Window
         _log.ScrollToEnd();
     }
 
-    /// <summary>The zones a default panel must not cover, in red under the panels, redrawn at every canvas size.</summary>
-    private void DrawZones()
+    /// <summary>
+    /// Under the panels, redrawn at every canvas size: the zones a default panel must not cover, in red, and Bob's seven
+    /// cards as grey boxes with their names, where TavernLayout puts the game's shop cards.
+    /// </summary>
+    private void DrawScene()
     {
-        foreach (var old in Overlay.Children.OfType<FrameworkElement>().Where(e => Equals(e.Tag, "zone")).ToList())
+        foreach (var old in Overlay.Children.OfType<FrameworkElement>().Where(e => Equals(e.Tag, "zone") || Equals(e.Tag, "shop")).ToList())
         {
             Overlay.Children.Remove(old);
         }
@@ -237,6 +275,35 @@ internal sealed class HarnessWindow : Window
             Canvas.SetTop(label, zone.Top + 6);
             Overlay.Children.Add(area);
             Overlay.Children.Add(label);
+        }
+
+        var slots = TavernLayout.CardSlots(Overlay.ActualWidth, Overlay.ActualHeight, HarnessData.Shop.Count);
+        for (var i = 0; i < slots.Count; i++)
+        {
+            var slot = slots[i];
+            var card = new Border
+            {
+                Width = slot.Width * 0.9,
+                Height = slot.Height * 0.9,
+                Background = new SolidColorBrush(Color.FromRgb(0x4A, 0x50, 0x5C)),
+                CornerRadius = new CornerRadius(12),
+                Tag = "shop",
+                IsHitTestVisible = false,
+                Child = new TextBlock
+                {
+                    Text = Database.GetCardFromId(HarnessData.Shop[i])?.LocalizedName ?? HarnessData.Shop[i],
+                    Foreground = Brushes.White,
+                    FontSize = 14,
+                    TextWrapping = TextWrapping.Wrap,
+                    TextAlignment = TextAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(6),
+                },
+            };
+            Panel.SetZIndex(card, -5);
+            Canvas.SetLeft(card, slot.Left + slot.Width * 0.05);
+            Canvas.SetTop(card, slot.Top + slot.Height * 0.05);
+            Overlay.Children.Add(card);
         }
     }
 }

@@ -2,7 +2,7 @@
 
   <!-- Simulation of the plugin's panels in a plain Windows window, so that they can be moved, resized and looked
        at without Hearthstone running. The REAL panel sources are compiled in (Compile Include, below): PanelMover,
-       TavernAdvicePanel, LineupsPanel, CompGuidesPanel, SkipCombatPanel, CardImages, PreviewPlacer, OverlayLayer.
+       CompsPanel, TavernMarkers, SkipCombatPanel, CardImages, PreviewPlacer, OverlayLayer.
        What they ask of HDT (OverlayExtensions, Log, Database, the asset downloaders) is answered by HdtShim.cs, so
        the harness needs no HDT assembly and does not depend on HDT's version. What HDT's overlay window does around
        them (click-through above the game, hover polled at 60 Hz) is NOT simulated.
@@ -29,9 +29,8 @@
 
   <ItemGroup>
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\PanelMover.cs" Link="Plugin\PanelMover.cs" />
-    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\TavernAdvicePanel.cs" Link="Plugin\TavernAdvicePanel.cs" />
-    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\LineupsPanel.cs" Link="Plugin\LineupsPanel.cs" />
-    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\CompGuidesPanel.cs" Link="Plugin\CompGuidesPanel.cs" />
+    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\CompsPanel.cs" Link="Plugin\CompsPanel.cs" />
+    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\TavernMarkers.cs" Link="Plugin\TavernMarkers.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\SkipCombatPanel.cs" Link="Plugin\SkipCombatPanel.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\CardImages.cs" Link="Plugin\CardImages.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\PreviewPlacer.cs" Link="Plugin\PreviewPlacer.cs" />
