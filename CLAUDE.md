@@ -41,14 +41,14 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 
 Ce qui reste ouvert :
 
+- **Vérifier en jeu le panneau unique « Compositions »** (2026-10-04, `docs/journal/2026-10-04-panneau-unique.md`) :
+  liste des guides de HDT et couleurs des cibles, détail au clic, cadres sur les cartes de Bob, étiquettes des choix,
+  tribus du lobby (bêtes). Vu seulement dans la simulation (captures, `--selftest`).
 - **Vérifier en jeu la poignée de redimensionnement** (2026-10-04) : le calcul est testé et éprouvé par mutation,
-  mais le pointage sous HDT, le cadre pointillé, le rendu d'un panneau étroit (surtout lineups : l'en-tête compte deux
-  lignes, un titre ou un bandeau long en prendrait trois) et le retour au défaut par « Reset » ne se voient que sous Windows.
-- **Vérifier en jeu** les phases 5 et 6 (liste exhaustive : spec § 5), et les livraisons du 2026-09-27
-  (panneau des compos en ovales au plancher de 12 px, détail au clic, lineups à part, surlignage en taverne,
-  Skip combat relancé par Battle.net : `docs/journal/2026-09-27-*.md`).
-- **Vérifier en jeu** le panneau des Comp Guides de HDT (`comp-guides`, livré le 2026-10-04 :
-  `docs/journal/2026-10-04-comp-guides-hdt.md` § 3).
+  mais le pointage sous HDT, le cadre pointillé, le rendu d'un panneau étroit et le retour au défaut par « Reset » ne
+  se voient que sous Windows.
+- **Vérifier en jeu** les phases 5 et 6 (liste exhaustive : spec § 5), et le Skip combat relancé par Battle.net
+  (`docs/journal/2026-09-27-*.md`).
 - **Deux arbitrages d'Ali** : garder la ligne « comp ≈ » sous chaque héros (échantillons minces, 17
   parties en médiane) ; garder le bilan par adversaire s'il doublonne l'interface du jeu.
 - **Import HSReplay jamais utilisé** : `stats\manual\` est vide, seules les 24 compos Firestone tournent.
@@ -117,26 +117,25 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   de Bob l'épingle ou la désépingle pour la partie, sans toucher au fichier). Un cache d'un format antérieur (champ
   `schema` : 4 pour les compositions depuis leurs cinq plateaux finaux, 2 pour les stats de héros depuis
   la courbe de plateau, les fichiers de héros tapés à la main pouvant rester en 1) ou illisible est retéléchargé ;
-  si ce téléchargement échoue, la ligne `Bronzebeard HUD: tavern …` du journal d'HDT dit pourquoi
-  (`comps=0 (cache: schema 3 ≠ 4, redownload failed: …)`). On ne supprime jamais le cache à la main. Le
+  si ce téléchargement échoue, la ligne `Bronzebeard HUD: data comp-stats …` du journal d'HDT dit pourquoi
+  (`FAILED, cache: schema 3 ≠ 4, redownload failed: …`). On ne supprime jamais le cache à la main. Le
   cache des compositions est du JSON compact (≈ 77 Ko sur last-patch).
-- Panneaux déplaçables (compos visées, lineups, Skip combat, Comp Guides de HDT) : menu Plugins d'HDT › Bronzebeard HUD › « Move panels »
+- Panneaux déplaçables (`target-compositions`, le panneau « Compositions », et `skip-combat`) : menu Plugins d'HDT › Bronzebeard HUD › « Move panels »
   (ou le bouton du plugin dans les options). Hors de ce mode, rien n'est cliquable au-dessus du jeu. Les
   positions sont gardées dans `%LocalAppData%\BronzebeardHud\layout.json`, en fractions de la taille de
-  l'overlay : `{"schema": 1, "panels": {"lineups": {"left": 0.76, "top": 0.07}}}`. Un fichier illisible
+  l'overlay : `{"schema": 1, "panels": {"target-compositions": {"left": 0.76, "top": 0.07}}}`. Un fichier illisible
   donne la disposition par défaut (message dans le journal d'HDT) ; « Reset panel positions » la rétablit.
-  Une entrée d'un panneau qui n'existe plus (celui des combats, retiré) est ignorée sans message.
+  Une entrée d'un panneau qui n'existe plus (`combats`, `lineups`, `comp-guides`) est ignorée sans message.
   Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
-- Redimensionner (même mode : poignée ◢ au coin bas-droit du panneau des compos, de celui des lineups et de celui des Comp Guides de HDT, cadre
+- Redimensionner (même mode : poignée ◢ au coin bas-droit du panneau « Compositions », cadre
   pointillé cyan autour de la place donnée ; **pas de poignée sur Skip combat**, un bouton n'a rien à montrer en plus
   ou en moins). On donne de la **place** au contenu, jamais un zoom (Ali, 2026-10-04) : le panneau montre plus ou
-  moins de lignes (« 2 of 8 shown »), de pivots ou d'ovales par ligne, au même corps de texte, donc le plancher de
+  moins de guides (« 2 of 15 shown ») ou de sections du détail, au même corps de texte, donc le plancher de
   12 px tient. La taille est gardée à côté de la position, `"width"` et `"height"` en fractions de l'overlay,
   facultatifs ensemble : `{"left": 0.76, "top": 0.07, "width": 0.22, "height": 0.5}` ; un fichier sans taille se lit
-  comme avant, et « Reset panel positions » rend aussi la taille. Minimums (`PanelFit.TargetMin*`, `LineupsMin*`) :
-  panneau des compos = sa largeur par défaut (sept ovales) et le titre + 1 ligne ; lineups = sept ovales par ligne et
-  un plateau complet. Une boîte plus petite que ce que le panneau montre toujours (une ligne ; la partie fixe du
-  détail d'une compo) grandit pour le tenir, jusqu'au retour à la liste. Hors mode déplacement la boîte épouse son
+  comme avant, et « Reset panel positions » rend aussi la taille. Minimum (`PanelFit.TargetMin*`) : la largeur par
+  défaut (case, nom, six ovales) et le titre + 1 ligne. Une boîte plus petite que ce que le panneau montre toujours
+  (une ligne de guide, sous la barre de son tier) grandit pour le tenir. Hors mode déplacement la boîte épouse son
   contenu jusqu'à la taille choisie. La poignée et le cadre sont des éléments du canvas gérés par `PanelMover`, pas
   des enfants du panneau, qui remplace tout son contenu à chaque redessin. La poignée **ne garde aucun rectangle** :
   la place d'où part un redimensionnement est demandée au `PanelLayout` à chaque geste (`Resize` prend la place par
@@ -157,48 +156,50 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   omis, jamais rétréci (encart des héros : la ligne « comp ≈ » passe sur deux lignes ou disparaît ; MMR des
   adversaires : le rang disparaît, la cote reste). Un test lit les sources du plugin et y refuse `Viewbox` et
   `FontSize = <nombre>`.
-- Panneau des compos, overlay verrouillé : une ligne par compo — case, nom et place moyenne, sept ovales
-  (anneau vert + ✓ si tenus, pointillé clair sinon) ; survoler un ovale montre la carte entière, et la case
-  fait viser la compo seule (quatre au plus, une couleur chacune, oubliées à la partie suivante). Aucun texte
-  sous 12 px en 1080p (`PanelTypography`), rien ne rétrécit : le panneau s'arrête au-dessus de l'or et montre
-  les lignes qui tiennent (« 4 of 8 shown », `PanelFit`). Maquette cliquable : `docs/mock/` (README).
-  Ses − et + règlent le nombre de compos suggérées (1 à 8, 3 par défaut), gardé dans
-  `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}`. Les
-  suggestions sont les compos atteignables, meilleure place moyenne d'abord (avec le héros joué quand
-  elle est connue).
-- Détail d'une compo : un clic sur son nom ou un de ses ovales le montre à la place de la liste (« ← back »
-  pour revenir) — enablers de tier ≤ 3, pièces clés, pivots, tour final médian — **dérivé** des cartes et
-  plateaux finaux par `CompDetail`, car aucune source n'a de donnée early game. Une pièce clé de tier ≤ 3
-  reste dans les enablers : choix d'Ali du 2026-09-27, fixé par un test.
-- « Comment les tops le jouent » : le bouton ? au-dessus de chaque sbire de Bob (à droite du ◇) ouvre un
-  panneau à part, déplaçable (`lineups`), par défaut dans la colonne de droite (hors des cartes, du panneau
-  des compos et du bouton Skip combat) ; fermé par son × ou en fin de taverne.
-- Taverne : un sbire de Bob qui est pièce clé (« commit », cadre plein) ou early enabler (« enabler »,
-  pointillés) d'une compo visée est surligné dans sa couleur, l'étiquette fondue dans le marqueur existant ;
-  les compos cochées d'abord, sinon les suggestions affichées (blanc) ; commit l'emporte (`TavernHighlights`).
+- **Panneau « Compositions »** (`CompsPanel`, un seul panneau depuis le 2026-10-04 à la place de « Target compositions »
+  et « HDT comp guides » : `docs/journal/2026-10-04-panneau-unique.md`), en taverne et en combat, par défaut sous le
+  plateau du joueur à droite du héros (`TavernLayout.TargetPanel`). **Source** : les Comp Guides que HDT affiche lui-même,
+  lus par son API publique (`API.Core.OverlayWindow.BattlegroundsCompsGuidesVM` : `CurrentState`, `Comps` gratuite ou
+  `CompsByTier` Tier 7, objets `HSReplay.Responses.BattlegroundsCompGuide`) ; HDT la charge à chaque début de partie, le
+  plugin ne fait aucune requête ; le `.csproj` référence `HSReplay.dll` (fourni par HDT, jamais copié) pour ce seul type ;
+  mesure et forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. Titre : « Compositions », « k of n shown »
+  quand des guides manquent, la source (« HDT free » / « Tier 7 »), « Meta ↗ », « − n targets + » (1 à 4, 3 par défaut,
+  gardé dans `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}`) ; une ligne
+  dorée tant que HDT n'a pas de guides.
+- **Cibles** (`CompTargetTracker`) : les guides cochés (quatre au plus, ordre de coche), puis les plus probables d'après
+  le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on, `CompGuideMatch`), jusqu'à n. Une cible garde sa
+  couleur tant qu'elle le reste (magenta, lime, bleu ciel, blanc), cases et couleurs sont oubliées à la partie suivante.
+  Liste dans l'ordre de HDT par tier (S → D, barres aux dégradés de HDT), les cibles en tête de leur tier ; une ligne =
+  case, nom (deux lignes au besoin, jamais coupé ; couleur et gras d'une cible, blanc si quelque chose est tenu, gris
+  sinon), les **cartes clés** seules en ovales (anneau vert + ✓ si tenues, tier en badge ; au-delà de six : cinq et
+  « +k »). Une cible porte en plus un liseré de 3 px, une teinte et une pastille de rang dans sa couleur. Ce qui ne tient
+  pas est omis, les cibles en dernier (`CompGuideLayout.Fit`). Survoler un ovale montre la carte entière.
+- **Détail** (clic sur un nom ou un ovale, comme dans HDT) : « ← All comp guides » à la place du titre, case, nom, badges
+  de tier et de difficulté (couleurs de HDT, `CompGuideDifficulty`), puis HOW TO PLAY (première ligne, noms de cartes en
+  gras), CORE CARDS, ADDON CARDS, WHEN TO COMMIT (une pastille par ligne), COMMON ENABLERS, PIVOTS (`GuidePivots`). Une
+  section qui ne tient pas est omise entière (« k of n sections », `CompGuideLayout.Sections`) : à la place par défaut
+  en 1080p, deux ou trois tiennent ; agrandir le panneau pour tout voir.
+- **Taverne** (`TavernMarkers`, `TavernHighlights.For(Bob, cibles)`) : carte clé d'une cible → cadre plein, enabler ou
+  add-on → pointillés, dans la couleur de la cible (carte clé d'abord, puis l'ordre des cibles), étiquette « core Nom
+  k/N », « enabler Nom » ou « + Nom » ; le ◇ au-dessus de chaque sbire l'épingle (cadre blanc). **Choix** (découverte,
+  Dark Gift, trinket : `ChoiceAdvisor`) : carte d'une cible → étiquette dans sa couleur (« ★ core Nom 2/3→3/3 »,
+  « + Nom ») ; sinon le guide jouable dans le lobby dont elle est carte clé (« core Nom (S) », neutre) ; sinon « — ».
+  Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est à la fois BEAST et PET).
+- **Journal** : `comp guides loaded from HDT (…)` à chaque nouvelle liste, `… comp guides: none from HDT (state …)` tant
+  que HDT n'a rien ; `comps round=… source=… comps=… board=… hand=… targets=[1. Nom #couleur ★k/N; …]` à la fin de
+  chaque tour de taverne ; `tavern highlights=[carte:core|enabler|addon:guide, …] targets=[…]` quand ils changent ;
+  `choice kind=…` par choix ; `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]`.
+- Les compositions de Firestone (`CompService`, `TavernAdvisor`, `CompositionRows`, `CompDetail`, `CompTransitions`,
+  `MinionLineups`) restent chargées et dans le code, pour orienter les aides plus tard, mais ne sont plus affichées
+  (hors ligne « comp ≈ » de l'encart des héros). Une erreur d'un fichier de `manual\` est dite une fois par
+  `compositions data: …` (avertissement). `docs/mock/` est la maquette de l'ancien panneau Firestone.
 - Bouton « Skip combat » (jaune, en combat seulement, panneau déplaçable `skip-combat`) : tue Hearthstone et
   le fait relancer **par Battle.net** (`--exec="launch WTCG"`, redemandé chaque seconde : ≈ 7 s mesurées),
   jamais par son exécutable (connexion refusée, mesuré) ; sans Battle.net, rien n'est tué. Un clic par combat,
   lignes `Bronzebeard HUD: skip combat …` (parent, commande, demandes, nouveau pid, vivant 3 s après).
-- Comp Guides de HDT (demande d'Ali du 2026-10-04, panneau **ajouté**, le panneau des compos Firestone reste tel
-  quel) : panneau déplaçable et redimensionnable `comp-guides` (même poignée ◢ que les deux autres, minimum
-  `CompGuideLayout.MinWidth` × `MinHeight`), en taverne et en combat, par défaut au bas gauche du cadre (symétrique
-  du panneau des compos, à droite des MMR du classement, à gauche du héros ; la marge gauche est la place par
-  défaut du widget de session de HDT). **Source** : la liste que HDT affiche lui-même, lue par son API publique
-  (`API.Core.OverlayWindow.BattlegroundsCompsGuidesVM` : `CurrentState`, `Comps` gratuite ou `CompsByTier`
-  Tier 7, objets `HSReplay.Responses.BattlegroundsCompGuide`) ; HDT la charge à chaque début de partie, le plugin
-  ne fait aucune requête. Groupée par tier comme la vue Tier 7 de HDT (S → D, puis `tier_rank`, puis le nom) ;
-  les 3 compos que le plateau **et** la main rendent les plus probables (3 × carte clé, 2 × enabler, 1 × appoint,
-  `CompGuideMatch`) sont encadrées de vert vif, numérotées, remontées en tête de leur tier, avec les cartes tenues
-  et les clés manquantes ; les autres disent ce qui est tenu (« ★2/4 +1 »). Ce qui ne tient pas est omis, les
-  compos mises en valeur en dernier (`CompGuideLayout.Fit`, « k of n shown »). Journal :
-  `Bronzebeard HUD: comp guides loaded from HDT (…)` à chaque nouvelle liste, `… comp guides round=… highlighted=[…]`
-  à la fin de chaque tour de taverne, `… comp guides: none from HDT (state …)` tant que HDT n'a rien. Mesure et
-  forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. Le `.csproj` référence `HSReplay.dll`
-  (fourni par HDT, jamais copié) pour ce seul type.
 - Sous WSL, on vérifie les tests et le build. Le chargement par HDT et les événements réels ne se vérifient que
   sous Windows, avec HDT installé. **Exception : la simulation** `tools/BronzebeardHud.Harness/` (README) fait tourner
-  les vrais panneaux (`PanelMover`, compos, lineups, Comp Guides, Skip combat) dans une fenêtre Windows ordinaire, sans
+  les vrais panneaux (`PanelMover`, « Compositions », cadres sur les cartes de Bob, Skip combat) dans une fenêtre Windows ordinaire, sans
   HDT ni partie, avec des données synthétiques ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
   la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. Elle ne simule
   pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) : un défaut qui y vivrait ne s'y voit pas.
