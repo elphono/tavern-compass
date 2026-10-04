@@ -85,6 +85,42 @@ public class TavernLayoutTests
         }
     }
 
+    /// <summary>
+    /// The widest white margins measured around the art of a card portrait (art.hearthstonejson.com/v1/256x/{id}.jpg,
+    /// 25 portraits, 2026-10-04): 36 columns on one side (BG36_352, BGS_004), 5 rows at the top or the bottom.
+    /// </summary>
+    private const double WidestWhiteSide = 36;
+
+    private const double WidestWhiteTopOrBottom = 5;
+
+    [Fact]
+    public void PortraitCut_LeavesOutTheWhiteMarginsAroundTheArt_AndFillsTheOvalUndistorted()
+    {
+        var cut = TavernLayout.PortraitCut;
+        var size = TavernLayout.PortraitSize;
+        var bottom = cut.Top + cut.Height;
+
+        Assert.True(cut.Left >= 0 && cut.Top >= 0 && cut.Right <= size && bottom <= size, "the cut reaches out of the portrait");
+        Assert.True(cut.Left >= WidestWhiteSide, $"only {cut.Left} columns left out on the left: a white crescent shows");
+        Assert.True(size - cut.Right >= WidestWhiteSide, $"only {size - cut.Right} columns left out on the right: a white crescent shows");
+        Assert.True(cut.Top >= WidestWhiteTopOrBottom, $"only {cut.Top} rows left out at the top");
+        Assert.True(size - bottom >= WidestWhiteTopOrBottom, $"only {size - bottom} rows left out at the bottom");
+        Assert.Equal(TavernLayout.OvalAspect, cut.Height / cut.Width, precision: 9);
+    }
+
+    /// <summary>
+    /// An oval must fit the fixed lines the target panel draws it in, or its ring and tick are clipped: a composition
+    /// line is PanelFit.RowHeight tall, a pivot line PivotLine − 4, and a detail section counts DetailSection for its
+    /// title (3 + 16 + 2) and one line of ovals. HDT's own oval (240 / 174) is 55 px tall at this width: it does not.
+    /// </summary>
+    [Fact]
+    public void Ovals_FitTheLinesOfTheTargetPanel()
+    {
+        Assert.True(PanelFit.OvalHeight <= PanelFit.RowHeight, $"oval {PanelFit.OvalHeight} px in a {PanelFit.RowHeight} px composition line");
+        Assert.True(PanelFit.OvalHeight <= PanelFit.PivotLine - 4, $"oval {PanelFit.OvalHeight} px in a {PanelFit.PivotLine - 4} px pivot line");
+        Assert.True(PanelFit.OvalHeight <= PanelFit.DetailSection - (3 + 16 + 2), $"oval {PanelFit.OvalHeight} px in a detail section counted {PanelFit.DetailSection}");
+    }
+
     [Fact]
     public void NothingToLayOut_IsEmpty()
     {

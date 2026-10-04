@@ -33,7 +33,8 @@ internal static class CardImages
 
     /// <summary>
     /// One card as an oval, cut like the game's minion portraits: <paramref name="width"/> wide,
-    /// width × TavernLayout.OvalAspect tall, the art clipped to an ellipse, in full colour; held: solid green ring
+    /// width × TavernLayout.OvalAspect tall, the central part of the art (TavernLayout.PortraitCut, as wide as the cut
+    /// HDT gives its own minion portraits) clipped to an ellipse, in full colour; held: solid green ring
     /// and a tick, missing: light dashed ring. Badges (tick, tier) sit on the corners, at the text floor
     /// (PanelTypography.Badge), mostly outside the oval so they hide little of the art.
     /// </summary>
@@ -48,6 +49,8 @@ internal static class CardImages
     {
         var height = width * TavernLayout.OvalAspect;
         var stroke = (owned ? 3 : 2) * scale;
+        // Only the portrait's central part fills the oval (TavernLayout.PortraitCut): the whole square showed the white
+        // margins around the art as a crescent inside the ring.
         var image = new Image
         {
             Width = width,
@@ -139,7 +142,7 @@ internal static class CardImages
             });
         }
 
-        Load(AssetDownloaders.cardPortraitDownloader, cardId, image);
+        Load(AssetDownloaders.cardPortraitDownloader, cardId, image, CutPortrait);
         return cell;
     }
 
@@ -170,7 +173,7 @@ internal static class CardImages
         return image;
     }
 
-    private static async void Load(AssetDownloader<HdtCard, BitmapImage>? downloader, string cardId, Image target)
+    private static async void Load(AssetDownloader<HdtCard, BitmapImage>? downloader, string cardId, Image target, Func<BitmapSource, BitmapSource>? shape = null)
     {
         // async void: every failure must be caught here, or it would take HDT down.
         try
@@ -187,11 +190,34 @@ internal static class CardImages
                 return;
             }
 
-            target.Source = bitmap;
+            target.Source = shape == null ? bitmap : shape(bitmap);
         }
         catch (Exception)
         {
             // No picture: the vignette keeps its frame and tooltip.
         }
+    }
+
+    /// <summary>
+    /// The part of a card portrait that fills an oval (TavernLayout.PortraitCut, in pixels of a 256 square), at the
+    /// bitmap's own resolution, kept inside the bitmap.
+    /// </summary>
+    private static BitmapSource CutPortrait(BitmapSource portrait)
+    {
+        var cut = TavernLayout.PortraitCut;
+        var sx = portrait.PixelWidth / TavernLayout.PortraitSize;
+        var sy = portrait.PixelHeight / TavernLayout.PortraitSize;
+        var left = Math.Max(0, (int)Math.Round(cut.Left * sx));
+        var top = Math.Max(0, (int)Math.Round(cut.Top * sy));
+        var width = Math.Min(portrait.PixelWidth - left, (int)Math.Round(cut.Width * sx));
+        var height = Math.Min(portrait.PixelHeight - top, (int)Math.Round(cut.Height * sy));
+        if (width <= 0 || height <= 0)
+        {
+            return portrait;
+        }
+
+        var cropped = new CroppedBitmap(portrait, new Int32Rect(left, top, width, height));
+        cropped.Freeze();
+        return cropped;
     }
 }

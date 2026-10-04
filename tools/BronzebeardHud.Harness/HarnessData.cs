@@ -11,11 +11,17 @@ namespace BronzebeardHud.Harness;
 /// </summary>
 internal static class HarnessData
 {
-    /// <summary>Card ids already used by the repository's tests; any id works, one that does not exist simply has no picture.</summary>
+    /// <summary>
+    /// Card ids already used by the repository's tests; any id works, one that does not exist simply has no picture.
+    /// BG36_352 and BGS_004 (indices 10 and 17, on the Mech Magnet and Murloc Handbuff lines of the default scene) are
+    /// the portraits with the widest white side margins measured (36 px of 256): they show whether the oval cut leaves
+    /// a white crescent (TavernLayout.PortraitCut). They took the place of BG26_300 and BG30_002, which have no portrait
+    /// on art.hearthstonejson.com (404).
+    /// </summary>
     public static readonly string[] Pool =
     {
-        "BG21_005", "BG23_008", "BG23_318", "BG24_022", "BG25_009", "BG25_010", "BG25_016", "BG25_040", "BG25_354", "BG26_174", "BG26_300", "BG26_817",
-        "BG28_300", "BG28_309", "BG28_504", "BG28_573", "BG29_300", "BG30_002", "BG31_808", "BG31_815", "BG31_835", "BG32_324", "BG32_880", "BG33_823",
+        "BG21_005", "BG23_008", "BG23_318", "BG24_022", "BG25_009", "BG25_010", "BG25_016", "BG25_040", "BG25_354", "BG26_174", "BG36_352", "BG26_817",
+        "BG28_300", "BG28_309", "BG28_504", "BG28_573", "BG29_300", "BGS_004", "BG31_808", "BG31_815", "BG31_835", "BG32_324", "BG32_880", "BG33_823",
         "BG33_825", "BG34_170", "BG36_110", "BG36_114", "BG36_116", "BG36_318", "BG36_515",
     };
 

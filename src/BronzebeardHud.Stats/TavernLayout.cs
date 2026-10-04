@@ -118,11 +118,28 @@ public static class TavernLayout
     /// <summary>Bottom of the player's board row: top = H/2 − 0.03 × H (OverlayWindow.Update.cs:537-538), plus the row height.</summary>
     public static double PlayerRowBottom(double height) => height / 2 - 0.03 * height + BoardRowHeight * height;
 
+    /// <summary>Side of a card portrait (art.hearthstonejson.com/v1/256x/{id}.jpg, HDT's card portrait), in source pixels.</summary>
+    public const double PortraitSize = 256;
+
     /// <summary>
     /// Card vignettes are ovals, cut like the game's minion portraits: height = width × <see cref="OvalAspect"/>
-    /// (PanelFit.OvalWidth).
+    /// (PanelFit.OvalWidth). Not HDT's own 240 / 174 (<see cref="PortraitCut"/>): at the same width, that oval is
+    /// 55 px tall and no longer fits the 50 px lines it is drawn in (PanelFit.RowHeight, the pivots, the detail's
+    /// sections), which clip its ring and its tick.
     /// </summary>
     public const double OvalAspect = 1.2;
+
+    /// <summary>
+    /// The part of a card portrait that fills an oval, in source pixels of the <see cref="PortraitSize"/> square,
+    /// centred. The art sits on a white square with up to 36 white columns on either side and 5 rows at the top or the
+    /// bottom (measured on 25 portraits, 2026-10-04: 24 of them have 22 to 36 white columns); the whole square cut to an
+    /// oval showed them as a white crescent inside the ring. As wide as HDT's own cut of a minion portrait
+    /// (Controls/Overlay/Battlegrounds/BattlegroundsMinion.xaml: an EllipseGeometry RadiusX="87" RadiusY="120"
+    /// Center="128,128" on the 256 × 256 portrait, i.e. the central 174 × 240), so 41 columns are left out on each side;
+    /// as tall as <see cref="OvalAspect"/> makes it (208.8: 23.6 rows left out at the top and the bottom), so that it
+    /// fills the oval undistorted.
+    /// </summary>
+    public static readonly LayoutRect PortraitCut = new(PortraitSize / 2, PortraitSize / 2, 174, 174 * OvalAspect);
 
     /// <summary>
     /// Height of the full-card preview shown when a vignette is hovered: HDT draws a Battlegrounds card
