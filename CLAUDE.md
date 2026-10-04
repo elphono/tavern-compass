@@ -41,6 +41,9 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 
 Ce qui reste ouvert :
 
+- **Vérifier en jeu la poignée de redimensionnement** (2026-10-04) : le calcul est testé et éprouvé par mutation,
+  mais le pointage sous HDT, le cadre pointillé, le rendu d'un panneau étroit (surtout lineups : l'en-tête compte deux
+  lignes, un titre ou un bandeau long en prendrait trois) et le retour au défaut par « Reset » ne se voient que sous Windows.
 - **Vérifier en jeu** les phases 5 et 6 (liste exhaustive : spec § 5), et les livraisons du 2026-09-27
   (panneau des compos en ovales au plancher de 12 px, détail au clic, lineups à part, surlignage en taverne,
   Skip combat relancé par Battle.net : `docs/journal/2026-09-27-*.md`).
@@ -122,6 +125,21 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   donne la disposition par défaut (message dans le journal d'HDT) ; « Reset panel positions » la rétablit.
   Une entrée d'un panneau qui n'existe plus (celui des combats, retiré) est ignorée sans message.
   Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
+- Redimensionner (même mode : poignée ◢ au coin bas-droit du panneau des compos et de celui des lineups, cadre
+  pointillé cyan autour de la place donnée ; **pas de poignée sur Skip combat**, un bouton n'a rien à montrer en plus
+  ou en moins). On donne de la **place** au contenu, jamais un zoom (Ali, 2026-10-04) : le panneau montre plus ou
+  moins de lignes (« 2 of 8 shown »), de pivots ou d'ovales par ligne, au même corps de texte, donc le plancher de
+  12 px tient. La taille est gardée à côté de la position, `"width"` et `"height"` en fractions de l'overlay,
+  facultatifs ensemble : `{"left": 0.76, "top": 0.07, "width": 0.22, "height": 0.5}` ; un fichier sans taille se lit
+  comme avant, et « Reset panel positions » rend aussi la taille. Minimums (`PanelFit.TargetMin*`, `LineupsMin*`) :
+  panneau des compos = sa largeur par défaut (sept ovales) et le titre + 1 ligne ; lineups = sept ovales par ligne et
+  un plateau complet. Une boîte plus petite que ce que le panneau montre toujours (une ligne ; la partie fixe du
+  détail d'une compo) grandit pour le tenir, jusqu'au retour à la liste. Hors mode déplacement la boîte épouse son
+  contenu jusqu'à la taille choisie. La poignée et le cadre sont des éléments du canvas gérés par `PanelMover`, pas
+  des enfants du panneau, qui remplace tout son contenu à chaque redessin. Tous les « est-ce que ça tient ? » de
+  `PanelFit` ont une tolérance (`Tolerance`) : une boîte exactement de la hauteur de n lignes, divisée par une échelle
+  qui n'est pas une fraction binaire, rendait n − 1 lignes (mesuré : à 72 % des hauteurs de fenêtre de 600 à 2200,
+  22 % des couples hauteur × nombre de lignes ; 0 avec la tolérance, fixé par un balayage de test).
 - Encart des héros proposés (sélection du héros, fixe) : sous le bouton de reroll du jeu (« Réinitialiser »,
   0,632 → 0,718 H), de 0,725 à 0,805 H, 0,17 H de large, dans la colonne du héros (grille d'HDT, un héros tous
   les 340/1080 H). Un encart qui approcherait à moins de 0,01 H du bouton OK (0,751 → 0,825 H) se décale de

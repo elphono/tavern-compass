@@ -91,14 +91,18 @@ internal sealed class LineupsPanel
         var height = _canvas.ActualHeight;
         var scale = TavernLayout.Scale(height);
         var rect = PanelFit.LineupsPanel(width, height);
-        _panel.Width = rect.Width;
-        _mover.Place(_panel, "lineups", rect, interactive: true);
+        var placed = _mover.Place(_panel, "lineups", rect, interactive: true,
+            new PanelResize(PanelFit.LineupsMinWidth * scale, PanelFit.LineupsMinHeight * scale, Relayout));
+        _panel.Width = placed.Width;
 
-        // Room from wherever the panel sits (it may have been moved) down to the gold, as for the target panel.
+        // The room the content has: the box the player gave the panel (its width sets the ovals per line, its height
+        // the compositions shown), otherwise from wherever the panel sits (it may have been moved) down to the gold,
+        // as for the target panel.
         var top = Canvas.GetTop(_panel);
-        var room = new LayoutRect(rect.CenterX, 0, rect.Width, Math.Min(rect.Height, PanelFit.BottomLimit * height - top));
+        var roomHeight = _mover.IsResized("lineups") ? placed.Height : Math.Min(rect.Height, PanelFit.BottomLimit * height - top);
+        var room = new LayoutRect(placed.CenterX, 0, placed.Width, roomHeight);
         var shown = PanelFit.LineupCompositions(room, height, lineups.Compositions.Select(c => c.Boards[0].Cards.Count).ToList());
-        var lines = new StackPanel { Margin = new Thickness(PanelFit.Padding * scale), Width = rect.Width - 2 * (PanelFit.Padding + PanelFit.Border) * scale };
+        var lines = new StackPanel { Margin = new Thickness(PanelFit.Padding * scale), Width = placed.Width - 2 * (PanelFit.Padding + PanelFit.Border) * scale };
 
         var name = Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(lineups.CardId)?.LocalizedName ?? lineups.CardId;
         var header = new DockPanel { LastChildFill = true };

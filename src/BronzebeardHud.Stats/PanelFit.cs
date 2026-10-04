@@ -56,6 +56,14 @@ public static class PanelFit
     public const double Border = 2;
     public const double Padding = 8;
 
+    /// <summary>
+    /// Design pixels of slack in every "does it fit?" comparison. A box dragged to exactly the height of its
+    /// content, divided by a scale that is not a binary fraction, comes back a hair short (2.9999999 lines): without
+    /// this, the panel would show one line fewer than the box holds (measured: at 72 % of the window heights from 600
+    /// to 2200, 22 % of the height × line count pairs).
+    /// </summary>
+    private const double Tolerance = 1e-6;
+
     /// <summary>Title bar: "Target compositions", Meta, − n +; buttons 22 tall, a rule under them.</summary>
     public const double TitleBar = 32;
 
@@ -89,22 +97,39 @@ public static class PanelFit
     private static double Chrome(bool footer, bool status) =>
         2 * Border + 2 * Padding + TitleBar + (footer ? FooterLine : 0) + (status ? StatusLine : 0);
 
-    /// <summary>Room below a panel's top, in design pixels: down to <see cref="BottomLimit"/>.</summary>
-    public static double Room(double height, double top) => (BottomLimit * height - top) / TavernLayout.Scale(height);
+    /// <summary>
+    /// Room below a panel's top, in design pixels: down to <paramref name="bottom"/> (overlay pixels, the lower edge
+    /// of the box the player gave the panel) or, when it has none, down to <see cref="BottomLimit"/>.
+    /// </summary>
+    public static double Room(double height, double top, double? bottom = null) => ((bottom ?? BottomLimit * height) - top) / TavernLayout.Scale(height);
+
+    /// <summary>
+    /// Smallest box of the target panel when resized (design pixels): the title and one composition line, as wide as
+    /// its seven ovals need. A footer or a status line under that one line does not widen it: the panel then grows
+    /// to hold what it shows, as it always showed at least one line.
+    /// </summary>
+    public const double TargetMinWidth = PanelWidth;
+    public static double TargetMinHeight => ListHeight(1, footer: false, status: false);
+
+    /// <summary>
+    /// What the detail view always shows: "← back" and the name, the meta line and the two sections (enablers, key
+    /// pieces), under the title bar. Only the pivots below it give way to a smaller box.
+    /// </summary>
+    public const double DetailMinHeight = 2 * Border + 2 * Padding + TitleBar + DetailHeader + DetailMeta + 2 * DetailSection;
 
     /// <summary>
     /// How many composition lines the list shows: as many as fit between the panel's top and
     /// <see cref="BottomLimit"/>, at most <paramref name="wanted"/>, at least one when there is one to show.
     /// </summary>
-    public static int Rows(double height, double top, int wanted, bool footer, bool status)
+    public static int Rows(double height, double top, int wanted, bool footer, bool status, double? bottom = null)
     {
         if (wanted <= 0)
         {
             return 0;
         }
 
-        var available = Room(height, top) - Chrome(footer, status) + RowGap;
-        var fit = (int)Math.Floor(available / (RowHeight + RowGap));
+        var available = Room(height, top, bottom) - Chrome(footer, status) + RowGap;
+        var fit = (int)Math.Floor((available + Tolerance) / (RowHeight + RowGap));
         return Math.Max(1, Math.Min(wanted, fit));
     }
 
@@ -116,9 +141,9 @@ public static class PanelFit
     /// How many pivot lines the detail view shows under its header, meta line and two sections (enablers, key
     /// pieces), which always show; at most <paramref name="pivots"/>.
     /// </summary>
-    public static int DetailPivots(double height, double top, int pivots)
+    public static int DetailPivots(double height, double top, int pivots, double? bottom = null)
     {
-        var available = Room(height, top) - Chrome(false, false) - DetailHeader - DetailMeta - 2 * DetailSection;
+        var available = Room(height, top, bottom) - DetailMinHeight;
         return Math.Max(0, Math.Min(pivots, (int)Math.Floor(available / PivotLine)));
     }
 
@@ -143,9 +168,17 @@ public static class PanelFit
     public const double LineupLabel = 32;
     public const double LineupMmr = 16;
 
+    /// <summary>
+    /// Smallest box of the lineups panel when resized (design pixels): a line of seven ovals (a full board), and
+    /// under the title, headline and label one such board with its MMR line. No padding: one pixel less shows none.
+    /// </summary>
+    public const int MinLineupOvals = 7;
+    public const double LineupsMinWidth = 2 * Border + 2 * Padding + MinLineupOvals * (OvalWidth + OvalGap);
+    public static double LineupsMinHeight => LineupsHeader + LineupLabel + (OvalHeight + RowGap) + LineupMmr;
+
     /// <summary>Ovals per line of a board in a panel <paramref name="panelWidth"/> wide (overlay pixels).</summary>
     public static int OvalsPerLine(double panelWidth, double height) =>
-        Math.Max(1, (int)Math.Floor((panelWidth / TavernLayout.Scale(height) - 2 * Border - 2 * Padding) / (OvalWidth + OvalGap)));
+        Math.Max(1, (int)Math.Floor((panelWidth / TavernLayout.Scale(height) - 2 * Border - 2 * Padding + Tolerance) / (OvalWidth + OvalGap)));
 
     /// <summary>How many compositions of <paramref name="boardSizes"/> (their best board's card count) the lineups panel shows.</summary>
     public static int LineupCompositions(LayoutRect panel, double height, IReadOnlyList<int> boardSizes)
@@ -157,7 +190,7 @@ public static class PanelFit
         {
             var lines = (int)Math.Ceiling(Math.Max(1, size) / (double)perLine);
             var need = LineupLabel + lines * (OvalHeight + RowGap) + LineupMmr;
-            if (need > room)
+            if (need > room + Tolerance)
             {
                 break;
             }

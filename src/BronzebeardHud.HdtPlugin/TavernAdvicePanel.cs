@@ -549,7 +549,7 @@ internal sealed class TavernAdvicePanel
     /// all of it is derived from; EARLY ENABLERS and WHEN TO COMMIT, one line of ovals each with their tier; then
     /// as many pivots as fit (PanelFit.DetailPivots), each a label and the cards shared.
     /// </summary>
-    private void AddDetail(StackPanel lines, CompDetail detail, double scale, double height, double top)
+    private void AddDetail(StackPanel lines, CompDetail detail, double scale, double height, double top, double? bottom)
     {
         var id = detail.Composition.Id;
         var row = _rows.FirstOrDefault(r => r.Composition.Id == id);
@@ -612,7 +612,7 @@ internal sealed class TavernAdvicePanel
         // Pivots: as many as fit under the two sections (PanelFit.DetailPivots), each a label and its shared cards.
         if (_transitions.TryGetValue(id, out var transitions))
         {
-            var shown = PanelFit.DetailPivots(height, top, transitions.Count);
+            var shown = PanelFit.DetailPivots(height, top, transitions.Count, bottom);
             foreach (var transition in transitions.Take(shown))
             {
                 var pivot = new Grid { Height = (PanelFit.PivotLine - 4) * scale, Margin = new Thickness(0, 4 * scale, 0, 0) };
@@ -657,16 +657,22 @@ internal sealed class TavernAdvicePanel
         var height = _canvas.ActualHeight;
         var scale = TavernLayout.Scale(height);
         var panel = TavernLayout.TargetPanel(width, height);
-        _targets.Width = panel.Width;
-        _targets.MinHeight = panel.Height;
-        _mover.Place(_targets, "target-compositions", panel, interactive: true);
+        var placed = _mover.Place(_targets, "target-compositions", panel, interactive: true,
+            new PanelResize(PanelFit.TargetMinWidth * scale, PanelFit.TargetMinHeight * scale, RelayoutPanel));
+        var resized = _mover.IsResized("target-compositions");
+        _targets.Width = placed.Width;
+        _targets.MinHeight = resized ? Math.Min(panel.Height, placed.Height) : panel.Height;
         var top = Canvas.GetTop(_targets);
+
+        // The room the content has: the box the player gave the panel, otherwise down to the gold.
+        double? bottom = resized ? top + placed.Height : null;
         var hasFooter = !string.IsNullOrEmpty(_footer);
         var hasStatus = !string.IsNullOrEmpty(_status);
+        var statusLine = hasStatus ? PanelFit.StatusLine : 0;
         var showDetail = DetailEnabled && _view.ShowsDetail && _detail != null;
-        var shown = showDetail ? 0 : PanelFit.Rows(height, top, _rows.Count, hasFooter, hasStatus);
+        var shown = showDetail ? 0 : PanelFit.Rows(height, top, _rows.Count, hasFooter, hasStatus, bottom);
 
-        var lines = new StackPanel { Margin = new Thickness(PanelFit.Padding * scale), Width = panel.Width - 2 * (PanelFit.Padding + PanelFit.Border) * scale };
+        var lines = new StackPanel { Margin = new Thickness(PanelFit.Padding * scale), Width = placed.Width - 2 * (PanelFit.Padding + PanelFit.Border) * scale };
         var title = new DockPanel { Height = (PanelFit.TitleBar - 6) * scale, LastChildFill = true };
         var count = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         DockPanel.SetDock(count, Dock.Right);
@@ -692,7 +698,7 @@ internal sealed class TavernAdvicePanel
         IReadOnlyList<string> visible;
         if (showDetail)
         {
-            AddDetail(lines, _detail!, scale, height, top);
+            AddDetail(lines, _detail!, scale, height, top, bottom - statusLine * scale); // the status line, under the detail, takes its room
             visible = _visibleIds; // the tavern keeps following the list's compositions while a detail is open
         }
         else
@@ -724,7 +730,18 @@ internal sealed class TavernAdvicePanel
             lines.Children.Add(Text(_status!, PanelTypography.Small, scale, Brushes.Gold));
         }
 
-        _targets.MaxHeight = Math.Max(panel.Height, PanelFit.BottomLimit * height - top);
+        if (!resized)
+        {
+            _targets.MaxHeight = Math.Max(panel.Height, PanelFit.BottomLimit * height - top);
+        }
+        else
+        {
+            // Never less than what is shown: a list always shows one line, and the detail its fixed part, even in a box
+            // too small for them.
+            var needed = showDetail ? PanelFit.DetailMinHeight + statusLine : PanelFit.ListHeight(shown, hasFooter, hasStatus);
+            _targets.MaxHeight = Math.Max(placed.Height, needed * scale);
+        }
+
         _targets.Child = lines;
         _targets.Visibility = Visibility.Visible;
 

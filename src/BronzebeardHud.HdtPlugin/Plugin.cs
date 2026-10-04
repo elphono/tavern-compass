@@ -634,6 +634,7 @@ public sealed class Plugin : IPlugin
         _skipCombat = null;
         _lineupsPanel?.Detach();
         _lineupsPanel = null;
+        _mover?.Detach();
         _panel = null;
         _tavern = null;
         _stats?.Dispose();
