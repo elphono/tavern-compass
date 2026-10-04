@@ -20,7 +20,7 @@ internal static class HexBrush
 /// card of a target, solid frame; an enabler or add-on, dotted frame; in the target's colour, CompTargetTracker.Palette),
 /// or that is pinned; and a ◇ above each minion to pin it. Positions come from <see cref="TavernLayout"/> (HDT's shop
 /// constants) and follow the canvas size. Labels are built to fit by <see cref="MarkerText"/>: nothing is shrunk, every
-/// text is at least PanelTypography.Floor at 1080p.
+/// text is at least PanelTypography.Floor at 1080p. All of it is taken off while a choice is open (<see cref="Suspend"/>).
 /// </summary>
 internal sealed class TavernMarkers
 {
@@ -48,6 +48,25 @@ internal sealed class TavernMarkers
 
     /// <summary>When false, no pin buttons are drawn (the pinning feature was switched off by its guard).</summary>
     public bool PinButtonsEnabled { get; set; } = true;
+
+    /// <summary>True while a choice is open (ChoiceCover): nothing is drawn, what <see cref="Show"/> gave is kept.</summary>
+    public bool Suspended { get; private set; }
+
+    /// <summary>
+    /// While a choice is open the game draws its options over Bob's row: frames, labels and ◇ buttons are taken off (a ◇
+    /// inside an option would pin instead of choosing), and drawn again from what was last shown once it closes, with
+    /// nothing computed again. A <see cref="Show"/> meanwhile is kept for then.
+    /// </summary>
+    public void Suspend(bool suspended)
+    {
+        if (suspended == Suspended)
+        {
+            return;
+        }
+
+        Suspended = suspended;
+        Relayout();
+    }
 
     /// <param name="cards">Bob's row, left to right, the tavern spell included.</param>
     /// <param name="highlights">One per card (TavernHighlights.For); any other count draws no frame, the pins only.</param>
@@ -90,7 +109,7 @@ internal sealed class TavernMarkers
     private void Relayout()
     {
         Clear();
-        if (!_visible || _cards.Count == 0 || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
+        if (!_visible || Suspended || _cards.Count == 0 || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
         {
             return;
         }

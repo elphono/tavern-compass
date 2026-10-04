@@ -47,6 +47,10 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _compDetailGuard;
     private readonly FeatureGuard _skipCombatGuard;
     private readonly FeatureGuard _bridgeGuard;
+    private readonly FeatureGuard _coverGuard;
+
+    // While a choice is open in the shop, the markers on Bob's cards and the panel are off the screen (ChoiceCover).
+    private readonly ChoiceCover _cover = new();
 
     // HDT's own comp guides (HdtCompGuides), as last read.
     private string? _guidesState;
@@ -135,6 +139,13 @@ public sealed class Plugin : IPlugin
             _bridge = null;
             _heroEffects = null;
             _bridgeVersion++;
+        }));
+        // Once switched off, nothing stays hidden behind a choice that the feature can no longer see close.
+        _coverGuard = new FeatureGuard("choice-cover", (n, e) => Disable(n, e, () =>
+        {
+            _cover.Reset();
+            _markers?.Suspend(false);
+            _compsPanel?.Suspend(false);
         }));
         _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
@@ -625,6 +636,7 @@ public sealed class Plugin : IPlugin
         _heroEffects = null;
         _bridgeKey = string.Empty;
         _heroEffectsKey = string.Empty;
+        _cover.Reset(); // the panels are new: nothing of them is hidden yet
     }
 
     public void OnUnload()
@@ -664,6 +676,7 @@ public sealed class Plugin : IPlugin
         _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
         _compsGuard.Run(() => UpdateComps(game)); // the targets first: the frames and the choices follow them
         _markersGuard.Run(() => UpdateTavern(game));
+        _coverGuard.Run(() => UpdateChoiceCover(game)); // in the same update: a choice that opens never shows them over it
         _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
         _choiceGuard.Run(() => UpdateChoice(game));
         _warbandGuard.Run(() => UpdateWarband(game));
@@ -914,6 +927,24 @@ public sealed class Plugin : IPlugin
         _warbandRound = round;
         _warbandLine = comparison.Line;
         _compsPanel.SetFooter(comparison.Line);
+    }
+
+    /// <summary>
+    /// While a choice is open in the shop (ChoiceCover: any kind ChoiceClassifier tells from None), the markers on Bob's
+    /// cards and the "Compositions" panel with its popup are off the screen, and back as they were once it closes: nothing
+    /// is computed again for that, the panel and the markers keep what they were last given. One log line per transition.
+    /// A decision to be confirmed in game by Ali (docs/journal/2026-10-04-panneau-unique.md).
+    /// </summary>
+    private void UpdateChoiceCover(GameV2 game)
+    {
+        var options = game.IsBattlegroundsMatch ? HdtEntityAdapter.OfferedOptions(game) : Array.Empty<OfferedOption>();
+        if (_cover.Observe(HdtEntityAdapter.Phase(game), ChoiceClassifier.Kind(options)) is { } line)
+        {
+            Log.Info(line);
+        }
+
+        _markers?.Suspend(_cover.Hidden);
+        _compsPanel?.Suspend(_cover.Hidden);
     }
 
     /// <summary>

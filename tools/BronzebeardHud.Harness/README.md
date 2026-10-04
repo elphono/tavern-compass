@@ -55,8 +55,9 @@ leur mise en page et leur remplissage.
 - La rangée de Bob : deux cartes clés d'une cible (cadre plein), un add-on et un enabler (pointillés), une carte épinglée
   (◆, blanc) et deux qui ne servent à rien.
 - Trois plateaux (liste déroulante) : 0, 1 et 3 cibles ; le bouton « Detail of target 1 / list » ouvre et ferme le détail.
-- Un choix (liste déroulante) : ses options au-dessus de la rangée de Bob, comme dans le jeu, et sous tout ce que dessine le
-  plugin (cadres, ◇, étiquettes), qui garde la rangée de Bob affichée pendant un choix en taverne.
+- Un choix (liste déroulante) : ses options au-dessus de la rangée de Bob, comme dans le jeu, sous les étiquettes du
+  plugin. Tant qu'il est ouvert, les cadres, étiquettes et ◇ des cartes de Bob et le panneau « Compositions » (et son popup)
+  sont retirés de l'écran, puis remis tels quels à sa fermeture (`ChoiceCover`, comme le plugin).
 - Un volet de journal : les lignes du plugin (`resize start`, `resize end`, `panel moved`, `ticked guides`…).
 - La disposition est enregistrée dans `%TEMP%\BronzebeardHarness\layout.json`, **jamais** dans le `layout.json` du plugin.
 - Les données sont inventées (quinze guides, leurs textes et leurs listes de cartes) sur de vrais identifiants de cartes ;

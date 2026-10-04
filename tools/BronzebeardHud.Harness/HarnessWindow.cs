@@ -39,6 +39,7 @@ internal sealed class HarnessWindow : Window
     private readonly SkipCombatPanel _skip;
     private readonly ChoiceAdvicePanel _choices;
     private readonly CompTargetTracker _tracker = new();
+    private readonly ChoiceCover _cover = new();
     private ChoiceKind _choiceKind = ChoiceKind.None;
     private readonly TextBox _log = new() { IsReadOnly = true, FontFamily = new FontFamily("Consolas"), FontSize = 12, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.NoWrap };
     private readonly List<string> _lines = new();
@@ -300,6 +301,16 @@ internal sealed class HarnessWindow : Window
     private void UpdateChoice(IReadOnlyList<CompTarget> targets, PlayerCards cards)
     {
         var options = HarnessData.Choice(_choiceKind);
+
+        // Plugin.UpdateChoiceCover: the scene is a shop; while a choice is open, the markers and the panel are off the screen.
+        if (_cover.Observe(OverlayPhase.Shop, ChoiceClassifier.Kind(options)) is { } line)
+        {
+            Log.Info(line);
+        }
+
+        Markers.Suspend(_cover.Hidden);
+        Comps.Suspend(_cover.Hidden);
+
         if (options.Count == 0)
         {
             Choice = null;
@@ -331,11 +342,16 @@ internal sealed class HarnessWindow : Window
         }
     }
 
-    /// <summary>Opens a choice above the scene (or closes it, with None), advised on the targets as they stand.</summary>
+    /// <summary>
+    /// Opens a choice above the scene (or closes it, with None), advised on the targets as they stand. As in the plugin, a
+    /// choice that opens or closes runs the choice's code alone: the panel and the markers are neither given anything nor
+    /// computed again, only taken off the screen and put back (ChoiceCover).
+    /// </summary>
     public void ShowChoice(ChoiceKind kind)
     {
         _choiceKind = kind;
-        Refresh();
+        DrawScene(); // the options' boxes
+        UpdateChoice(_tracker.Targets, HarnessData.Scenarios[_scenario].Cards);
     }
 
     /// <summary>

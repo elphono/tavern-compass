@@ -23,7 +23,7 @@ namespace BronzebeardHud.HdtPlugin;
 /// detail and the popup draw the sections with the same code (GuideView).
 ///
 /// Movable and resizable ("target-compositions", the id the panel always had: a place Ali saved stays valid), in the shop
-/// and in combat. Nothing is shrunk: every piece is built and measured in place, then what fits is shown (CompGuideLayout:
+/// and in combat, off the screen while a choice is open in the shop (<see cref="Suspend"/>). Nothing is shrunk: every piece is built and measured in place, then what fits is shown (CompGuideLayout:
 /// the targets never give way to the others, "k of n shown" by the title; a detail section that does not fit is left out whole, "k of n
 /// sections"). The tick boxes, the names, the ovals and the buttons are clickable while the overlay stays locked: HDT
 /// makes its window catch the mouse only over elements declared with IsOverlayHitTestVisible
@@ -78,6 +78,9 @@ internal sealed class CompsPanel
     private string? _footer;
     private string? _loggedDetail;
 
+    // A redraw was asked while a choice hid the panel (Suspend): it is redrawn when it comes back, not merely shown again.
+    private bool _staleWhileSuspended;
+
     /// <param name="toggle">Called with a guide id (CompGuide.Id) when its tick box is clicked.</param>
     /// <param name="count">How many targets are wanted (settings.json), shown between − and +.</param>
     /// <param name="changeCount">Called with −1 or +1 when − or + is clicked.</param>
@@ -117,11 +120,46 @@ internal sealed class CompsPanel
         };
         OverlayLayer.Add(_canvas, _panel);
         _canvas.SizeChanged += OnCanvasSizeChanged;
-        _popup = new GuidePopup(canvas, PopupContent, () => _mover.MoveMode || _view.ShowsDetail || !IsVisible, cursorOver ?? GuidePopup.IsCursorOver, run);
+        _popup = new GuidePopup(canvas, PopupContent, () => _mover.MoveMode || _view.ShowsDetail || !IsVisible || Suspended, cursorOver ?? GuidePopup.IsCursorOver, run);
         _mover.MoveModeChanged += OnMoveModeChanged;
     }
 
+    /// <summary>Shown by the plugin (in the shop and in combat), even while a choice hides it (<see cref="Suspended"/>).</summary>
     public bool IsVisible { get; private set; }
+
+    /// <summary>True while a choice is open (ChoiceCover): the panel and its popup are off the screen, what it shows is kept.</summary>
+    public bool Suspended { get; private set; }
+
+    /// <summary>
+    /// While a choice is open the panel is taken off the screen with its guide popup (at its default place it covered the
+    /// bottom of the third option), and put back once it closes: the very same elements when nothing changed meanwhile,
+    /// redrawn from what it was last given otherwise (a new board, a resize). No popup shows meanwhile.
+    /// </summary>
+    public void Suspend(bool suspended)
+    {
+        if (suspended == Suspended)
+        {
+            return;
+        }
+
+        Suspended = suspended;
+        if (suspended)
+        {
+            _panel.Visibility = Visibility.Collapsed;
+            _popup.Hide();
+            return;
+        }
+
+        if (_staleWhileSuspended || !IsVisible)
+        {
+            _staleWhileSuspended = false;
+            Relayout();
+            return;
+        }
+
+        _panel.Visibility = Visibility.Visible;
+        _popup.Listed(_shownLines);
+    }
 
     /// <summary>The popup of a hovered guide line (the simulation's self-test drives it).</summary>
     public GuidePopup Popup => _popup;
@@ -204,7 +242,7 @@ internal sealed class CompsPanel
         var guide = _board.All.Select(p => p.Guide).FirstOrDefault(g => g.Id == guideId);
         var left = Canvas.GetLeft(_panel);
         var top = Canvas.GetTop(_panel);
-        if (guide == null || !IsVisible || double.IsNaN(left) || double.IsNaN(top) || _panel.ActualWidth <= 0)
+        if (guide == null || !IsVisible || Suspended || double.IsNaN(left) || double.IsNaN(top) || _panel.ActualWidth <= 0)
         {
             return null;
         }
@@ -493,8 +531,9 @@ internal sealed class CompsPanel
     /// </summary>
     private void Relayout()
     {
-        if (!IsVisible || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
+        if (!IsVisible || Suspended || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
         {
+            _staleWhileSuspended |= Suspended;
             _panel.Visibility = Visibility.Collapsed;
             _popup.Hide();
             return;
