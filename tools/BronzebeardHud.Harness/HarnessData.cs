@@ -7,8 +7,9 @@ namespace BronzebeardHud.Harness;
 
 /// <summary>
 /// Synthetic data for the panels: invented comp guides built on real card ids (so that pictures can be fetched), a few
-/// boards the player may hold, Bob's row, and the card names and tiers of HearthstoneJSON when they have been fetched.
-/// Nothing here comes from Firestone or HSReplay: the guides' names, card lists and texts are made up.
+/// boards the player may hold, Bob's row, the options of a discover, a Dark Gift and a trinket choice with invented
+/// trinket stats, and the card names and tiers of HearthstoneJSON when they have been fetched.
+/// Nothing here comes from Firestone or HSReplay: the guides' names, card lists and texts, and the trinket stats, are made up.
 /// </summary>
 internal static class HarnessData
 {
@@ -95,6 +96,82 @@ internal static class HarnessData
 
     private static PlayerCards Hold(int[] board, int[] hand) =>
         new(board.Select(i => new OwnedCard(Pool[i])).ToList(), hand.Select(i => new OwnedCard(Pool[i])).ToList());
+
+    /// <summary>The choices the harness can open above the scene (the bar's list, <c>--choice</c>), "none" first.</summary>
+    public static IReadOnlyList<(string Label, ChoiceKind Kind)> Choices { get; } = new[]
+    {
+        ("No choice", ChoiceKind.None),
+        ("Discover", ChoiceKind.Discover),
+        ("Dark Gift", ChoiceKind.DarkGift),
+        ("Trinket", ChoiceKind.Trinket),
+    };
+
+    /// <summary>A choice named as <c>--choice</c> names it (<see cref="ChoiceClassifier.Name"/>: discover, dark-gift, trinket, none).</summary>
+    public static ChoiceKind ChoiceOf(string name)
+    {
+        foreach (var (_, kind) in Choices)
+        {
+            if (string.Equals(ChoiceClassifier.Name(kind), name, StringComparison.OrdinalIgnoreCase))
+            {
+                return kind;
+            }
+        }
+
+        throw new ArgumentException($"--choice {name}: expected {string.Join(", ", Choices.Select(c => ChoiceClassifier.Name(c.Kind)))}");
+    }
+
+    /// <summary>
+    /// The options of each choice, as HDT hands them to the plugin, with the counts of Ali's games (his HDT logs: discover
+    /// and Dark Gift 3 options, trinkets 4 in all 48 trinket choices). Picked so that, with the third scenario's targets
+    /// (Pirate Discover, Mech Magnet, Mech Divine Shield), every kind of label shows:
+    /// - discover: 16, a core card of the target Mech Divine Shield and an add-on of the target Mech Magnet (two lines);
+    ///   11, an add-on of the target Pirate Discover; 42, a core card of Elemental Cycle, no target here, the only target
+    ///   of the second scenario (its colour then), and nothing at all in the first one;
+    /// - Dark Gift: 21, an enabler of the target Mech Divine Shield; 0, a core card of Undead Butcher, an S guide that is
+    ///   no target, and of two other guides ("+2 more"); 50, nothing (an add-on of a guide that is no target);
+    /// - trinkets (real ones, their English text as HDT reads it): one names Pirates (Pirate Discover's tribe), one Mechs
+    ///   (Mech Magnet and Mech Divine Shield), one Elementals (no target's), one no tribe.
+    /// </summary>
+    public static IReadOnlyList<OfferedOption> Choice(ChoiceKind kind) => kind switch
+    {
+        ChoiceKind.Discover => Minions(false, 16, 11, 42),
+        ChoiceKind.DarkGift => Minions(true, 21, 0, 50),
+        ChoiceKind.Trinket => Trinkets.Select((t, i) => new OfferedOption(9101 + i, t.Id, "BATTLEGROUND_TRINKET", text: t.Text)).ToList(),
+        _ => Array.Empty<OfferedOption>(),
+    };
+
+    private static IReadOnlyList<OfferedOption> Minions(bool darkGift, params int[] indices) =>
+        indices.Select((index, i) => new OfferedOption((darkGift ? 9201 : 9001) + i, Pool[index], "MINION", hasDarkGift: darkGift)).ToList();
+
+    /// <summary>Real trinkets and their English text (HearthstoneJSON), which TrinketAffinity reads for a tribe.</summary>
+    private static readonly (string Id, string Text)[] Trinkets =
+    {
+        ("BG30_MagicItem_439", "You only need 2 copies of a Pirate to make it Golden."),
+        ("BG30_MagicItem_910", "[x]After a friendly Mech loses <b>Divine Shield</b>, give it <b>Divine Shield</b>. <i>(3 times per combat.)</i>"),
+        ("BG30_MagicItem_544", "[x]After you play an Elemental, give Elementals in the Tavern +3/+2 this game."),
+        ("BG30_MagicItem_303", "<b>Start of Combat:</b> When you have space, summon an Ancestral Automaton."),
+    };
+
+    /// <summary>The English text of a trinket of <see cref="Choice"/>; null for anything else.</summary>
+    public static string? TrinketText(string cardId) => Trinkets.FirstOrDefault(t => t.Id == cardId).Text;
+
+    /// <summary>The MMR bracket the harness plays in (MmrBracket's percentile): the trinkets' placement for it is shown.</summary>
+    public const int Bracket = 25;
+
+    /// <summary>
+    /// Invented trinket stats (never Firestone's), one per trinket: a placement for every player and per bracket, the
+    /// last one without the harness's bracket (its placement for every player is shown) and the third without a pick rate.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, TrinketStat> TrinketStats = new[]
+    {
+        new TrinketStat(Trinkets[0].Id, 3.92, 5400, 0.31, new Dictionary<int, double> { [100] = 3.92, [50] = 3.85, [25] = 3.71 }),
+        new TrinketStat(Trinkets[1].Id, 4.10, 4100, 0.18, new Dictionary<int, double> { [100] = 4.10, [50] = 4.02, [25] = 3.95 }),
+        new TrinketStat(Trinkets[2].Id, 4.35, 2600, null, new Dictionary<int, double> { [100] = 4.35, [25] = 4.28 }),
+        new TrinketStat(Trinkets[3].Id, 3.66, 7300, 0.44, new Dictionary<int, double> { [100] = 3.66 }),
+    }.ToDictionary(t => t.TrinketCardId, StringComparer.Ordinal);
+
+    /// <summary>The trinket stats ChoiceAdvisor asks for, as the plugin hands it the panel's cache (ChoiceAdvicePanel.TrinketStat).</summary>
+    public static TrinketStat? TrinketStat(string cardId) => TrinketStats.TryGetValue(cardId, out var stat) ? stat : null;
 
     /// <summary>
     /// The comp guides HDT would show, with their texts written in HSReplay's markup (<c>[[Name||dbf]]</c>, the dbf id

@@ -126,6 +126,8 @@ internal static class SelfTest
             && FindText(comps, "3 targets") != null && minusAgain?.Parent is Border { Opacity: 1 },
             CompTargets.Summary(window.Targets));
 
+        ChoiceChecks(window, Check);
+
         var bad = window.LogLines.Where(l => l.Contains("|Warning|") || l.Contains("|Error|")).ToList();
         Check("nothing logged as a warning or an error", bad.Count == 0, bad.Count == 0 ? $"{window.LogLines.Count} log lines" : string.Join(" | ", bad));
 
@@ -135,6 +137,110 @@ internal static class SelfTest
         var report = string.Join(Environment.NewLine, checks.Select(c => $"{(c.Ok ? "PASS" : "FAIL")}  {c.Name}: {c.Detail}"))
                      + Environment.NewLine + (passed ? "ALL PASSED" : "FAILED") + Environment.NewLine;
         return (passed, report);
+    }
+
+    /// <summary>
+    /// The labels of ChoiceAdvicePanel above each choice (discover, Dark Gift, trinket), on the scene's automatic targets:
+    /// one per option, where ChoiceLayout.Labels puts it; none of their texts under the floor or cut; a "★ core T" or
+    /// "+ T" label in the colour of the target T it names (read from the text, not from the advice); every trinket with
+    /// its placement, one adjusted for a target's tribe; an option that serves nothing says "—", never "no target comp";
+    /// closing the choice takes its labels away.
+    /// </summary>
+    private static void ChoiceChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var canvas = window.Overlay;
+        var scale = TavernLayout.Scale(canvas.ActualHeight);
+        var unrelated = new List<string>();
+        var drawnRects = new List<Rect>();
+        foreach (var kind in new[] { ChoiceKind.Discover, ChoiceKind.DarkGift, ChoiceKind.Trinket })
+        {
+            window.ShowChoice(kind);
+            window.UpdateLayout();
+            var targets = window.Targets;
+            var name = "choice " + ChoiceClassifier.Name(kind);
+            var options = window.ChoiceOptions;
+            var lineCount = window.Choices.LastLines.Select(l => l.Count).DefaultIfEmpty(1).Max();
+            var rects = ChoiceLayout.Labels(kind, options.Count, canvas.ActualWidth, canvas.ActualHeight, lineCount);
+            var labels = rects.Select(r => canvas.Children.OfType<Border>().FirstOrDefault(b => !Equals(b.Tag, "choice") && b.IsVisible && b.Child is StackPanel
+                && Math.Abs(Canvas.GetLeft(b) - r.Left) < 0.5 && Math.Abs(Canvas.GetTop(b) - r.Top) < 0.5
+                && Math.Abs(b.ActualWidth - r.Width) < 0.5 && Math.Abs(b.ActualHeight - r.Height) < 0.5)).ToList();
+            var said = labels.Select(l => l == null ? new List<string>() : Texts(l).Where(t => t.IsVisible).Select(Content).ToList()).ToList();
+            drawnRects.AddRange(rects.Select(r => new Rect(r.Left, r.Top, r.Width, r.Height)));
+            check($"{name}: one label per option, where ChoiceLayout puts it", options.Count > 0 && labels.All(l => l != null) && said.All(s => s.Count > 0),
+                $"{labels.Count(l => l != null)} labels for {options.Count} options: " + string.Join("; ", said.Select((s, i) => $"#{i} {string.Join(" / ", s)}")));
+
+            var problems = new List<string>();
+            var checkedTexts = 0;
+            foreach (var label in labels.Where(l => l != null))
+            {
+                var (count, found) = TextProblems(label!, scale);
+                checkedTexts += count;
+                problems.AddRange(found);
+            }
+
+            check($"{name}: no text under 12 px, none cut", checkedTexts > 0 && problems.Count == 0, $"{checkedTexts} texts checked" + Problems(problems));
+
+            if (kind == ChoiceKind.Trinket)
+            {
+                var adjusted = said.Where(s => s.Any(line => line.StartsWith("≈ ", StringComparison.Ordinal) && targets.Any(t => line.Contains(t.Guide.Name)))).Count();
+                check($"{name}: every trinket shows its placement, one adjusted for a target's tribe", said.Count > 0 && said.All(s => s.Count > 0 && s[0].StartsWith("avg ", StringComparison.Ordinal)) && adjusted >= 1,
+                    $"{adjusted} adjusted: " + string.Join("; ", said.Select((s, i) => $"#{i} {string.Join(" / ", s)}")));
+            }
+            else
+            {
+                // The target is read from the label's text, the colour from what is drawn: neither from the advice.
+                var coloured = new List<string>();
+                var wrong = new List<string>();
+                for (var i = 0; i < labels.Count; i++)
+                {
+                    var first = said[i].FirstOrDefault() ?? string.Empty;
+                    if (!first.StartsWith("★ core ", StringComparison.Ordinal) && !first.StartsWith("+ ", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var named = targets.Where(t => first.Contains(t.Guide.Name)).ToList();
+                    var drawn = (labels[i]?.Background as SolidColorBrush)?.Color;
+                    var line = $"#{i} \"{first}\" drawn {drawn}";
+                    if (named.Count != 1)
+                    {
+                        wrong.Add(line + $": names {named.Count} targets");
+                        continue;
+                    }
+
+                    var expected = (Color)ColorConverter.ConvertFromString(named[0].Colour);
+                    (drawn == expected ? coloured : wrong).Add(line + $", {named[0].Guide.Name} is {expected}");
+                }
+
+                check($"{name}: a \"★ core T\" or \"+ T\" label is in the colour of T", coloured.Count >= 1 && wrong.Count == 0,
+                    string.Join("; ", wrong.Concat(coloured)));
+            }
+
+            // Serves nothing: no target lists it, and no other guide has it as a core card (the harness's guides, not the advice).
+            var guides = HarnessData.Guides(id => id).All;
+            for (var i = 0; i < options.Count && i < said.Count; i++)
+            {
+                var id = options[i].CardId;
+                if (kind != ChoiceKind.Trinket && targets.All(t => GuideCardEffects.RoleIn(t.Guide, id) == null) && !guides.Any(g => g.CoreCards.Contains(id)))
+                {
+                    unrelated.Add($"{ChoiceClassifier.Name(kind)} #{i} {id}: {string.Join(" / ", said[i])}");
+                }
+            }
+
+            if (said.Any(s => s.Any(line => line.IndexOf("no target comp", StringComparison.OrdinalIgnoreCase) >= 0)))
+            {
+                unrelated.Add($"{ChoiceClassifier.Name(kind)}: a label says \"no target comp\"");
+            }
+        }
+
+        check("an option that serves nothing says \"—\", never \"no target comp\"",
+            unrelated.Count >= 1 && unrelated.All(u => u.EndsWith(": —", StringComparison.Ordinal)), string.Join("; ", unrelated));
+
+        window.ShowChoice(ChoiceKind.None);
+        window.UpdateLayout();
+        var left = canvas.Children.OfType<Border>().Count(b => b.Child is StackPanel && drawnRects.Any(r => Math.Abs(Canvas.GetLeft(b) - r.Left) < 0.5 && Math.Abs(Canvas.GetTop(b) - r.Top) < 0.5));
+        var cards = canvas.Children.OfType<Border>().Count(b => Equals(b.Tag, "choice"));
+        check("closing the choice takes its labels and options away", left == 0 && cards == 0 && window.Choice == null, $"{left} labels and {cards} options left");
     }
 
     /// <summary>The sections a guide's detail has: how to play when it has a text, core cards, then each list it has.</summary>

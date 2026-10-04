@@ -13,12 +13,13 @@ using Hearthstone_Deck_Tracker.Utility.Logging;
 namespace BronzebeardHud.Harness;
 
 /// <summary>
-/// The plugin's two movable panels (Compositions, Skip combat) and the frames on Bob's cards, on a canvas the size of a
-/// Hearthstone window, fed with synthetic data as HDT's overlay would hold them. Bob's seven cards are drawn as grey
-/// boxes where the game draws them (TavernLayout.CardSlots), so that the frames and labels land on something. Move mode
-/// is on at the start. The zones a panel must not cover (the boards, the leaderboard, the hero) are drawn under the
-/// panels in red. The plugin's own log lines show in the pane on the right. The layout is saved in the harness's own
-/// file, never in the plugin's layout.json.
+/// The plugin's two movable panels (Compositions, Skip combat), the frames on Bob's cards and the labels above the
+/// options of a choice, on a canvas the size of a Hearthstone window, fed with synthetic data as HDT's overlay would hold
+/// them. Bob's seven cards are drawn as grey boxes where the game draws them (TavernLayout.CardSlots), so that the
+/// frames and labels land on something; so are the options of a choice, when one is open (ChoiceLayout.Cards, above Bob's
+/// row as the game draws them, under everything the plugin draws). Move mode is on at the start. The zones a panel must
+/// not cover (the boards, the leaderboard, the hero) are drawn under the panels in red. The plugin's own log lines show
+/// in the pane on the right. The layout is saved in the harness's own file, never in the plugin's layout.json.
 /// </summary>
 internal sealed class HarnessWindow : Window
 {
@@ -31,9 +32,14 @@ internal sealed class HarnessWindow : Window
         ("2291 × 1360", 2291, 1360),
     };
 
+    /// <summary>Z-index of a choice's options: above Bob's cards (−5), as the game draws them, below the plugin's layer (OverlayLayer, −1).</summary>
+    private const int ChoiceCardZIndex = -4;
+
     private readonly PanelMover _mover;
     private readonly SkipCombatPanel _skip;
+    private readonly ChoiceAdvicePanel _choices;
     private readonly CompTargetTracker _tracker = new();
+    private ChoiceKind _choiceKind = ChoiceKind.None;
     private readonly TextBox _log = new() { IsReadOnly = true, FontFamily = new FontFamily("Consolas"), FontSize = 12, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, TextWrapping = TextWrapping.NoWrap };
     private readonly List<string> _lines = new();
     private readonly string _folder;
@@ -57,6 +63,17 @@ internal sealed class HarnessWindow : Window
 
     public IReadOnlyList<TavernHighlight> Highlights { get; private set; } = Array.Empty<TavernHighlight>();
 
+    /// <summary>The choice open above the scene; None when there is none.</summary>
+    public ChoiceKind ChoiceKind => _choiceKind;
+
+    /// <summary>Its options, left to right (HarnessData.Choice); empty when no choice is open.</summary>
+    public IReadOnlyList<OfferedOption> ChoiceOptions => HarnessData.Choice(_choiceKind);
+
+    /// <summary>What ChoiceAdvisor said of the choice on screen, as the plugin hands it to the panel; null when none.</summary>
+    public ChoiceAdvice? Choice { get; private set; }
+
+    public ChoiceAdvicePanel Choices => _choices;
+
     public HarnessWindow(Options options)
     {
         _folder = Path.Combine(Path.GetTempPath(), "BronzebeardHarness");
@@ -78,7 +95,23 @@ internal sealed class HarnessWindow : Window
             action => action());
         Markers = new TavernMarkers(Overlay, id => Log.Info($"pin toggled: {id}"));
         _skip = new SkipCombatPanel(Overlay, _mover, () => Log.Info("Skip combat clicked (nothing is killed here)"));
+        // Its own trinket stats cache is never polled here, so it never fetches: the harness hands ChoiceAdvisor synthetic
+        // stats (HarnessData.TrinketStat) where the plugin hands it the panel's. The folder is the harness's, never the plugin's.
+        _choices = new ChoiceAdvicePanel(Overlay, Path.Combine(_folder, "stats"));
+        Overlay.SizeChanged += (_, _) => LogChoice(); // after the panel's own handler: the labels at the new size
+        Closed += (_, _) => _choices.Dispose();
         _mover.ToggleMoveMode(); // move mode on from the start: the harness is for moving and resizing
+        if (options.Choice != null)
+        {
+            try
+            {
+                _choiceKind = HarnessData.ChoiceOf(options.Choice);
+            }
+            catch (ArgumentException e)
+            {
+                Log.Warn(e.Message); // a headless run reports it again, as its error (Headless.Run)
+            }
+        }
 
         Title = "Bronzebeard HUD — simulation (not HDT)";
         Width = 1750;
@@ -124,6 +157,54 @@ internal sealed class HarnessWindow : Window
         {
             _skip.Show();
         }
+
+        UpdateChoice(targets, cards);
+    }
+
+    /// <summary>
+    /// The choice open above the scene, advised as Plugin.UpdateChoice advises it: ChoiceAdvisor on the board and hand, the
+    /// targets and HDT's guides, then the panel, then the plugin's diagnostic line. The lobby's tribes are unknown here
+    /// (empty: no guide is left out), and the trinket stats are the harness's (HarnessData.TrinketStat, for HarnessData.Bracket).
+    /// </summary>
+    private void UpdateChoice(IReadOnlyList<CompTarget> targets, PlayerCards cards)
+    {
+        var options = HarnessData.Choice(_choiceKind);
+        if (options.Count == 0)
+        {
+            Choice = null;
+            _choices.Hide();
+            return;
+        }
+
+        var advice = ChoiceAdvisor.Advise(options, cards.All, targets, _guides, Array.Empty<string>(), HarnessData.TrinketStat, HarnessData.Bracket);
+        Choice = advice;
+        if (advice.HasMarkers)
+        {
+            _choices.Show(advice);
+        }
+        else
+        {
+            _choices.Hide();
+        }
+
+        LogChoice();
+    }
+
+    /// <summary>The plugin's line for the choice on screen, once the panel has drawn it (it draws nothing before the canvas has a size).</summary>
+    private void LogChoice()
+    {
+        if (Choice != null && Overlay.ActualWidth > 0 && Overlay.ActualHeight > 0)
+        {
+            Log.Info(ChoiceAdvisor.DiagnosticLine(ChoiceOptions, Choice, _guides.Count, _guides.Source, _choices.LastLines, _choices.FirstLabel,
+                Overlay.ActualWidth, Overlay.ActualHeight));
+        }
+    }
+
+    /// <summary>Opens a choice above the scene (or closes it, with None), advised on the targets as they stand.</summary>
+    public void ShowChoice(ChoiceKind kind)
+    {
+        _choiceKind = kind;
+        Refresh();
     }
 
     /// <summary>
@@ -190,6 +271,10 @@ internal sealed class HarnessWindow : Window
             Refresh();
         };
 
+        var choice = new ComboBox { ItemsSource = HarnessData.Choices.Select(c => c.Label).ToList(), Width = 110, Margin = new Thickness(0, 0, 14, 0) };
+        choice.SelectedIndex = Math.Max(0, HarnessData.Choices.Select(c => c.Kind).ToList().IndexOf(_choiceKind));
+        choice.SelectionChanged += (_, _) => ShowChoice(HarnessData.Choices[choice.SelectedIndex].Kind);
+
         var skip = new CheckBox { Content = "Skip combat button", IsChecked = true, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
         skip.Click += (_, _) =>
         {
@@ -229,7 +314,7 @@ internal sealed class HarnessWindow : Window
         };
 
         var bar = new WrapPanel { Margin = new Thickness(8) };
-        foreach (var element in new UIElement[] { move, reset, size, board, skip, detail, clear })
+        foreach (var element in new UIElement[] { move, reset, size, board, choice, skip, detail, clear })
         {
             bar.Children.Add(element);
         }
@@ -270,15 +355,18 @@ internal sealed class HarnessWindow : Window
     }
 
     /// <summary>
-    /// Under the panels, redrawn at every canvas size: the zones a default panel must not cover, in red, and Bob's seven
-    /// cards as grey boxes with their names, where TavernLayout puts the game's shop cards.
+    /// Under the panels, redrawn at every canvas size: the zones a default panel must not cover, in red, Bob's seven
+    /// cards as grey boxes with their names, where TavernLayout puts the game's shop cards, and the options of the choice
+    /// open, if any, where ChoiceLayout puts the game's.
     /// </summary>
     private void DrawScene()
     {
-        foreach (var old in Overlay.Children.OfType<FrameworkElement>().Where(e => Equals(e.Tag, "zone") || Equals(e.Tag, "shop")).ToList())
+        foreach (var old in Overlay.Children.OfType<FrameworkElement>().Where(e => Equals(e.Tag, "zone") || Equals(e.Tag, "shop") || Equals(e.Tag, "choice")).ToList())
         {
             Overlay.Children.Remove(old);
         }
+
+        DrawChoiceCards();
 
         foreach (var (name, zone) in NoGoZones.For(Overlay.ActualWidth, Overlay.ActualHeight))
         {
@@ -322,5 +410,54 @@ internal sealed class HarnessWindow : Window
             Canvas.SetTop(card, slot.Top + slot.Height * 0.05);
             Overlay.Children.Add(card);
         }
+    }
+
+    /// <summary>
+    /// The options of the choice open, as grey boxes at ChoiceLayout.Cards (HDT's constants, where the game draws them):
+    /// the card's name, then what the harness's guides make of it (a minion) or its text (a trinket), so that a label can
+    /// be read against the truth. Above Bob's row, under the plugin's labels.
+    /// </summary>
+    private void DrawChoiceCards()
+    {
+        var options = ChoiceOptions;
+        var cards = ChoiceLayout.Cards(_choiceKind, options.Count, Overlay.ActualWidth, Overlay.ActualHeight);
+        for (var i = 0; i < cards.Count; i++)
+        {
+            var id = options[i].CardId;
+            var what = _choiceKind == ChoiceKind.Trinket
+                ? System.Text.RegularExpressions.Regex.Replace(HarnessData.TrinketText(id) ?? string.Empty, @"<[^>]+>|\[x\]", string.Empty)
+                : Roles(id);
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10) };
+            text.Children.Add(new TextBlock { Text = Database.GetCardFromId(id)?.LocalizedName ?? id, Foreground = Brushes.White, FontSize = 20, FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center });
+            text.Children.Add(new TextBlock { Text = $"option {i + 1} · {id}", Foreground = new SolidColorBrush(Color.FromRgb(0xC8, 0xCC, 0xD4)), FontSize = 14, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 4, 0, 10) });
+            text.Children.Add(new TextBlock { Text = what, Foreground = new SolidColorBrush(Color.FromRgb(0xE4, 0xE7, 0xEC)), FontSize = 15, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center });
+            var card = new Border
+            {
+                Width = cards[i].Width,
+                Height = cards[i].Height,
+                Background = new SolidColorBrush(Color.FromRgb(0x5E, 0x65, 0x73)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xC8, 0xCC, 0xD4)),
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(16),
+                Tag = "choice",
+                IsHitTestVisible = false,
+                Child = text,
+            };
+            Panel.SetZIndex(card, ChoiceCardZIndex);
+            Canvas.SetLeft(card, cards[i].Left);
+            Canvas.SetTop(card, cards[i].Top);
+            Overlay.Children.Add(card);
+        }
+    }
+
+    /// <summary>What the harness's guides make of a card, one guide per line ("core of X (S)", "add-on of Y (A)"), or "in no guide".</summary>
+    private string Roles(string cardId)
+    {
+        var roles = _guides.All
+            .Select(g => (Guide: g, Role: GuideCardEffects.RoleIn(g, cardId)))
+            .Where(x => x.Role != null)
+            .Select(x => $"{(x.Role == GuideCardRole.Addon ? "add-on" : x.Role.ToString()!.ToLowerInvariant())} of {x.Guide.Name} ({x.Guide.TierLetter})")
+            .ToList();
+        return roles.Count == 0 ? "in no guide" : string.Join("\n", roles);
     }
 }

@@ -8,8 +8,9 @@ namespace BronzebeardHud.Harness;
 /// <summary>
 /// Command line. Without argument: the window, for hands-on debugging. <c>--selftest</c> and <c>--screenshot</c> run
 /// without anyone at the keyboard (the window is parked far off screen), write their result under <c>--out</c> and
-/// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--tick a,b</c> ticks guides and
-/// <c>--detail x</c> opens a guide's detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name).
+/// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--tick a,b</c> ticks guides,
+/// <c>--choice k</c> opens a choice above the scene (discover, dark-gift, trinket) and <c>--detail x</c> opens a guide's
+/// detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name).
 /// </summary>
 internal sealed class Options
 {
@@ -27,6 +28,9 @@ internal sealed class Options
 
     /// <summary>Guides ticked before the screenshot, as the player ticks them: a target's rank ("1") or a guide's name, comma-separated.</summary>
     public IReadOnlyList<string> Tick { get; private set; } = Array.Empty<string>();
+
+    /// <summary>The choice open above the scene, as ChoiceClassifier names it (discover, dark-gift, trinket); null: none.</summary>
+    public string? Choice { get; private set; }
 
     /// <summary>Milliseconds the screenshot waits for card names and pictures, which arrive asynchronously.</summary>
     public int Wait { get; private set; } = 8000;
@@ -60,6 +64,9 @@ internal sealed class Options
                     break;
                 case "--tick" when i + 1 < args.Length:
                     options.Tick = args[++i].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    break;
+                case "--choice" when i + 1 < args.Length:
+                    options.Choice = args[++i];
                     break;
                 case "--wait" when i + 1 < args.Length:
                     options.Wait = int.Parse(args[++i]);
@@ -117,6 +124,12 @@ internal static class Headless
                 foreach (var which in options.Tick)
                 {
                     window.Tick(which);
+                }
+
+                if (options.Choice != null)
+                {
+                    // Advised again on the targets the ticks left; an unknown name fails the capture (error.txt).
+                    window.ShowChoice(HarnessData.ChoiceOf(options.Choice));
                 }
 
                 if (options.Detail != null)
