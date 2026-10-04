@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Panneau unique Compositions</title>
-<meta name="description" content="Note de conception du 2026-10-04 : les sept demandes d'Ali sur les panneaux de compositions, ce qui a été fait, ce qui reste à décider et à voir en jeu.">
+<meta name="description" content="Note de conception du 2026-10-04 : les sept demandes d'Ali sur les panneaux de compositions, puis la seconde passe du soir (survol, stats Firestone, choix), ce qui reste à décider et à voir en jeu.">
 <style>
   :root {
     --bg: #f7f7f4; --surface: #ffffff; --text: #1d1f24; --muted: #555b67; --border: #d6d9df; --soft: #eef0f3;
     --o-panel: #1d5fd6; --o-frames: #7c3aed; --o-choice: #0f766e;
     --core: #b45309; --core-soft: #fde9c8; --bad: #c81e1e; --art: #9aa3b2; --paper: #ffffff;
+    --ok: #15803d; --ok-soft: #d7f5df;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
@@ -17,6 +18,7 @@
       --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
       --o-panel: #6ea8ff; --o-frames: #b79bff; --o-choice: #3fd0bd;
       --core: #f5b83d; --core-soft: #4a3712; --bad: #ff6b6b; --art: #5d6577; --paper: #f4f4f4;
+      --ok: #4ade80; --ok-soft: #133a22;
       color-scheme: dark;
     }
   }
@@ -24,6 +26,7 @@
     --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
     --o-panel: #6ea8ff; --o-frames: #b79bff; --o-choice: #3fd0bd;
     --core: #f5b83d; --core-soft: #4a3712; --bad: #ff6b6b; --art: #5d6577; --paper: #f4f4f4;
+    --ok: #4ade80; --ok-soft: #133a22;
     color-scheme: dark;
   }
 
@@ -94,12 +97,38 @@
   pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 10px 12px; border-radius: 6px; margin: 8px 0; }
   ul { padding-left: 22px; }
   li { margin: 4px 0; }
+
+  /* Second pass (evening) */
+  a { color: var(--o-panel); }
+  .pass2 { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--core); border-radius: 8px; padding: 12px 16px; margin: 0 0 20px; }
+  .pass2 b { font-size: 18px; }
+  .pass2 ol { margin: 6px 0 0; padding-left: 22px; }
+  .tag2 { display: inline-block; font-size: 14px; font-weight: 700; color: var(--core); border: 1.5px solid var(--core); border-radius: 4px; padding: 0 6px; margin-left: 8px; vertical-align: 3px; }
+  .warn { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--bad); border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  .map svg { max-width: 560px; }
+  .slot svg { max-width: 440px; }
+  .bridge-wide { display: none; max-width: 900px; }
+  .bridge-tall { max-width: 420px; margin: 0 auto; }
+  @media (min-width: 940px) { .bridge-wide { display: block; } .bridge-tall { display: none; } }
+  .crop.w700 { max-width: 700px; }
+  .tiles + table, .tiles + .mech { margin-top: 16px; }
+  .crop.w1100 { max-width: 1100px; }
 </style>
 </head>
 <body>
 <main>
   <h1>Panneau unique « Compositions »</h1>
   <p class="meta">Note de conception pour Ali, 2026-10-04. État : vu dans la simulation, pas encore sous HDT. Chaque section donne d'abord la décision ; le raisonnement est dessiné dessous, et les preuves sont repliées.</p>
+
+  <div class="pass2">
+    <b>Seconde passe (soir) : survol, stats Firestone branchées, choix nettoyés.</b>
+    <ol>
+      <li><a href="#survol">§ 5 — Survol d'une ligne</a> : le guide complet en popup, sans prendre l'aperçu des cartes.</li>
+      <li><a href="#pont">§ 6 — Stats Firestone → aides</a> : les compos Firestone reliées aux guides de HDT nourrissent trois aides.</li>
+      <li><a href="#choix">§ 7 — Choix : avant / après</a> : plus rien du plugin par-dessus une découverte, un Dark Gift ou un trinket.</li>
+      <li><a href="#decider">§ 9 — À décider ou vérifier</a>, mis à jour ; <a href="#preuves">§ 10 — Preuves</a>, complétées.</li>
+    </ol>
+  </div>
 
   <h2>1. En une phrase</h2>
   <p class="lead">Un seul panneau « Compositions », construit sur la liste de guides de HDT. Jusqu'à quatre cibles (cochées, sinon choisies automatiquement) y portent chacune une couleur, et les cadres sur les cartes de Bob comme les aides de choix suivent ces mêmes cibles.</p>
@@ -137,9 +166,9 @@
       <tr>
         <td class="n">4</td>
         <td data-label="Demande d'Ali">Les deux panneaux disent la même chose ; l'ergonomie de HDT est meilleure. Plusieurs compos à la fois, chacune sa couleur.</td>
-        <td data-label="Décision">Fusion : la liste de HDT par tier. Cibles = les guides cochés seuls s’ils existent, sinon les N plus probables (1 à 4) ; une couleur par cible, stable pendant la partie. La ligne « Board vs hero avg » est gardée telle quelle.</td>
+        <td data-label="Décision">Fusion : la liste de HDT par tier. Cibles = les guides cochés seuls s’ils existent, sinon les N plus probables (1 à 4) ; une couleur par cible, stable pendant la partie. La ligne « Board vs hero avg » est gardée telle quelle.</td>
         <td data-label="Où le voir">Après, liste ; zoom de la liste (dernière ligne)</td>
-        <td data-label="Écarté">La liste Firestone et sa place moyenne (« avg ») par compo : le tier de HDT la remplace. Lecture à confirmer : § 6 (b).</td>
+        <td data-label="Écarté">La liste Firestone et sa place moyenne (« avg ») par compo : le tier de HDT la remplace. Lecture à confirmer : § 9 (g).</td>
       </tr>
       <tr>
         <td class="n">5</td>
@@ -159,7 +188,7 @@
         <td class="n">7</td>
         <td data-label="Demande d'Ali">Les aides de découverte, de trinket et de Dark Gift doivent s'appuyer sur les mêmes cibles.</td>
         <td data-label="Décision">Carte clé d'une cible → « ★ core T k/N→… » dans sa couleur ; add-on ou enabler → « + T ». Sinon, carte clé d'un guide non visé mais jouable avec les tribus du lobby → « core G (S) ». Trinket : ses statistiques, ajustées sur la tribu principale des cibles.</td>
-        <td data-label="Où le voir"><b>Aucune capture</b> : la simulation n'affiche pas les choix</td>
+        <td data-label="Où le voir"><b>§ 7</b> : la simulation montre les choix depuis la seconde passe</td>
         <td data-label="Écarté">« no target comp », qui ne disait rien d'utile.</td>
       </tr>
     </tbody>
@@ -277,7 +306,7 @@
   </figure>
   <figure class="crop w580">
     <a href="img/2026-10-04-panneau-unique/apres-detail-complet.png"><img src="img/2026-10-04-panneau-unique/apres-detail-complet.png" width="580" height="680" alt="Détail complet de Mech Magnet dans une grande boîte : six sections, le bouton Skip combat passe devant les pivots"></a>
-    <figcaption><b>Le détail dans une boîte agrandie et remontée</b> : les 6 sections. Placée ainsi, elle couvre la 7ᵉ carte de Bob (son ◇ passe devant un ovale) et Skip combat passe devant les pivots : voir § 6 (a).</figcaption>
+    <figcaption><b>Le détail dans une boîte agrandie et remontée</b> : les 6 sections. Placée ainsi, elle couvre la 7ᵉ carte de Bob (son ◇ passe devant un ovale) et Skip combat passe devant les pivots : voir § 9 (d) ; le popup du survol montre désormais tout le guide sans agrandir la boîte (§ 5).</figcaption>
   </figure>
 
   <h2>4. Le flux : une seule source de cibles, trois sorties</h2>
@@ -382,67 +411,488 @@
     <figcaption>Les trois sorties lisent les mêmes cibles, avec les mêmes couleurs : elles ne peuvent pas se contredire. Une case cochée restreint les cibles à celles qu’on a cochées.</figcaption>
   </figure>
 
-  <h2>5. Ce qui n'a PAS été vu</h2>
+  <h2 id="survol">5. Survol d'une ligne <span class="tag2">soir</span></h2>
+  <p class="lead">Survoler une ligne du panneau 250 ms ouvre le guide complet dans un popup que le plugin pose lui-même, au-dessus du panneau et hors des zones du jeu. L'aperçu d'une carte (l'infobulle de HDT) reste possible en même temps, sans recouvrir le popup.</p>
+  <div class="tiles">
+    <div class="tile"><b>1</b><span>seul emplacement d'infobulle pour tout l'overlay de HDT : la mesure qui a décidé</span></div>
+    <div class="tile"><b>250 ms</b><span>avant le popup : parcourir la liste ne fait pas défiler les popups</span></div>
+    <div class="tile"><b>≈ 180 px</b><span>entre le bord droit du popup et celui du panneau en 1080p, pour rester hors des plateaux</span></div>
+  </div>
+
+  <div class="mech">
+    <figure class="slot">
+      <svg viewBox="0 0 340 312" role="img" aria-labelledby="t-slot">
+        <title id="t-slot">HDT n'a qu'un emplacement d'infobulle : pris par la ligne, il serait refusé aux ovales ; le popup du plugin le laisse libre pour l'aperçu</title>
+        <defs>
+          <marker id="sl-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+          <marker id="sl-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--core)"/></marker>
+        </defs>
+        <text x="4" y="20" font-size="15" font-weight="700">Écarté : la ligne prend l'infobulle</text>
+        <rect class="box" x="4" y="34" width="120" height="36" rx="6"/>
+        <text x="64" y="57" font-size="15" text-anchor="middle">ligne survolée</text>
+        <rect class="box" x="4" y="84" width="120" height="36" rx="6"/>
+        <text x="64" y="107" font-size="15" text-anchor="middle">ovale survolé</text>
+        <rect x="156" y="34" width="182" height="86" rx="8" style="fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:6 4"/>
+        <text x="247" y="54" font-size="15" class="sub" text-anchor="middle">emplacement unique</text>
+        <rect x="166" y="64" width="162" height="44" rx="6" style="fill:var(--soft);stroke:var(--text);stroke-width:1.5"/>
+        <text x="247" y="91" font-size="15" text-anchor="middle">guide de la ligne</text>
+        <path class="wire" d="M124 52 L164 72" marker-end="url(#sl-n)"/>
+        <path d="M124 102 L136 102" style="stroke:var(--bad);stroke-width:2;fill:none"/>
+        <text x="138" y="109" font-size="20" font-weight="700" style="fill:var(--bad)">✗</text>
+        <text x="4" y="146" font-size="15" class="mono">Children.Count &gt; 0 → return</text>
+        <text x="4" y="168" font-size="15" class="sub">l'ovale n'a plus d'aperçu de carte</text>
+        <line x1="4" y1="184" x2="336" y2="184" style="stroke:var(--border);stroke-width:1.5"/>
+        <text x="4" y="208" font-size="15" font-weight="700">Retenu : un popup sur le canvas</text>
+        <rect class="box" x="4" y="222" width="120" height="36" rx="6"/>
+        <text x="64" y="245" font-size="15" text-anchor="middle">ligne survolée</text>
+        <rect x="156" y="222" width="182" height="36" rx="6" style="fill:var(--core-soft);stroke:var(--core);stroke-width:2.5"/>
+        <text x="247" y="245" font-size="15" font-weight="600" text-anchor="middle">popup du plugin</text>
+        <path d="M124 240 L152 240" style="stroke:var(--core);stroke-width:2;fill:none" marker-end="url(#sl-c)"/>
+        <rect class="box" x="4" y="270" width="120" height="36" rx="6"/>
+        <text x="64" y="293" font-size="15" text-anchor="middle">ovale survolé</text>
+        <rect x="156" y="270" width="182" height="36" rx="6" style="fill:var(--ok-soft);stroke:var(--ok);stroke-width:2"/>
+        <text x="247" y="293" font-size="15" text-anchor="middle">aperçu de HDT ✓</text>
+        <path class="wire" d="M124 288 L152 288" marker-end="url(#sl-n)"/>
+      </svg>
+      <figcaption>HDT n'a qu'un emplacement d'infobulle. S'il servait au guide d'une ligne, les ovales de cette ligne ne montreraient plus leur carte. Le popup vit donc sur le canvas du plugin, comme les panneaux, et l'emplacement de HDT reste aux aperçus.</figcaption>
+    </figure>
+
+    <figure class="map">
+      <svg viewBox="0 0 460 300" role="img" aria-labelledby="t-map">
+        <title id="t-map">Écran 1080p en taverne : le popup se pose dans la colonne à droite des plateaux, au-dessus du panneau ; l'aperçu d'une carte, à gauche du panneau</title>
+        <rect x="1" y="2" width="458" height="268" rx="4" style="fill:none;stroke:var(--border);stroke-width:1.5"/>
+        <g style="fill:var(--bad);fill-opacity:0.12;stroke:var(--bad);stroke-width:1.5">
+          <rect x="11" y="21" width="54" height="201"/>
+          <rect x="75" y="58" width="260" height="102"/>
+          <rect x="147" y="160" width="116" height="109"/>
+        </g>
+        <text transform="translate(45 121) rotate(-90)" font-size="20" text-anchor="middle">classement</text>
+        <text x="205" y="98" font-size="20" text-anchor="middle">plateaux</text>
+        <text x="205" y="122" font-size="20" text-anchor="middle">et rangée de Bob</text>
+        <text x="152" y="262" font-size="20">héros</text>
+        <rect x="197" y="146" width="59" height="84" rx="4" style="fill:var(--surface);stroke:var(--o-frames);stroke-width:2.5;stroke-dasharray:5 4"/>
+        <rect x="265" y="164" width="132" height="86" rx="4" style="fill:var(--surface);stroke:var(--o-panel);stroke-width:3"/>
+        <rect x="269" y="172" width="124" height="14" style="fill:var(--core-soft);stroke:var(--core);stroke-width:1.5"/>
+        <text x="331" y="224" font-size="20" font-weight="700" text-anchor="middle" style="fill:var(--o-panel)">panneau</text>
+        <rect x="338" y="43" width="108" height="118" rx="4" style="fill:var(--core-soft);stroke:var(--core);stroke-width:3"/>
+        <text x="392" y="96" font-size="20" font-weight="700" text-anchor="middle">popup</text>
+        <text x="392" y="122" font-size="20" class="sub" text-anchor="middle">250 ms</text>
+        <path d="M226 230 L226 274" style="stroke:var(--o-frames);stroke-width:1.5"/>
+        <text x="226" y="294" font-size="20" text-anchor="middle">aperçu d'une carte (HDT)</text>
+      </svg>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--bad);opacity:0.35"></i>zone du jeu : le plugin n'y pose rien</span>
+        <span><i class="sw" style="border:2.5px solid var(--o-panel)"></i>panneau</span>
+        <span><i class="sw" style="background:var(--core-soft);border:2px solid var(--core)"></i>popup, et la ligne survolée</span>
+        <span><i class="sw" style="border:2px dashed var(--o-frames)"></i>aperçu d'une carte</span>
+      </div>
+      <figcaption>Où se pose le popup en taverne, 1080p, à l'échelle de la capture ci-dessous. En combat, il remonte au-dessus du bouton Skip combat.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Quand le popup se montre, quand il se cache</h3>
+  <table>
+    <thead><tr><th>Ce qui arrive</th><th>Le popup</th></tr></thead>
+    <tbody>
+      <tr><td>Le curseur reste 250 ms sur une ligne</td><td>montre le guide de cette ligne : nom, badges, sections dans l'ordre de HDT</td></tr>
+      <tr><td>Le curseur sort de la ligne</td><td>caché, <b>sauf</b> si le curseur est encore dans le rectangle de la ligne (<code>GetCursorPos</code>) : § 9 (b)</td></tr>
+      <tr><td>Un deuxième MouseEnter sur la même ligne (sonde de HDT, puis WPF)</td><td>rien ne change</td></tr>
+      <tr><td>Clic sur un nom ou un ovale</td><td>caché ; le détail remplace la liste, comme avant</td></tr>
+      <tr><td>Mode déplacement</td><td>caché, et aucune ligne n'en ouvre</td></tr>
+      <tr><td>Un choix s'ouvre en taverne</td><td>caché avec le panneau (§ 7)</td></tr>
+      <tr><td>Passage taverne ↔ combat, panneau caché</td><td>caché</td></tr>
+    </tbody>
+  </table>
+</main>
+
+<div class="wide">
+  <div class="duo">
+    <figure>
+      <a href="img/2026-10-04-panneau-unique/apres-survol-popup.png"><img src="img/2026-10-04-panneau-unique/apres-survol-popup.png" width="1920" height="1080" loading="lazy" alt="Taverne : la ligne Pirate Discover survolée ouvre son guide en popup en haut à droite, au-dessus du panneau ; l'aperçu d'une carte de la ligne s'affiche à gauche du panneau"></a>
+      <figcaption><b>Taverne</b> : la ligne Pirate Discover survolée, puis un de ses ovales. Popup en (1452, 244), 400 × 438, ses 5 sections ; l'aperçu de Sin'dorei Straight Shot à gauche du panneau. Aucun des deux ne recouvre l'autre ni le panneau.</figcaption>
+    </figure>
+    <figure>
+      <a href="img/2026-10-04-panneau-unique/apres-survol-combat.png"><img src="img/2026-10-04-panneau-unique/apres-survol-combat.png" width="1920" height="1080" loading="lazy" alt="Combat : le même popup remonte au-dessus du bouton Skip combat"></a>
+      <figcaption><b>Combat</b> : le même popup remonte au-dessus de Skip combat (bas du popup à 564 px, haut du bouton à 573). Le panneau ne bouge pas.</figcaption>
+    </figure>
+  </div>
+</div>
+
+<main style="padding-top:0">
+  <h3>Ce que la simulation ne montre pas</h3>
+  <table>
+    <thead><tr><th>Sous HDT</th><th>Dans la simulation</th></tr></thead>
+    <tbody>
+      <tr><td>Une sonde à ≈ 60 Hz lève MouseEnter et MouseLeave d'après la seule géométrie</td><td>la simulation les lève elle-même</td></tr>
+      <tr><td>Le double MouseEnter réel (sonde, puis WPF au-dessus d'un élément cliquable)</td><td>appelé deux fois par le self-test</td></tr>
+      <tr><td>Le MouseLeave de WPF quand HDT repasse sa fenêtre en clic-transparent</td><td>simulé, en disant au popup que le curseur est encore dans la ligne</td></tr>
+      <tr><td>La mise à l'échelle de Windows (DPI) : curseur lu par <code>GetCursorPos</code>, ramené par <code>PointFromScreen</code></td><td>jamais éprouvée ailleurs que sur la machine de simulation</td></tr>
+      <tr><td>L'emplacement unique d'infobulle de HDT</td><td>une copie, écrite d'après le code décompilé</td></tr>
+    </tbody>
+  </table>
+  <details>
+    <summary>La mesure, dans le code de HDT 1.58.6</summary>
+    <p>Décompilé : <code>Windows/OverlayWindow.cs</code> 2414-2502 et 2640-2805, <code>Utility/Extensions/OverlayExtensions.cs</code> 173-240.</p>
+    <table class="cards">
+      <thead><tr><th>Ce que fait HDT</th><th>Conséquence</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Ce que fait HDT"><code>SetTooltip</code> : un seul emplacement pour tout l'overlay (<code>Children.Count &gt; 0 → return</code>), fermé au MouseLeave, sans taille maximale</td><td data-label="Conséquence">une infobulle de ligne occuperait l'emplacement : les ovales de cette ligne ne montreraient plus leur carte</td></tr>
+        <tr><td data-label="Ce que fait HDT">sonde ≈ 60 Hz purement géométrique : tout élément <code>IsOverlayHoverVisible</code> dont le rectangle contient le curseur reçoit MouseEnter</td><td data-label="Conséquence">une ligne et l'ovale qu'elle contient sont « entrés » ensemble ; passer de l'une à l'autre ne lève rien sur la ligne</td></tr>
+        <tr><td data-label="Ce que fait HDT">au-dessus d'un élément cliquable, WPF lève en plus ses propres MouseEnter / MouseLeave</td><td data-label="Conséquence">gestionnaires appelés deux fois ; un MouseLeave peut arriver curseur encore sur la ligne</td></tr>
+        <tr><td data-label="Ce que fait HDT"><code>SetTooltip</code> place l'infobulle d'après sa taille mesurée, juste après l'avoir ajoutée</td><td data-label="Conséquence">une <code>Image</code> sans source mesure 0 × 0 : l'aperçu tombait sur le panneau au premier survol ; corrigé (c8155b4), <code>FullCard</code> rend une boîte de la taille de la carte</td></tr>
+      </tbody>
+    </table>
+    <p>Mesuré sur les captures (1920 × 1080) : panneau en (1181, 691), 488 × 319, bord droit à 1669 ; popup de Pirate Discover de 1452 à 1852, soit 183 px plus à droite. Un guide à six sections (Mech Magnet) : popup en (1452, 135), 400 × 547. En 4:3 (1440 × 1080), la colonne à droite des plateaux n'a que 217 px : le popup passe au-dessus des plateaux, 301 px de haut, sections réduites (calculé par <code>GuidePopupLayout</code>, pas regardé).</p>
+  </details>
+
+  <h2 id="pont">6. Stats Firestone → aides <span class="tag2">soir</span></h2>
+  <p class="lead">Un guide de HDT est relié à une compo Firestone quand elles partagent assez de cartes. Trois aides gagnent alors une donnée de plus : les plateaux finaux, le tour final, l'affinité avec le héros joué. Sans pont, les textes d'avant, mot pour mot.</p>
+  <figure>
+    <svg class="bridge-wide" viewBox="0 0 880 410" role="img" aria-labelledby="t-bridge">
+      <title id="t-bridge">Un guide de HDT et une compo Firestone sont reliés si elles partagent au moins deux cartes et au moins la moitié des cartes clés du guide ; le pont nourrit l'étiquette de choix, le cadre de taverne et la ligne de contexte du détail</title>
+      <defs>
+        <marker id="bw2-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+        <marker id="bw2-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-choice)"/></marker>
+        <marker id="bw2-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-frames)"/></marker>
+        <marker id="bw2-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-panel)"/></marker>
+      </defs>
+      <rect class="box" x="10" y="10" width="260" height="190" rx="8"/>
+      <text x="22" y="36" font-size="16" font-weight="700">Guide de HDT</text>
+      <g font-size="15"><text x="22" y="84">clés</text><text x="22" y="128">add-ons</text><text x="22" y="172">enablers</text></g>
+      <g>
+        <ellipse cx="110" cy="79" rx="14" ry="17" style="fill:var(--ok-soft);stroke:var(--core);stroke-width:3"/>
+        <ellipse cx="148" cy="79" rx="14" ry="17" style="fill:var(--ok-soft);stroke:var(--core);stroke-width:3"/>
+        <ellipse cx="186" cy="79" rx="14" ry="17" style="fill:var(--ok-soft);stroke:var(--core);stroke-width:3"/>
+        <ellipse cx="224" cy="79" rx="14" ry="17" style="fill:var(--art);stroke:var(--core);stroke-width:3"/>
+        <ellipse cx="110" cy="123" rx="14" ry="17" style="fill:var(--ok-soft);stroke:var(--core);stroke-width:2.5;stroke-dasharray:4 3"/>
+        <ellipse cx="148" cy="123" rx="14" ry="17" style="fill:var(--art);stroke:var(--core);stroke-width:2.5;stroke-dasharray:4 3"/>
+        <ellipse cx="110" cy="167" rx="14" ry="17" style="fill:var(--soft);stroke:var(--muted);stroke-width:1.5"/>
+        <ellipse cx="148" cy="167" rx="14" ry="17" style="fill:var(--soft);stroke:var(--muted);stroke-width:1.5"/>
+      </g>
+      <g font-size="16" font-weight="700" text-anchor="middle" style="fill:var(--ok)"><text x="110" y="85" style="fill:var(--ok)">✓</text><text x="148" y="85" style="fill:var(--ok)">✓</text><text x="186" y="85" style="fill:var(--ok)">✓</text><text x="110" y="129" style="fill:var(--ok)">✓</text></g>
+      <text x="174" y="172" font-size="15" class="sub">ignorés</text>
+
+      <rect class="box" x="10" y="220" width="260" height="180" rx="8"/>
+      <text x="22" y="246" font-size="16" font-weight="700">Compo Firestone</text>
+      <text x="22" y="268" font-size="15" class="sub">listes et plateaux finaux</text>
+      <g>
+        <ellipse cx="40" cy="302" rx="14" ry="17" style="fill:var(--ok-soft);stroke:var(--muted);stroke-width:1.5"/>
+        <ellipse cx="80" cy="302" rx="14" ry="17" style="fill:var(--ok-soft);stroke:var(--muted);stroke-width:1.5"/>
+        <ellipse cx="120" cy="302" rx="14" ry="17" style="fill:var(--ok-soft);stroke:var(--muted);stroke-width:1.5"/>
+        <ellipse cx="160" cy="302" rx="14" ry="17" style="fill:var(--ok-soft);stroke:var(--muted);stroke-width:1.5"/>
+        <ellipse cx="200" cy="302" rx="14" ry="17" style="fill:var(--art);stroke:var(--muted);stroke-width:1.5"/>
+        <ellipse cx="240" cy="302" rx="14" ry="17" style="fill:var(--art);stroke:var(--muted);stroke-width:1.5"/>
+      </g>
+      <g font-size="16" font-weight="700" text-anchor="middle"><text x="40" y="308" style="fill:var(--ok)">✓</text><text x="80" y="308" style="fill:var(--ok)">✓</text><text x="120" y="308" style="fill:var(--ok)">✓</text><text x="160" y="308" style="fill:var(--ok)">✓</text></g>
+      <g style="fill:var(--soft);stroke:var(--border);stroke-width:1.5">
+        <rect x="22" y="334" width="40" height="22" rx="3"/><rect x="70" y="334" width="40" height="22" rx="3"/><rect x="118" y="334" width="40" height="22" rx="3"/><rect x="166" y="334" width="40" height="22" rx="3"/><rect x="214" y="334" width="40" height="22" rx="3"/>
+      </g>
+      <text x="22" y="386" font-size="15" class="sub">les 5 plateaux finaux</text>
+
+      <path class="wire" d="M270 105 L298 150" marker-end="url(#bw2-n)"/>
+      <path class="wire" d="M270 310 L298 222" marker-end="url(#bw2-n)"/>
+      <rect x="300" y="105" width="220" height="150" rx="8" style="fill:var(--surface);stroke:var(--text);stroke-width:2"/>
+      <g font-size="15" text-anchor="middle">
+        <text x="410" y="132" font-size="16" font-weight="700">pont si</text>
+        <text x="410" y="160">≥ 2 cartes partagées</text>
+        <text x="410" y="184" font-weight="700">ET</text>
+        <text x="410" y="208">≥ moitié des cartes clés</text>
+        <text x="410" y="240" class="sub">ici : 4 cartes, 3 clés sur 4</text>
+      </g>
+      <path class="wire" d="M410 255 L410 298" marker-end="url(#bw2-n)"/>
+      <text x="420" y="282" font-size="15" class="sub">non</text>
+      <rect class="box" x="320" y="300" width="180" height="76" rx="8"/>
+      <g font-size="15" text-anchor="middle">
+        <text x="410" y="326" font-size="16" font-weight="700" class="sub">✗ no match</text>
+        <text x="410" y="348" class="sub">textes d'avant,</text>
+        <text x="410" y="368" class="sub">mot pour mot</text>
+      </g>
+      <path d="M520 185 L552 185" style="stroke:var(--ok);stroke-width:2.5;fill:none"/>
+      <text x="523" y="176" font-size="15" font-weight="700" style="fill:var(--ok)">oui</text>
+      <path d="M552 185 L578 74" style="stroke:var(--o-choice);stroke-width:2.5;fill:none" marker-end="url(#bw2-c)"/>
+      <path d="M552 185 L578 197" style="stroke:var(--o-frames);stroke-width:2.5;fill:none" marker-end="url(#bw2-f)"/>
+      <path d="M552 185 L578 326" style="stroke:var(--o-panel);stroke-width:2.5;fill:none" marker-end="url(#bw2-p)"/>
+
+      <rect x="580" y="10" width="290" height="118" rx="8" style="fill:var(--surface);stroke:var(--o-choice);stroke-width:3"/>
+      <text x="596" y="36" font-size="16" font-weight="700" style="fill:var(--o-choice)">Étiquette de choix</text>
+      <g font-size="15"><text x="596" y="62">★ core T 2/3→3/3 · 4/5 boards</text><text x="596" y="86">+ T 3/5 boards</text><text x="596" y="110">pivot → G (S)</text></g>
+      <rect x="580" y="142" width="290" height="110" rx="8" style="fill:var(--surface);stroke:var(--o-frames);stroke-width:3"/>
+      <text x="596" y="168" font-size="16" font-weight="700" style="fill:var(--o-frames)">Cadre de taverne</text>
+      <rect x="596" y="180" width="84" height="60" rx="5" style="fill:none;stroke:var(--o-frames);stroke-width:2.5;stroke-dasharray:6 4"/>
+      <text x="638" y="216" font-size="15" font-weight="700" text-anchor="middle">+ T 3/5</text>
+      <g font-size="15"><text x="694" y="204">carte de Bob sur</text><text x="694" y="226">≥ 2 plateaux finaux</text></g>
+      <rect x="580" y="266" width="290" height="134" rx="8" style="fill:var(--surface);stroke:var(--o-panel);stroke-width:3"/>
+      <text x="596" y="292" font-size="16" font-weight="700" style="fill:var(--o-panel)">Détail et popup d'un guide</text>
+      <g font-size="15"><text x="596" y="318">≈ 3,5 with your hero (23)</text><text x="596" y="342">· final turn ≈ 13</text><text x="596" y="366">· 5 top boards</text><text x="596" y="390" class="sub">omise sans pont</text></g>
+    </svg>
+
+    <svg class="bridge-tall" viewBox="0 0 340 952" role="img" aria-labelledby="t-bridge2">
+      <title id="t-bridge2">Le même pont, de haut en bas</title>
+      <defs>
+        <marker id="bt2-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+      </defs>
+      <rect class="box" x="2" y="4" width="336" height="168" rx="8"/>
+      <text x="14" y="30" font-size="16" font-weight="700">Guide de HDT</text>
+      <g font-size="15"><text x="14" y="75">clés</text><text x="14" y="115">add-ons</text><text x="14" y="153">enablers</text></g>
+      <ellipse cx="130" cy="70" rx="15" ry="17" style="fill:var(--ok-soft);stroke:var(--core);stroke-width:3"/>
+      <ellipse cx="172" cy="70" rx="15" ry="17" style="fill:var(--ok-soft);stroke:var(--core);stroke-width:3"/>
+      <ellipse cx="214" cy="70" rx="15" ry="17" style="fill:var(--ok-soft);stroke:var(--core);stroke-width:3"/>
+      <ellipse cx="256" cy="70" rx="15" ry="17" style="fill:var(--art);stroke:var(--core);stroke-width:3"/>
+      <ellipse cx="130" cy="110" rx="15" ry="17" style="fill:var(--ok-soft);stroke:var(--core);stroke-width:2.5;stroke-dasharray:4 3"/>
+      <ellipse cx="172" cy="110" rx="15" ry="17" style="fill:var(--art);stroke:var(--core);stroke-width:2.5;stroke-dasharray:4 3"/>
+      <ellipse cx="130" cy="148" rx="15" ry="16" style="fill:var(--soft);stroke:var(--muted);stroke-width:1.5"/>
+      <ellipse cx="172" cy="148" rx="15" ry="16" style="fill:var(--soft);stroke:var(--muted);stroke-width:1.5"/>
+      <g font-size="16" font-weight="700" text-anchor="middle"><text x="130" y="76" style="fill:var(--ok)">✓</text><text x="172" y="76" style="fill:var(--ok)">✓</text><text x="214" y="76" style="fill:var(--ok)">✓</text><text x="130" y="116" style="fill:var(--ok)">✓</text></g>
+      <text x="200" y="153" font-size="15" class="sub">ignorés</text>
+
+      <rect class="box" x="2" y="184" width="336" height="176" rx="8"/>
+      <text x="14" y="210" font-size="16" font-weight="700">Compo Firestone</text>
+      <text x="14" y="232" font-size="15" class="sub">listes et plateaux finaux</text>
+      <ellipse cx="40" cy="268" rx="15" ry="17" style="fill:var(--ok-soft);stroke:var(--muted);stroke-width:1.5"/>
+      <ellipse cx="84" cy="268" rx="15" ry="17" style="fill:var(--ok-soft);stroke:var(--muted);stroke-width:1.5"/>
+      <ellipse cx="128" cy="268" rx="15" ry="17" style="fill:var(--ok-soft);stroke:var(--muted);stroke-width:1.5"/>
+      <ellipse cx="172" cy="268" rx="15" ry="17" style="fill:var(--ok-soft);stroke:var(--muted);stroke-width:1.5"/>
+      <ellipse cx="216" cy="268" rx="15" ry="17" style="fill:var(--art);stroke:var(--muted);stroke-width:1.5"/>
+      <ellipse cx="260" cy="268" rx="15" ry="17" style="fill:var(--art);stroke:var(--muted);stroke-width:1.5"/>
+      <g font-size="16" font-weight="700" text-anchor="middle"><text x="40" y="274" style="fill:var(--ok)">✓</text><text x="84" y="274" style="fill:var(--ok)">✓</text><text x="128" y="274" style="fill:var(--ok)">✓</text><text x="172" y="274" style="fill:var(--ok)">✓</text></g>
+      <g style="fill:var(--soft);stroke:var(--border);stroke-width:1.5">
+        <rect x="14" y="298" width="54" height="22" rx="3"/><rect x="78" y="298" width="54" height="22" rx="3"/><rect x="142" y="298" width="54" height="22" rx="3"/><rect x="206" y="298" width="54" height="22" rx="3"/><rect x="270" y="298" width="54" height="22" rx="3"/>
+      </g>
+      <text x="14" y="348" font-size="15" class="sub">5 plateaux finaux → « k/5 boards »</text>
+
+      <path class="wire" d="M170 362 L170 382" marker-end="url(#bt2-n)"/>
+      <rect x="2" y="386" width="336" height="130" rx="8" style="fill:var(--surface);stroke:var(--text);stroke-width:2"/>
+      <g font-size="15" text-anchor="middle">
+        <text x="170" y="412" font-size="16" font-weight="700">pont si</text>
+        <text x="170" y="438">≥ 2 cartes partagées</text>
+        <text x="170" y="462">ET ≥ moitié des cartes clés</text>
+        <text x="170" y="494" class="sub">ici : 4 cartes, 3 clés sur 4</text>
+      </g>
+      <path class="wire" d="M84 516 L84 532" marker-end="url(#bt2-n)"/>
+      <path class="wire" d="M256 516 L256 532" marker-end="url(#bt2-n)"/>
+      <rect x="2" y="534" width="164" height="60" rx="8" style="fill:var(--surface);stroke:var(--ok);stroke-width:2"/>
+      <rect class="box" x="174" y="534" width="164" height="60" rx="8"/>
+      <g font-size="15" text-anchor="middle">
+        <text x="84" y="560" font-size="16" font-weight="700" style="fill:var(--ok)">✓ pont</text>
+        <text x="84" y="582" class="sub">trois aides de plus</text>
+        <text x="256" y="560" font-size="16" font-weight="700" class="sub">✗ no match</text>
+        <text x="256" y="582" class="sub">textes d'avant</text>
+      </g>
+      <path class="wire" d="M84 594 L84 616" marker-end="url(#bt2-n)"/>
+
+      <rect x="2" y="620" width="336" height="104" rx="8" style="fill:var(--surface);stroke:var(--o-choice);stroke-width:3"/>
+      <text x="14" y="646" font-size="16" font-weight="700" style="fill:var(--o-choice)">Étiquette de choix</text>
+      <g font-size="15"><text x="14" y="672">★ core T 2/3→3/3 · 4/5 boards</text><text x="14" y="694">+ T 3/5 boards</text><text x="14" y="716">pivot → G (S)</text></g>
+      <rect x="2" y="736" width="336" height="86" rx="8" style="fill:var(--surface);stroke:var(--o-frames);stroke-width:3"/>
+      <rect x="14" y="750" width="84" height="58" rx="5" style="fill:none;stroke:var(--o-frames);stroke-width:2.5;stroke-dasharray:6 4"/>
+      <text x="56" y="784" font-size="15" font-weight="700" text-anchor="middle">+ T 3/5</text>
+      <text x="112" y="768" font-size="16" font-weight="700" style="fill:var(--o-frames)">Cadre de taverne</text>
+      <g font-size="15"><text x="112" y="790">carte de Bob sur ≥ 2</text><text x="112" y="810">plateaux finaux</text></g>
+      <rect x="2" y="834" width="336" height="112" rx="8" style="fill:var(--surface);stroke:var(--o-panel);stroke-width:3"/>
+      <text x="14" y="860" font-size="16" font-weight="700" style="fill:var(--o-panel)">Détail et popup d'un guide</text>
+      <g font-size="15"><text x="14" y="884">≈ 3,5 with your hero (23)</text><text x="14" y="906">· final turn ≈ 13 · 5 top boards</text><text x="14" y="930" class="sub">omise sans pont</text></g>
+    </svg>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--ok-soft);border:2px solid var(--core)"></i>carte clé du guide, partagée (✓)</span>
+      <span><i class="sw" style="border:2px dashed var(--core)"></i>add-on du guide</span>
+      <span><i class="sw" style="background:var(--art)"></i>carte non partagée</span>
+    </div>
+    <figcaption>Le pont exige au moins deux cartes partagées (clés et add-ons du guide ; ses enablers, que presque toutes les compos jouent, ne comptent pas) <b>et</b> au moins la moitié de ses cartes clés. Entre plusieurs compos qui passent : le plus de cartes clés, puis de cartes, puis de parties. Les « k/n boards » et le cadre de taverne exigent en plus ≥ 2 plateaux finaux. Jamais la place moyenne de la compo.</figcaption>
+  </figure>
+
+  <h3>Ce qu'on avait, ce qui sert maintenant</h3>
+  <table class="cards">
+    <thead><tr><th>Donnée Firestone</th><th>Après la première passe</th><th>Maintenant</th><th>Où la voir</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Donnée Firestone">Plateaux finaux des compos (<code>FinalBoards</code>)</td><td data-label="Après la première passe">chargés, plus affichés depuis la fusion</td><td data-label="Maintenant">fondent le pont (avec les listes) et les « k/n boards »</td><td data-label="Où la voir">étiquettes de choix, cadre « + T k/n », « 5 top boards »</td></tr>
+      <tr><td data-label="Donnée Firestone"><code>MinionLineups</code></td><td data-label="Après la première passe">servait le cadre « lineups », retiré</td><td data-label="Maintenant">dit sur combien de plateaux finaux de la compo pontée est la carte, et sa place habituelle</td><td data-label="Où la voir">« k/n boards » ; la place, dans le journal seulement</td></tr>
+      <tr><td data-label="Donnée Firestone"><code>CompDetail</code> (tour final médian)</td><td data-label="Après la première passe">plus affiché</td><td data-label="Maintenant">« final turn ≈ 13 »</td><td data-label="Où la voir">ligne de contexte du détail et du popup</td></tr>
+      <tr><td data-label="Donnée Firestone"><code>HeroCompAffinity</code></td><td data-label="Après la première passe">plus calculé</td><td data-label="Maintenant">recalculé quand le héros joué ou les compos changent</td><td data-label="Où la voir">« ≈ 3,5 with your hero (23) », même ligne</td></tr>
+      <tr><td data-label="Donnée Firestone"><code>TrinketStats</code></td><td data-label="Après la première passe">étiquettes de trinket</td><td data-label="Maintenant"><b>inchangé</b></td><td data-label="Où la voir">« avg 3.71 → ≈3.41 ≈ Pirate Discover » (§ 7)</td></tr>
+      <tr><td data-label="Donnée Firestone">card-stats</td><td data-label="Après la première passe">jamais chargées (l'accord les autorise)</td><td data-label="Maintenant"><b>toujours pas chargées</b></td><td data-label="Où la voir">proposition, à décider : § 9 (e)</td></tr>
+    </tbody>
+  </table>
+  <p>L'encart des héros proposés (« comp ≈ ») lisait déjà les compos Firestone : il ne change pas.</p>
+  <div class="warn"><b>Pas mesuré : le taux de pontage réel.</b> 24 compos Firestone contre ≈ 23 guides de HDT, deux nomenclatures écrites par des gens différents ; personne n'a compté combien se recoupent au seuil choisi. Dans la simulation, 2 guides sur 15 sont pontés, sur des compos inventées pour l'être : ce chiffre ne dit rien du jeu. La ligne <code>bridge:</code> du journal d'HDT le dira à la première partie ; si presque tout est « no match », c'est le seuil qu'il faudra rediscuter, pas le code.</div>
+</main>
+
+<div class="wide">
+  <figure class="crop w1100">
+    <a href="img/2026-10-04-panneau-unique/apres-choix-discover.png"><img src="img/2026-10-04-panneau-unique/apres-choix-discover-zoom.png" width="1100" height="304" loading="lazy" alt="Zoom sur une découverte : trois étiquettes au-dessus des options, + Pirate Discover · 3/5 boards en magenta, + Mech Magnet 3/5 boards en vert, pivot → Beast Pack (A) en gris"></a>
+    <figcaption><b>Étiquette de choix</b>, les trois formes du pont : « + Pirate Discover · 3/5 boards » (le rôle dans une cible, plus les plateaux), « + Mech Magnet 3/5 boards » (une carte qu'aucune liste de la cible ne nomme, mais sur 3 de ses 5 plateaux finaux, dans sa couleur), « pivot → Beast Pack (A) » (neutre). Le texte dans les cartes grises est celui de la simulation, qui dit ce qu'est l'option.</figcaption>
+  </figure>
+  <figure class="crop w700">
+    <a href="img/2026-10-04-panneau-unique/apres-survol-contexte.png"><img src="img/2026-10-04-panneau-unique/apres-survol-contexte-zoom.png" width="700" height="475" loading="lazy" alt="Zoom : le popup de Pirate Discover porte sous son nom la ligne ≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards ; à gauche, la dernière carte de Bob porte un cadre pointillé vert + M. Magnet 3/5"></a>
+    <figcaption><b>Cadre de taverne et ligne de contexte</b> : Bramble Tunneler, sur 3 des 5 plateaux finaux de la compo de Mech Magnet, porte un cadre pointillé « + M. Magnet 3/5 » ; sous le nom du guide, « ≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards ». Un clic ouvre la capture entière.</figcaption>
+  </figure>
+</div>
+
+<main style="padding-top:0">
+  <details>
+    <summary>La preuve : la ligne <code>bridge:</code> et les contrôles du self-test</summary>
+    <p>Self-test relancé à 1ef888b pour cette note. Le contre-exemple Mech Divine Shield partage 3 cartes avec <code>mech_fs</code>, mais seulement 3 de ses 7 cartes clés : moins de la moitié, donc « no match ».</p>
+    <pre>PASS  bridge: one log line naming every guide; Pirate Discover and Mech Magnet bridged, the counter-example Mech Divine Shield "no match": 1 line(s); counter-example: Mech Divine Shield shares 3 cards with mech_fs, 3 of its 7 core cards; Bronzebeard HUD: bridge: Undead Butcher → no match; Pirate Discover → pirate_fs (4/4 keys, 6 cards, 1800 games); Mech Magnet → mech_fs (2/2 keys, 3 cards, 1200 games); Beast Pack → no match; […] Mech Divine Shield → no match; Murloc Tidecaller → no match; Beast Deathrattle → no match (2/15 guides bridged, against 2 compositions; Firestone synthetic)
+PASS  Bob's card on the top boards of a bridged target: dotted frame and "+ T k/n" in T's colour, in the log: BG36_331 (Bob's #7) on 3/5 boards of mech_fs: frame dotted #FFB8FF1F, label "+ M. Magnet 3/5" #FFB8FF1F, Mech Magnet is #FFB8FF1F; log: "BG36_331:boards 3/5:Mech Magnet/17"
+PASS  choice discover: the bridge's labels: "+ T k/n boards" in T's colour, a role "· k/n boards", "pivot → G (X)" neutral: top boards: #1 "+ Mech Magnet 3/5 boards" on #FFB8FF1F, Mech Magnet is #B8FF1F | suffix: #0 "+ Pirate Discover · 3/5 boards" on #FFFF2BD6 | pivot: #2 "pivot → Beast Pack (A)" on #E63A3A44</pre>
+  </details>
+
+  <h2 id="choix">7. Choix : avant / après <span class="tag2">soir</span></h2>
+  <p class="lead">Tant qu'un choix est ouvert en taverne, les cadres et étiquettes de Bob, ses ◇, le panneau et son popup sont retirés ; à la fermeture, ils reviennent tels quels, sans recalcul. Restent les étiquettes du choix, aux couleurs des cibles. Décision du pilote, réversible, à confirmer en jeu : § 9 (c).</p>
+  <div class="tiles">
+    <div class="tile"><b>43 px</b><span>du bas de la 3ᵉ option couverts par le panneau en découverte, sur 302 px de large</span></div>
+    <div class="tile"><b>162 px</b><span>couverts en Dark Gift, sur 359 px de large (constantes de HDT)</span></div>
+    <div class="tile"><b>0 pixel</b><span>d'écart entre la taverne rétablie et une taverne qui n'a jamais eu de choix</span></div>
+  </div>
+  <table class="cards">
+    <thead><tr><th>Défaut vu dans la simulation</th><th>Découverte</th><th>Dark Gift</th><th>Après</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Défaut vu">Cadres et étiquettes de Bob dessinés par-dessus les options</td><td data-label="Découverte">✗ oui</td><td data-label="Dark Gift">✗ oui</td><td data-label="Après">✓ retirés</td></tr>
+      <tr><td data-label="Défaut vu">◇ d'épinglage, cliquables, sur les cartes proposées : un clic épinglait au lieu de choisir</td><td data-label="Découverte">sous les étiquettes, au-dessus des cartes</td><td data-label="Dark Gift">✗ dans les cartes</td><td data-label="Après">✓ retirés</td></tr>
+      <tr><td data-label="Défaut vu">Panneau sur le bas de la 3ᵉ option, à sa place par défaut en 1080p</td><td data-label="Découverte">✗ 302 × 43 px</td><td data-label="Dark Gift">✗ 359 × 162 px</td><td data-label="Après">✓ retiré</td></tr>
+    </tbody>
+  </table>
+</main>
+
+<div class="wide">
+  <div class="duo">
+    <figure>
+      <a href="img/2026-10-04-panneau-unique/avant-choix-marqueurs.png"><img src="img/2026-10-04-panneau-unique/avant-choix-marqueurs.png" width="1920" height="1080" loading="lazy" alt="Avant : une découverte à trois options ; les cadres et étiquettes de la rangée de Bob passent par-dessus les cartes proposées, et le panneau couvre le bas de la troisième"></a>
+      <figcaption><b>Avant</b> (20:19, avant 176fb05) : découverte, trois cibles. Les cadres et étiquettes de Bob (« core MDS 2/7 », « + P. Discover », « pinned », « enabler MDS »…) passent par-dessus les options ; le panneau couvre le bas de la 3ᵉ.</figcaption>
+    </figure>
+    <figure>
+      <a href="img/2026-10-04-panneau-unique/avant-choix-darkgift.png"><img src="img/2026-10-04-panneau-unique/avant-choix-darkgift.png" width="1920" height="1080" loading="lazy" alt="Avant : un Dark Gift ; ses grandes cartes couvrent la rangée de Bob, dont les boutons d'épinglage tombent dans les cartes, et le panneau couvre le bas de la troisième"></a>
+      <figcaption><b>Avant</b> : Dark Gift. Ses cartes, plus grandes, couvrent toute la rangée de Bob : les ◇, cliquables, tombent dans les cartes proposées, et le panneau en couvre 162 px.</figcaption>
+    </figure>
+    <figure>
+      <a href="img/2026-10-04-panneau-unique/apres-choix-discover.png"><img src="img/2026-10-04-panneau-unique/apres-choix-discover.png" width="1920" height="1080" loading="lazy" alt="Après : la même découverte, sans marqueurs ni panneau ; seules les trois étiquettes du choix restent au-dessus des options"></a>
+      <figcaption><b>Après</b> (1ef888b) : la même découverte. Marqueurs, ◇ et panneau retirés ; restent les étiquettes du choix, qui portent le pont (§ 6).</figcaption>
+    </figure>
+    <figure>
+      <a href="img/2026-10-04-panneau-unique/apres-choix-ferme.png"><img src="img/2026-10-04-panneau-unique/apres-choix-ferme.png" width="1920" height="1080" loading="lazy" alt="Après : le choix refermé, la rangée de Bob retrouve ses cadres et le panneau sa place"></a>
+      <figcaption><b>Après, choix refermé</b> : tout revient tel quel, au pixel près comme une taverne sans choix. Le cadre pointillé vert « + M. Magnet 3/5 » sur Bramble Tunneler est une sortie du pont.</figcaption>
+    </figure>
+  </div>
+  <figure style="max-width:960px">
+    <a href="img/2026-10-04-panneau-unique/apres-choix-trinket.png"><img src="img/2026-10-04-panneau-unique/apres-choix-trinket.png" width="1920" height="1080" loading="lazy" alt="Après : un choix de quatre trinkets ; seules leurs étiquettes de statistiques restent, sans marqueurs ni panneau"></a>
+    <figcaption><b>Après, trinket</b> (capture refaite à 1ef888b) : les quatre étiquettes de trinket, inchangées (« avg 3.71 → ≈3.41 ≈ Pirate Discover »…), et rien d'autre du plugin.</figcaption>
+  </figure>
+</div>
+
+<main style="padding-top:0">
+  <p>Dans ces captures, le cadre cyan autour du panneau est celui du mode déplacement, que la simulation allume d'office. Le bouton Skip combat des captures « avant » est là parce que la simulation le montre par défaut ; les captures « après » sont prises sans lui, comme en taverne.</p>
+  <h3>Arbitrages pris en route</h3>
+  <ul>
+    <li><b>Un choix sans disposition connue</b> (héros, pouvoirs, quêtes…) masque aussi : ses options couvrent la rangée de Bob de la même façon.</li>
+    <li><b>Seulement en taverne</b> : en sélection des héros rien n'est affiché, et le combat rétablit tout même si un choix reste listé.</li>
+    <li><b>Réversible</b> : <code>ChoiceCover.IsOpen</code>, ou le garde-fou <code>choice-cover</code> (s'il tombe, tout est rétabli). Journal : une ligne par transition, <code>choice open: markers and panel hidden</code> puis <code>choice closed: restored</code>.</li>
+    <li><b>Pas vu</b> : un choix qui resterait « ouvert » (liste d'options périmée chez HDT) cacherait le panneau pour le reste du tour. Jamais vu, mais jamais vu en jeu non plus.</li>
+  </ul>
+
+  <h2>8. Ce qui n'a PAS été vu</h2>
   <p>Rien n'a tourné sous HDT. La simulation fait tourner les vrais panneaux dans une fenêtre Windows ordinaire, mais elle ne reproduit pas la couche d'HDT au-dessus du jeu.</p>
   <table>
     <thead><tr><th>Ce qu'il faut voir</th><th>Simulation</th><th>Sous HDT</th></tr></thead>
     <tbody>
-      <tr><td>Liste des guides, couleurs des cibles</td><td class="yes">✓ captures, auto-test</td><td class="no">✗</td></tr>
+      <tr><td>Liste des guides, couleurs des cibles</td><td class="yes">✓ captures, self-test</td><td class="no">✗</td></tr>
       <tr><td>Détail au clic, « ← All comp guides »</td><td class="yes">✓</td><td class="no">✗</td></tr>
       <tr><td>Cadres sur les cartes de Bob</td><td class="yes">✓ sur des cartes grises</td><td class="no">✗</td></tr>
-      <tr><td>Étiquettes des choix (découverte, trinket, Dark Gift)</td><td class="no">✗ absentes de la simulation</td><td class="no">✗</td></tr>
+      <tr><td>Étiquettes des choix (découverte, trinket, Dark Gift) <span class="tag2">soir</span></td><td class="yes">✓ captures, self-test</td><td class="no">✗</td></tr>
+      <tr><td>Masquage pendant un choix, puis rétablissement <span class="tag2">soir</span></td><td class="yes">✓ captures, self-test</td><td class="no">✗</td></tr>
+      <tr><td>Popup au survol d'une ligne, aperçu de carte en même temps <span class="tag2">soir</span></td><td class="yes">✓ captures, self-test (survol levé par la simulation)</td><td class="no">✗</td></tr>
+      <tr><td>Sonde de HDT à 60 Hz, double MouseEnter, MouseLeave de WPF, DPI <span class="tag2">soir</span></td><td class="no">✗ (§ 5)</td><td class="no">✗</td></tr>
       <tr><td>Clics à travers la couche d'HDT (cases, noms, ovales)</td><td class="no">✗ pas de couche HDT</td><td class="no">✗</td></tr>
-      <tr><td>Survol des ovales, sondé par HDT à 60 Hz</td><td class="no">✗</td><td class="no">✗</td></tr>
+      <tr><td>Pont sur les vraies données : combien de guides trouvent une compo <span class="tag2">soir</span></td><td class="no">✗ compos inventées pour être pontées</td><td class="no">✗ la ligne <code>bridge:</code> le dira</td></tr>
       <tr><td>Vrais guides : noms longs, Tier 7, textes réels</td><td class="no">✗ guides inventés</td><td class="no">✗</td></tr>
     </tbody>
   </table>
 
-  <h2>6. À décider, ou à vérifier en partie</h2>
+  <h2 id="decider">9. À décider, ou à vérifier en partie</h2>
+  <p>Mis à jour le soir. L'ancien point « le pont avec Firestone n'est plus affiché » est réglé (§ 6) ; l'ancien « le détail ne montre que 3 sections sur 6 » devient (d), le popup montrant désormais tout.</p>
   <table class="cards">
-    <thead><tr><th>#</th><th>Question</th><th>Ce qui est en place</th><th>Options</th></tr></thead>
+    <thead><tr><th>#</th><th>Question</th><th>Ce qui est en place</th><th>Options, ou ce qu'il faut regarder</th></tr></thead>
     <tbody>
       <tr>
         <td class="n">a</td>
-        <td data-label="Question">À la place par défaut en 1080p, le détail ne montre que 3 sections sur 6.</td>
-        <td data-label="En place">« 3 of 6 sections » sous le détail ; la poignée ◢ agrandit le panneau et tout s'affiche.</td>
-        <td data-label="Options">Agrandir à la poignée (rien à coder, mais la boîte agrandie couvre Bob ou Skip combat : 3ᵉ capture), ou changer la place par défaut.</td>
+        <td data-label="Question">Place du popup.</td>
+        <td data-label="En place">Les zones du jeu d'abord : en 1080p, son bord droit est ≈ 180 px à droite de celui du panneau (1852 contre 1669). En 4:3, il passe au-dessus des plateaux, 301 px de haut (calculé, pas regardé).</td>
+        <td data-label="Options">Garder ; ou aligner son bord droit sur le panneau, ce qui le pose sur le bord droit des plateaux (1269 → 1669 en 1080p).</td>
       </tr>
       <tr>
         <td class="n">b</td>
-        <td data-label="Question">« S/A/B/C suffit, pas besoin de l'avg » : quelle lecture ?</td>
-        <td data-label="En place">Lu comme : le tier de HDT remplace la place moyenne Firestone par compo. La ligne « Board 142 · hero avg 120 at turn 8 · +18% » est gardée.</td>
-        <td data-label="Options">Si Ali visait cette ligne-là, la réduire à une lettre tient en une ligne de code.</td>
+        <td data-label="Question">Sortie de ligne ignorée tant que le curseur est dans son rectangle.</td>
+        <td data-label="En place"><code>GetCursorPos</code>, la même mesure que la sonde de HDT ; déduit du code d'HDT, simulé.</td>
+        <td data-label="Options">En jeu : passer du nom au fond de la ligne garde-t-il le popup ? sortir de la ligne le cache-t-il bien ?</td>
       </tr>
       <tr>
         <td class="n">c</td>
-        <td data-label="Question">Le pont avec Firestone n'est plus affiché : affinité avec le héros (« ≈ 3,5 with your hero »), tour final médian.</td>
-        <td data-label="En place">Les données et le code restent (<code>HeroCompAffinity</code>, <code>CompDetail</code>).</td>
-        <td data-label="Options">Les rebrancher sur les guides de HDT en recoupant les cartes, si Ali y tient.</td>
+        <td data-label="Question">Masquage pendant un choix, y compris les choix sans disposition connue.</td>
+        <td data-label="En place">Marqueurs, ◇, panneau et popup retirés en taverne, rétablis tels quels (§ 7).</td>
+        <td data-label="Options">Confirmer ; ou ne masquer que les choix de disposition connue ; ou ne retirer que ce qui couvre une option.</td>
       </tr>
       <tr>
         <td class="n">d</td>
-        <td data-label="Question">Aider les découvertes quand aucune compo ne s'impose.</td>
-        <td data-label="En place">Les card-stats de Firestone sont autorisées par l'accord, mais jamais chargées.</td>
-        <td data-label="Options">Les charger pour noter les cartes proposées hors de toute cible.</td>
+        <td data-label="Question">La ligne de contexte prend une ligne au détail.</td>
+        <td data-label="En place">À la place par défaut en 1080p, le détail de Pirate Discover passe de 3 à 2 sections sur 5 ; le popup en combat de 6 à 5 sur 6. En taverne, le popup montre tout.</td>
+        <td data-label="Options">Garder (le popup montre tout) ; ou ne la mettre que dans le popup ; ou l'enlever.</td>
       </tr>
       <tr>
         <td class="n">e</td>
-        <td data-label="Question">Le réglage « n targets » est borné à 4 (il allait à 8).</td>
-        <td data-label="En place">Une couleur par cible, quatre couleurs ; un <code>settings.json</code> réglé de 5 à 8 se lit 4.</td>
-        <td data-label="Options">Garder 4, ou ajouter des couleurs pour aller au-delà.</td>
+        <td data-label="Question">Aider les découvertes quand aucune cible ne s'impose.</td>
+        <td data-label="En place">Les card-stats de Firestone sont autorisées par l'accord, mais jamais chargées.</td>
+        <td data-label="Options">Proposition : les charger pour noter les cartes proposées hors de toute cible.</td>
       </tr>
       <tr>
         <td class="n">f</td>
-        <td data-label="Question">Vérifications en jeu.</td>
-        <td data-label="En place">La liste tenue dans CLAUDE.md, « Ce qui reste ouvert ».</td>
-        <td data-label="Options">Une partie sous HDT, en commençant par le § 5.</td>
+        <td data-label="Question">Le suffixe de la ligne <code>bridge:</code> du journal.</td>
+        <td data-label="En place">« (2/15 guides bridged, against 2 compositions; Firestone synthetic) », à chaque recalcul du pont.</td>
+        <td data-label="Options">Le garder tant que le taux réel n'est pas connu ; le réduire ensuite.</td>
+      </tr>
+      <tr>
+        <td class="n">g</td>
+        <td data-label="Question">Points de la première passe encore ouverts.</td>
+        <td data-label="En place">« S/A/B/C suffit, pas besoin de l'avg » lu comme : le tier de HDT remplace la place moyenne Firestone par compo, la ligne « Board vs hero avg » restant. Le réglage « n targets » borné à 4 (il allait à 8), une couleur par cible ; un <code>settings.json</code> réglé de 5 à 8 se lit 4.</td>
+        <td data-label="Options">Si Ali visait la ligne « Board vs hero avg », la réduire à une lettre tient en une ligne de code. Garder 4 cibles, ou ajouter des couleurs.</td>
       </tr>
     </tbody>
   </table>
+  <p>Et en partie : tout le § 8, en commençant par la ligne <code>bridge:</code> du journal d'HDT.</p>
 
-  <h2>7. Preuves</h2>
+  <h2 id="preuves">10. Preuves</h2>
   <details>
     <summary>Tests, mutations, mesures, commits</summary>
+    <h3>Seconde passe (soir)</h3>
+    <table class="cards">
+      <thead><tr><th>Preuve</th><th>Chiffre</th><th>D'où</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Preuve">Tests de la solution à 1ef888b (Stats + GameState + LogParser + App)</td><td data-label="Chiffre">528 + 52 + 23 + 7, 0 échec</td><td data-label="D'où"><code>dotnet test</code>, relancé pour cette note</td></tr>
+        <tr><td data-label="Preuve">Mutations du pont (<code>GuideBridge</code>, aides de choix, cadres de taverne)</td><td data-label="Chiffre">22 sur 22 tuées</td><td data-label="D'où">seconde campagne, contre toute la suite ; la première avait laissé 2 survivantes, deux vrais trous bouchés par deux tests (c418331)</td></tr>
+        <tr><td data-label="Preuve">Mutations du popup côté Stats (place, logique du survol)</td><td data-label="Chiffre">15 sur 15 tuées</td><td data-label="D'où">14 dans la campagne de c1c1996 ; la 15ᵉ (popup plus large que la fenêtre) tuée par le test ajouté avant ce commit, relancée pour cette note</td></tr>
+        <tr><td data-label="Preuve">Mutations du popup côté simulation (self-test)</td><td data-label="Chiffre">6 détectées + 1 témoin</td><td data-label="D'où">le témoin : sans vider le dispatcher, l'ancien contrôle du journal passait malgré un avertissement injecté (6463f72)</td></tr>
+        <tr><td data-label="Preuve">Mutations du masquage pendant un choix et du pont dans la simulation</td><td data-label="Chiffre">toutes tuées sauf une</td><td data-label="D'où">la survivante est une défense en profondeur, trois gardes contre le popup pendant un choix (message de 3ad9954, pas relancé ici)</td></tr>
+        <tr><td data-label="Preuve">Self-test de la simulation (<code>--selftest</code>)</td><td data-label="Chiffre">50 PASS, 0 FAIL</td><td data-label="D'où">relancé à 1ef888b pour cette note</td></tr>
+        <tr><td data-label="Preuve">Build Release du plugin contre HDT 1.58.6 installé</td><td data-label="Chiffre">0 avertissement, 0 erreur</td><td data-label="D'où">relancé à 1ef888b</td></tr>
+        <tr><td data-label="Preuve">Commits du travail</td><td data-label="Chiffre">c613a9c → 1ef888b, 13 commits</td><td data-label="D'où"><code>git log</code></td></tr>
+      </tbody>
+    </table>
+    <pre>$ dotnet test        (à 1ef888b)
+Passed!  - Failed:     0, Passed:   528, Skipped:     0, Total:   528 - BronzebeardHud.Stats.Tests.dll (net8.0)
+Passed!  - Failed:     0, Passed:    23, Skipped:     0, Total:    23 - BronzebeardHud.LogParser.Tests.dll (net8.0)
+Passed!  - Failed:     0, Passed:    52, Skipped:     0, Total:    52 - BronzebeardHud.GameState.Tests.dll (net8.0)
+Passed!  - Failed:     0, Passed:     7, Skipped:     0, Total:     7 - BronzebeardHud.App.Tests.dll (net8.0)</pre>
+    <pre>$ ./tools/BronzebeardHud.Harness/launch.sh --selftest        (à 1ef888b)
+PASS  two movable panels are drawn: 2 visible panels: (1181,691 488x319) | (1540,573 136x45)
+[… 48 autres PASS, 0 FAIL …]
+PASS  the layout file is the harness's own: C:\temp\BronzebeardHarness-ci\layout.json
+ALL PASSED</pre>
+    <pre>$ # la 15ᵉ mutation du popup, sur une copie de 1ef888b : « || popupWidth &gt; width - 2 * margin) » → « ) »
+  Failed BronzebeardHud.Stats.Tests.GuidePopupLayoutTests.AWindowNarrowerThanThePopup_GivesNothing_ThoughANarrowerOneFits
+Failed!  - Failed:     1, Passed:   527, Skipped:     0, Total:   528 - BronzebeardHud.Stats.Tests.dll (net8.0)</pre>
+    <pre>$ dotnet build src/BronzebeardHud.HdtPlugin -c Release --no-incremental -p:HdtInstallDir=…/HearthstoneDeckTracker/app-1.58.6/        (à 1ef888b)
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)</pre>
+
+    <h3>Première passe</h3>
     <table class="cards">
       <thead><tr><th>Preuve</th><th>Chiffre</th><th>D'où</th></tr></thead>
       <tbody>
