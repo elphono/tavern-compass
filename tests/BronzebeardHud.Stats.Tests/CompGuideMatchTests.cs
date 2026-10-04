@@ -84,7 +84,7 @@ public class CompGuideMatchTests
         Assert.Equal(new[] { "BA" }, progress.EnablersHeld); // add-on and enabler: an enabler only
         Assert.Empty(progress.AddonsHeld);
         Assert.Equal(CompGuideMatch.KeyWeight + CompGuideMatch.EnablerWeight, progress.Score);
-        Assert.Equal(new[] { "B1", "BA" }, progress.Held);
+        Assert.Null(typeof(CompGuideProgress).GetProperty("Held")); // no list mixing the roles (see CompGuideProgress)
     }
 
     [Fact]

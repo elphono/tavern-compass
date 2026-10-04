@@ -33,7 +33,16 @@ public sealed class CompGuide
         Difficulty = difficulty;
         PrimaryTribe = primaryTribe;
         RepresentativeCard = representativeCard;
+        Id = name + "/" + primaryTribe.ToString(CultureInfo.InvariantCulture);
     }
+
+    /// <summary>
+    /// The guide's id for the plugin, stable across HDT's reloads of its list: the name and the tribe, "Undead Butcher/11".
+    /// HSReplay's wire format carries an "id", but the objects HDT hands over do not (HSReplay.Responses.BattlegroundsCompGuide
+    /// in HSReplay.dll 1.58.6: Name, Tier, TierRank, Difficulty, PrimaryTribe, RepresentativeCard, CoreCards, AddonCards,
+    /// HowToPlay, WhenToCommit, CommonEnablers, LastUpdated), so the id is derived from what both carry.
+    /// </summary>
+    public string Id { get; }
 
     public string Name { get; }
 
@@ -69,10 +78,46 @@ public sealed class CompGuide
     /// <summary>1 = hard, 2 = medium, 3 = easy, as HDT reads it.</summary>
     public int Difficulty { get; }
 
-    /// <summary>HearthDb Race value of the guide's main tribe (0 when none).</summary>
+    /// <summary>HearthDb Race value of the guide's main tribe (0 when none); its name: <see cref="GuideTribes.NameOf"/>.</summary>
     public int PrimaryTribe { get; }
 
     public string? RepresentativeCard { get; }
+}
+
+/// <summary>
+/// A guide's <see cref="CompGuide.PrimaryTribe"/> (a HearthDb.Enums.Race value) as the tribe name the rest of the
+/// plugin uses: <see cref="Tribes.All"/>, which is also what HDT's lobby tribes give (HdtEntityAdapter.LobbyTribeNames:
+/// Race.ToString()). Values read from HearthDb.dll of HDT 1.58.6 (enum constants, not a guess): UNDEAD = 11,
+/// MURLOC = 14, DEMON = 15, MECHANICAL = 17, ELEMENTAL = 18, BEAST = 20 (PET = 20 too), PIRATE = 23, DRAGON = 24,
+/// QUILBOAR = 43, NAGA = 92, ABERRATION = 126. The table maps values, never enum names: Race.ToString() on 20 may as
+/// well say "PET", since two names share it.
+/// </summary>
+public static class GuideTribes
+{
+    private static readonly IReadOnlyDictionary<int, string> Names = new Dictionary<int, string>
+    {
+        [11] = "UNDEAD",
+        [14] = "MURLOC",
+        [15] = "DEMON",
+        [17] = "MECHANICAL",
+        [18] = "ELEMENTAL",
+        [20] = "BEAST",
+        [23] = "PIRATE",
+        [24] = "DRAGON",
+        [43] = "QUILBOAR",
+        [92] = "NAGA",
+        [126] = "ABERRATION",
+    };
+
+    /// <summary>"MECHANICAL" for 17; null for 0 (no tribe) and for a value that is no Battlegrounds tribe.</summary>
+    public static string? NameOf(int race) => Names.TryGetValue(race, out var name) ? name : null;
+
+    /// <summary>
+    /// Whether a guide of this tribe can be played in the lobby. True when the lobby is unknown (empty), when the guide
+    /// has no tribe, and when its tribe is not one this table knows: a guide is left out only on a positive mismatch.
+    /// </summary>
+    public static bool InLobby(int race, IReadOnlyCollection<string> lobbyTribes) =>
+        lobbyTribes.Count == 0 || NameOf(race) is not { } name || lobbyTribes.Contains(name);
 }
 
 public static class CompGuideTiers

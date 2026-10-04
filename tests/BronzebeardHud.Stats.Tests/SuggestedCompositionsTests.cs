@@ -64,9 +64,12 @@ public class SuggestedCompositionsTests
     }
 
     [Theory]
-    [InlineData("{\"schema\": 1, \"suggestedCompositions\": 5}", 5, false)]
+    [InlineData("{\"schema\": 1, \"suggestedCompositions\": 2}", 2, false)]
+    [InlineData("{\"schema\": 1, \"suggestedCompositions\": 4}", 4, false)]
+    [InlineData("{\"schema\": 1, \"suggestedCompositions\": 5}", 4, false)] // written when the bound was 8: one target per colour now
+    [InlineData("{\"schema\": 1, \"suggestedCompositions\": 8}", 4, false)]
     [InlineData("{\"schema\": 1, \"suggestedCompositions\": 0}", 1, false)]
-    [InlineData("{\"schema\": 1, \"suggestedCompositions\": 12}", 8, false)]
+    [InlineData("{\"schema\": 1, \"suggestedCompositions\": 12}", 4, false)]
     [InlineData("{\"schema\": 1, \"suggestedCompositions\": \"five\"}", 3, true)]
     [InlineData("{ not json", 3, true)]
     [InlineData("", 3, false)]
@@ -78,11 +81,11 @@ public class SuggestedCompositionsTests
     }
 
     [Fact]
-    public void Settings_RoundTrip_AndStepsStayInside1To8()
+    public void Settings_RoundTrip_AndStepsStayInside1To4()
     {
         var settings = HudSettings.Default;
         Assert.Equal(3, settings.SuggestedCompositions);
-        foreach (var expected in new[] { 4, 5, 6, 7, 8, 8 })
+        foreach (var expected in new[] { 4, 4, 4 })
         {
             settings = settings.WithSuggested(settings.SuggestedCompositions + 1);
             Assert.Equal(expected, HudSettings.Parse(settings.Serialize()).Settings.SuggestedCompositions);
