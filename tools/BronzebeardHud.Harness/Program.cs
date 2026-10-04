@@ -8,8 +8,8 @@ namespace BronzebeardHud.Harness;
 /// <summary>
 /// Command line. Without argument: the window, for hands-on debugging. <c>--selftest</c> and <c>--screenshot</c> run
 /// without anyone at the keyboard (the window is parked far off screen), write their result under <c>--out</c> and
-/// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--detail x</c> opens a guide's detail
-/// before the screenshot (x: a target's rank, "1", or a guide's name).
+/// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--tick a,b</c> ticks guides and
+/// <c>--detail x</c> opens a guide's detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name).
 /// </summary>
 internal sealed class Options
 {
@@ -24,6 +24,9 @@ internal sealed class Options
 
     /// <summary>A guide whose detail is opened before the screenshot: a target's rank ("1") or a guide's name; null: the list.</summary>
     public string? Detail { get; private set; }
+
+    /// <summary>Guides ticked before the screenshot, as the player ticks them: a target's rank ("1") or a guide's name, comma-separated.</summary>
+    public IReadOnlyList<string> Tick { get; private set; } = Array.Empty<string>();
 
     /// <summary>Milliseconds the screenshot waits for card names and pictures, which arrive asynchronously.</summary>
     public int Wait { get; private set; } = 8000;
@@ -54,6 +57,9 @@ internal sealed class Options
                     break;
                 case "--detail" when i + 1 < args.Length:
                     options.Detail = args[++i];
+                    break;
+                case "--tick" when i + 1 < args.Length:
+                    options.Tick = args[++i].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                     break;
                 case "--wait" when i + 1 < args.Length:
                     options.Wait = int.Parse(args[++i]);
@@ -108,6 +114,11 @@ internal static class Headless
 
             if (options.Screenshot)
             {
+                foreach (var which in options.Tick)
+                {
+                    window.Tick(which);
+                }
+
                 if (options.Detail != null)
                 {
                     window.OpenDetail(options.Detail);

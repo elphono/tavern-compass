@@ -75,9 +75,9 @@ public class TavernHighlightsTests
     }
 
     [Fact]
-    public void ATickedTargetOutranksTheProbableOnes()
+    public void ATickedTarget_IsTheOnlyOne_TheProbableOnesGetNoFrame()
     {
-        // Pirates ticked: first target, first colour; KEY_P1 and ADD_M are now Pirates' before anyone else's.
+        // Pirates ticked: the only target. The Undead Butcher board is as good as before, but nobody means to head for it.
         var targets = Targets(All, Board("KEY_U1", "KEY_U2", "KEY_M1"), 3, Pirates);
 
         var highlights = TavernHighlights.For(new[] { "KEY_P1", "ADD_M", "KEY_U1" }, targets);
@@ -86,7 +86,7 @@ public class TavernHighlightsTests
         {
             (HighlightKind.Commit, "Pirate Gold", P0, "core"),
             (HighlightKind.Enabler, "Pirate Gold", P0, "+"),
-            (HighlightKind.Commit, "Undead Butcher", P1, "core"),
+            (HighlightKind.None, null, null, ""),
         }, Summary(highlights));
     }
 

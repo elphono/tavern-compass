@@ -250,8 +250,12 @@ internal sealed class CompsPanel
         Child = Text(tier.Letter, PanelTypography.Body, scale, Brushes.White, bold: true),
     };
 
-    /// <summary>A small clickable button of the panel (−, +, Meta ↗, ← All comp guides), clickable while the overlay stays locked.</summary>
-    private Border PanelButton(string text, double scale, Action onClick, bool light = false)
+    /// <summary>
+    /// A small clickable button of the panel (−, +, Meta ↗, ← All comp guides), clickable while the overlay stays locked.
+    /// A button that is not <paramref name="enabled"/> is drawn dim and does nothing, but still catches the click, so that
+    /// it does not fall through to the game.
+    /// </summary>
+    private Border PanelButton(string text, double scale, Action onClick, bool light = false, bool enabled = true)
     {
         var label = new TextBlock
         {
@@ -272,13 +276,17 @@ internal sealed class CompsPanel
             BorderThickness = new Thickness(1),
             Padding = new Thickness(5 * scale, 0, 5 * scale, 0),
             VerticalAlignment = VerticalAlignment.Center,
-            Cursor = System.Windows.Input.Cursors.Hand,
+            Cursor = enabled ? System.Windows.Input.Cursors.Hand : null,
+            Opacity = enabled ? 1 : 0.4,
             Child = label,
         };
         button.MouseLeftButtonUp += (_, e) =>
         {
             e.Handled = true;
-            _run(onClick);
+            if (enabled)
+            {
+                _run(onClick);
+            }
         };
         OverlayExtensions.SetIsOverlayHitTestVisible(button, true);
         return button;
@@ -434,14 +442,20 @@ internal sealed class CompsPanel
             right.Children.Add(meta);
         }
 
-        var n = _count();
-        right.Children.Add(PanelButton("−", scale, () => _changeCount(-1)));
-        var count = Text($"{n.ToString(CultureInfo.InvariantCulture)} target{(n == 1 ? string.Empty : "s")}", PanelTypography.Small, scale, MutedBrush);
+        // Ticked guides are the targets, alone: the number of automatic targets no longer applies, so − and + are dim and
+        // the title counts what was chosen.
+        var chosen = _targets.Count(t => t.Ticked);
+        var n = chosen > 0 ? chosen : _count();
+        right.Children.Add(PanelButton("−", scale, () => _changeCount(-1), enabled: chosen == 0));
+        var count = Text(chosen > 0
+                ? $"{n.ToString(CultureInfo.InvariantCulture)} chosen"
+                : $"{n.ToString(CultureInfo.InvariantCulture)} target{(n == 1 ? string.Empty : "s")}",
+            PanelTypography.Small, scale, MutedBrush);
         count.TextWrapping = TextWrapping.NoWrap;
         count.VerticalAlignment = VerticalAlignment.Center;
         count.Margin = new Thickness(5 * scale, 0, 5 * scale, 0);
         right.Children.Add(count);
-        right.Children.Add(PanelButton("+", scale, () => _changeCount(+1)));
+        right.Children.Add(PanelButton("+", scale, () => _changeCount(+1), enabled: chosen == 0));
         bar.Children.Add(right);
 
         shown = new TextBlock { FontSize = PanelTypography.Small * scale, Foreground = MutedBrush, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6 * scale, 0, 0, 0) };

@@ -137,7 +137,7 @@
       <tr>
         <td class="n">4</td>
         <td data-label="Demande d'Ali">Les deux panneaux disent la même chose ; l'ergonomie de HDT est meilleure. Plusieurs compos à la fois, chacune sa couleur.</td>
-        <td data-label="Décision">Fusion : la liste de HDT par tier. N cibles (1 à 4) = les guides cochés, puis les plus probables ; une couleur par cible, stable pendant la partie. La ligne « Board vs hero avg » est gardée telle quelle.</td>
+        <td data-label="Décision">Fusion : la liste de HDT par tier. Cibles = les guides cochés seuls s’ils existent, sinon les N plus probables (1 à 4) ; une couleur par cible, stable pendant la partie. La ligne « Board vs hero avg » est gardée telle quelle.</td>
         <td data-label="Où le voir">Après, liste ; zoom de la liste (dernière ligne)</td>
         <td data-label="Écarté">La liste Firestone et sa place moyenne (« avg ») par compo : le tier de HDT la remplace. Lecture à confirmer : § 6 (b).</td>
       </tr>
@@ -305,8 +305,8 @@
 
       <rect class="box" x="450" y="130" width="190" height="130" rx="8"/>
       <text x="545" y="156" font-size="15" class="mono" text-anchor="middle">CompTargetTracker</text>
-      <text x="545" y="180" font-size="15" class="sub" text-anchor="middle">cochées (≤ 4), puis</text>
-      <text x="545" y="200" font-size="15" class="sub" text-anchor="middle">les plus probables,</text>
+      <text x="545" y="180" font-size="15" class="sub" text-anchor="middle">cochées (≤ 4) seules,</text>
+      <text x="545" y="200" font-size="15" class="sub" text-anchor="middle">sinon les plus probables,</text>
       <text x="545" y="220" font-size="15" class="sub" text-anchor="middle">jusqu'à n (1 à 4)</text>
       <text x="545" y="244" font-size="15" text-anchor="middle" font-weight="600">couleur stable</text>
 
@@ -357,8 +357,8 @@
 
       <rect class="box" x="2" y="234" width="336" height="108" rx="8"/>
       <text x="170" y="262" font-size="16" class="mono" text-anchor="middle">CompTargetTracker</text>
-      <text x="170" y="288" font-size="15" class="sub" text-anchor="middle">cochées (≤ 4), puis les plus</text>
-      <text x="170" y="310" font-size="15" class="sub" text-anchor="middle">probables, jusqu'à n (1 à 4)</text>
+      <text x="170" y="288" font-size="15" class="sub" text-anchor="middle">cochées (≤ 4) seules, sinon</text>
+      <text x="170" y="310" font-size="15" class="sub" text-anchor="middle">les plus probables, n (1 à 4)</text>
       <text x="170" y="332" font-size="15" text-anchor="middle" font-weight="600">couleur stable</text>
 
       <path class="wire" d="M18 342 L18 608"/>
@@ -379,7 +379,7 @@
       <text x="190" y="596" font-size="16.5" font-weight="700" text-anchor="middle" style="fill:var(--o-choice)">Aides de choix</text>
       <text x="190" y="624" font-size="15" class="mono sub" text-anchor="middle">ChoiceAdvisor</text>
     </svg>
-    <figcaption>Les trois sorties lisent les mêmes cibles, avec les mêmes couleurs : elles ne peuvent pas se contredire. Une case cochée dans le panneau revient au choix des cibles.</figcaption>
+    <figcaption>Les trois sorties lisent les mêmes cibles, avec les mêmes couleurs : elles ne peuvent pas se contredire. Une case cochée restreint les cibles à celles qu’on a cochées.</figcaption>
   </figure>
 
   <h2>5. Ce qui n'a PAS été vu</h2>

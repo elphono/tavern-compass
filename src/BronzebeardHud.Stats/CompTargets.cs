@@ -24,8 +24,8 @@ public sealed class CompTarget
     public CompGuideProgress Progress { get; }
 
     /// <summary>
-    /// 1 for the first target, then 2, 3, 4: the ticked guides first, in the order they were ticked, then the most
-    /// probable ones (<see cref="CompGuideMatch"/>). Rank 1 is the guide being played (a trinket's full adjustment).
+    /// 1 for the first target, then 2, 3, 4: the ticked guides in the order they were ticked, or, when none is ticked,
+    /// the most probable ones (<see cref="CompGuideMatch"/>). Rank 1 is the guide being played (a trinket's full adjustment).
     /// </summary>
     public int Rank { get; }
 
@@ -40,13 +40,14 @@ public sealed class CompTarget
 public static class CompTargets
 {
     /// <summary>
-    /// The ticked guides first (those the board knows, in the order of <paramref name="ticked"/>, at most
-    /// <see cref="CompTargetTracker.MaxTicked"/>), then the most probable guides that are not ticked and score above 0
-    /// (<see cref="CompGuideBoard.Ranked"/>), until there are <paramref name="count"/> targets in all. Ticked guides are
-    /// targets even beyond <paramref name="count"/>: four ticked guides and a count of 2 give four targets.
+    /// What the player ticked restricts: when he ticked at least one guide the board knows, those guides are the targets
+    /// and nothing else is (in the order they were ticked, at most <see cref="CompTargetTracker.MaxTicked"/>, whatever
+    /// their score and <paramref name="count"/>): a ticked guide is one he means to head for, so the frames on Bob's cards
+    /// and the labels of choices speak for it alone. When he ticked nothing the board knows, the targets are the most
+    /// probable guides that score above 0 (<see cref="CompGuideBoard.Ranked"/>), <paramref name="count"/> of them.
     /// </summary>
     /// <param name="ticked">Guide ids (<see cref="CompGuide.Id"/>), in the order they were ticked; an id the board does not know is skipped.</param>
-    /// <param name="count">Targets wanted in all, 1 to <see cref="HudSettings.MaxSuggested"/> (brought inside).</param>
+    /// <param name="count">Automatic targets wanted, 1 to <see cref="HudSettings.MaxSuggested"/> (brought inside); unused once a guide is ticked.</param>
     public static IReadOnlyList<(CompGuideProgress Progress, bool Ticked)> Choose(CompGuideBoard board, IReadOnlyList<string> ticked, int count)
     {
         count = Math.Max(HudSettings.MinSuggested, Math.Min(HudSettings.MaxSuggested, count));
@@ -65,7 +66,11 @@ public static class CompTargets
             .Take(CompTargetTracker.MaxTicked)
             .Select(id => (Progress: byId[id], Ticked: true))
             .ToList();
-        var taken = new HashSet<string>(chosen.Select(c => c.Progress.Guide.Id), StringComparer.Ordinal);
+        if (chosen.Count > 0)
+        {
+            return chosen; // ticked: those guides alone
+        }
+
         foreach (var progress in board.Ranked)
         {
             if (chosen.Count >= count)
@@ -73,7 +78,7 @@ public static class CompTargets
                 break;
             }
 
-            if (progress.Score > 0 && taken.Add(progress.Guide.Id))
+            if (progress.Score > 0)
             {
                 chosen.Add((progress, false));
             }
@@ -140,8 +145,8 @@ public static class CompTargets
 
 /// <summary>
 /// The targets of one game, and their colours. The player ticks guides in the panel (four at most, one colour each);
-/// <see cref="Next"/> then picks the targets — the ticked guides, then the most probable ones up to the number chosen
-/// in the settings — and gives each a colour of <see cref="Palette"/>: a guide keeps its colour as long as it stays a
+/// <see cref="Next"/> then picks the targets — the ticked guides alone, or, with none ticked, the most probable ones up
+/// to the number chosen in the settings — and gives each a colour of <see cref="Palette"/>: a guide keeps its colour as long as it stays a
 /// target from one call to the next, a colour is freed when its guide stops being a target, and a new target takes the
 /// first free colour. Ticks and colours are forgotten at the next game (<see cref="BeginGame"/>) or on
 /// <see cref="Reset"/>. Not thread-safe: the plugin calls it from HDT's update loop only.
@@ -205,7 +210,7 @@ public sealed class CompTargetTracker
     /// order. Colours of guides that are no longer targets are freed. Calling it again with the same board changes nothing.
     /// </summary>
     /// <param name="board">The guides ranked against the player's board and hand (<see cref="CompGuideMatch.Rank"/>).</param>
-    /// <param name="count">Targets wanted (HudSettings.SuggestedCompositions, 1 to 4); ticked guides count among them.</param>
+    /// <param name="count">Automatic targets wanted (HudSettings.SuggestedCompositions, 1 to 4); ignored while a guide is ticked.</param>
     public IReadOnlyList<CompTarget> Next(CompGuideBoard board, int count)
     {
         var chosen = CompTargets.Choose(board, _ticked, count);

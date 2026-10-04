@@ -121,12 +121,18 @@ public class CompsPanelLogicTests
         var a = Guide("Alpha", 1, 0, new[] { "A1", "A2", "A3" });
         var b = Guide("Beta", 2, 0, new[] { "B1", "B2" });
         var cards = new PlayerCards(Owned("A1", "A2", "B1"), Owned("X9"));
+        var board = CompGuideMatch.Rank(Set(a, b), cards);
+
+        // Nothing ticked: the probable guides, best first.
+        var automatic = new CompTargetTracker().Next(board, 3);
+        Assert.Equal($"Bronzebeard HUD: comps round=6 source=hdt-free comps=2 board=3 hand=1 targets=[1. Alpha {CompTargetTracker.Palette[0]} ★2/3; 2. Beta {CompTargetTracker.Palette[1]} ★1/2]",
+            CompTargets.RoundLine(6, CompGuideSources.HdtFree, 2, cards, automatic));
+
+        // Beta ticked: it alone, and the line says so.
         var tracker = new CompTargetTracker();
         Assert.True(tracker.Toggle(b.Id));
-        var targets = tracker.Next(CompGuideMatch.Rank(Set(a, b), cards), 3);
-
-        Assert.Equal($"Bronzebeard HUD: comps round=6 source=hdt-free comps=2 board=3 hand=1 targets=[1. Beta {CompTargetTracker.Palette[0]} ★1/2 ticked; 2. Alpha {CompTargetTracker.Palette[1]} ★2/3]",
-            CompTargets.RoundLine(6, CompGuideSources.HdtFree, 2, cards, targets));
+        Assert.Equal($"Bronzebeard HUD: comps round=6 source=hdt-free comps=2 board=3 hand=1 targets=[1. Beta {CompTargetTracker.Palette[0]} ★1/2 ticked]",
+            CompTargets.RoundLine(6, CompGuideSources.HdtFree, 2, cards, tracker.Next(board, 3)));
         Assert.Equal("Bronzebeard HUD: comps round=1 source=none comps=0 board=0 hand=0 targets=none",
             CompTargets.RoundLine(1, null, 0, PlayerCards.None, Array.Empty<CompTarget>()));
     }

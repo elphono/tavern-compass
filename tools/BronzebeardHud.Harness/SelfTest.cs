@@ -87,6 +87,45 @@ internal static class SelfTest
         Check("\"← All comp guides\" brings the list back", returned && !window.Comps.ShowsDetail && FindText(comps, name) != null && FindText(comps, "← All comp guides") == null,
             $"clicked: {returned}, detail shown: {window.Comps.ShowsDetail}");
 
+        // Ticking restricts: the boxes are clicked as the mouse would (their Click event); ticked guides are the targets, alone.
+        var autoTargets = window.Targets.Select(t => t.Guide.Id).ToList();
+        ClickBox(comps, firstUnticked: true);
+        window.UpdateLayout();
+        var one = window.Targets;
+        var oneGuide = one.FirstOrDefault()?.Guide.Id;
+        var framesOfOne = window.Highlights.Where(h => h.Kind != HighlightKind.None).Select(h => h.Target?.Guide.Id).Distinct().ToList();
+        Check("ticking a guide makes it the only target, and Bob's frames follow it", autoTargets.Count == 3 && one.Count == 1 && one[0].Ticked
+            && framesOfOne.All(id => id == oneGuide) && FindText(comps, "1 chosen") != null,
+            $"{autoTargets.Count} automatic targets, then {CompTargets.Summary(one)}; frames for {string.Join(",", framesOfOne)}; title: {(FindText(comps, "1 chosen") != null ? "1 chosen" : "not 1 chosen")}");
+
+        ClickBox(comps, firstUnticked: true);
+        window.UpdateLayout();
+        var two = window.Targets;
+        Check("ticking a second one adds it, in the order ticked", two.Count == 2 && two.All(t => t.Ticked) && two[0].Guide.Id == oneGuide && FindText(comps, "2 chosen") != null,
+            CompTargets.Summary(two));
+
+        // − and + are dim, and a click on either changes nothing. One at a time and on the count itself: the log lines of
+        // a click reach the window's list later, through the dispatcher, and − then + would cancel out.
+        var minus = FindText(comps, "−");
+        var plus = FindText(comps, "+");
+        var wanted = window.Count;
+        var clickedMinus = Click(comps, "−");
+        var afterMinus = window.Count;
+        var clickedPlus = Click(comps, "+");
+        window.UpdateLayout();
+        Check("− and + are dim and do nothing while a guide is ticked", clickedMinus && clickedPlus && afterMinus == wanted && window.Count == wanted
+            && minus?.Parent is Border { Opacity: < 1 } && plus?.Parent is Border { Opacity: < 1 } && window.Targets.Count == 2,
+            $"clicked: {clickedMinus}/{clickedPlus}, count {wanted} -> {afterMinus} -> {window.Count}, opacity {(minus?.Parent as Border)?.Opacity}/{(plus?.Parent as Border)?.Opacity}, {window.Targets.Count} targets");
+
+        ClickBox(comps, firstUnticked: false);
+        window.UpdateLayout();
+        ClickBox(comps, firstUnticked: false);
+        window.UpdateLayout();
+        var minusAgain = FindText(comps, "−");
+        Check("unticking everything gives the automatic targets back", window.Targets.Select(t => t.Guide.Id).SequenceEqual(autoTargets) && window.Targets.All(t => !t.Ticked)
+            && FindText(comps, "3 targets") != null && minusAgain?.Parent is Border { Opacity: 1 },
+            CompTargets.Summary(window.Targets));
+
         var bad = window.LogLines.Where(l => l.Contains("|Warning|") || l.Contains("|Error|")).ToList();
         Check("nothing logged as a warning or an error", bad.Count == 0, bad.Count == 0 ? $"{window.LogLines.Count} log lines" : string.Join(" | ", bad));
 
@@ -166,6 +205,30 @@ internal static class SelfTest
     /// <summary>What a text block says, its runs included.</summary>
     private static string Content(TextBlock text) =>
         !string.IsNullOrEmpty(text.Text) ? text.Text : string.Concat(text.Inlines.OfType<System.Windows.Documents.Run>().Select(r => r.Text));
+
+    private static IEnumerable<CheckBox> Boxes(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is CheckBox box)
+            {
+                yield return box;
+            }
+
+            foreach (var inner in Boxes(child))
+            {
+                yield return inner;
+            }
+        }
+    }
+
+    /// <summary>Clicks the first visible tick box that is unticked (or ticked), as the mouse would: its Click event.</summary>
+    private static void ClickBox(Border panel, bool firstUnticked)
+    {
+        var box = Boxes(panel).First(b => b.IsVisible && (b.IsChecked == true) != firstUnticked);
+        box.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+    }
 
     private static TextBlock? FindText(Border panel, string content) => Texts(panel).FirstOrDefault(t => t.IsVisible && Content(t) == content);
 

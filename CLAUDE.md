@@ -164,10 +164,14 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   plugin ne fait aucune requête ; le `.csproj` référence `HSReplay.dll` (fourni par HDT, jamais copié) pour ce seul type ;
   mesure et forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. Titre : « Compositions », « k of n shown »
   quand des guides manquent, la source (« HDT free » / « Tier 7 »), « Meta ↗ », « − n targets + » (1 à 4, 3 par défaut,
-  gardé dans `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}`) ; une ligne
-  dorée tant que HDT n'a pas de guides.
-- **Cibles** (`CompTargetTracker`) : les guides cochés (quatre au plus, ordre de coche), puis les plus probables d'après
-  le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on, `CompGuideMatch`), jusqu'à n. Une cible garde sa
+  gardé dans `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}` ; dès qu'une
+  compo est cochée le titre dit « k chosen » et − / + sont grisés, sans effet) ; une ligne dorée tant que HDT n'a pas de
+  guides.
+- **Cibles** (`CompTargetTracker`) : **une case cochée restreint** (Ali, 2026-10-04 : « une compo checkboxée est une compo
+  vers laquelle on veut se diriger »). S'il y a des guides cochés (quatre au plus, ordre de coche), ce sont les seules
+  cibles : eux seuls portent des cadres en taverne et servent aux aides de choix, même si une autre compo est bien plus
+  probable. Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
+  `CompGuideMatch`), jusqu'à n (− n +, qui ne sert alors qu'à cela). Tout décocher rend les cibles automatiques. Une cible garde sa
   couleur tant qu'elle le reste (magenta, lime, bleu ciel, blanc), cases et couleurs sont oubliées à la partie suivante.
   Liste dans l'ordre de HDT par tier (S → D, barres aux dégradés de HDT), les cibles en tête de leur tier ; une ligne =
   case, nom (deux lignes au besoin, jamais coupé ; couleur et gras d'une cible, blanc si quelque chose est tenu, gris

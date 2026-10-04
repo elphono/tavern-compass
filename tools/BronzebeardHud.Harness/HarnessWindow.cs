@@ -52,6 +52,9 @@ internal sealed class HarnessWindow : Window
     /// <summary>The targets of the scene as it stands (the panel's colours).</summary>
     public IReadOnlyList<CompTarget> Targets => _tracker.Targets;
 
+    /// <summary>How many automatic targets are wanted (the panel's − n +): what a click on − or + would change.</summary>
+    public int Count => _count;
+
     public IReadOnlyList<TavernHighlight> Highlights { get; private set; } = Array.Empty<TavernHighlight>();
 
     public HarnessWindow(Options options)
@@ -136,6 +139,20 @@ internal sealed class HarnessWindow : Window
         {
             throw new ArgumentException($"--detail {which}: no such target or guide (targets: {CompTargets.Summary(_tracker.Targets)})");
         }
+    }
+
+    /// <summary>Ticks a guide as the player does: <paramref name="which"/> is a target's rank (1 for the first target) or a guide's name.</summary>
+    public void Tick(string which)
+    {
+        var guide = int.TryParse(which, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rank)
+            ? _tracker.Targets.FirstOrDefault(t => t.Rank == rank)?.Guide
+            : _guides.All.FirstOrDefault(g => string.Equals(g.Name, which, StringComparison.OrdinalIgnoreCase));
+        if (guide == null)
+        {
+            throw new ArgumentException($"--tick {which}: no such target or guide (targets: {CompTargets.Summary(_tracker.Targets)})");
+        }
+
+        ToggleGuide(guide.Id);
     }
 
     private void ToggleGuide(string id)

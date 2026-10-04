@@ -24,7 +24,7 @@ plus de liste « tout ce qui est tenu »).
 | Sujet | Décision |
 |---|---|
 | Panneaux | un seul, `CompsPanel`, clé de layout `target-compositions` (la place sauvegardée d'Ali reste valable) |
-| Source | les guides de HDT ; les cibles = cochés puis plus probables, 1 à 4 (− n +), couleur stable pendant la partie |
+| Source | les guides de HDT ; les cibles = les cochés **seuls** s'il y en a, sinon les plus probables, 1 à 4 (− n +, sans effet tant qu'une case est cochée), couleur stable pendant la partie |
 | Ligne de guide | case, nom (deux lignes au besoin), cartes clés seules en ovales de 54 ; une cible : liseré, teinte, rang |
 | Détail | comme HDT : la liste est remplacée, « ← All comp guides », sections dans l'ordre de HDT |
 | Taverne | carte clé d'une cible → cadre plein, enabler ou add-on → pointillés, couleur de la cible (`TavernHighlights`) |
@@ -55,3 +55,12 @@ Arbitrages pris en route, là où la demande laissait le choix :
 Rien de ceci n'a tourné sous HDT : la liste et ses couleurs sur de vrais guides (noms longs, Tier 7), le détail et ses
 textes réels, les cadres sur les vraies cartes de Bob, les étiquettes de choix, et le pointage des cases et des noms
 au-dessus du jeu. Vu dans la simulation (`tools/BronzebeardHud.Harness`, `--selftest`, captures liste et détail).
+
+## Correction d'Ali : une case cochée restreint
+
+Première livraison : une compo cochée passait en tête des cibles et les plus probables complétaient jusqu'à n. Ali :
+« les checkbox devant les compos restreignent les cartes highlightées dans le shop, une compo checkboxée est une compo
+vers laquelle on veut se diriger » (c'était d'ailleurs le sens de l'ancien panneau : la case visait la compo seule).
+Maintenant `CompTargets.Choose` rend les cochées seules ; sans cochée, les plus probables. Le titre dit « k chosen » et
+− / + sont grisés. Vérifié dans la simulation par de vrais clics sur les cases (`--selftest`) et par mutation.
+
