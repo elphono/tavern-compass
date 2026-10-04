@@ -43,7 +43,7 @@ Ce qui reste ouvert :
 
 - **Vérifier en jeu le panneau unique « Compositions »** (2026-10-04, `docs/journal/2026-10-04-panneau-unique.md`) :
   liste des guides de HDT et couleurs des cibles, détail au clic, cadres sur les cartes de Bob, étiquettes des choix,
-  tribus du lobby (bêtes). Vu seulement dans la simulation (captures, `--selftest`), sauf les étiquettes des choix : le harnais ne compile pas `ChoiceAdvicePanel`, elles n'ont été vues nulle part.
+  tribus du lobby (bêtes). Vu seulement dans la simulation (captures, `--selftest` ; les étiquettes des choix depuis le 2026-10-04, `--choice`).
 - **Vérifier en jeu la poignée de redimensionnement** (2026-10-04) : le calcul est testé et éprouvé par mutation,
   mais le pointage sous HDT, le cadre pointillé, le rendu d'un panneau étroit et le retour au défaut par « Reset » ne
   se voient que sous Windows.
@@ -203,7 +203,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   lignes `Bronzebeard HUD: skip combat …` (parent, commande, demandes, nouveau pid, vivant 3 s après).
 - Sous WSL, on vérifie les tests et le build. Le chargement par HDT et les événements réels ne se vérifient que
   sous Windows, avec HDT installé. **Exception : la simulation** `tools/BronzebeardHud.Harness/` (README) fait tourner
-  les vrais panneaux (`PanelMover`, « Compositions », cadres sur les cartes de Bob, Skip combat) dans une fenêtre Windows ordinaire, sans
+  les vrais panneaux (`PanelMover`, « Compositions », cadres sur les cartes de Bob, Skip combat, étiquettes des choix) dans une fenêtre Windows ordinaire, sans
   HDT ni partie, avec des données synthétiques ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
   la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. Elle ne simule
   pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) : un défaut qui y vivrait ne s'y voit pas.
