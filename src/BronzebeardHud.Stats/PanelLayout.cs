@@ -174,12 +174,15 @@ public sealed class PanelLayout
 
     /// <summary>
     /// Pulls the panel's bottom right corner to (<paramref name="cornerX"/>, <paramref name="cornerY"/>), overlay
-    /// pixels, its top left corner staying where <paramref name="current"/> has it: the size stops at
-    /// <paramref name="minimum"/> and at the overlay's edge.
+    /// pixels: the size stops at <paramref name="minimum"/> and at the overlay's edge. The top left corner stays where
+    /// the panel is, which this layout says itself (<paramref name="defaultRect"/> being its default place): the
+    /// caller never passes a rectangle it kept. One cached at the last redraw is stale as soon as the panel is moved,
+    /// since a move ends without a redraw, and resizing from it sent the panel back to its place before the move.
     /// </summary>
-    public void Resize(string panelId, LayoutRect current, double cornerX, double cornerY, (double Width, double Height) minimum,
+    public void Resize(string panelId, LayoutRect defaultRect, double cornerX, double cornerY, (double Width, double Height) minimum,
         double canvasWidth, double canvasHeight)
     {
+        var current = Resolve(panelId, defaultRect, canvasWidth, canvasHeight, minimum);
         var width = Clamp(cornerX - current.Left, minimum.Width, canvasWidth - current.Left);
         var height = Clamp(cornerY - current.Top, minimum.Height, canvasHeight - current.Top);
         StoreRect(panelId, current.Left, current.Top, width, height, canvasWidth, canvasHeight);

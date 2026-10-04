@@ -33,3 +33,12 @@ vivent dans `PanelLayout` (`StoreRect`, `Resize`, `Resolve` avec minimum) et `Pa
 
 Pointage de la poignée sous HDT, cadre pointillé, retour au défaut par « Reset », et rendu d'un panneau lineups
 étroit (l'en-tête est estimé à deux lignes : un titre ou un bandeau long en prendrait trois et la dernière ligne serait coupée).
+
+## Retour d'Ali après le premier essai : « il revient à l'endroit par défaut »
+
+| | |
+|---|---|
+| Cause | la poignée partait du rectangle gardé au dernier `Place`. Un panneau déplacé n'est pas redessiné à la fin du déplacement (`Plugin.cs` ne redessine que si la clé d'état change) : ce rectangle était périmé, et `Resize` rangeait la place d'avant le déplacement. Reproduit sur le modèle : déplacer (200, 500) puis tirer la poignée rendait (1640, 160), la place par défaut |
+| Correctif | `PanelLayout.Resize` prend la place par défaut et lit la position dans le layout, qui est à jour ; `PanelMover` ne garde plus que la place par défaut. Quatre tests rouges d'abord, dont trois tours déplacer / redimensionner ; 33 mutations, 0 survivante |
+| Pas établi | le moment : Ali a vu le retour « au relâchement » ; avec cette cause, le panneau part dès le premier mouvement de la poignée. Les lignes `resize start` / `resize end` du journal d'HDT tranchent si le défaut revient |
+

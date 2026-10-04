@@ -202,27 +202,87 @@ public class PanelLayoutTests
         Assert.StartsWith("layout.json:", error);
     }
 
+    // Resize takes the panel's place from the layout itself, never from a rectangle the caller kept: a rectangle cached
+    // at the last redraw is stale as soon as the panel is moved (a move ends without a redraw), and resizing from it
+    // sent the panel back to where it was before the move.
+
     [Fact]
     public void Resize_TheCornerFollowsThePointer_TheTopLeftStays()
     {
         var layout = PanelLayout.Empty;
-        var current = At(200, 100, 400, 300);
+        layout.Store("lineups", 200, 100, 2000, 1000); // the panel sits at (200, 100)
 
-        layout.Resize("lineups", current, cornerX: 1000, cornerY: 700, Minimum, 2000, 1000);
+        layout.Resize("lineups", LineupsDefault, cornerX: 1000, cornerY: 700, Minimum, 2000, 1000);
 
         Assert.Equal((200.0, 100.0, 800.0, 600.0), Round(layout.Resolve("lineups", LineupsDefault, 2000, 1000, Minimum)));
+    }
+
+    [Fact]
+    public void Resize_OfAPanelNeverMoved_KeepsItsDefaultPlace()
+    {
+        var layout = PanelLayout.Empty;
+
+        layout.Resize("lineups", LineupsDefault, cornerX: 2300, cornerY: 700, Minimum, 2400, 1000);
+
+        // Default place: left 1640, top 160 on a 2400 × 1000 overlay.
+        Assert.Equal((1640.0, 160.0, 660.0, 540.0), Round(layout.Resolve("lineups", LineupsDefault, 2400, 1000, Minimum)));
+    }
+
+    [Fact]
+    public void Resize_AfterAMove_KeepsTheMovedPlace_NotTheDefaultOne()
+    {
+        var layout = PanelLayout.Empty;
+        layout.Store("lineups", 200, 500, 2400, 1000); // moved away from its default place (1640, 160)
+
+        layout.Resize("lineups", LineupsDefault, cornerX: 1000, cornerY: 900, Minimum, 2400, 1000);
+
+        Assert.Equal((200.0, 500.0, 800.0, 400.0), Round(layout.Resolve("lineups", LineupsDefault, 2400, 1000, Minimum)));
+    }
+
+    [Fact]
+    public void Resize_OfAPanelPulledBackOnScreen_StartsFromWhereItIsShown()
+    {
+        // A stored place that no longer fits (a smaller window, a hand-edited file): the panel is shown pulled back
+        // inside, with the size it has, and the resize must start from that place, not from the stored one.
+        var layout = PanelLayout.Empty;
+        layout.StoreRect("lineups", 2300, 100, 700, 300, 2400, 1000); // 2300 + 700 does not fit in 2400: shown at 1700
+
+        layout.Resize("lineups", LineupsDefault, cornerX: 2350, cornerY: 500, Minimum, 2400, 1000);
+
+        Assert.Equal((1700.0, 100.0, 650.0, 400.0), Round(layout.Resolve("lineups", LineupsDefault, 2400, 1000, Minimum)));
+    }
+
+    [Fact]
+    public void MoveAndResize_RepeatedThreeTimes_AlwaysStartFromWhereThePanelIs()
+    {
+        // Two rounds validate the transition; the third shows that nothing keeps an old place alive.
+        var layout = PanelLayout.Empty;
+
+        layout.Store("lineups", 200, 500, 2400, 1000);
+        layout.Resize("lineups", LineupsDefault, cornerX: 1000, cornerY: 900, Minimum, 2400, 1000);
+        Assert.Equal((200.0, 500.0, 800.0, 400.0), Round(layout.Resolve("lineups", LineupsDefault, 2400, 1000, Minimum)));
+
+        layout.Store("lineups", 700, 50, 2400, 1000);
+        layout.Resize("lineups", LineupsDefault, cornerX: 1500, cornerY: 400, Minimum, 2400, 1000);
+        Assert.Equal((700.0, 50.0, 800.0, 350.0), Round(layout.Resolve("lineups", LineupsDefault, 2400, 1000, Minimum)));
+
+        layout.Resize("lineups", LineupsDefault, cornerX: 1300, cornerY: 300, Minimum, 2400, 1000); // resized again, not moved
+        Assert.Equal((700.0, 50.0, 600.0, 250.0), Round(layout.Resolve("lineups", LineupsDefault, 2400, 1000, Minimum)));
+
+        layout.Store("lineups", 900, 600, 2400, 1000);                                              // moved again: the size stays
+        Assert.Equal((900.0, 600.0, 600.0, 250.0), Round(layout.Resolve("lineups", LineupsDefault, 2400, 1000, Minimum)));
     }
 
     [Fact]
     public void Resize_StopsAtTheMinimum_AndAtTheOverlayEdge_WithoutMovingThePanel()
     {
         var layout = PanelLayout.Empty;
-        var current = At(200, 100, 400, 300);
+        layout.Store("lineups", 200, 100, 2000, 1000);
 
-        layout.Resize("lineups", current, cornerX: 210, cornerY: 105, Minimum, 2000, 1000); // dragged past the top left
+        layout.Resize("lineups", LineupsDefault, cornerX: 210, cornerY: 105, Minimum, 2000, 1000); // dragged past the top left
         Assert.Equal((200.0, 100.0, 300.0, 120.0), Round(layout.Resolve("lineups", LineupsDefault, 2000, 1000, Minimum)));
 
-        layout.Resize("lineups", current, cornerX: 2600, cornerY: 1400, Minimum, 2000, 1000); // dragged out of the window
+        layout.Resize("lineups", LineupsDefault, cornerX: 2600, cornerY: 1400, Minimum, 2000, 1000); // dragged out of the window
         Assert.Equal((200.0, 100.0, 1800.0, 900.0), Round(layout.Resolve("lineups", LineupsDefault, 2000, 1000, Minimum)));
     }
 
@@ -232,13 +292,13 @@ public class PanelLayoutTests
         // Resolve raises any stored size to the minimum it is given, which would hide a Resize that stored less:
         // read the file back with a tiny minimum to see what was really kept.
         var layout = PanelLayout.Empty;
-        var current = At(200, 100, 400, 300);
+        layout.Store("lineups", 200, 100, 2000, 1000);
         var tiny = (Width: 1.0, Height: 1.0);
 
-        layout.Resize("lineups", current, cornerX: 210, cornerY: 105, Minimum, 2000, 1000);
+        layout.Resize("lineups", LineupsDefault, cornerX: 210, cornerY: 105, Minimum, 2000, 1000);
         Assert.Equal((200.0, 100.0, 300.0, 120.0), Round(layout.Resolve("lineups", LineupsDefault, 2000, 1000, tiny)));
 
-        layout.Resize("lineups", current, cornerX: 2600, cornerY: 1400, Minimum, 2000, 1000);
+        layout.Resize("lineups", LineupsDefault, cornerX: 2600, cornerY: 1400, Minimum, 2000, 1000);
         Assert.Equal((200.0, 100.0, 1800.0, 900.0), Round(layout.Resolve("lineups", LineupsDefault, 2000, 1000, tiny)));
     }
 
@@ -246,9 +306,9 @@ public class PanelLayoutTests
     public void Resize_ACornerDraggedBeyondThePanelsOwnTopLeft_GivesTheMinimum_NotTheDefaultSize()
     {
         var layout = PanelLayout.Empty;
-        var current = At(200, 100, 400, 300);
+        layout.Store("lineups", 200, 100, 2000, 1000);
 
-        layout.Resize("lineups", current, cornerX: 50, cornerY: 20, Minimum, 2000, 1000); // left of and above its top left corner
+        layout.Resize("lineups", LineupsDefault, cornerX: 50, cornerY: 20, Minimum, 2000, 1000); // left of and above its top left corner
 
         Assert.True(layout.IsResized("lineups"), "the size was dropped: the panel would jump back to its default size");
         Assert.Equal((200.0, 100.0, 300.0, 120.0), Round(layout.Resolve("lineups", LineupsDefault, 2000, 1000, Minimum)));

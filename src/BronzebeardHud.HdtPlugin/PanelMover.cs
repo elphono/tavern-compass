@@ -39,12 +39,13 @@ internal sealed class PanelMover
 
     private sealed class Resizer
     {
-        public Resizer(string id, Border handle, Rectangle frame, PanelResize resize)
+        public Resizer(string id, Border handle, Rectangle frame, PanelResize resize, LayoutRect defaultRect)
         {
             Id = id;
             Handle = handle;
             Frame = frame;
             Resize = resize;
+            Default = defaultRect;
         }
 
         public string Id { get; }
@@ -52,8 +53,12 @@ internal sealed class PanelMover
         public Rectangle Frame { get; }
         public PanelResize Resize { get; set; }
 
-        /// <summary>The rectangle the last <see cref="PanelMover.Place"/> gave the panel.</summary>
-        public LayoutRect Placed { get; set; }
+        /// <summary>
+        /// The panel's default rectangle, as of the last <see cref="PanelMover.Place"/>. Only this is kept, never the
+        /// rectangle the panel was given: where the panel is and how big is asked of the layout every time, because a
+        /// kept one is stale after a move (which ends without a redraw).
+        /// </summary>
+        public LayoutRect Default { get; set; }
     }
 
     private readonly Canvas _canvas;
@@ -109,7 +114,7 @@ internal sealed class PanelMover
             panel.MouseLeftButtonUp += OnUp;
             if (resize != null)
             {
-                AddResizer(panel, panelId, resize);
+                AddResizer(panel, panelId, resize, defaultRect);
             }
 
             Apply(panel);
@@ -125,7 +130,7 @@ internal sealed class PanelMover
         if (resize != null && _resizers.TryGetValue(panel, out var resizer))
         {
             resizer.Resize = resize;
-            resizer.Placed = rect;
+            resizer.Default = defaultRect;
             UpdateResizer(panel);
         }
 
@@ -192,7 +197,7 @@ internal sealed class PanelMover
         }
     }
 
-    private void AddResizer(Border panel, string panelId, PanelResize resize)
+    private void AddResizer(Border panel, string panelId, PanelResize resize, LayoutRect defaultRect)
     {
         var frame = new Rectangle
         {
@@ -217,7 +222,7 @@ internal sealed class PanelMover
         handle.MouseLeftButtonUp += OnHandleUp;
         OverlayLayer.Add(_canvas, frame);
         OverlayLayer.Add(_canvas, handle);
-        _resizers[panel] = new Resizer(panelId, handle, frame, resize);
+        _resizers[panel] = new Resizer(panelId, handle, frame, resize, defaultRect);
         panel.SizeChanged += (_, _) => UpdateResizer(panel);
         panel.IsVisibleChanged += (_, _) => UpdateResizer(panel);
     }
@@ -244,7 +249,8 @@ internal sealed class PanelMover
         }
 
         var width = panel.ActualWidth;
-        var height = _layout.IsResized(resizer.Id) ? Math.Max(resizer.Placed.Height, panel.ActualHeight) : panel.ActualHeight;
+        var chosen = _layout.Resolve(resizer.Id, resizer.Default, _canvas.ActualWidth, _canvas.ActualHeight, resizer.Resize.Minimum);
+        var height = _layout.IsResized(resizer.Id) ? Math.Max(chosen.Height, panel.ActualHeight) : panel.ActualHeight;
         var side = HandleSize * TavernLayout.Scale(_canvas.ActualHeight);
         Canvas.SetLeft(resizer.Frame, left);
         Canvas.SetTop(resizer.Frame, top);
@@ -266,6 +272,11 @@ internal sealed class PanelMover
         _resized = panel;
         _handleGrab = e.GetPosition(handle);
         handle.CaptureMouse();
+        if (_resizers.TryGetValue(panel, out var resizer))
+        {
+            Log.Info($"Bronzebeard HUD: resize start {Where(panel, resizer)}");
+        }
+
         e.Handled = true;
     }
 
@@ -280,7 +291,7 @@ internal sealed class PanelMover
         // the handle was grabbed, plus the handle's own side.
         var pointer = e.GetPosition(_canvas);
         var side = resizer.Handle.Width;
-        _layout.Resize(resizer.Id, resizer.Placed, pointer.X - _handleGrab.X + side, pointer.Y - _handleGrab.Y + side,
+        _layout.Resize(resizer.Id, resizer.Default, pointer.X - _handleGrab.X + side, pointer.Y - _handleGrab.Y + side,
             resizer.Resize.Minimum, _canvas.ActualWidth, _canvas.ActualHeight);
         resizer.Resize.Relayout(); // the panel shows what fits in the new box, right now: "2 of 8 shown" follows the hand
         UpdateResizer(panel);
@@ -294,10 +305,27 @@ internal sealed class PanelMover
             return;
         }
 
+        var panel = _resized;
         _resized = null;
         handle.ReleaseMouseCapture();
         Save();
+        if (_resizers.TryGetValue(panel, out var resizer))
+        {
+            Log.Info($"Bronzebeard HUD: resize end {Where(panel, resizer)}");
+        }
+
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// For the journal: where the panel is on the canvas, and what the layout says. They must agree; a gap between
+    /// the two is what a panel jumping to another place looks like.
+    /// </summary>
+    private string Where(Border panel, Resizer resizer)
+    {
+        var chosen = _layout.Resolve(resizer.Id, resizer.Default, _canvas.ActualWidth, _canvas.ActualHeight, resizer.Resize.Minimum);
+        return $"panel={resizer.Id} on canvas ({Canvas.GetLeft(panel):0},{Canvas.GetTop(panel):0} {panel.ActualWidth:0}x{panel.ActualHeight:0}), "
+               + $"layout says ({chosen.Left:0},{chosen.Top:0} {chosen.Width:0}x{chosen.Height:0})";
     }
 
     private void OnDown(object sender, MouseButtonEventArgs e)
@@ -339,6 +367,7 @@ internal sealed class PanelMover
         _layout.Store(_panels[panel].Id, Canvas.GetLeft(panel), Canvas.GetTop(panel), _canvas.ActualWidth, _canvas.ActualHeight);
         Save();
         UpdateResizer(panel);
+        Log.Info($"Bronzebeard HUD: panel moved {_panels[panel].Id} to ({Canvas.GetLeft(panel):0},{Canvas.GetTop(panel):0})");
         e.Handled = true;
     }
 

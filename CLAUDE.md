@@ -138,7 +138,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   un plateau complet. Une boîte plus petite que ce que le panneau montre toujours (une ligne ; la partie fixe du
   détail d'une compo) grandit pour le tenir, jusqu'au retour à la liste. Hors mode déplacement la boîte épouse son
   contenu jusqu'à la taille choisie. La poignée et le cadre sont des éléments du canvas gérés par `PanelMover`, pas
-  des enfants du panneau, qui remplace tout son contenu à chaque redessin. Tous les « est-ce que ça tient ? » de
+  des enfants du panneau, qui remplace tout son contenu à chaque redessin. La poignée **ne garde aucun rectangle** :
+  la place d'où part un redimensionnement est demandée au `PanelLayout` à chaque geste (`Resize` prend la place par
+  défaut et lit le reste), car un rectangle gardé au dernier redessin est périmé dès qu'on déplace le panneau (un
+  déplacement finit sans redessin) et renvoyait le panneau à sa place d'avant (constaté le 2026-10-04). Le journal d'HDT
+  dit `resize start` / `resize end` (place du panneau sur le canvas et place que dit le layout : elles doivent être
+  égales) et `panel moved`. Tous les « est-ce que ça tient ? » de
   `PanelFit` ont une tolérance (`Tolerance`) : une boîte exactement de la hauteur de n lignes, divisée par une échelle
   qui n'est pas une fraction binaire, rendait n − 1 lignes (mesuré : à 72 % des hauteurs de fenêtre de 600 à 2200,
   22 % des couples hauteur × nombre de lignes ; 0 avec la tolérance, fixé par un balayage de test).
