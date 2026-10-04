@@ -47,8 +47,10 @@ fi
 
 # Start-Process, not "cmd.exe /c start": a window started through cmd stays attached to its console, and WSL then
 # waits for it to close, so this script (and whoever called it) would never return.
-args=$(printf "'%s'," "$@")
-if [ -n "$args" ]; then
+# Counted on $#, not on the printed text: printf with no argument still prints the empty quotes, and an empty
+# -ArgumentList is an error for Start-Process.
+if [ "$#" -gt 0 ]; then
+  args=$(printf "'%s'," "$@")
   powershell.exe -NoProfile -Command "Start-Process -FilePath '$exe' -ArgumentList ${args%,}" </dev/null
 else
   powershell.exe -NoProfile -Command "Start-Process -FilePath '$exe'" </dev/null
