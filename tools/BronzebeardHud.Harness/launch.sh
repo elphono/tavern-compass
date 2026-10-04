@@ -4,7 +4,10 @@
 #   ./launch.sh --selftest      checks the scene without anyone at the keyboard; prints the report, exit 0 when it all passes
 #   ./launch.sh --screenshot    also writes C:\temp\BronzebeardHarness-ci\out\shot.png (the overlay at its own size)
 # --selftest and --screenshot run from their own copy, C:\temp\BronzebeardHarness-ci: a harness window left open keeps
-# its exe locked (a running exe cannot be replaced), and neither its folder nor its exe is touched by them.
+# its exe locked (a running exe cannot be replaced), and neither its folder nor its exe is touched by them. They also
+# read their own layout, C:\temp\BronzebeardHarness-ci\layout.json (never written: the default layout), unless --layout
+# is given, so that a capture does not depend on how the window's panels were arranged. The window's log and picture
+# cache (%TEMP%\BronzebeardHarness) stay shared.
 # Further arguments go to the harness: --size 1600x900, --layout <path>.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -32,7 +35,9 @@ cp -r "$repo/tools/BronzebeardHud.Harness/bin/Release/net48/." "$dest/" \
 exe="$folder\\BronzebeardHud.Harness.exe"
 if [ "$headless" = 1 ]; then
   rm -rf "$dest/out"
-  args=$(printf "'%s'," "$@" '--out' "$folder\\out")
+  layout=('--layout' "$folder\\layout.json")
+  case " $* " in *" --layout "*) layout=() ;; esac
+  args=$(printf "'%s'," "$@" "${layout[@]}" '--out' "$folder\\out")
   powershell.exe -NoProfile -Command "\$p = Start-Process -FilePath '$exe' -ArgumentList ${args%,} -Wait -PassThru; exit \$p.ExitCode" || code=$?
   [ -f "$dest/out/selftest.txt" ] && cat "$dest/out/selftest.txt"
   [ -f "$dest/out/error.txt" ] && cat "$dest/out/error.txt"
