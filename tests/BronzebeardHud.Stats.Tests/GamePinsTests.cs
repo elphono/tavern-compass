@@ -48,21 +48,11 @@ public class GamePinsTests
         {
             var slots = TavernLayout.CardSlots(width, height, count);
             var buttons = TavernLayout.PinButtons(width, height, count);
-            var lineups = TavernLayout.LineupButtons(width, height, count);
             Assert.Equal(count, buttons.Count);
             for (var i = 0; i < count; i++)
             {
-                // The pin left of the card's centre, the "?" right of it, side by side and apart.
-                Assert.True(buttons[i].Right < slots[i].CenterX && lineups[i].Left > slots[i].CenterX, $"{count} cards: buttons {i} not around the centre");
-                Assert.False(Overlap(buttons[i], lineups[i]));
-                Assert.Equal(slots[i].CenterX, (buttons[i].CenterX + lineups[i].CenterX) / 2, precision: 6);
-                Assert.True(lineups[i].Top + lineups[i].Height <= slots[i].Top && lineups[i].Right <= width, $"{count} cards: lineup button {i} reaches its card or the edge");
-                Assert.All(slots, slot => Assert.False(Overlap(lineups[i], slot) || Overlap(lineups[i], TavernLayout.HdtPinIcon(slot, height)), $"{count} cards: lineup button {i} on a card"));
-                if (i > 0)
-                {
-                    Assert.False(Overlap(lineups[i - 1], buttons[i]), $"{count} cards: button {i} touches the previous card's");
-                }
-
+                // The pin left of the card's centre, where it stood beside the retired "?" button.
+                Assert.True(buttons[i].Right < slots[i].CenterX, $"{count} cards: button {i} not left of the centre");
                 Assert.True(buttons[i].Top + buttons[i].Height <= slots[i].Top, $"{count} cards: button {i} reaches its card");
                 Assert.True(buttons[i].Top >= 0 && buttons[i].Left >= 0 && buttons[i].Right <= width, $"{count} cards: button {i} off the window");
                 Assert.All(slots, slot => Assert.False(Overlap(buttons[i], slot), $"{count} cards: button {i} on a card"));

@@ -142,10 +142,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   défaut et lit le reste), car un rectangle gardé au dernier redessin est périmé dès qu'on déplace le panneau (un
   déplacement finit sans redessin) et renvoyait le panneau à sa place d'avant (constaté le 2026-10-04). Le journal d'HDT
   dit `resize start` / `resize end` (place du panneau sur le canvas et place que dit le layout : elles doivent être
-  égales) et `panel moved`. Tous les « est-ce que ça tient ? » de
-  `PanelFit` ont une tolérance (`Tolerance`) : une boîte exactement de la hauteur de n lignes, divisée par une échelle
-  qui n'est pas une fraction binaire, rendait n − 1 lignes (mesuré : à 72 % des hauteurs de fenêtre de 600 à 2200,
-  22 % des couples hauteur × nombre de lignes ; 0 avec la tolérance, fixé par un balayage de test).
+  égales) et `panel moved`. Le calcul en lignes de l'ancien panneau (`PanelFit.Rows`, `DetailPivots`, et leur
+  `Tolerance` : une boîte exactement de la hauteur de n lignes, divisée par une échelle qui n'est pas une fraction
+  binaire, rendait n − 1 lignes) est retiré depuis la fusion : le panneau unique mesure ses pièces en place, en pixels
+  de l'overlay, et `CompGuideLayout` décide ce qui tient (`Sections` avec une tolérance, `Fit` sans).
 - Encart des héros proposés (sélection du héros, fixe) : sous le bouton de reroll du jeu (« Réinitialiser »,
   0,632 → 0,718 H), de 0,725 à 0,805 H, 0,17 H de large, dans la colonne du héros (grille d'HDT, un héros tous
   les 340/1080 H). Un encart qui approcherait à moins de 0,01 H du bouton OK (0,751 → 0,825 H) se décale de

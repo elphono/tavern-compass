@@ -62,44 +62,13 @@ public sealed class SectionFit
 }
 
 /// <summary>
-/// Where the comp guides panel goes by default, and how much of it fits. Nothing is shrunk: what does not fit is
-/// left out, and the panel says how many guides it shows.
+/// How much of the guide list, or of a guide's detail, fits in the "Compositions" panel. Nothing is shrunk: what does
+/// not fit is left out, and the panel says how many guides (or sections) it shows. The panel's place and size are
+/// the target panel's (TavernLayout.TargetPanel, PanelFit); since 2026-10-04 there is no separate comp guides panel,
+/// and PanelLayout ignores a "comp-guides" entry.
 /// </summary>
 public static class CompGuideLayout
 {
-    // No panel id any more: the comp guides are shown in the target panel ("target-compositions") since 2026-10-04, and
-    // PanelLayout ignores a "comp-guides" entry. DefaultPanel and the minimum stay for whoever lays a guide list out alone.
-
-    /// <summary>Space kept between the panel and its neighbours, × H.</summary>
-    public const double Gap = 0.01;
-
-    /// <summary>
-    /// Smallest box of the panel when resized (design pixels, PanelResize): wide enough for its title and the
-    /// "Tier 7" tag on one line; tall enough for the title, one tier's bar and one guide line. A smaller box would show
-    /// nothing; in a box this small, Fit shows what fits and says how many guides are left out.
-    /// </summary>
-    public const double MinWidth = 200;
-    public const double MinHeight = 2 * PanelFit.Border + 2 * PanelFit.Padding + 28 + 30 + 20;
-
-    /// <summary>
-    /// The default place: the lower left part of Hearthstone's 4:3 frame, mirror of the target composition panel
-    /// (TavernLayout.TargetPanel) on the other side of the hero. Right of the leaderboard and of the opponents' MMR
-    /// labels (LeaderboardLayout.MmrLabel), left of the hero and hero power (within W/2 ± 0.2 × H), below the player's
-    /// board row, down to PanelFit.BottomLimit. Clear of Bob's cards and their buttons, the target composition panel
-    /// and the Skip combat button, which all sit right of the hero or above the board's bottom.
-    /// About 0.26 × H wide at any window ratio. HDT's own session widget defaults to the window's left edge at 15 %
-    /// of its height (Config.SessionRecapLeft = 0, SessionRecapTop = 15), which is why the panel does not use the
-    /// margin left of the frame.
-    /// </summary>
-    public static LayoutRect DefaultPanel(double width, double height)
-    {
-        var left = Enumerable.Range(1, 8).Max(place => LeaderboardLayout.MmrLabel(width, height, place).Right) + Gap * height;
-        var right = width / 2 - 0.2 * height - Gap * height;
-        var top = TavernLayout.PlayerRowBottom(height) + 0.012 * height;
-        var bottom = PanelFit.BottomLimit * height;
-        return new LayoutRect((left + right) / 2, (top + bottom) / 2, Math.Max(0, right - left), Math.Max(0, bottom - top));
-    }
-
     /// <summary>
     /// Which pieces fit in <paramref name="room"/> (overlay pixels). The highlighted guides first, in display order, so
     /// that the most probable ones never give way to the others; then the other guides in display order, until one

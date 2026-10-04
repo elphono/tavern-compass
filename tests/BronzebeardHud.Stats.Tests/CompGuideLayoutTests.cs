@@ -2,50 +2,6 @@ namespace BronzebeardHud.Stats.Tests;
 
 public class CompGuideLayoutTests
 {
-    [Theory]
-    [InlineData(1600, 900)]
-    [InlineData(1920, 1080)]
-    [InlineData(2560, 1440)]
-    [InlineData(2291, 1360)] // Ali's window
-    [InlineData(1440, 1080)] // 4:3
-    [InlineData(2560, 1080)] // 21:9
-    public void DefaultPanel_ClearOfTheOtherPanels_AndOfTheGame(double width, double height)
-    {
-        var panel = CompGuideLayout.DefaultPanel(width, height);
-
-        Assert.False(NoGoZones.Overlaps(panel, TavernLayout.TargetPanel(width, height)), "covers the target composition panel");
-        Assert.False(NoGoZones.Overlaps(panel, SkipCombatLayout.Button(width, height)), "covers the Skip combat button");
-        foreach (var (name, zone) in NoGoZones.For(width, height))
-        {
-            Assert.False(NoGoZones.Overlaps(panel, zone), $"covers the {name}");
-        }
-
-        for (var place = 1; place <= 8; place++)
-        {
-            Assert.False(NoGoZones.Overlaps(panel, LeaderboardLayout.MmrLabel(width, height, place)), $"covers the MMR label of place {place}");
-        }
-
-        foreach (var count in new[] { 3, 5, 7 })
-        {
-            foreach (var card in TavernLayout.CardSlots(width, height, count)
-                         .Concat(TavernLayout.PinButtons(width, height, count))
-                         .Concat(TavernLayout.LineupButtons(width, height, count))
-                         .Concat(TavernLayout.Markers(width, height, count, lines: 3)))
-            {
-                Assert.False(NoGoZones.Overlaps(panel, card), $"{count} cards: covers one of Bob's cards, its buttons or its marker");
-            }
-        }
-
-        Assert.True(panel.Left >= 0 && panel.Right <= width && panel.Top >= 0, "outside the window");
-        Assert.True(panel.Top + panel.Height <= PanelFit.BottomLimit * height + 1e-6, "reaches the gold");
-        Assert.InRange(panel.Width / TavernLayout.Scale(height), 270, 290); // the same design width at every ratio
-        Assert.True(panel.Height >= 0.25 * height, "too short");
-
-        // The default box is a box the resize handle accepts: never under the panel's minimum.
-        Assert.True(panel.Width / TavernLayout.Scale(height) >= CompGuideLayout.MinWidth, "narrower than the resize minimum");
-        Assert.True(panel.Height / TavernLayout.Scale(height) >= CompGuideLayout.MinHeight, "shorter than the resize minimum");
-    }
-
     private static CompGuideFitItem Header(int group, double height = 20) => new(CompGuideItemKind.TierHeader, group, height);
 
     private static CompGuideFitItem Row(int group, double height = 18, bool highlighted = false) => new(CompGuideItemKind.Row, group, height, highlighted);
