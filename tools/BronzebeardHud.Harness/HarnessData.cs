@@ -88,7 +88,9 @@ internal static class HarnessData
     /// <summary>
     /// Bob's row for the scene: with the third scenario's targets, a core card of a target not held yet (16, Mech Divine
     /// Shield, also an add-on of Mech Magnet: core wins), a core card held again (7, Pirate Discover), an add-on (11, Pirate
-    /// Discover), an enabler (21, Mech Divine Shield), a pinned card that serves no target (42) and two that serve nothing.
+    /// Discover), an enabler (21, Mech Divine Shield), a pinned card that serves no target (42), one that serves nothing
+    /// (50), and one no target's guide lists but that stands on 3 of the 5 boards of Mech Magnet's Firestone comp (57: a
+    /// dotted "+ Mech Magnet 3/5" frame, through the bridge).
     /// </summary>
     public static IReadOnlyList<string> Shop { get; } = new[] { 16, 11, 7, 42, 50, 21, 57 }.Select(i => Pool[i]).ToList();
 
@@ -123,18 +125,22 @@ internal static class HarnessData
     /// <summary>
     /// The options of each choice, as HDT hands them to the plugin, with the counts of Ali's games (his HDT logs: discover
     /// and Dark Gift 3 options, trinkets 4 in all 48 trinket choices). Picked so that, with the third scenario's targets
-    /// (Pirate Discover, Mech Magnet, Mech Divine Shield), every kind of label shows:
-    /// - discover: 16, a core card of the target Mech Divine Shield and an add-on of the target Mech Magnet (two lines);
-    ///   11, an add-on of the target Pirate Discover; 42, a core card of Elemental Cycle, no target here, the only target
-    ///   of the second scenario (its colour then), and nothing at all in the first one;
-    /// - Dark Gift: 21, an enabler of the target Mech Divine Shield; 0, a core card of Undead Butcher, an S guide that is
-    ///   no target, and of two other guides ("+2 more"); 50, nothing (an add-on of a guide that is no target);
+    /// (Pirate Discover, Mech Magnet, Mech Divine Shield) and the bridge to <see cref="FirestoneComps"/>, every kind of
+    /// label shows:
+    /// - discover, the three labels the bridge opens: 11, an add-on of the target Pirate Discover, on 3 of the 5 boards of
+    ///   its comp ("+ Pirate Discover · 3/5 boards"); 46, in no list of a target but on 3 of the 5 boards of Mech Magnet's
+    ///   comp ("+ Mech Magnet 3/5 boards", in its colour; "+ Elemental Cycle" in the second scenario, where Elemental Cycle
+    ///   is the only target); 22, a core card of Beast Pack, a guide the target Mech Divine Shield can pivot to ("pivot →
+    ///   Beast Pack (A)", neutral; "core Beast Pack (A)" without the bridge or that target);
+    /// - Dark Gift: 21, an enabler of the target Mech Divine Shield, bridged to nothing (no "boards"); 0, a core card of
+    ///   Undead Butcher, an S guide that is no target, and of two other guides ("+2 more"); 50, nothing (an add-on of a
+    ///   guide that is no target, on no board);
     /// - trinkets (real ones, their English text as HDT reads it): one names Pirates (Pirate Discover's tribe), one Mechs
     ///   (Mech Magnet and Mech Divine Shield), one Elementals (no target's), one no tribe.
     /// </summary>
     public static IReadOnlyList<OfferedOption> Choice(ChoiceKind kind) => kind switch
     {
-        ChoiceKind.Discover => Minions(false, 16, 11, 42),
+        ChoiceKind.Discover => Minions(false, 11, 46, 22),
         ChoiceKind.DarkGift => Minions(true, 21, 0, 50),
         ChoiceKind.Trinket => Trinkets.Select((t, i) => new OfferedOption(9101 + i, t.Id, "BATTLEGROUND_TRINKET", text: t.Text)).ToList(),
         _ => Array.Empty<OfferedOption>(),

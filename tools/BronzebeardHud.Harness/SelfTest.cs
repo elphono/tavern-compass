@@ -14,14 +14,22 @@ namespace BronzebeardHud.Harness;
 /// Compositions panel is the only resizable one), a click on a guide's name opens its detail and "← All comp guides"
 /// brings the list back, no text of the panel is under the 12 px floor or cut (list and detail), the scenarios give
 /// the targets they are named for, Bob's cards carry the frames TavernHighlights asks for, hovering a guide line shows
-/// its popup where it covers nothing and hides it as it should (HoverChecks), nothing was logged as a warning or an
-/// error (the log read once the dispatcher has delivered it), and the layout file is the harness's own, never the real
-/// plugin's.
+/// its popup where it covers nothing and hides it as it should (HoverChecks), the bridge to the synthetic Firestone comps
+/// is logged and shows in the labels of a discover, on Bob's cards and in a guide's context line (BridgeLine,
+/// TopBoardFrame, ChoiceChecks, ContextChecks), an open choice takes the markers and the panel off the screen and its
+/// closing puts them back as they were (CoverChecks), nothing was logged as a warning or an error (the log read once the
+/// dispatcher has delivered it), and the layout file is the harness's own, never the real plugin's.
 /// </summary>
 internal static class SelfTest
 {
     /// <summary>PanelMover's colour in move mode: its frames are told apart from the dotted frames on Bob's cards by it.</summary>
     private static readonly Color MoverColour = Color.FromRgb(0x00, 0xE5, 0xFF);
+
+    /// <summary>ChoiceAdvicePanel's background for a label that names no target (a pivot, another guide, "—").</summary>
+    private static readonly Color NeutralLabel = Color.FromArgb(0xE6, 0x3A, 0x3A, 0x44);
+
+    /// <summary>GuideView.MutedBrush: the context line's colour.</summary>
+    private static readonly Color Muted = Color.FromRgb(0xC8, 0xCD, 0xD8);
 
     public static (bool Passed, string Report) Run(HarnessWindow window)
     {
@@ -61,6 +69,9 @@ internal static class SelfTest
         var solidDrawn = canvas.Children.OfType<Border>().Count(b => b.Child == null && b.BorderThickness.Left >= 6 * scale - 1e-6);
         Check("Bob's cards carry the frames of the targets", solid >= 2 && dotted >= 2 && solidDrawn == solid && dottedDrawn == dotted,
             $"{solid} core (solid) and {dotted} enabler or add-on (dotted) highlights; drawn: {solidDrawn} solid, {dottedDrawn} dotted");
+
+        BridgeLine(window, Check);
+        TopBoardFrame(window, Check);
 
         var comps = window.Comps.Element;
         var listTexts = TextProblems(comps, scale);
@@ -131,6 +142,8 @@ internal static class SelfTest
 
         ChoiceChecks(window, Check);
         HoverChecks(window, Check);
+        ContextChecks(window, Check);
+        CoverChecks(window, Check);
 
         // The log lines reach the window through Dispatcher.BeginInvoke (HarnessWindow): read before they land, the list was
         // empty and the check passed on nothing. Let the dispatcher run what is queued first, then require lines.
@@ -224,12 +237,19 @@ internal static class SelfTest
                     string.Join("; ", wrong.Concat(coloured)));
             }
 
-            // Serves nothing: no target lists it, and no other guide has it as a core card (the harness's guides, not the advice).
+            if (kind == ChoiceKind.Discover)
+            {
+                BridgeLabels(labels, said, targets, check);
+            }
+
+            // Serves nothing: no target lists it, no other guide has it as a core card, and it stands on fewer than two final
+            // boards of every synthetic Firestone comp (the harness's data, not the advice).
             var guides = HarnessData.Guides(id => id).All;
             for (var i = 0; i < options.Count && i < said.Count; i++)
             {
                 var id = options[i].CardId;
-                if (kind != ChoiceKind.Trinket && targets.All(t => GuideCardEffects.RoleIn(t.Guide, id) == null) && !guides.Any(g => g.CoreCards.Contains(id)))
+                if (kind != ChoiceKind.Trinket && targets.All(t => GuideCardEffects.RoleIn(t.Guide, id) == null) && !guides.Any(g => g.CoreCards.Contains(id))
+                    && !HarnessData.FirestoneComps.Any(c => BoardsWith(c, id) >= CardEvidence.MinimumBoards))
                 {
                     unrelated.Add($"{ChoiceClassifier.Name(kind)} #{i} {id}: {string.Join(" / ", said[i])}");
                 }
@@ -249,6 +269,293 @@ internal static class SelfTest
         var left = canvas.Children.OfType<Border>().Count(b => b.Child is StackPanel && drawnRects.Any(r => Math.Abs(Canvas.GetLeft(b) - r.Left) < 0.5 && Math.Abs(Canvas.GetTop(b) - r.Top) < 0.5));
         var cards = canvas.Children.OfType<Border>().Count(b => Equals(b.Tag, "choice"));
         check("closing the choice takes its labels and options away", left == 0 && cards == 0 && window.Choice == null, $"{left} labels and {cards} options left");
+    }
+
+    /// <summary>Final boards of a composition that hold a card (a board holding it twice counts once).</summary>
+    private static int BoardsWith(Composition comp, string cardId) => comp.FinalBoards.Count(b => b.Cards.Contains(cardId));
+
+    /// <summary>
+    /// (a) The bridge's log line, once (the guides do not change in the self-test): every guide named, Pirate Discover and
+    /// Mech Magnet bridged to their synthetic comps, and the counter-example — Mech Divine Shield, which shares at least two
+    /// cards with mech_fs but under half of its core cards (measured here on the data, not taken from GuideBridge) — "no match".
+    /// </summary>
+    private static void BridgeLine(HarnessWindow window, Action<string, bool, string> check)
+    {
+        FlushLog(window);
+        var lines = window.LogLines.Where(l => l.Contains("Bronzebeard HUD: bridge: ")).ToList();
+        var line = lines.FirstOrDefault() ?? string.Empty;
+        var guides = HarnessData.Guides(id => id).All;
+        var mds = guides.First(g => g.Name == "Mech Divine Shield");
+        var mech = HarnessData.FirestoneComps.First(c => c.Id == "mech_fs");
+        var mechCards = new HashSet<string>(mech.CoreCards.Concat(mech.AddonCards).Concat(mech.FinalBoards.SelectMany(b => b.Cards)));
+        var shared = mds.CoreCards.Concat(mds.AddonCards).Distinct().Where(mechCards.Contains).ToList();
+        var sharedKeys = mds.CoreCards.Count(mechCards.Contains);
+        var nearMiss = shared.Count >= GuideBridge.MinimumShared && 2 * sharedKeys < mds.CoreCards.Count;
+        check("bridge: one log line naming every guide; Pirate Discover and Mech Magnet bridged, the counter-example Mech Divine Shield \"no match\"",
+            lines.Count == 1 && guides.All(g => line.Contains(g.Name + " → ")) && line.Contains("Pirate Discover → pirate_fs (") && line.Contains("Mech Magnet → mech_fs (")
+            && line.Contains("Mech Divine Shield → no match") && nearMiss,
+            $"{lines.Count} line(s); counter-example: Mech Divine Shield shares {shared.Count} cards with mech_fs, {sharedKeys} of its {mds.CoreCards.Count} core cards; "
+            + line.Substring(Math.Max(0, line.IndexOf(">> ", StringComparison.Ordinal) + 3)));
+    }
+
+    /// <summary>
+    /// (c) A card of Bob's no target's guide lists but that stands on at least two final boards of a synthetic comp (57, on 3
+    /// of mech_fs's 5, Mech Magnet's comp: HarnessData.FirestoneComps): a dotted frame in Mech Magnet's colour on its slot,
+    /// a "+ … 3/5" label in that colour, and the plugin's log line says "card:boards 3/5:guide" (TavernHighlights.Summary).
+    /// </summary>
+    private static void TopBoardFrame(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var canvas = window.Overlay;
+        var shop = HarnessData.Shop;
+        var top = shop.Select((card, i) => (Card: card, Index: i, Boards: HarnessData.FirestoneComps.Select(c => (Comp: c, Count: BoardsWith(c, card))).OrderByDescending(x => x.Count).First()))
+            .Where(x => window.Targets.All(t => GuideCardEffects.RoleIn(t.Guide, x.Card) == null) && x.Boards.Count >= CardEvidence.MinimumBoards)
+            .ToList();
+        var mm = window.Targets.FirstOrDefault(t => t.Guide.Name == "Mech Magnet");
+        if (top.Count != 1 || mm == null || top[0].Boards.Comp.Id != "mech_fs")
+        {
+            check("Bob's card on the top boards of a bridged target: dotted frame and \"+ T k/n\" in T's colour, in the log", false,
+                $"{top.Count} such cards in Bob's row, Mech Magnet {(mm == null ? "no target" : "a target")}");
+            return;
+        }
+
+        var (card, index, boards) = top[0];
+        var count = $"{boards.Count}/{boards.Comp.FinalBoards.Count}";
+        var colour = (Color)ColorConverter.ConvertFromString(mm.Colour);
+        var slot = TavernLayout.CardSlots(canvas.ActualWidth, canvas.ActualHeight, shop.Count)[index];
+        var frame = canvas.Children.OfType<Rectangle>().FirstOrDefault(r => r.IsVisible && r.StrokeDashArray.Count > 0
+            && Math.Abs(Canvas.GetLeft(r) - slot.Left) < 0.5 && Math.Abs(Canvas.GetTop(r) - slot.Top) < 0.5);
+        var frameColour = (frame?.Stroke as SolidColorBrush)?.Color;
+        var label = canvas.Children.OfType<Border>().FirstOrDefault(b => b.IsVisible && b.Child is StackPanel && !Equals(b.Tag, "choice")
+            && Canvas.GetLeft(b) + b.ActualWidth / 2 > slot.Left && Canvas.GetLeft(b) + b.ActualWidth / 2 < slot.Left + slot.Width
+            && Texts(b).Any(t => Content(t).StartsWith("+ ", StringComparison.Ordinal) && Content(t).EndsWith(" " + count, StringComparison.Ordinal)));
+        var labelText = label == null ? "none" : string.Join(" / ", Texts(label).Select(Content));
+        FlushLog(window);
+        var summary = $"{card}:boards {count}:{mm.Guide.Id}";
+        var logged = window.LogLines.Where(l => l.Contains("tavern highlights=[") && l.Contains(summary)).ToList();
+        check("Bob's card on the top boards of a bridged target: dotted frame and \"+ T k/n\" in T's colour, in the log",
+            frameColour == colour && (label?.Background as SolidColorBrush)?.Color == colour && logged.Count >= 1,
+            $"{card} (Bob's #{index + 1}) on {count} boards of {boards.Comp.Id}: frame {(frame == null ? "none" : $"dotted {frameColour}")}, label \"{labelText}\" "
+            + $"{(label?.Background as SolidColorBrush)?.Color}, Mech Magnet is {colour}; log: {(logged.Count > 0 ? "\"" + summary + "\"" : "no line with " + summary)}");
+    }
+
+    /// <summary>
+    /// (b) In a discover, the three labels the bridge opens, read from what is drawn (text and background), never from the
+    /// advice: "+ T k/n boards" (a card no list of T names, on T's comp's boards) in the colour of T, a role followed by
+    /// "· k/n boards", and "pivot → G (X)" on the neutral background. Their sizes and cuts: the check before, on every label.
+    /// </summary>
+    private static void BridgeLabels(IReadOnlyList<Border?> labels, IReadOnlyList<List<string>> said, IReadOnlyList<CompTarget> targets, Action<string, bool, string> check)
+    {
+        var topBoards = new List<string>();
+        var suffixed = new List<string>();
+        var pivots = new List<string>();
+        var wrong = new List<string>();
+        for (var i = 0; i < labels.Count && i < said.Count; i++)
+        {
+            var drawn = (labels[i]?.Background as SolidColorBrush)?.Color;
+            foreach (var line in said[i])
+            {
+                var what = $"#{i} \"{line}\" on {drawn}";
+                if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^\+ .+ \d+/\d+ boards$") && !line.Contains("·"))
+                {
+                    var named = targets.Where(t => line.StartsWith("+ " + t.Guide.Name + " ", StringComparison.Ordinal)).ToList();
+                    var ok = named.Count == 1 && line == said[i][0] && drawn == (Color)ColorConverter.ConvertFromString(named[0].Colour);
+                    (ok ? topBoards : wrong).Add(what + (named.Count == 1 ? $", {named[0].Guide.Name} is {named[0].Colour}" : $", names {named.Count} targets"));
+                }
+                else if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^(★ core|\+) .+ · \d+/\d+ boards$"))
+                {
+                    suffixed.Add(what);
+                }
+                else if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^pivot → .+ \([SABCD]\)$"))
+                {
+                    (drawn == NeutralLabel && line == said[i][0] ? pivots : wrong).Add(what);
+                }
+            }
+        }
+
+        check("choice discover: the bridge's labels: \"+ T k/n boards\" in T's colour, a role \"· k/n boards\", \"pivot → G (X)\" neutral",
+            topBoards.Count >= 1 && suffixed.Count >= 1 && pivots.Count >= 1 && wrong.Count == 0,
+            $"top boards: {string.Join("; ", topBoards)} | suffix: {string.Join("; ", suffixed)} | pivot: {string.Join("; ", pivots)}"
+            + (wrong.Count > 0 ? " | WRONG: " + string.Join("; ", wrong) : string.Empty));
+    }
+
+    /// <summary>
+    /// (e) A guide's line of Firestone context (TargetContext), under its header in the detail and in the popup: drawn for a
+    /// bridged guide (Pirate Discover: "≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards", computed by hand from
+    /// HarnessData — 23 games at 2,9 pulled towards 3,9 by 30: 3,47; boards at turns 11, 12, 13, 13, 14), at
+    /// PanelTypography.Small in the muted colour, between the name and the first section; not drawn for the guide bridged to
+    /// nothing (Mech Divine Shield).
+    /// </summary>
+    private static void ContextChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        const string expected = "≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards";
+        var scale = TavernLayout.Scale(window.Overlay.ActualHeight);
+        var comps = window.Comps;
+        var popup = comps.Popup;
+        window.SetMoveMode(false);
+        window.ShowSkipCombat(false);
+        window.CursorInside = _ => false;
+        window.UpdateLayout();
+
+        static TextBlock? ContextIn(DependencyObject root) => Texts(root).FirstOrDefault(t => t.IsVisible && Content(t).Contains(" top board"));
+
+        string LookAt(DependencyObject root, TextBlock? context)
+        {
+            if (context == null)
+            {
+                return "none";
+            }
+
+            var y = context.TransformToAncestor((Visual)root).Transform(new Point(0, 0)).Y;
+            var firstSection = Texts(root).Where(t => t.IsVisible && SectionOrder.Any(s => Content(t).StartsWith(s, StringComparison.Ordinal)))
+                .Select(t => t.TransformToAncestor((Visual)root).Transform(new Point(0, 0)).Y).DefaultIfEmpty(double.MaxValue).Min();
+            var colour = (context.Foreground as SolidColorBrush)?.Color;
+            var ok = Content(context) == expected && Math.Abs(context.FontSize - PanelTypography.Small * scale) < 1e-6 && colour == Muted && y < firstSection;
+            return $"{(ok ? "ok" : "WRONG")} \"{Content(context)}\" {context.FontSize:0.#} px {colour} at y {y:0}, first section at {firstSection:0}";
+        }
+
+        (string Detail, string Popup) Look(string name)
+        {
+            var guide = window.GuideOf(name)!;
+            Click(comps.Element, guide.Name);
+            window.UpdateLayout();
+            var detail = comps.ShowsDetail ? LookAt(comps.Element, ContextIn(comps.Element)) : "detail not opened";
+            Click(comps.Element, "← All comp guides");
+            window.UpdateLayout();
+            var line = comps.ShownLines[guide.Id];
+            Raise(line, UIElement.MouseEnterEvent);
+            Headless.Pump(400);
+            window.UpdateLayout();
+            var shown = popup.IsVisible ? LookAt(popup.Element, ContextIn(popup.Element)) : "popup not shown";
+            Raise(line, UIElement.MouseLeaveEvent);
+            return (detail, shown);
+        }
+
+        var bridged = Look("Pirate Discover");
+        var unbridged = Look("Mech Divine Shield");
+        check("context line: under the header of a bridged guide's detail and popup (small, muted), absent for a guide bridged to nothing",
+            bridged.Detail.StartsWith("ok ", StringComparison.Ordinal) && bridged.Popup.StartsWith("ok ", StringComparison.Ordinal)
+            && unbridged.Detail == "none" && unbridged.Popup == "none",
+            $"Pirate Discover: detail {bridged.Detail}; popup {bridged.Popup} | Mech Divine Shield: detail {unbridged.Detail}; popup {unbridged.Popup}");
+        window.CursorInside = null;
+    }
+
+    /// <summary>
+    /// What TavernMarkers has on the canvas, found without asking it: every visible element that is neither the scene's
+    /// (a string Tag: zones, Bob's and the options' boxes, HDT's tooltip slot), nor the panel or its popup, nor a label of
+    /// the choice open (at ChoiceLayout's places); each described by its kind, place, colours and texts, sorted.
+    /// </summary>
+    private static List<string> MarkerSignatures(HarnessWindow window)
+    {
+        var canvas = window.Overlay;
+        var choiceLabels = window.Choice is { HasMarkers: true } advice
+            ? ChoiceLayout.Labels(advice.Kind, window.ChoiceOptions.Count, canvas.ActualWidth, canvas.ActualHeight,
+                window.Choices.LastLines.Select(l => l.Count).DefaultIfEmpty(1).Max()).Select(RectOf).ToList()
+            : new List<Rect>();
+        return canvas.Children.OfType<FrameworkElement>()
+            .Where(e => e.Visibility == Visibility.Visible && e.Tag is not string && !ReferenceEquals(e, window.Comps.Element) && !ReferenceEquals(e, window.Comps.Popup.Element))
+            .Where(e => !choiceLabels.Any(r => Math.Abs(Canvas.GetLeft(e) - r.Left) < 0.5 && Math.Abs(Canvas.GetTop(e) - r.Top) < 0.5))
+            .Select(e =>
+            {
+                var look = e switch
+                {
+                    Rectangle r => $"stroke {(r.Stroke as SolidColorBrush)?.Color} dash {r.StrokeDashArray.Count}",
+                    Border b => $"border {(b.BorderBrush as SolidColorBrush)?.Color} {b.BorderThickness.Left:0.##} background {(b.Background as SolidColorBrush)?.Color}",
+                    _ => string.Empty,
+                };
+                return $"{e.GetType().Name} ({Canvas.GetLeft(e):0.#},{Canvas.GetTop(e):0.#} {e.ActualWidth:0.#}x{e.ActualHeight:0.#}) {look} [{string.Join(" / ", Texts(e).Select(Content))}]";
+            })
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
+    /// (d) A choice opened in the shop takes off the screen Bob's frames, labels and ◇ buttons, the panel and a guide popup on
+    /// show, and no popup shows meanwhile; one log line when it opens, none for the next updates of the same choice or of
+    /// another; closing it puts back the same targets and the same markers (same places, colours and texts), the panel as
+    /// it was — the same elements, not rebuilt —, one log line, and a hovered line shows its popup again. A Dark Gift first:
+    /// its ◇ fell inside the options. Also measured, for the record: how much of each option the panel covers at its place.
+    /// </summary>
+    private static void CoverChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var canvas = window.Overlay;
+        var comps = window.Comps;
+        var popup = comps.Popup;
+        window.SetMoveMode(false);
+        window.ShowSkipCombat(false);
+        window.CursorInside = _ => false;
+        window.ShowChoice(ChoiceKind.None);
+        window.UpdateLayout();
+        FlushLog(window);
+        var logStart = window.LogLines.Count;
+
+        var markersBefore = MarkerSignatures(window);
+        var pinsBefore = markersBefore.Count(s => s.EndsWith("[◇]", StringComparison.Ordinal) || s.EndsWith("[◆]", StringComparison.Ordinal));
+        var targetsBefore = CompTargets.Summary(window.Targets);
+        var highlightsBefore = window.Highlights;
+        var panelBefore = RectOf(comps.Element);
+        var contentBefore = comps.Element.Child;
+        var guide = window.Targets[0].Guide;
+        var line = comps.ShownLines[guide.Id];
+        Raise(line, UIElement.MouseEnterEvent);
+        Headless.Pump(400);
+        var popupBefore = popup.IsVisible;
+
+        string Covered(ChoiceKind kind) => string.Join(", ", ChoiceLayout.Cards(kind, 3, canvas.ActualWidth, canvas.ActualHeight).Select((c, i) =>
+        {
+            var overlap = Rect.Intersect(panelBefore, RectOf(c));
+            return overlap.IsEmpty ? $"option {i + 1}: 0" : $"option {i + 1}: {overlap.Width:0}x{overlap.Height:0} px";
+        }));
+        var measure = $"panel at {Describe(panelBefore)} covers, discover: {Covered(ChoiceKind.Discover)}; Dark Gift: {Covered(ChoiceKind.DarkGift)}";
+
+        window.ShowChoice(ChoiceKind.DarkGift);
+        window.UpdateLayout();
+        var markersDuring = MarkerSignatures(window);
+        var panelDuring = comps.Element.IsVisible;
+        var popupDuring = popup.IsVisible;
+        Raise(line, UIElement.MouseLeaveEvent);
+        Raise(line, UIElement.MouseEnterEvent); // the line "entered" again while the choice is open: no popup
+        Headless.Pump(400);
+        var popupOnHover = popup.IsVisible;
+        Raise(line, UIElement.MouseLeaveEvent);
+        window.ShowChoice(ChoiceKind.DarkGift); // the next updates of the same choice
+        window.ShowChoice(ChoiceKind.Discover); // then another kind, still open
+        window.UpdateLayout();
+        var markersStill = MarkerSignatures(window);
+        var panelStill = comps.Element.IsVisible;
+        check("choice open: Bob's frames, labels and ◇, the panel and a popup on show leave the screen; no popup on hover meanwhile",
+            popupBefore && pinsBefore > 0 && markersBefore.Count > pinsBefore && markersDuring.Count == 0 && markersStill.Count == 0
+            && !panelDuring && !panelStill && !popupDuring && !popupOnHover,
+            $"before: {markersBefore.Count} marker elements ({pinsBefore} ◇), panel shown, popup {popupBefore}; Dark Gift open: {markersDuring.Count} marker elements"
+            + $"{(markersDuring.Count > 0 ? " (" + string.Join(" | ", markersDuring.Take(3)) + ")" : string.Empty)}, panel {panelDuring}, popup {popupDuring}, "
+            + $"popup on hover {popupOnHover}; discover after it: {markersStill.Count}, panel {panelStill}; {measure}");
+
+        window.ShowChoice(ChoiceKind.None);
+        window.UpdateLayout();
+        var markersAfter = MarkerSignatures(window);
+        var lost = markersBefore.Except(markersAfter).ToList();
+        var added = markersAfter.Except(markersBefore).ToList();
+        var sameContent = ReferenceEquals(comps.Element.Child, contentBefore);
+        check("choice closed: the same targets, frames, labels and ◇ as before, the panel back as it was (the same elements)",
+            markersAfter.SequenceEqual(markersBefore) && CompTargets.Summary(window.Targets) == targetsBefore && ReferenceEquals(window.Highlights, highlightsBefore)
+            && comps.Element.IsVisible && RectOf(comps.Element) == panelBefore && sameContent,
+            $"{markersAfter.Count} marker elements, identical {markersAfter.SequenceEqual(markersBefore)}"
+            + (lost.Count + added.Count > 0 ? $" (gone: {string.Join(" | ", lost)}; new: {string.Join(" | ", added)})" : string.Empty)
+            + $"; targets {CompTargets.Summary(window.Targets)}; panel {Describe(RectOf(comps.Element))} visible {comps.Element.IsVisible}, same content {sameContent}");
+
+        FlushLog(window);
+        var transitions = window.LogLines.Skip(logStart)
+            .Where(l => l.Contains("Bronzebeard HUD: choice open") || l.Contains("Bronzebeard HUD: choice closed"))
+            .Select(l => l.Substring(l.IndexOf(">> ", StringComparison.Ordinal) + 3))
+            .ToList();
+        check("one log line per transition, none per update", transitions.SequenceEqual(new[] { ChoiceCover.HiddenLine, ChoiceCover.RestoredLine }),
+            string.Join(" | ", transitions));
+
+        Raise(comps.ShownLines[guide.Id], UIElement.MouseEnterEvent);
+        Headless.Pump(400);
+        var popupAgain = popup.IsVisible;
+        Raise(comps.ShownLines[guide.Id], UIElement.MouseLeaveEvent);
+        check("after the choice, a hovered line shows its popup again", popupAgain, $"popup visible {popupAgain}");
+        window.CursorInside = null;
     }
 
     private static readonly string[] SectionOrder = { "HOW TO PLAY", "CORE CARDS", "ADDON CARDS", "WHEN TO COMMIT", "COMMON ENABLERS", "PIVOTS" };

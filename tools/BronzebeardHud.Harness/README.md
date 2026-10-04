@@ -10,6 +10,7 @@ redimensionner et les regarder **sans lancer une partie** ni HDT.
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --detail 2   # la même, détail de la 2e cible ouvert (rang, ou nom d'un guide)
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --tick 1   # la même, la compo n° 1 cochée : elle devient la seule cible
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover   # la même, un choix ouvert : discover, dark-gift ou trinket
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover --close-choice   # le choix ouvert puis refermé : la scène rétablie
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --hover 1 --no-skip   # la ligne de la 1re cible survolée : son popup, comme en taverne
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --hover 1 --hover-card 2   # la même, et le 2e ovale de la ligne survolé : l'aperçu de sa carte
 ```
@@ -20,8 +21,14 @@ ligne comme la sonde de HDT, et laisse passer le délai ; la capture échoue (`e
 qu'en combat dans le plugin) : le popup a alors toute la colonne au-dessus du panneau.
 
 `--choice discover|dark-gift|trinket` (ou la liste « No choice / Discover / Dark Gift / Trinket » de la barre) ouvre un choix au-dessus de la scène : 3 options (découverte, Dark Gift) ou 4 trinkets, comme dans les parties d'Ali, en rectangles gris
-nommés aux places de `ChoiceLayout.Cards`, avec les étiquettes du vrai `ChoiceAdvicePanel` au-dessus. Options et stats de trinkets synthétiques (`HarnessData.Choice`) : carte clé, add-on, enabler d'une cible, carte clé
-d'un guide S non ciblé, carte sans rapport ; trinkets nommant la tribu d'une cible ; elles suivent `--scenario` et `--tick`.
+nommés aux places de `ChoiceLayout.Cards`, avec les étiquettes du vrai `ChoiceAdvicePanel` au-dessus. Options et stats de trinkets synthétiques (`HarnessData.Choice`) : en découverte, les trois étiquettes du pont
+(« + Pirate Discover · 3/5 boards », « + Mech Magnet 3/5 boards », « pivot → Beast Pack (A) ») ; en Dark Gift, enabler d'une cible non pontée, carte clé
+d'un guide S non ciblé, carte sans rapport ; trinkets nommant la tribu d'une cible ; elles suivent `--scenario` et `--tick`. `--close-choice` referme le
+choix avant la capture : la scène telle que le plugin la rétablit.
+
+Le pont (`GuideBridge`) relie les guides à deux compos Firestone **synthétiques** (`HarnessData.FirestoneComps`, cinq plateaux finaux
+chacune, sur les ids de `Pool`, un héros inventé) : `pirate_fs` → Pirate Discover, `mech_fs` → Mech Magnet ; Mech Divine Shield partage
+trois cartes avec `mech_fs` mais seulement 3 de ses 7 cartes clés : « no match », le contre-exemple. La ligne `bridge:` est au journal.
 
 Arguments en plus : `--size 1600x900`, `--layout <fichier>`, `--wait <ms>` (attente des noms et images avant la capture),
 `--scenario 0|1|2` (plateau tenu : rien, deux cartes d'une compo, un plateau fort ; 2 par défaut), `--detail <rang ou nom>`
@@ -53,7 +60,8 @@ leur mise en page et leur remplissage.
 - Les deux panneaux déplaçables (Compositions, Skip combat), mode déplacement activé au départ, et les zones à ne pas
   masquer en rouge dessous (définies par `NoGoZones` des tests : une seule définition).
 - La rangée de Bob : deux cartes clés d'une cible (cadre plein), un add-on et un enabler (pointillés), une carte épinglée
-  (◆, blanc) et deux qui ne servent à rien.
+  (◆, blanc), une qui ne sert à rien, et une qu'aucun guide de cible ne nomme mais qui est sur 3 des 5 plateaux de la compo
+  Firestone de Mech Magnet (pointillés « + M. Magnet 3/5 », par le pont).
 - Trois plateaux (liste déroulante) : 0, 1 et 3 cibles ; le bouton « Detail of target 1 / list » ouvre et ferme le détail.
 - Un choix (liste déroulante) : ses options au-dessus de la rangée de Bob, comme dans le jeu, sous les étiquettes du
   plugin. Tant qu'il est ouvert, les cadres, étiquettes et ◇ des cartes de Bob et le panneau « Compositions » (et son popup)
@@ -78,7 +86,14 @@ de popup ; deux `MouseEnter`, un seul affichage ; le popup dans l'overlay, hors 
 combat ; ses textes (mêmes contrôles) ; ses sections dans l'ordre de HDT, les six d'un guide qui les a ; une ligne de
 journal par affichage ; l'aperçu de carte d'un ovale de la ligne en même temps, sans recouvrir ni le popup ni le panneau ;
 un `MouseLeave` alors que le curseur est encore dans la ligne ignoré, un vrai le cache ; le clic sur le nom (détail) et
-le mode déplacement le cachent ; aucune ligne Warning/Error, **lue après que le dispatcher a livré les lignes** (avant le
+le mode déplacement le cachent ; **le pont** : une ligne `bridge:` qui nomme chaque guide, les deux pontés et le contre-exemple
+« no match » (mesuré sur les données : ≥ 2 cartes communes mais moins de la moitié des cartes clés) ; en découverte, « + T k/n boards »
+dans la couleur de T, un rôle suivi de « · k/n boards », « pivot → G (X) » sur fond neutre, lus sur ce qui est dessiné ; sur une carte
+de Bob, un cadre pointillé « + T 3/5 » dans la couleur de T et la ligne `tavern highlights=[…:boards 3/5:…]` ; la ligne de contexte
+sous l'en-tête du détail et du popup d'un guide ponté (texte attendu calculé à la main, 12 px, gris), absente pour le non ponté ;
+**un choix ouvert** (Dark Gift puis découverte) retire cadres, étiquettes, ◇, panneau et popup, aucun popup au survol pendant ce
+temps, une ligne `choice open` et une seule ; refermé, les mêmes cibles, les mêmes marqueurs (places, couleurs, textes), le panneau
+à sa place avec **les mêmes éléments** (pas reconstruit), une ligne `choice closed`, et le survol remarche ; aucune ligne Warning/Error, **lue après que le dispatcher a livré les lignes** (avant le
 2026-10-04 elle lisait 0 ligne : elles arrivent par `Dispatcher.BeginInvoke`) ; le fichier de disposition est celui de la
 simulation.
 Le contrôle des textes a été éprouvé par mutation le 2026-10-04 : un nom sans retour à la ligne et un texte à 11 px le font
@@ -86,3 +101,8 @@ Le contrôle des textes a été éprouvé par mutation le 2026-10-04 : un nom sa
 Ceux du survol aussi (2026-10-04) : popup posé sur les plateaux, délai supprimé, sortie « curseur encore dans la ligne »
 non reconnue, aperçu de carte sans sa boîte de taille fixe, mode déplacement qui ne cache plus ; et un avertissement
 journalisé juste avant le contrôle du journal le fait échouer (sans la vidange du dispatcher, il passait inaperçu).
+Ceux du pont et du masquage aussi (2026-10-04) : marqueurs dessinés malgré le choix, panneau laissé visible, panneau
+reconstruit au retour, journal à chaque mise à jour, pont non passé aux aides ou aux cadres, couleur de « + T k/n boards »
+neutre, ligne de contexte absente, à 13 px ou absente du seul popup, seuil du pont relâché (le contre-exemple ponte). Une
+mutation survit, et c'est voulu : retirer « suspendu » de ce qui bloque le popup ne le fait pas revenir pendant un choix,
+`PopupContent` refuse aussi un panneau suspendu, et un panneau replié a une largeur nulle (trois gardes, la propriété tient).

@@ -9,7 +9,8 @@ namespace BronzebeardHud.Harness;
 /// Command line. Without argument: the window, for hands-on debugging. <c>--selftest</c> and <c>--screenshot</c> run
 /// without anyone at the keyboard (the window is parked far off screen), write their result under <c>--out</c> and
 /// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--tick a,b</c> ticks guides,
-/// <c>--choice k</c> opens a choice above the scene (discover, dark-gift, trinket) and <c>--detail x</c> opens a guide's
+/// <c>--choice k</c> opens a choice above the scene (discover, dark-gift, trinket), <c>--close-choice</c> closes it again
+/// before the screenshot (the scene restored), and <c>--detail x</c> opens a guide's
 /// detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name). <c>--hover x</c> hovers a guide's
 /// line (move mode off) so that its popup shows in the screenshot, <c>--hover-card k</c> also hovers the k-th oval of that
 /// line (its card preview), and <c>--no-skip</c> hides the Skip combat button, as in the tavern.
@@ -33,6 +34,9 @@ internal sealed class Options
 
     /// <summary>The choice open above the scene, as ChoiceClassifier names it (discover, dark-gift, trinket); null: none.</summary>
     public string? Choice { get; private set; }
+
+    /// <summary>With <see cref="Choice"/>, the choice is closed again before the screenshot: the scene as the plugin restores it.</summary>
+    public bool CloseChoice { get; private set; }
 
     /// <summary>A guide whose line is hovered before the screenshot (its popup shows): a target's rank or a guide's name; null: none.</summary>
     public string? Hover { get; private set; }
@@ -78,6 +82,9 @@ internal sealed class Options
                     break;
                 case "--choice" when i + 1 < args.Length:
                     options.Choice = args[++i];
+                    break;
+                case "--close-choice":
+                    options.CloseChoice = true;
                     break;
                 case "--hover" when i + 1 < args.Length:
                     options.Hover = args[++i];
@@ -150,6 +157,11 @@ internal static class Headless
                 {
                     // Advised again on the targets the ticks left; an unknown name fails the capture (error.txt).
                     window.ShowChoice(HarnessData.ChoiceOf(options.Choice));
+                    if (options.CloseChoice)
+                    {
+                        window.UpdateLayout();
+                        window.ShowChoice(BronzebeardHud.Stats.ChoiceKind.None); // what the player sees once it is made: everything back
+                    }
                 }
 
                 if (options.Detail != null)
