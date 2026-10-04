@@ -100,11 +100,25 @@ public sealed class CompDetail
 
             if (TypicalFinalTurn is { } turn)
             {
-                parts.Add("final turn ≈ " + turn.ToString("0.#", CultureInfo.GetCultureInfo("fr-FR")));
+                parts.Add(FinalTurnText(turn));
             }
 
             return string.Join(" · ", parts);
         }
+    }
+
+    /// <summary>"final turn ≈ 11,5", decimal comma as Ali reads it.</summary>
+    public static string FinalTurnText(double turn) => "final turn ≈ " + turn.ToString("0.#", CultureInfo.GetCultureInfo("fr-FR"));
+
+    /// <summary>Median turn of the composition's final boards that give a turn; null when none does.</summary>
+    public static double? MedianFinalTurn(Composition composition)
+    {
+        var turns = composition.FinalBoards.Where(b => b.Turn.HasValue).Select(b => b.Turn!.Value).OrderBy(t => t).ToList();
+        return turns.Count == 0
+            ? null
+            : turns.Count % 2 == 1
+                ? turns[turns.Count / 2]
+                : (turns[turns.Count / 2 - 1] + turns[turns.Count / 2]) / 2.0;
     }
 
     /// <param name="techLevel">Tavern tier of a card id; null (or 0) when unknown. In the plugin it comes from HearthDb.</param>
@@ -132,12 +146,7 @@ public sealed class CompDetail
             .Select(id => new CompDetailCard(id, Tier(id), Frequency(id)))
             .ToList();
 
-        var turns = composition.FinalBoards.Where(b => b.Turn.HasValue).Select(b => b.Turn!.Value).OrderBy(t => t).ToList();
-        double? median = turns.Count == 0
-            ? null
-            : turns.Count % 2 == 1
-                ? turns[turns.Count / 2]
-                : (turns[turns.Count / 2 - 1] + turns[turns.Count / 2]) / 2.0;
+        var median = MedianFinalTurn(composition);
 
         var note = composition.FinalBoards.Count > 0
             ? $"Derived from {composition.FinalBoards.Count} top final boards (Firestone) and the comp's card lists; the source has no early-game guide."

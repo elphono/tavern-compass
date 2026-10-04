@@ -177,13 +177,16 @@ public static class TrinketAffinity
     }
 }
 
-/// <summary>Why an option's label says what it says (the diagnostic line names it).</summary>
+/// <summary>
+/// Why an option's label says what it says (the diagnostic line names it). For a minion or a spell, the first that applies, in
+/// this order: <see cref="Target"/>, <see cref="TopBoards"/>, <see cref="Pivot"/>, <see cref="Guide"/>, <see cref="None"/>.
+/// </summary>
 public enum ChoiceReason
 {
     /// <summary>Nothing specific: "—".</summary>
     None,
 
-    /// <summary>A core card, enabler or add-on of a target: in the target's colour.</summary>
+    /// <summary>A core card, enabler or add-on of a target: in the target's colour, with the boards of its bridged comp when known.</summary>
     Target,
 
     /// <summary>A core card of a guide that is no target, playable in the lobby: neutral.</summary>
@@ -191,18 +194,67 @@ public enum ChoiceReason
 
     /// <summary>A trinket: its placement, adjusted when it names a target's tribe.</summary>
     Trinket,
+
+    /// <summary>
+    /// No guide of a target lists the card, but it stands on at least <see cref="CardEvidence.MinimumBoards"/> of the final
+    /// boards of a target's bridged comp (<see cref="GuideBridge"/>): "+ Undead Butcher 3/5 boards", in the target's colour.
+    /// </summary>
+    TopBoards,
+
+    /// <summary>A core card of a guide a target can pivot to (<see cref="GuidePivots"/>): "pivot → Naga Spells (S)", neutral.</summary>
+    Pivot,
+}
+
+/// <summary>A guide a target can turn to (<see cref="GuidePivots.For"/>), of which the offered card is a core card.</summary>
+public sealed class ChoicePivot
+{
+    public ChoicePivot(CompTarget from, GuidePivot pivot)
+    {
+        From = from;
+        Pivot = pivot;
+    }
+
+    public CompTarget From { get; }
+
+    public GuidePivot Pivot { get; }
+
+    public CompGuide To => Pivot.To;
 }
 
 public sealed class OptionAdvice
 {
-    public OptionAdvice(int position, OfferedOption option, IReadOnlyList<GuideCardEffect> effects, IReadOnlyList<CompGuide> guides, TrinketNote? trinket)
+    /// <param name="boards">What the targets' bridged comps say of the card (<see cref="BoardEvidence.For"/>); null: nothing known.</param>
+    /// <param name="pivots">Guides a target can pivot to that the card is a core card of; null: none.</param>
+    public OptionAdvice(int position, OfferedOption option, IReadOnlyList<GuideCardEffect> effects, IReadOnlyList<CompGuide> guides, TrinketNote? trinket,
+        IReadOnlyList<BoardEvidence>? boards = null, IReadOnlyList<ChoicePivot>? pivots = null)
     {
         Position = position;
         Option = option;
         Effects = effects;
         Guides = guides;
         Trinket = trinket;
+        Boards = boards ?? Array.Empty<BoardEvidence>();
+        Pivots = pivots ?? Array.Empty<ChoicePivot>();
+        TopBoards = Boards.Where(b => b.Card.IsTop && GuideCardEffects.RoleIn(b.Target.Guide, option.CardId) == null).ToList();
     }
+
+    /// <summary>One per target whose bridged comp has final boards, in target order: on how many of them the card stands.</summary>
+    public IReadOnlyList<BoardEvidence> Boards { get; }
+
+    /// <summary>
+    /// Of <see cref="Boards"/>, the targets whose guide does not list the card but whose boards hold it at least
+    /// <see cref="CardEvidence.MinimumBoards"/> times. Said only when the card does nothing for any target (<see cref="Reason"/>).
+    /// </summary>
+    public IReadOnlyList<BoardEvidence> TopBoards { get; }
+
+    /// <summary>
+    /// When the card does nothing for the targets: the guides a target can pivot to that it is a core card of (playable in
+    /// the lobby, no target), in target order then pivot order; empty otherwise.
+    /// </summary>
+    public IReadOnlyList<ChoicePivot> Pivots { get; }
+
+    /// <summary>What the target's bridged comp says of the card; null when it has no bridge or no boards.</summary>
+    public BoardEvidence? BoardsFor(CompTarget target) => Boards.FirstOrDefault(b => b.Target.Guide.Id == target.Guide.Id);
 
     public int Position { get; }
     public OfferedOption Option { get; }
@@ -221,11 +273,21 @@ public sealed class OptionAdvice
     public ChoiceReason Reason =>
         Trinket != null ? ChoiceReason.Trinket
         : Effects.Count > 0 ? ChoiceReason.Target
+        : TopBoards.Count > 0 ? ChoiceReason.TopBoards
+        : Pivots.Count > 0 ? ChoiceReason.Pivot
         : Guides.Count > 0 ? ChoiceReason.Guide
         : ChoiceReason.None;
 
-    /// <summary>The label's colour: the first target's (<see cref="CompTarget.Colour"/>); null for a neutral label or a trinket.</summary>
-    public string? Colour => Trinket == null && Effects.Count > 0 ? Effects[0].Target.Colour : null;
+    /// <summary>
+    /// The label's colour: the first target's (<see cref="CompTarget.Colour"/>) it serves or whose boards hold it; null for a
+    /// neutral label or a trinket.
+    /// </summary>
+    public string? Colour => Reason switch
+    {
+        ChoiceReason.Target => Effects[0].Target.Colour,
+        ChoiceReason.TopBoards => TopBoards[0].Target.Colour,
+        _ => null,
+    };
 }
 
 public sealed class ChoiceAdvice
@@ -244,16 +306,20 @@ public sealed class ChoiceAdvice
 }
 
 /// <summary>
-/// The labels above the options of a choice, from the comp guide targets: what a card does for a target first; failing
-/// that, which other guide it is a core card of; failing that, nothing. Never "no target comp": with nothing ticked, the
-/// targets are the most probable guides, and a card that serves none of them still says which guide it would start.
+/// The labels above the options of a choice, from the comp guide targets: what a card does for a target first (with, when
+/// the target's guide is bridged to a Firestone comp, on how many of its top final boards the card stands); failing that,
+/// a target's bridged comp whose top boards hold it although its guide does not list it; failing that, a guide a target
+/// can pivot to that it is a core card of; failing that, which other guide it is a core card of; failing that, nothing.
+/// Never "no target comp": with nothing ticked, the targets are the most probable guides, and a card that serves none of
+/// them still says which guide it would start. Without a bridge the labels are those from before the bridge.
 /// </summary>
 public static class ChoiceAdvisor
 {
     /// <param name="owned">The player's board and hand: the core cards held are counted on them.</param>
     /// <param name="targets">The targets (<see cref="CompTargetTracker.Next"/>), in their order.</param>
-    /// <param name="guides">Every guide HDT lists, for the fallback; null when HDT gives none.</param>
+    /// <param name="guides">Every guide HDT lists, for the pivots and the fallback; null when HDT gives none.</param>
     /// <param name="lobbyTribes">The lobby's tribes as <see cref="Tribes.All"/> names; empty when unknown (no guide is then left out).</param>
+    /// <param name="bridge">Guide id → its Firestone comp (<see cref="GuideBridge.For"/>); null: no Firestone evidence.</param>
     public static ChoiceAdvice Advise(
         IReadOnlyList<OfferedOption> options,
         IReadOnlyList<OwnedCard> owned,
@@ -261,7 +327,8 @@ public static class ChoiceAdvisor
         CompGuideSet? guides,
         IReadOnlyCollection<string> lobbyTribes,
         Func<string, TrinketStat?>? trinketStat = null,
-        int bracket = MmrBracket.EveryPlayer)
+        int bracket = MmrBracket.EveryPlayer,
+        IReadOnlyDictionary<string, GuideEvidence>? bridge = null)
     {
         var kind = ChoiceClassifier.Kind(options);
         if (kind is ChoiceKind.None or ChoiceKind.Unsupported)
@@ -279,6 +346,11 @@ public static class ChoiceAdvisor
         {
             order[guide] = order.Count;
         }
+
+        var otherIds = new HashSet<string>(others.Select(g => g.Id), StringComparer.Ordinal);
+        var targetPivots = guides == null
+            ? new List<(CompTarget Target, IReadOnlyList<GuidePivot> Pivots)>()
+            : targets.Select(t => (Target: t, Pivots: GuidePivots.For(t.Guide, guides, held))).ToList();
 
         var advice = options.Select((option, position) =>
         {
@@ -298,17 +370,28 @@ public static class ChoiceAdvisor
                     .OrderBy(g => g.Tier)
                     .ThenBy(g => order[g])
                     .ToList();
-            return new OptionAdvice(position, option, effects, fallback, null);
+            var pivots = effects.Count > 0
+                ? (IReadOnlyList<ChoicePivot>)Array.Empty<ChoicePivot>()
+                : targetPivots
+                    .SelectMany(x => x.Pivots
+                        .Where(p => otherIds.Contains(p.To.Id) && p.To.CoreCards.Contains(option.CardId))
+                        .Select(p => new ChoicePivot(x.Target, p)))
+                    .GroupBy(p => p.To.Id, StringComparer.Ordinal)
+                    .Select(g => g.First())
+                    .ToList();
+            return new OptionAdvice(position, option, effects, fallback, null, BoardEvidence.For(option.CardId, targets, bridge), pivots);
         }).ToList();
         return new ChoiceAdvice(kind, advice, targets);
     }
 
     /// <summary>
-    /// The lines above one option. For a target: "★ core Undead Butcher 2/3→3/3" (a core card, 2 of 3 held, 3 once taken),
-    /// "★ core … 3/3 copy" (a held core card again), "+ Undead Butcher" (an enabler or add-on). For another guide:
-    /// "core Naga Spells (S)" with its tier. A trinket: its placement, "avg 3.80 → ≈3.50" and the target behind the "≈".
-    /// Nothing: "—". Several targets or guides: as many lines as fit <paramref name="maxLines"/>, the last one saying how
-    /// many are left ("+2 more"). Built to fit <paramref name="maxChars"/>, shortest forms last, never cut by the renderer.
+    /// The lines above one option, by its <see cref="OptionAdvice.Reason"/>. For a target: "★ core Undead Butcher 2/3→3/3"
+    /// (a core card, 2 of 3 held, 3 once taken), "★ core … 3/3 copy" (a held core card again), "+ Undead Butcher" (an enabler
+    /// or add-on), each followed by " · 4/5 boards" when the target's bridged comp has final boards and the suffix fits
+    /// (<see cref="MarkerText.LabelWithSuffix"/>). Top boards: "+ Undead Butcher 3/5 boards". A pivot: "pivot → Naga Spells (S)".
+    /// For another guide: "core Naga Spells (S)" with its tier. A trinket: its placement, "avg 3.80 → ≈3.50" and the target
+    /// behind the "≈". Nothing: "—". Several targets or guides: as many lines as fit <paramref name="maxLines"/>, the last one
+    /// saying how many are left ("+2 more"). Built to fit <paramref name="maxChars"/>, shortest forms last, never cut by the renderer.
     /// </summary>
     public static IReadOnlyList<string> Lines(OptionAdvice option, int maxChars, bool statsLoaded, int maxLines = 2)
     {
@@ -335,20 +418,26 @@ public static class ChoiceAdvisor
 
         string EffectLabel(GuideCardEffect e)
         {
+            var suffix = option.BoardsFor(e.Target)?.Card.Text is { } boards ? "· " + boards : null;
             if (!e.IsCore)
             {
-                return MarkerText.Label("+", e.Target.Guide.Name, string.Empty, maxChars);
+                return MarkerText.LabelWithSuffix("+", e.Target.Guide.Name, string.Empty, suffix, maxChars);
             }
 
             var count = e.CoreAfter > e.CoreBefore
                 ? $"{e.CoreBefore}/{e.CoreTotal}→{e.CoreAfter}/{e.CoreTotal}"
                 : $"{e.CoreBefore}/{e.CoreTotal} copy";
-            return MarkerText.Label("★ core", e.Target.Guide.Name, count, maxChars);
+            return MarkerText.LabelWithSuffix("★ core", e.Target.Guide.Name, count, suffix, maxChars);
         }
 
-        var labels = option.Effects.Count > 0
-            ? option.Effects.Select(EffectLabel).ToList()
-            : option.Guides.Select(g => MarkerText.Label("core", g.Name, $"({g.TierLetter})", maxChars)).ToList();
+        var labels = option.Reason switch
+        {
+            ChoiceReason.Target => option.Effects.Select(EffectLabel).ToList(),
+            ChoiceReason.TopBoards => option.TopBoards.Select(b => MarkerText.Label("+", b.Target.Guide.Name, b.Card.Text!, maxChars)).ToList(),
+            ChoiceReason.Pivot => option.Pivots.Select(p => MarkerText.Label("pivot →", p.To.Name, $"({p.To.TierLetter})", maxChars)).ToList(),
+            ChoiceReason.Guide => option.Guides.Select(g => MarkerText.Label("core", g.Name, $"({g.TierLetter})", maxChars)).ToList(),
+            _ => new List<string>(),
+        };
         if (labels.Count == 0)
         {
             return new[] { Fit("—", maxChars) };
@@ -370,8 +459,10 @@ public static class ChoiceAdvisor
 
     /// <summary>
     /// One line per choice in HDT's log: what the choice was, in which order HDT gave it, the targets and their colours,
-    /// what each option said and why (target, guide, trinket or none), and where the first label went. An unsupported
-    /// choice names its card types.
+    /// what each option said and why (target, topboards, pivot, guide, trinket or none) and on what evidence — the bridged
+    /// comp, the boards and the usual position ("(Undead Butcher → undead_butcher 4/5 pos 2)") for a target or top boards,
+    /// the pivot and its shared cards ("(Undead Butcher → Naga Spells 2 shared)") for a pivot, nothing otherwise — and
+    /// where the first label went. An unsupported choice names its card types.
     /// </summary>
     /// <param name="guideCount">Guides HDT lists (CompGuideSet.Count).</param>
     /// <param name="guideState">Where they come from or why there are none (source, or HDT's state).</param>
@@ -389,7 +480,26 @@ public static class ChoiceAdvisor
         }
 
         string Reason(int i) => i < advice.Options.Count ? advice.Options[i].Reason.ToString().ToLowerInvariant() : "?";
-        var said = "[" + string.Join("; ", lines.Select((l, i) => $"#{i} {Reason(i)}: {string.Join(" / ", l)}")) + "]";
+        string Evidence(int i)
+        {
+            if (i >= advice.Options.Count)
+            {
+                return string.Empty;
+            }
+
+            var o = advice.Options[i];
+            var evidence = o.Reason switch
+            {
+                ChoiceReason.Target => o.Effects.Select(e => o.BoardsFor(e.Target)).Where(b => b != null).Select(b => b!.Diagnostic),
+                ChoiceReason.TopBoards => o.TopBoards.Select(b => b.Diagnostic),
+                ChoiceReason.Pivot => o.Pivots.Select(p => $"{p.From.Guide.Name} → {p.To.Name} {p.Pivot.Shared.Count.ToString(inv)} shared"),
+                _ => Enumerable.Empty<string>(),
+            };
+            var text = string.Join(", ", evidence);
+            return text.Length > 0 ? $" ({text})" : string.Empty;
+        }
+
+        var said = "[" + string.Join("; ", lines.Select((l, i) => $"#{i} {Reason(i)}: {string.Join(" / ", l)}{Evidence(i)}")) + "]";
         var first = firstLabel is { } rect ? $"x={N(rect.Left)} y={N(rect.Top)} w={N(rect.Width)} h={N(rect.Height)}" : "none";
         return head + $" guides={guideCount} ({guideState}) targets={CompTargets.Summary(advice.Targets)} advice={said} first={first} canvas={N(canvasWidth)}x{N(canvasHeight)}";
     }

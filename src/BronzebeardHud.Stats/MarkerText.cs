@@ -37,19 +37,7 @@ public static class MarkerText
     /// </summary>
     public static string Label(string mark, string compositionName, string count, int maxChars)
     {
-        string Join(params string[] parts) => string.Join(" ", parts.Where(p => p.Length > 0));
-        var words = compositionName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        var candidates = new List<string> { Join(mark, compositionName, count) };
-        if (words.Length > 1)
-        {
-            candidates.Add(Join(mark, string.Join(" ", words.Take(words.Length - 1).Select(w => char.ToUpperInvariant(w[0]) + ".")) + " " + words[words.Length - 1], count));
-        }
-
-        if (words.Length > 0)
-        {
-            candidates.Add(Join(mark, string.Concat(words.Select(w => char.ToUpperInvariant(w[0]))), count));
-        }
-
+        var candidates = NameForms(compositionName).Select(name => Join(mark, name, count)).ToList();
         candidates.Add(Join(mark, count));
         candidates.Add(mark + count);
         var fitting = candidates.FirstOrDefault(c => DisplayLength(c) <= maxChars);
@@ -65,6 +53,48 @@ public static class MarkerText
         }
 
         return shortest;
+    }
+
+    /// <summary>
+    /// <see cref="Label(string, string, string, int)"/> followed by <paramref name="suffix"/> ("★ core Undead Butcher 2/3→3/3 · 4/5 boards")
+    /// when it fits with a form of the name — full, initials but the last word, initials: the suffix shortens the name, it
+    /// never takes its place. When none fits, the label without the suffix, as if there were none. A null or empty suffix
+    /// gives the label unchanged.
+    /// </summary>
+    public static string LabelWithSuffix(string mark, string compositionName, string count, string? suffix, int maxChars)
+    {
+        if (!string.IsNullOrEmpty(suffix))
+        {
+            var fitting = NameForms(compositionName)
+                .Select(name => Join(mark, name, count, suffix!))
+                .FirstOrDefault(c => DisplayLength(c) <= maxChars);
+            if (fitting != null)
+            {
+                return fitting;
+            }
+        }
+
+        return Label(mark, compositionName, count, maxChars);
+    }
+
+    private static string Join(params string[] parts) => string.Join(" ", parts.Where(p => p.Length > 0));
+
+    /// <summary>The name, then initials for every word but the last ("U. Butcher"), then initials only ("UB").</summary>
+    private static IReadOnlyList<string> NameForms(string compositionName)
+    {
+        var words = compositionName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        var forms = new List<string> { compositionName };
+        if (words.Length > 1)
+        {
+            forms.Add(string.Join(" ", words.Take(words.Length - 1).Select(w => char.ToUpperInvariant(w[0]) + ".")) + " " + words[words.Length - 1]);
+        }
+
+        if (words.Length > 0)
+        {
+            forms.Add(string.Concat(words.Select(w => char.ToUpperInvariant(w[0]))));
+        }
+
+        return forms;
     }
 
     /// <summary>
