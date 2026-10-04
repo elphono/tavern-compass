@@ -64,3 +64,54 @@ vers laquelle on veut se diriger » (c'était d'ailleurs le sens de l'ancien pan
 Maintenant `CompTargets.Choose` rend les cochées seules ; sans cochée, les plus probables. Le titre dit « k chosen » et
 − / + sont grisés. Vérifié dans la simulation par de vrais clics sur les cases (`--selftest`) et par mutation.
 
+## Survol : le guide complet en popup
+
+Ali : « le HDT Comp guide devrait faire pop le guide complet de la comp (comme dans HDT) en popup quand on survole, ou en
+remplaçant le contenu du panel en cliquant ». Le clic existait (détail, « ← All comp guides ») ; le survol manquait, et
+le détail à la place par défaut n'affiche que trois sections sur six.
+
+**Mesure, HDT 1.58.6 décompilé** (`Windows/OverlayWindow.cs` 2414-2502 et 2640-2805,
+`Utility/Extensions/OverlayExtensions.cs` 173-240) :
+
+| Ce que fait HDT | Conséquence |
+|---|---|
+| sonde ≈ 60 Hz purement géométrique : tout élément déclaré `IsOverlayHoverVisible` dont le rectangle contient le curseur reçoit `MouseEnter` (`CustomMouseEventArgs`), `MouseLeave` quand il en sort | une ligne et l'ovale qu'elle contient sont « entrés » ensemble ; passer de l'une à l'autre ne lève rien sur la ligne |
+| au-dessus d'un élément cliquable (`IsOverlayHitTestVisible`), WPF lève **en plus** ses propres `MouseEnter` / `MouseLeave` ; l'infobulle de HDT ne tient compte, pour un élément survolable, que de ceux de la sonde | nos gestionnaires peuvent être appelés deux fois, et WPF peut lever un `MouseLeave` alors que le curseur est encore sur la ligne (fenêtre repassée en clic-transparent) |
+| `SetTooltip` : **un seul** emplacement d'infobulle pour tout l'overlay (`Children.Count > 0 → return`), fermé au `MouseLeave`, sans taille maximale | une infobulle sur la ligne occuperait l'emplacement : les ovales de cette ligne ne montreraient plus leur carte |
+| `SetTooltip` place l'infobulle d'après sa taille mesurée (`ActualWidth`, `ActualHeight`) juste après l'avoir ajoutée | une `Image` sans source mesure 0 × 0 : voir plus bas |
+
+**Décision** : pas d'infobulle de HDT. Le popup (`GuidePopup`) est un élément du canvas, comme les panneaux ; le
+`MouseEnter` d'une ligne lance une minuterie de 250 ms (parcourir la liste ne fait pas défiler les popups), son
+`MouseLeave` l'annule et cache. Rien dans le popup n'est survolable ni cliquable ; les aperçus de cartes gardent
+l'infobulle de HDT, au-dessus du popup, et peuvent se montrer en même temps sans le recouvrir. Les sections sont
+construites par le même code que le détail (`GuideView`).
+
+Arbitrages pris en route :
+
+- **Événements de la sonde et de WPF traités pareil** (`GuideHover`, testé) : une deuxième entrée sur la ligne ne change
+  rien ; une sortie alors que le curseur est **encore dans le rectangle de la ligne** (`GetCursorPos`, la même mesure
+  que la sonde) est ignorée. Sans cela, le `MouseLeave` que WPF lève quand HDT repasse sa fenêtre en clic-transparent
+  (curseur passé du nom au fond de la ligne) cacherait le popup, et la sonde, qui tient la ligne pour entrée, ne le
+  ferait jamais revenir. Déduit du code, **pas vu en jeu**.
+- **Place** (`GuidePopupLayout.Place`) : la demande voulait le bord droit du popup sur celui du panneau **et** x ≥ 1442
+  en 1080p ; les deux ne tiennent pas ensemble (1669 − 400 = 1269, sur les plateaux). Les zones du jeu l'emportent : bord
+  droit sur celui du panneau quand rien ne gêne, poussé de côté sinon. Mesuré dans la simulation, 1920 × 1080 : popup en
+  (1452, 135) 400 × 547 en taverne, les six sections d'un guide qui les a ; en combat, au-dessus de Skip combat,
+  (1452, 17) 400 × 547. En 4:3 (1440 × 1080) la colonne à droite des plateaux n'a que 217 px : le popup passe au-dessus
+  des plateaux, 301 px de haut, sections réduites (calculé par `GuidePopupLayout`, pas regardé dans la simulation). Il
+  évite aussi toute la place qu'un aperçu de carte du panneau peut prendre (`PreviewArea`).
+- **Caché** au clic qui ouvre le détail, au changement de phase (taverne ↔ combat), en mode déplacement, panneau caché.
+
+**Trouvé en route, l'aperçu de carte au premier survol.** La simulation remplaçait l'infobulle de HDT par une infobulle
+WPF, qui se remesure toute seule. Refaite selon le code de HDT (un emplacement sur le canvas, placé d'après la taille
+mesurée de l'infobulle), elle a montré l'aperçu d'un ovale **sur le panneau**, décalé vers le bas et coupé par le bord
+de la fenêtre : `FullCard` rendait l'`Image` elle-même, dont la source n'est posée qu'à son `Loaded`, après le calcul de
+HDT ; une `Image` sans source mesure 0 × 0. Les ovales étant reconstruits à chaque redessin du panneau, c'est le cas de
+chaque premier survol. Corrigé : `FullCard` rend une boîte de la taille de la carte. Avant / après vus sur capture ;
+**pas vu en jeu**.
+
+**Ce que la simulation ne montre pas** : la sonde de HDT (la simulation lève `MouseEnter` / `MouseLeave` elle-même), le
+double `MouseEnter` réel, le `MouseLeave` de WPF quand la fenêtre repasse en clic-transparent (simulé en disant au popup
+que le curseur est encore dans la ligne), et l'emplacement unique d'infobulle de HDT ailleurs que dans sa copie, écrite
+d'après le code décompilé.
+

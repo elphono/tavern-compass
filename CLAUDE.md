@@ -43,7 +43,9 @@ Ce qui reste ouvert :
 
 - **Vérifier en jeu le panneau unique « Compositions »** (2026-10-04, `docs/journal/2026-10-04-panneau-unique.md`) :
   liste des guides de HDT et couleurs des cibles, détail au clic, cadres sur les cartes de Bob, étiquettes des choix,
-  tribus du lobby (bêtes). Vu seulement dans la simulation (captures, `--selftest` ; les étiquettes des choix depuis le 2026-10-04, `--choice`).
+  tribus du lobby (bêtes), popup du guide au survol d'une ligne (et l'aperçu de carte au premier survol d'un ovale). Vu
+  seulement dans la simulation (captures, `--selftest` ; les étiquettes des choix depuis le 2026-10-04, `--choice` ; le
+  survol, `--hover`).
 - **Vérifier en jeu la poignée de redimensionnement** (2026-10-04) : le calcul est testé et éprouvé par mutation,
   mais le pointage sous HDT, le cadre pointillé, le rendu d'un panneau étroit et le retour au défaut par « Reset » ne
   se voient que sous Windows.
@@ -177,12 +179,30 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   case, nom (deux lignes au besoin, jamais coupé ; couleur et gras d'une cible, blanc si quelque chose est tenu, gris
   sinon), les **cartes clés** seules en ovales (anneau vert + ✓ si tenues, tier en badge ; au-delà de six : cinq et
   « +k »). Une cible porte en plus un liseré de 3 px, une teinte et une pastille de rang dans sa couleur. Ce qui ne tient
-  pas est omis, les cibles en dernier (`CompGuideLayout.Fit`). Survoler un ovale montre la carte entière.
+  pas est omis, les cibles en dernier (`CompGuideLayout.Fit`). Survoler un ovale montre la carte entière (infobulle de
+  HDT ; `CardImages.FullCard` est une boîte de la taille de la carte, car HDT place l'infobulle d'après sa taille mesurée
+  dès l'ajout, avant que l'image ne charge : une `Image` sans source mesure 0 × 0 et l'aperçu tombait sur le panneau au
+  premier survol — vu dans la simulation le 2026-10-04, pas encore en jeu).
+- **Survol d'une ligne** (`GuidePopup`, Ali, 2026-10-04 : « le guide complet, comme dans HDT, en popup au survol ») :
+  après 250 ms sur une ligne de la liste, tout le guide dans une boîte à part, hors de la boîte du panneau — nom (couleur
+  de la cible, sinon blanc), badges de tier et de difficulté, les six sections dans l'ordre de HDT (mêmes constructeurs
+  que le détail : `GuideView`), « k of n sections » si tout ne tient pas. Place (`GuidePopupLayout.Place`, testée) :
+  au-dessus du panneau, à droite des plateaux (1080p : x = 1452, bas à 9 px du panneau ; au-dessus de Skip combat
+  quand il est là), bord droit sur celui du panneau quand rien ne gêne, poussé de côté sinon ; jamais sur une zone du jeu,
+  le panneau, Skip combat ni la place d'un aperçu de carte du panneau ; en dessous si le panneau est en haut ; rien s'il
+  n'y a de place nulle part (`guide popup: no room`, une fois par partie). **Pas une infobulle de HDT** : HDT n'a qu'un
+  emplacement d'infobulle pour tout l'overlay, une infobulle sur la ligne aurait empêché l'aperçu de carte de ses ovales ;
+  le popup est un élément du canvas, rien n'y est survolable ni cliquable, et l'aperçu d'un ovale de la ligne peut se
+  montrer en même temps. Événements de la sonde de HDT et de WPF traités pareil (`GuideHover`) : une deuxième entrée ne
+  change rien, une sortie alors que le curseur est encore dans le rectangle de la ligne est ignorée. Caché : sortie de
+  la ligne, clic qui ouvre le détail, changement de phase, mode déplacement, panneau caché. Journal :
+  `guide popup <nom> shown at (x,y w×h) sections=k/n` par affichage. Mesure et décision :
+  `docs/journal/2026-10-04-panneau-unique.md` § « Survol ».
 - **Détail** (clic sur un nom ou un ovale, comme dans HDT) : « ← All comp guides » à la place du titre, case, nom, badges
   de tier et de difficulté (couleurs de HDT, `CompGuideDifficulty`), puis HOW TO PLAY (première ligne, noms de cartes en
   gras), CORE CARDS, ADDON CARDS, WHEN TO COMMIT (une pastille par ligne), COMMON ENABLERS, PIVOTS (`GuidePivots`). Une
   section qui ne tient pas est omise entière (« k of n sections », `CompGuideLayout.Sections`) : à la place par défaut
-  en 1080p, deux ou trois tiennent ; agrandir le panneau pour tout voir.
+  en 1080p, deux ou trois tiennent ; agrandir le panneau, ou survoler la ligne (popup ci-dessous), pour tout voir.
 - **Taverne** (`TavernMarkers`, `TavernHighlights.For(Bob, cibles)`) : carte clé d'une cible → cadre plein, enabler ou
   add-on → pointillés, dans la couleur de la cible (carte clé d'abord, puis l'ordre des cibles), étiquette « core Nom
   k/N », « enabler Nom » ou « + Nom » ; le ◇ au-dessus de chaque sbire l'épingle (cadre blanc). **Choix** (découverte,
@@ -203,7 +223,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   lignes `Bronzebeard HUD: skip combat …` (parent, commande, demandes, nouveau pid, vivant 3 s après).
 - Sous WSL, on vérifie les tests et le build. Le chargement par HDT et les événements réels ne se vérifient que
   sous Windows, avec HDT installé. **Exception : la simulation** `tools/BronzebeardHud.Harness/` (README) fait tourner
-  les vrais panneaux (`PanelMover`, « Compositions », cadres sur les cartes de Bob, Skip combat, étiquettes des choix) dans une fenêtre Windows ordinaire, sans
+  les vrais panneaux (`PanelMover`, « Compositions » et son popup de survol, cadres sur les cartes de Bob, Skip combat, étiquettes des choix) dans une fenêtre Windows ordinaire, sans
   HDT ni partie, avec des données synthétiques ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
   la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. Elle ne simule
   pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) : un défaut qui y vivrait ne s'y voit pas.
