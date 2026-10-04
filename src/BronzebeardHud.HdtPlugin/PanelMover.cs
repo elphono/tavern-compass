@@ -95,6 +95,29 @@ internal sealed class PanelMover
 
     public bool MoveMode { get; private set; }
 
+    /// <summary>Raised after move mode was switched on or off (the guide popup hides then).</summary>
+    public event Action? MoveModeChanged;
+
+    /// <summary>
+    /// Where the visible panels it places are on the canvas, but <paramref name="except"/>: what a popup of that panel
+    /// must not cover (the Skip combat button).
+    /// </summary>
+    public IReadOnlyList<LayoutRect> VisiblePanels(Border except)
+    {
+        var rects = new List<LayoutRect>();
+        foreach (var panel in _panels.Keys)
+        {
+            var left = Canvas.GetLeft(panel);
+            var top = Canvas.GetTop(panel);
+            if (panel != except && panel.Visibility == Visibility.Visible && panel.ActualWidth > 0 && panel.ActualHeight > 0 && !double.IsNaN(left) && !double.IsNaN(top))
+            {
+                rects.Add(new LayoutRect(left + panel.ActualWidth / 2, top + panel.ActualHeight / 2, panel.ActualWidth, panel.ActualHeight));
+            }
+        }
+
+        return rects;
+    }
+
     /// <summary>
     /// Puts a panel at its remembered (or default) place, and makes it draggable in move mode. An
     /// <paramref name="interactive"/> panel keeps WPF hit-testing on outside move mode, so that its own
@@ -164,6 +187,8 @@ internal sealed class PanelMover
         {
             Save();
         }
+
+        MoveModeChanged?.Invoke();
     }
 
     /// <summary>Back to the default places for every panel.</summary>

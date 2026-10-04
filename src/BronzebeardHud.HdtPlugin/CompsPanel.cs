@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Media;
 using BronzebeardHud.Stats;
 using Hearthstone_Deck_Tracker.Hearthstone;
@@ -19,7 +18,9 @@ namespace BronzebeardHud.HdtPlugin;
 /// tick). A target carries its colour (CompTargetTracker.Palette): a 3 px bar on the left, a tint, its rank in a round
 /// badge, its name in bold in that colour; the frames on Bob's cards and the labels of choices use the same colour. A click
 /// on a name or an oval replaces the list by that guide's detail, as HDT does: "← All comp guides", the name with its tier
-/// and difficulty badges, then HOW TO PLAY, CORE CARDS, ADDON CARDS, WHEN TO COMMIT, COMMON ENABLERS and PIVOTS.
+/// and difficulty badges, then HOW TO PLAY, CORE CARDS, ADDON CARDS, WHEN TO COMMIT, COMMON ENABLERS and PIVOTS. Hovering a
+/// line shows that whole guide in a popup beside the panel, free of the panel's box (GuidePopup, after a short delay); the
+/// detail and the popup draw the sections with the same code (GuideView).
 ///
 /// Movable and resizable ("target-compositions", the id the panel always had: a place Ali saved stays valid), in the shop
 /// and in combat. Nothing is shrunk: every piece is built and measured in place, then what fits is shown (CompGuideLayout:
@@ -47,18 +48,12 @@ internal sealed class CompsPanel
     /// <summary>A target's line: the bar in its colour, on the left, taken from the tick box column (the names stay aligned).</summary>
     private const double TargetBar = 3;
 
-    private static readonly Brush PanelBrush = new SolidColorBrush(Color.FromArgb(0xEB, 0x14, 0x14, 0x1E));
-    private static readonly Brush FrameBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F));
+    /// <summary>The panel's background and frame (the guide popup wears them too).</summary>
+    internal static readonly Brush PanelBrush = new SolidColorBrush(Color.FromArgb(0xEB, 0x14, 0x14, 0x1E));
+    internal static readonly Brush FrameBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F));
     private static readonly Brush ButtonBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x44));
-    private static readonly Brush MutedBrush = new SolidColorBrush(Color.FromRgb(0xC8, 0xCD, 0xD8));
+    private static readonly Brush MutedBrush = GuideView.MutedBrush;
     private static readonly Brush RuleBrush = new SolidColorBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
-    private static readonly Brush PillBrush = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF));
-
-    // One colour per kind of card, the same in every section title: core (solid frame in the tavern), add-on, enabler, pivot.
-    private static readonly Brush CoreBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xD2, 0x3F));
-    private static readonly Brush AddonBrush = new SolidColorBrush(Color.FromRgb(0x7C, 0xE3, 0x8B));
-    private static readonly Brush EnablerBrush = new SolidColorBrush(Color.FromRgb(0x5C, 0xE1, 0xFF));
-    private static readonly Brush PivotBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x43));
 
     private readonly Canvas _canvas;
     private readonly PanelMover _mover;
@@ -71,6 +66,8 @@ internal sealed class CompsPanel
     private readonly Action<CompGuide, SectionFit> _detailShown;
     private readonly Action<Action> _run;
     private readonly TargetPanelView _view = new();
+    private readonly GuidePopup _popup;
+    private Dictionary<string, FrameworkElement> _shownLines = new(StringComparer.Ordinal);
 
     private CompGuideBoard _board = CompGuideBoard.Empty;
     private IReadOnlyList<CompTarget> _targets = Array.Empty<CompTarget>();
@@ -86,8 +83,13 @@ internal sealed class CompsPanel
     /// <param name="pivotsFor">A guide's pivots (GuidePivots), under their own guard; null when that feature failed.</param>
     /// <param name="detailShown">Called once each time a guide's detail is opened, with what of it fits (the log line).</param>
     /// <param name="run">Runs what a click or a resize triggers, under the panel's feature guard (a WPF handler is under none).</param>
+    /// <param name="cursorOver">
+    /// Whether the cursor is within an element, for the guide popup's MouseLeave (GuidePopup.IsCursorOver when null; the
+    /// simulation's self-test swaps it).
+    /// </param>
     public CompsPanel(Canvas canvas, PanelMover mover, Action<string> toggle, Func<int> count, Action<int> changeCount, Action openMeta,
-        Func<CompGuide, IReadOnlyList<GuidePivot>?> pivotsFor, Action<CompGuide, SectionFit> detailShown, Action<Action> run)
+        Func<CompGuide, IReadOnlyList<GuidePivot>?> pivotsFor, Action<CompGuide, SectionFit> detailShown, Action<Action> run,
+        Func<FrameworkElement, bool>? cursorOver = null)
     {
         _canvas = canvas;
         _mover = mover;
@@ -109,9 +111,20 @@ internal sealed class CompsPanel
         };
         OverlayLayer.Add(_canvas, _panel);
         _canvas.SizeChanged += OnCanvasSizeChanged;
+        _popup = new GuidePopup(canvas, PopupContent, () => _mover.MoveMode || _view.ShowsDetail || !IsVisible, cursorOver ?? GuidePopup.IsCursorOver, run);
+        _mover.MoveModeChanged += OnMoveModeChanged;
     }
 
     public bool IsVisible { get; private set; }
+
+    /// <summary>The popup of a hovered guide line (the simulation's self-test drives it).</summary>
+    public GuidePopup Popup => _popup;
+
+    /// <summary>The guide lines the list shows, by guide id: what hover is tracked on (none in a guide's detail).</summary>
+    public IReadOnlyDictionary<string, FrameworkElement> ShownLines => _shownLines;
+
+    /// <summary>Hides the guide popup: the shop phase ended or began (Plugin.UpdateComps).</summary>
+    public void HideGuidePopup() => _popup.Hide();
 
     /// <summary>The panel on the canvas (the simulation's self-test reads its texts).</summary>
     public Border Element => _panel;
@@ -165,12 +178,33 @@ internal sealed class CompsPanel
         _view.Back(); // out of the game: the next one starts on the list
         _loggedDetail = null;
         _panel.Visibility = Visibility.Collapsed;
+        _popup.Hide();
+        _popup.NewGame();
     }
 
     public void Detach()
     {
         _canvas.SizeChanged -= OnCanvasSizeChanged;
+        _mover.MoveModeChanged -= OnMoveModeChanged;
+        _popup.Detach();
         _canvas.Children.Remove(_panel);
+    }
+
+    private void OnMoveModeChanged() => _run(_popup.Hide);
+
+    /// <summary>What the popup draws for a guide of the list, and where the panel and the other panels are; null when it left the list.</summary>
+    private GuidePopupContent? PopupContent(string guideId)
+    {
+        var guide = _board.All.Select(p => p.Guide).FirstOrDefault(g => g.Id == guideId);
+        var left = Canvas.GetLeft(_panel);
+        var top = Canvas.GetTop(_panel);
+        if (guide == null || !IsVisible || double.IsNaN(left) || double.IsNaN(top) || _panel.ActualWidth <= 0)
+        {
+            return null;
+        }
+
+        var panel = new LayoutRect(left + _panel.ActualWidth / 2, top + _panel.ActualHeight / 2, _panel.ActualWidth, _panel.ActualHeight);
+        return new GuidePopupContent(guide, CompTargets.Find(_targets, guide), _held, _pivotsFor(guide), panel, _mover.VisiblePanels(except: _panel));
     }
 
     /// <summary>Opens a guide's detail in place of the list, as a click on its name does; false when it is not listed.</summary>
@@ -201,49 +235,15 @@ internal sealed class CompsPanel
         return new SolidColorBrush(Color.FromArgb(0x38, colour.R, colour.G, colour.B));
     }
 
-    private static TextBlock Text(string text, double size, double scale, Brush brush, bool bold = false) => new()
-    {
-        Text = text,
-        FontSize = size * scale,
-        Foreground = brush,
-        FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
-        TextWrapping = TextWrapping.Wrap,
-    };
-
-    /// <summary>One line of a guide's text, card names in bold as HDT draws them (CompGuideText).</summary>
-    private static TextBlock Runs(IReadOnlyList<CompGuideTextRun> runs, double size, double scale, Brush brush)
-    {
-        var text = new TextBlock { FontSize = size * scale, Foreground = brush, TextWrapping = TextWrapping.Wrap };
-        foreach (var run in runs)
-        {
-            text.Inlines.Add(new Run(run.Text) { FontWeight = run.IsCard ? FontWeights.Bold : FontWeights.Normal });
-        }
-
-        return text;
-    }
+    private static TextBlock Text(string text, double size, double scale, Brush brush, bool bold = false) => GuideView.Text(text, size, scale, brush, bold);
 
     /// <summary>A card's tavern tier for its badge; null when HDT knows none.</summary>
-    private static int? TierOf(string cardId) => Database.GetCardFromId(cardId)?.TechLevel is > 0 and var tier ? tier : null;
-
-    /// <summary>HDT's tier colours: BattlegroundsCompGuideViewModel.TierColor, a left-to-right gradient.</summary>
-    private static Brush TierBrush(int tier)
-    {
-        var (from, to) = tier switch
-        {
-            1 => (Color.FromRgb(64, 138, 191), Color.FromRgb(56, 95, 122)),
-            2 => (Color.FromRgb(107, 160, 54), Color.FromRgb(88, 121, 55)),
-            3 => (Color.FromRgb(146, 160, 54), Color.FromRgb(104, 121, 55)),
-            4 => (Color.FromRgb(160, 124, 54), Color.FromRgb(121, 95, 55)),
-            5 => (Color.FromRgb(160, 72, 54), Color.FromRgb(121, 66, 55)),
-            _ => (Color.FromRgb(112, 112, 112), Color.FromRgb(64, 64, 64)),
-        };
-        return new LinearGradientBrush(from, to, new Point(0, 0.5), new Point(1, 0.5));
-    }
+    internal static int? TierOf(string cardId) => Database.GetCardFromId(cardId)?.TechLevel is > 0 and var tier ? tier : null;
 
     /// <summary>A tier's bar, as in HDT's Tier 7 list: the letter on the tier's gradient.</summary>
     private static FrameworkElement TierHeader(CompGuideBoardTier tier, double scale) => new Border
     {
-        Background = TierBrush(tier.Tier),
+        Background = GuideView.TierBrush(tier.Tier),
         CornerRadius = new CornerRadius(3 * scale),
         Padding = new Thickness(6 * scale, 0, 6 * scale, 1 * scale),
         Margin = new Thickness(0, 4 * scale, 0, 0),
@@ -411,6 +411,9 @@ internal sealed class CompsPanel
             Padding = new Thickness(0, RowInset * scale, 0, RowInset * scale),
             Child = grid,
         };
+
+        // The whole line, its name and its background included, shows the guide's popup on hover (after a delay).
+        _popup.Track(element, guide.Id);
         return (element, FillOvals);
     }
 
@@ -487,6 +490,7 @@ internal sealed class CompsPanel
         if (!IsVisible || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
         {
             _panel.Visibility = Visibility.Collapsed;
+            _popup.Hide();
             return;
         }
 
@@ -512,6 +516,7 @@ internal sealed class CompsPanel
 
         var guide = _view.DetailId is { } id ? _board.All.Select(p => p.Guide).FirstOrDefault(g => g.Id == id) : null;
         double needed;
+        _shownLines = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
         if (guide != null && DetailEnabled)
         {
             needed = LayoutDetail(lines, guide, scale, height, inner, room - frame) + frame;
@@ -525,6 +530,9 @@ internal sealed class CompsPanel
 
         // Never less than what is shown: a list always shows one line, even in a box too small for it.
         _panel.MaxHeight = Math.Max(room, needed);
+
+        // Last, the panel being complete: the popup of a hovered line follows the redraw (no line in a detail: it hides).
+        _popup.Listed(_shownLines);
     }
 
     /// <summary>The list, as much of it as fits in <paramref name="room"/>; returns the height used.</summary>
@@ -539,15 +547,15 @@ internal sealed class CompsPanel
             chrome.Add(status);
         }
 
-        var pieces = new List<(FrameworkElement Element, Action? FillOvals, CompGuideItemKind Kind, int Group, bool Target)>();
+        var pieces = new List<(FrameworkElement Element, Action? FillOvals, CompGuideItemKind Kind, int Group, bool Target, string? GuideId)>();
         var tiers = CompTargets.Tiers(_board, _targets);
         for (var g = 0; g < tiers.Count; g++)
         {
-            pieces.Add((TierHeader(tiers[g], scale), null, CompGuideItemKind.TierHeader, g, false));
+            pieces.Add((TierHeader(tiers[g], scale), null, CompGuideItemKind.TierHeader, g, false, null));
             foreach (var progress in tiers[g].Rows)
             {
                 var (element, fill) = Row(progress, scale, height);
-                pieces.Add((element, fill, CompGuideItemKind.Row, g, CompTargets.Find(_targets, progress.Guide) != null));
+                pieces.Add((element, fill, CompGuideItemKind.Row, g, CompTargets.Find(_targets, progress.Guide) != null, progress.Guide.Id));
             }
         }
 
@@ -582,6 +590,10 @@ internal sealed class CompsPanel
             pieces[index].FillOvals?.Invoke();
             lines.Children.Add(pieces[index].Element);
             shownHeight += pieces[index].Element.DesiredSize.Height;
+            if (pieces[index].GuideId is { } shownId)
+            {
+                _shownLines[shownId] = pieces[index].Element;
+            }
         }
 
         shownCount.Text = fit.ShowsMoreLine
@@ -593,76 +605,6 @@ internal sealed class CompsPanel
         }
 
         return used + shownHeight;
-    }
-
-    /// <summary>A section's title in its colour, then a short hint in grey, on one line that wraps.</summary>
-    private static TextBlock SectionTitle(string title, string? hint, Brush colour, double scale)
-    {
-        var text = new TextBlock { FontSize = PanelTypography.Small * scale, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6 * scale, 0, 0) };
-        text.Inlines.Add(new Run(title.ToUpperInvariant()) { Foreground = colour, FontWeight = FontWeights.Bold });
-        if (!string.IsNullOrEmpty(hint))
-        {
-            text.Inlines.Add(new Run("  " + hint) { Foreground = MutedBrush });
-        }
-
-        return text;
-    }
-
-    private static FrameworkElement Section(string title, string? hint, Brush colour, double scale, FrameworkElement content)
-    {
-        var section = new StackPanel();
-        section.Children.Add(SectionTitle(title, hint, colour, scale));
-        section.Children.Add(content);
-        return section;
-    }
-
-    /// <summary>Cards as ovals, <see cref="PanelFit.CoreOvalsPerRow"/> to a line, as many lines as needed; hover shows the card.</summary>
-    private FrameworkElement OvalLines(IReadOnlyList<string> cards, double scale, double height)
-    {
-        var block = new StackPanel();
-        for (var i = 0; i < cards.Count; i += PanelFit.CoreOvalsPerRow)
-        {
-            var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4 * scale, 0, 0) };
-            foreach (var card in cards.Skip(i).Take(PanelFit.CoreOvalsPerRow))
-            {
-                line.Children.Add(Oval(card, scale, height, onClick: null));
-            }
-
-            block.Children.Add(line);
-        }
-
-        return block;
-    }
-
-    /// <summary>A guide's tier (its letter on HDT's gradient) and difficulty (HDT's colours), right of its name.</summary>
-    private static FrameworkElement Badges(CompGuide guide, double scale)
-    {
-        var badges = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
-        badges.Children.Add(new Border
-        {
-            Background = TierBrush(guide.Tier),
-            CornerRadius = new CornerRadius(3 * scale),
-            Padding = new Thickness(6 * scale, 0, 6 * scale, 1 * scale),
-            Margin = new Thickness(6 * scale, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = Text(guide.TierLetter, PanelTypography.PanelTitle, scale, Brushes.White, bold: true),
-        });
-        if (guide.Difficulty is >= 1 and <= 3)
-        {
-            var label = Text(CompGuideDifficulty.Text(guide.Difficulty), PanelTypography.Small, scale, Brushes.White, bold: true);
-            label.TextWrapping = TextWrapping.NoWrap;
-            badges.Children.Add(new Border
-            {
-                Background = HexBrush.Of(CompGuideDifficulty.Colour(guide.Difficulty)),
-                CornerRadius = new CornerRadius(3 * scale),
-                Padding = new Thickness(6 * scale, 2 * scale, 6 * scale, 2 * scale),
-                Margin = new Thickness(4 * scale, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Child = label,
-            });
-        }
-
-        return badges;
     }
 
     /// <summary>
@@ -697,7 +639,7 @@ internal sealed class CompsPanel
             header.Children.Add(rank);
         }
 
-        var badges = Badges(guide, scale);
+        var badges = GuideView.Badges(guide, scale);
         DockPanel.SetDock(badges, Dock.Right);
         header.Children.Add(badges);
         var name = Text(guide.Name, PanelTypography.CompositionName, scale, target != null ? HexBrush.Of(target.Colour) : Brushes.White, bold: true);
@@ -705,63 +647,9 @@ internal sealed class CompsPanel
         header.Children.Add(name);
         chrome.Add(header);
 
-        var sections = new List<FrameworkElement>();
-        if (guide.HowToPlayFirstLine.Count > 0)
-        {
-            sections.Add(Section("How to play", null, Brushes.White, scale, Runs(guide.HowToPlayFirstLine, PanelTypography.Body, scale, Brushes.White)));
-        }
-
-        var coreHeld = guide.CoreCards.Count(_held.Contains);
-        sections.Add(Section("Core cards", $"{coreHeld}/{guide.CoreCards.Count} held · solid frame in the tavern", CoreBrush, scale, OvalLines(guide.CoreCards, scale, height)));
-        if (guide.AddonCards.Count > 0)
-        {
-            sections.Add(Section("Addon cards", "dotted frame", AddonBrush, scale, OvalLines(guide.AddonCards, scale, height)));
-        }
-
-        if (guide.WhenToCommitLines.Count > 0)
-        {
-            var pills = new StackPanel();
-            foreach (var line in guide.WhenToCommitLines)
-            {
-                pills.Children.Add(new Border
-                {
-                    Background = PillBrush,
-                    BorderBrush = CoreBrush,
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(9 * scale),
-                    Padding = new Thickness(8 * scale, 2 * scale, 8 * scale, 3 * scale),
-                    Margin = new Thickness(0, 3 * scale, 0, 0),
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    Child = Runs(line, PanelTypography.Small, scale, Brushes.White),
-                });
-            }
-
-            sections.Add(Section("When to commit", null, CoreBrush, scale, pills));
-        }
-
-        if (guide.Enablers.Count > 0)
-        {
-            sections.Add(Section("Common enablers", "dotted frame", EnablerBrush, scale, OvalLines(guide.Enablers, scale, height)));
-        }
-
-        if (_pivotsFor(guide) is { Count: > 0 } pivots)
-        {
-            var block = new StackPanel();
-            foreach (var pivot in pivots)
-            {
-                var label = new TextBlock { FontSize = PanelTypography.Small * scale, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2 * scale, 0, 0) };
-                label.Inlines.Add(new Run("→ ") { Foreground = PivotBrush, FontWeight = FontWeights.Bold });
-                label.Inlines.Add(new Run(pivot.To.Name) { Foreground = Brushes.White, FontWeight = FontWeights.Bold });
-                label.Inlines.Add(new Run($" · {pivot.Shared.Count.ToString(CultureInfo.InvariantCulture)} shared") { Foreground = MutedBrush });
-                block.Children.Add(label);
-                block.Children.Add(OvalLines(pivot.Shared, scale, height));
-            }
-
-            sections.Add(Section("Pivots", "≈ guides sharing core or add-on cards", PivotBrush, scale, block));
-        }
-
-        var more = Text("9 of 9 sections", PanelTypography.Small, scale, MutedBrush);
-        more.Margin = new Thickness(0, 6 * scale, 0, 0);
+        // Hover on an oval of the detail shows the card (beside the panel); a click on it does nothing.
+        var sections = GuideView.Sections(guide, _held, _pivotsFor(guide), scale, card => Oval(card, scale, height, onClick: null));
+        var more = GuideView.MoreSections(scale);
         foreach (var element in chrome.Concat(sections).Append(more))
         {
             lines.Children.Add(element);
@@ -786,7 +674,7 @@ internal sealed class CompsPanel
 
         if (fit.ShowsMoreLine)
         {
-            more.Text = $"{fit.Shown.Count.ToString(CultureInfo.InvariantCulture)} of {fit.Total.ToString(CultureInfo.InvariantCulture)} sections";
+            more.Text = GuideView.SectionsShown(fit);
             lines.Children.Add(more);
             shownHeight += more.DesiredSize.Height;
         }

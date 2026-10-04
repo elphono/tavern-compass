@@ -59,6 +59,7 @@ public sealed class Plugin : IPlugin
     private PlayerCards _compsCards = BronzebeardHud.Stats.PlayerCards.None;
     private string _compsKey = string.Empty;
     private int _compsRound = -1;
+    private OverlayPhase _compsPhase = OverlayPhase.OutOfGame;
     private int _targetsVersion;
     private int _selectionVersion;
     private int _gameNumber;
@@ -602,6 +603,7 @@ public sealed class Plugin : IPlugin
         _compsBoard = CompGuideBoard.Empty;
         _compsCards = BronzebeardHud.Stats.PlayerCards.None;
         _compsRound = -1;
+        _compsPhase = OverlayPhase.OutOfGame;
     }
 
     public void OnUnload()
@@ -663,6 +665,12 @@ public sealed class Plugin : IPlugin
         }
 
         var phase = HdtEntityAdapter.Phase(game);
+        if (phase != _compsPhase)
+        {
+            _compsPhase = phase;
+            _compsPanel.HideGuidePopup(); // the tavern closes (or opens): a guide's popup does not outlive it
+        }
+
         if (phase is not (OverlayPhase.Shop or OverlayPhase.Combat))
         {
             LogCompsRound();

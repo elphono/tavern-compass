@@ -2,7 +2,7 @@
 
   <!-- Simulation of the plugin's panels in a plain Windows window, so that they can be moved, resized and looked
        at without Hearthstone running. The REAL panel sources are compiled in (Compile Include, below): PanelMover,
-       CompsPanel, TavernMarkers, SkipCombatPanel, ChoiceAdvicePanel, CardImages, PreviewPlacer, OverlayLayer.
+       CompsPanel, GuideView, GuidePopup, TavernMarkers, SkipCombatPanel, ChoiceAdvicePanel, CardImages, PreviewPlacer, OverlayLayer.
        ChoiceAdvicePanel builds its own trinket stats cache (StatsCache over HttpStatsFetcher) but only fetches when the
        plugin polls it: the harness never does, and hands ChoiceAdvisor synthetic trinket stats instead.
        What they ask of HDT (OverlayExtensions, Log, Database, the asset downloaders) is answered by HdtShim.cs, so
@@ -32,6 +32,8 @@
   <ItemGroup>
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\PanelMover.cs" Link="Plugin\PanelMover.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\CompsPanel.cs" Link="Plugin\CompsPanel.cs" />
+    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\GuideView.cs" Link="Plugin\GuideView.cs" />
+    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\GuidePopup.cs" Link="Plugin\GuidePopup.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\TavernMarkers.cs" Link="Plugin\TavernMarkers.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\SkipCombatPanel.cs" Link="Plugin\SkipCombatPanel.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\ChoiceAdvicePanel.cs" Link="Plugin\ChoiceAdvicePanel.cs" />

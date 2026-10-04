@@ -40,11 +40,12 @@ internal static class CardImages
     /// </summary>
     /// <param name="placePreview">
     /// Called as the cursor enters the vignette, before HDT's own handler shows the preview (handlers of one
-    /// element run in the order they were added), to set where the preview goes.
+    /// element run in the order they were added), to set where the preview goes. Null: a picture only, with no
+    /// preview, never hovered nor clicked (the guide popup, which nothing may catch the mouse in).
     /// </param>
     /// <param name="onClick">When given, a click on the vignette calls it with the card id (clickable while the overlay stays locked).</param>
     /// <param name="tier">When given, the tavern tier in a badge on the top left corner.</param>
-    public static FrameworkElement Vignette(string cardId, bool owned, double width, double scale, double previewHeight, Action<FrameworkElement> placePreview,
+    public static FrameworkElement Vignette(string cardId, bool owned, double width, double scale, double previewHeight, Action<FrameworkElement>? placePreview,
         Action<string>? onClick = null, int? tier = null)
     {
         var height = width * TavernLayout.OvalAspect;
@@ -87,8 +88,18 @@ internal static class CardImages
         // them, which its ToolTip attached property turns into a tooltip drawn in the overlay, flipped and
         // kept inside the window (Utility/Extensions/OverlayExtensions.Tooltip.cs:34-47, 90-118;
         // Windows/OverlayWindow.Tooltips.cs:34-175). Hover-only: the game keeps every click.
-        cell.MouseEnter += (_, _) => placePreview(cell);
-        if (onClick != null)
+        if (placePreview == null)
+        {
+            // Nothing catches the mouse: neither WPF (no hit test) nor HDT's probe (not declared hoverable), and no tooltip.
+            cell.Background = null;
+            cell.IsHitTestVisible = false;
+        }
+        else
+        {
+            cell.MouseEnter += (_, _) => placePreview(cell);
+        }
+
+        if (onClick != null && placePreview != null)
         {
             // Hover still shows the card: HDT raises its hover events on a hoverable element even when it is
             // also clickable (Windows/OverlayWindow.MouseOverDetection.cs:537-548).
@@ -101,9 +112,13 @@ internal static class CardImages
             };
         }
 
-        OverlayExtensions.SetIsOverlayHoverVisible(cell, true);
-        OverlayExtensions.SetToolTip(cell, FullCard(cardId, previewHeight));
-        ToolTipService.SetInitialShowDelay(cell, 0);
+        if (placePreview != null)
+        {
+            OverlayExtensions.SetIsOverlayHoverVisible(cell, true);
+            OverlayExtensions.SetToolTip(cell, FullCard(cardId, previewHeight));
+            ToolTipService.SetInitialShowDelay(cell, 0);
+        }
+
         var badge = 16 * scale;
         var badgeFont = PanelTypography.Badge * scale;
         if (owned)
