@@ -153,7 +153,8 @@ internal static class CardImages
     /// </summary>
     public static FrameworkElement FullCard(string cardId, double height)
     {
-        var image = new Image { Height = height, Width = height * BronzebeardHud.Stats.TavernLayout.PreviewAspect, Stretch = Stretch.Uniform, IsHitTestVisible = false };
+        var width = height * BronzebeardHud.Stats.TavernLayout.PreviewAspect;
+        var image = new Image { Height = height, Width = width, Stretch = Stretch.Uniform, IsHitTestVisible = false };
         var loaded = false;
         image.Loaded += (_, _) =>
         {
@@ -163,7 +164,13 @@ internal static class CardImages
                 Load(AssetDownloaders.cardImageDownloader, cardId, image);
             }
         };
-        return image;
+
+        // HDT places its tooltip from the tooltip's ActualWidth and ActualHeight, read right after adding it
+        // (Windows/OverlayWindow.cs SetTooltip, HDT 1.58.6 decompiled, lines 2700-2712), before the Loaded handler above
+        // has set the picture: an Image without a source is arranged 0 × 0 whatever its Width and Height, and the preview
+        // landed a card's width to the side and half a card lower, over the panel and cut by the window's bottom (seen in
+        // the simulation on 2026-10-04, whose tooltip follows HDT's code). A box of the card's size keeps that size empty.
+        return new Border { Width = width, Height = height, IsHitTestVisible = false, Child = image };
     }
 
     public static Image Hero(string heroCardId, double size)
