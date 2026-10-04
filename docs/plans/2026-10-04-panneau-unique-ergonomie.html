@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panneau unique Compositions</title>
+<meta name="description" content="Note de conception du 2026-10-04 : les sept demandes d'Ali sur les panneaux de compositions, ce qui a été fait, ce qui reste à décider et à voir en jeu.">
+<style>
+  :root {
+    --bg: #f7f7f4; --surface: #ffffff; --text: #1d1f24; --muted: #555b67; --border: #d6d9df; --soft: #eef0f3;
+    --o-panel: #1d5fd6; --o-frames: #7c3aed; --o-choice: #0f766e;
+    --core: #b45309; --core-soft: #fde9c8; --bad: #c81e1e; --art: #9aa3b2; --paper: #ffffff;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
+      --o-panel: #6ea8ff; --o-frames: #b79bff; --o-choice: #3fd0bd;
+      --core: #f5b83d; --core-soft: #4a3712; --bad: #ff6b6b; --art: #5d6577; --paper: #f4f4f4;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
+    --o-panel: #6ea8ff; --o-frames: #b79bff; --o-choice: #3fd0bd;
+    --core: #f5b83d; --core-soft: #4a3712; --bad: #ff6b6b; --art: #5d6577; --paper: #f4f4f4;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow-wrap: break-word;
+  }
+  main { max-width: 920px; margin: 0 auto; padding: 24px 16px 64px; }
+  .wide { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 8px 0 4px; }
+  h2 { font-size: 22px; line-height: 1.25; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  h3 { font-size: 18px; margin: 28px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 15px; margin: 0 0 20px; }
+  code { font: max(14px, 0.92em) ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+  .lead { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--text); border-radius: 8px; padding: 14px 16px; font-size: 18px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0 0; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .tile b { display: block; font-size: 26px; line-height: 1.1; }
+  .tile span { color: var(--muted); font-size: 15px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--surface); border: 1px solid var(--border); }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--soft); font-weight: 600; }
+  td.n { font-weight: 700; white-space: nowrap; }
+  .yes { font-weight: 700; }
+  .no { font-weight: 700; color: var(--muted); }
+  @media (max-width: 720px) {
+    table.cards, table.cards tbody, table.cards tr, table.cards td { display: block; width: 100%; }
+    table.cards thead { display: none; }
+    table.cards { border: 0; background: transparent; }
+    table.cards tr { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin: 0 0 12px; padding: 4px 0; }
+    table.cards td { border: 0; padding: 4px 12px; }
+    table.cards td::before { content: attr(data-label); display: block; font-size: 14px; color: var(--muted); font-weight: 600; }
+    table.cards td.n::before { display: inline; content: ""; }
+  }
+
+  figure { margin: 20px 0; }
+  figcaption { color: var(--muted); font-size: 15px; margin-top: 6px; }
+  img { max-width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 6px; background: #1c2230; }
+  .duo { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  @media (min-width: 1000px) { .duo { grid-template-columns: 1fr 1fr; } }
+  .crop img { width: 100%; }
+  .crop.w825 { max-width: 825px; }
+  .crop.w580 { max-width: 580px; }
+
+  svg { display: block; width: 100%; height: auto; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  svg .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  svg .sub { fill: var(--muted); }
+  svg .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+  svg .wire { stroke: var(--muted); stroke-width: 2; fill: none; }
+  .flow-wide { display: none; max-width: 900px; }
+  .flow-tall { max-width: 420px; margin: 0 auto; }
+  @media (min-width: 940px) { .flow-wide { display: block; } .flow-tall { display: none; } }
+  .mech { display: grid; grid-template-columns: 1fr; gap: 24px; }
+  @media (min-width: 860px) { .mech { grid-template-columns: 1fr 1fr; } }
+  .mech svg { max-width: 460px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 15px; color: var(--muted); margin-top: 6px; }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; margin: 12px 0; }
+  details > summary { cursor: pointer; font-weight: 600; }
+  details[open] > summary { margin-bottom: 8px; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 10px 12px; border-radius: 6px; margin: 8px 0; }
+  ul { padding-left: 22px; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Panneau unique « Compositions »</h1>
+  <p class="meta">Note de conception pour Ali, 2026-10-04. État : vu dans la simulation, pas encore sous HDT. Chaque section donne d'abord la décision ; le raisonnement est dessiné dessous, et les preuves sont repliées.</p>
+
+  <h2>1. En une phrase</h2>
+  <p class="lead">Un seul panneau « Compositions », construit sur la liste de guides de HDT. Jusqu'à quatre cibles (cochées, sinon choisies automatiquement) y portent chacune une couleur, et les cadres sur les cartes de Bob comme les aides de choix suivent ces mêmes cibles.</p>
+  <div class="tiles">
+    <div class="tile"><b>3 → 1</b><span>panneau : « Target compositions », « HDT comp guides » et le cadre « lineups » deviennent « Compositions »</span></div>
+    <div class="tile"><b>40 → 54</b><span>largeur des ovales de cartes, en pixels de conception à 1080p</span></div>
+    <div class="tile"><b>1 à 4</b><span>cibles, une couleur chacune, gardée pendant la partie</span></div>
+  </div>
+
+  <h2>2. Les 7 demandes d'Ali → ce qui a été fait</h2>
+  <table class="cards">
+    <thead><tr><th>#</th><th>Demande d'Ali</th><th>Décision</th><th>Où le voir (§ 3)</th><th>Écarté, et pourquoi</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="n">1</td>
+        <td data-label="Demande d'Ali">Les ovales sont trop petits.</td>
+        <td data-label="Décision">Ovales de 40 à 54 px. Le portrait n'est plus pris en entier : seules ses 174 colonnes centrales sur 256 remplissent l'ovale, comme la découpe de HDT (plus de croissant blanc, schéma ci-dessous).</td>
+        <td data-label="Où le voir">Zoom de la liste ; avant / après</td>
+        <td data-label="Écarté">Le rapport 240 / 174 des ovales de HDT : essayé, il donnait des ovales plus hauts que les lignes d'alors, anneau et coche coupés. Le rapport 1,2 est resté.</td>
+      </tr>
+      <tr>
+        <td class="n">2</td>
+        <td data-label="Demande d'Ali">« HDT comp guides » est illisible : noms de cartes en texte, « ★1/3 +1 » incompréhensible.</td>
+        <td data-label="Décision">Un clic sur un nom ou un ovale remplace la liste par le détail du guide, comme dans HDT : « ← All comp guides », puis les sections dans l'ordre de HDT.</td>
+        <td data-label="Où le voir">Détail à la place par défaut ; détail complet</td>
+        <td data-label="Écarté">Les noms de cartes en texte et « ★k/N +m » à l'écran (le « ★k/N » reste dans la ligne du journal d'HDT).</td>
+      </tr>
+      <tr>
+        <td class="n">3</td>
+        <td data-label="Demande d'Ali">Une compo « de plus de 7 cartes ».</td>
+        <td data-label="Décision">La ligne d'un guide = son nom et les ovales de ses <b>cartes clés</b> seules. Add-ons, enablers et « when to commit » vivent dans les sections du détail. Cause mesurée : schéma ci-dessous.</td>
+        <td data-label="Où le voir">Zoom de la liste</td>
+        <td data-label="Écarté">La liste « tout ce qui est tenu », qui mélangeait cartes clés, enablers et add-ons, et le « need » qui la suivait.</td>
+      </tr>
+      <tr>
+        <td class="n">4</td>
+        <td data-label="Demande d'Ali">Les deux panneaux disent la même chose ; l'ergonomie de HDT est meilleure. Plusieurs compos à la fois, chacune sa couleur.</td>
+        <td data-label="Décision">Fusion : la liste de HDT par tier. N cibles (1 à 4) = les guides cochés, puis les plus probables ; une couleur par cible, stable pendant la partie. La ligne « Board vs hero avg » est gardée telle quelle.</td>
+        <td data-label="Où le voir">Après, liste ; zoom de la liste (dernière ligne)</td>
+        <td data-label="Écarté">La liste Firestone et sa place moyenne (« avg ») par compo : le tier de HDT la remplace. Lecture à confirmer : § 6 (b).</td>
+      </tr>
+      <tr>
+        <td class="n">5</td>
+        <td data-label="Demande d'Ali">Les cadres en taverne doivent suivre automatiquement la compo construite, et changer avec elle.</td>
+        <td data-label="Décision">Cadres automatiques sur les cartes de Bob, dans la couleur de la cible : carte clé → cadre plein ; add-on ou enabler → pointillés ; étiquette « core MDS 2/7 », « + P. Discover », « enabler MDS ».</td>
+        <td data-label="Où le voir">Après, rangée de Bob</td>
+        <td data-label="Écarté">Les cadres tirés des compos Firestone (<code>TavernAdvisor</code> n'est plus appelé). Le ◇ d'épinglage reste.</td>
+      </tr>
+      <tr>
+        <td class="n">6</td>
+        <td data-label="Demande d'Ali">Le cadre « how top boards field it » (le « ? » au-dessus des sbires) est inutile.</td>
+        <td data-label="Décision">Cadre « lineups » et boutons « ? » retirés. Les statistiques restent dans le code (<code>MinionLineups</code>).</td>
+        <td data-label="Où le voir">Avant, en haut à droite ; absent après</td>
+        <td data-label="Écarté">Le panneau entier, à la demande d'Ali.</td>
+      </tr>
+      <tr>
+        <td class="n">7</td>
+        <td data-label="Demande d'Ali">Les aides de découverte, de trinket et de Dark Gift doivent s'appuyer sur les mêmes cibles.</td>
+        <td data-label="Décision">Carte clé d'une cible → « ★ core T k/N→… » dans sa couleur ; add-on ou enabler → « + T ». Sinon, carte clé d'un guide non visé mais jouable avec les tribus du lobby → « core G (S) ». Trinket : ses statistiques, ajustées sur la tribu principale des cibles.</td>
+        <td data-label="Où le voir"><b>Aucune capture</b> : la simulation n'affiche pas les choix</td>
+        <td data-label="Écarté">« no target comp », qui ne disait rien d'utile.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Les deux causes mesurées</h3>
+  <div class="mech">
+    <figure>
+      <svg viewBox="0 0 340 300" role="img" aria-labelledby="t-line">
+        <title id="t-line">Avant, une ligne listait 8 noms ; maintenant 5 ovales de cartes clés</title>
+        <text x="10" y="20" font-size="15" font-weight="700">Avant : « ★3/5 +3 », puis des noms</text>
+        <g font-size="14.6" text-anchor="middle">
+          <rect x="10" y="34" width="74" height="30" rx="6" style="fill:var(--core-soft);stroke:var(--core);stroke-width:2"/><text x="47" y="54">clé</text>
+          <rect x="92" y="34" width="74" height="30" rx="6" style="fill:var(--core-soft);stroke:var(--core);stroke-width:2"/><text x="129" y="54">clé</text>
+          <rect x="174" y="34" width="74" height="30" rx="6" style="fill:var(--core-soft);stroke:var(--core);stroke-width:2"/><text x="211" y="54">clé</text>
+          <rect x="256" y="34" width="74" height="30" rx="6" style="fill:var(--soft);stroke:var(--muted);stroke-width:1.5"/><text x="293" y="54">autre</text>
+          <rect x="10" y="72" width="74" height="30" rx="6" style="fill:var(--soft);stroke:var(--muted);stroke-width:1.5"/><text x="47" y="92">autre</text>
+          <rect x="92" y="72" width="74" height="30" rx="6" style="fill:var(--soft);stroke:var(--muted);stroke-width:1.5"/><text x="129" y="92">autre</text>
+          <rect x="174" y="72" width="74" height="30" rx="6" style="fill:none;stroke:var(--core);stroke-width:2;stroke-dasharray:5 4"/><text x="211" y="92">need</text>
+          <rect x="256" y="72" width="74" height="30" rx="6" style="fill:none;stroke:var(--core);stroke-width:2;stroke-dasharray:5 4"/><text x="293" y="92">need</text>
+        </g>
+        <text x="10" y="126" font-size="15">6 tenues + 2 manquantes = <tspan font-weight="700">8 noms</tspan></text>
+        <line x1="10" y1="142" x2="330" y2="142" style="stroke:var(--border);stroke-width:1.5"/>
+        <text x="10" y="168" font-size="15" font-weight="700">Maintenant : les cartes clés seules</text>
+        <g style="fill:var(--art)">
+          <ellipse cx="38" cy="212" rx="24" ry="29" style="stroke:var(--core);stroke-width:3.5"/>
+          <ellipse cx="98" cy="212" rx="24" ry="29" style="stroke:var(--core);stroke-width:3.5"/>
+          <ellipse cx="158" cy="212" rx="24" ry="29" style="stroke:var(--core);stroke-width:3.5"/>
+          <ellipse cx="218" cy="212" rx="24" ry="29" style="stroke:var(--core);stroke-width:2.5;stroke-dasharray:5 4;fill-opacity:0.45"/>
+          <ellipse cx="278" cy="212" rx="24" ry="29" style="stroke:var(--core);stroke-width:2.5;stroke-dasharray:5 4;fill-opacity:0.45"/>
+        </g>
+        <g font-size="22" font-weight="700" text-anchor="middle"><text x="38" y="220">✓</text><text x="98" y="220">✓</text><text x="158" y="220">✓</text></g>
+        <text x="10" y="268" font-size="15">5 ovales : 3 tenus, 2 à prendre</text>
+        <text x="10" y="290" font-size="15" class="sub">enablers, add-ons → sections du détail</text>
+      </svg>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--core-soft);border:2px solid var(--core)"></i>carte clé tenue</span>
+        <span><i class="sw" style="background:var(--soft);border:1.5px solid var(--muted)"></i>enabler ou add-on tenu</span>
+        <span><i class="sw" style="border:2px dashed var(--core)"></i>carte clé manquante</span>
+      </div>
+      <figcaption>« Plus de 7 cartes » : l'ancienne ligne mettait bout à bout toutes les cartes tenues, puis « need » et les cartes clés manquantes.</figcaption>
+      <details>
+        <summary>La mesure</summary>
+        <p>Journal d'HDT d'Ali, 2026-10-04 14:13:22, tour 11 : la première compo mise en valeur était à « ★3/5 +3 ». Cela fait 3 cartes clés tenues sur 5, plus 3 enablers ou add-ons tenus, donc 6 noms après « ✓ », puis 2 cartes clés après « need » : 8 noms sur une ligne.</p>
+        <pre>hdt_log.txt:450  14:13:22|Info|Plugin.LogCompGuidesRound &gt;&gt; Bronzebeard HUD: comp guides round=11 source=hdt-free comps=23 board=7 hand=10 highlighted=[1. … ★3/5 +3; 2. … ★2/4 +2; 3. … ★1/3 +1]</pre>
+        <p>HDT ne mélange jamais ces listes ; la liste « tout ce qui est tenu » (<code>CompGuideProgress.Held</code>) est retirée (commit b1c9ee3).</p>
+      </details>
+    </figure>
+
+    <figure>
+      <svg viewBox="0 0 340 226" role="img" aria-labelledby="t-cut">
+        <title id="t-cut">Découpe du portrait : l'ancien ovale montrait les marges blanches, le nouveau non</title>
+        <defs>
+          <clipPath id="bands-a"><rect x="10" y="30" width="19.7" height="140"/><rect x="130.3" y="30" width="19.7" height="140"/></clipPath>
+        </defs>
+        <g font-size="15" font-weight="700" text-anchor="middle"><text x="80" y="20">Avant</text><text x="260" y="20">Maintenant</text></g>
+        <!-- 256 px portrait drawn at 140: white square, art between columns 36 and 220 (the widest margins measured) -->
+        <rect x="10" y="30" width="140" height="140" style="fill:var(--paper);stroke:var(--border)"/>
+        <rect x="29.7" y="32.7" width="100.6" height="134.6" style="fill:var(--art)"/>
+        <ellipse cx="80" cy="100" rx="58.3" ry="70" clip-path="url(#bands-a)" style="fill:var(--bad);fill-opacity:0.75"/>
+        <ellipse cx="80" cy="100" rx="58.3" ry="70" style="fill:none;stroke:var(--text);stroke-width:2"/>
+        <rect x="190" y="30" width="140" height="140" style="fill:var(--paper);stroke:var(--border)"/>
+        <rect x="209.7" y="32.7" width="100.6" height="134.6" style="fill:var(--art)"/>
+        <ellipse cx="260" cy="100" rx="47.6" ry="57.1" style="fill:none;stroke:var(--text);stroke-width:2"/>
+        <g font-size="14.6" text-anchor="middle">
+          <text x="80" y="192">21 colonnes rognées</text>
+          <text x="80" y="212" style="fill:var(--bad)" font-weight="700">par côté : croissant</text>
+          <text x="260" y="192">41 colonnes rognées</text>
+          <text x="260" y="212" font-weight="700">par côté : net</text>
+        </g>
+      </svg>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--art)"></i>illustration</span>
+        <span><i class="sw" style="background:var(--paper);border:1px solid var(--border)"></i>marge blanche du portrait</span>
+        <span><i class="sw" style="background:var(--bad)"></i>blanc visible dans l'ovale</span>
+      </div>
+      <figcaption>Le portrait de 256 × 256 pose l'illustration sur un carré blanc. L'ancien ovale prenait presque tout le carré ; le nouveau ne garde que les 174 colonnes centrales, comme HDT.</figcaption>
+      <details>
+        <summary>La mesure</summary>
+        <p>25 portraits mesurés (art.hearthstonejson.com, 256x) : 24 ont 22 à 36 colonnes blanches de chaque côté. L'ancien ovale (40 × 48, le carré entier en « UniformToFill ») n'en rognait que 21,3 par côté. La découpe de HDT (<code>BattlegroundsMinion.xaml</code>, RadiusX = 87) en rogne 41 ; sa hauteur suit le rapport 1,2 (208,8 lignes).</p>
+        <p>Effet sur la capture de la simulation (35 ovales) : pixels blancs neutres (R, G, B &gt; 245) au bord intérieur des anneaux, <b>1325 avant, 0 après</b>. Trois mutations contre toute la suite (ancienne découpe, rapport 240/174, découpe 174 × 240) : trois détectées. Commit 48406c5.</p>
+      </details>
+    </figure>
+  </div>
+
+  <h2>3. Avant / après</h2>
+  <p>Captures de la simulation (<code>tools/BronzebeardHud.Harness</code>), 1920 × 1080, données inventées. Un clic ouvre l'image en taille réelle.</p>
+</main>
+
+<div class="wide">
+  <div class="duo">
+    <figure>
+      <a href="img/2026-10-04-panneau-unique/avant-liste.png"><img src="img/2026-10-04-panneau-unique/avant-liste.png" width="1920" height="1080" alt="Avant : à gauche le panneau HDT comp guides en texte, à droite Target compositions avec sept ovales par ligne, en haut à droite le cadre how top boards field it"></a>
+      <figcaption><b>Avant</b> (14:26) : « HDT comp guides » à gauche, « Target compositions » à droite, le cadre « how top boards field it » en haut à droite.</figcaption>
+    </figure>
+    <figure>
+      <a href="img/2026-10-04-panneau-unique/apres-liste.png"><img src="img/2026-10-04-panneau-unique/apres-liste.png" width="1920" height="1080" alt="Après : un seul panneau Compositions en bas à droite, trois cibles colorées, et des cadres colorés sur la rangée de Bob"></a>
+      <figcaption><b>Après</b> : un seul panneau « Compositions », 3 cibles colorées, et les cadres qu'elles posent sur la rangée de Bob.</figcaption>
+    </figure>
+  </div>
+  <figure style="max-width:1230px">
+    <a href="img/2026-10-04-panneau-unique/avant-zoom.png"><img src="img/2026-10-04-panneau-unique/avant-zoom.png" width="1230" height="340" alt="Zoom sur l'avant : HDT comp guides liste les cartes tenues en texte avec need ; Target compositions montre sept ovales de 40 et la place moyenne Firestone"></a>
+    <figcaption><b>Avant, zoom</b> (même capture) : à gauche les guides de HDT en texte, « ★1/3 +3 », cartes tenues puis « need » ; à droite les compos Firestone, sept ovales de 40 et leur « avg ».</figcaption>
+  </figure>
+</div>
+
+<main style="padding-top:0">
+  <figure class="crop w825">
+    <a href="img/2026-10-04-panneau-unique/apres-liste-zoom.png"><img src="img/2026-10-04-panneau-unique/apres-liste-zoom.png" width="825" height="660" alt="Zoom sur la liste : tiers S et C, trois cibles numérotées et colorées, ovales des cartes clés avec leur tier"></a>
+    <figcaption><b>La liste</b> : tiers S et C de HDT ; une ligne = case, nom, cartes clés ; au-delà de six, cinq ovales et « +2 » ; la ligne « Board vs hero avg » en bas.</figcaption>
+  </figure>
+  <figure class="crop w825">
+    <a href="img/2026-10-04-panneau-unique/apres-detail-defaut.png"><img src="img/2026-10-04-panneau-unique/apres-detail-defaut.png" width="825" height="660" alt="Détail de Mech Magnet à la place par défaut : How to play, Core cards, When to commit, puis 3 of 6 sections"></a>
+    <figcaption><b>Le détail à la place par défaut</b> (1080p) : 3 sections sur 6 tiennent, « 3 of 6 sections ».</figcaption>
+  </figure>
+  <figure class="crop w580">
+    <a href="img/2026-10-04-panneau-unique/apres-detail-complet.png"><img src="img/2026-10-04-panneau-unique/apres-detail-complet.png" width="580" height="680" alt="Détail complet de Mech Magnet dans une grande boîte : six sections, le bouton Skip combat passe devant les pivots"></a>
+    <figcaption><b>Le détail dans une boîte agrandie et remontée</b> : les 6 sections. Placée ainsi, elle couvre la 7ᵉ carte de Bob (son ◇ passe devant un ovale) et Skip combat passe devant les pivots : voir § 6 (a).</figcaption>
+  </figure>
+
+  <h2>4. Le flux : une seule source de cibles, trois sorties</h2>
+  <figure>
+    <svg class="flow-wide" viewBox="0 0 880 365" role="img" aria-labelledby="t-flow">
+      <title id="t-flow">Plateau et main, avec les guides de HDT, passent par CompGuideMatch.Rank puis CompTargetTracker, qui alimente le panneau, les cadres de Bob et les aides de choix</title>
+      <defs>
+        <marker id="aw-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+        <marker id="aw-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-panel)"/></marker>
+        <marker id="aw-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-frames)"/></marker>
+        <marker id="aw-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-choice)"/></marker>
+      </defs>
+      <rect class="box" x="10" y="80" width="160" height="70" rx="8"/>
+      <text x="90" y="110" font-size="16" font-weight="700" text-anchor="middle">Guides de HDT</text>
+      <text x="90" y="132" font-size="15" class="sub" text-anchor="middle">liste par tier</text>
+      <rect class="box" x="10" y="230" width="160" height="70" rx="8"/>
+      <text x="90" y="260" font-size="16" font-weight="700" text-anchor="middle">Plateau + main</text>
+      <text x="90" y="282" font-size="15" class="sub" text-anchor="middle">cartes tenues</text>
+
+      <rect class="box" x="220" y="145" width="180" height="100" rx="8"/>
+      <text x="310" y="172" font-size="15" class="mono" text-anchor="middle">CompGuideMatch</text>
+      <text x="310" y="192" font-size="15" class="mono" text-anchor="middle">.Rank</text>
+      <text x="310" y="214" font-size="15" class="sub" text-anchor="middle">3 × clé · 2 × enabler</text>
+      <text x="310" y="234" font-size="15" class="sub" text-anchor="middle">1 × add-on</text>
+
+      <rect class="box" x="450" y="130" width="190" height="130" rx="8"/>
+      <text x="545" y="156" font-size="15" class="mono" text-anchor="middle">CompTargetTracker</text>
+      <text x="545" y="180" font-size="15" class="sub" text-anchor="middle">cochées (≤ 4), puis</text>
+      <text x="545" y="200" font-size="15" class="sub" text-anchor="middle">les plus probables,</text>
+      <text x="545" y="220" font-size="15" class="sub" text-anchor="middle">jusqu'à n (1 à 4)</text>
+      <text x="545" y="244" font-size="15" text-anchor="middle" font-weight="600">couleur stable</text>
+
+      <rect x="690" y="40" width="180" height="84" rx="8" style="fill:var(--surface);stroke:var(--o-panel);stroke-width:3"/>
+      <text x="780" y="66" font-size="16" font-weight="700" text-anchor="middle" style="fill:var(--o-panel)">Panneau</text>
+      <text x="780" y="88" font-size="15" text-anchor="middle">« Compositions »</text>
+      <text x="780" y="110" font-size="14.6" class="mono sub" text-anchor="middle">CompsPanel</text>
+      <rect x="690" y="153" width="180" height="84" rx="8" style="fill:var(--surface);stroke:var(--o-frames);stroke-width:3"/>
+      <text x="780" y="182" font-size="16" font-weight="700" text-anchor="middle" style="fill:var(--o-frames)">Cadres de Bob</text>
+      <text x="780" y="206" font-size="14.6" class="mono sub" text-anchor="middle">TavernHighlights</text>
+      <text x="780" y="226" font-size="14.6" class="sub" text-anchor="middle">plein · pointillé</text>
+      <rect x="690" y="266" width="180" height="84" rx="8" style="fill:var(--surface);stroke:var(--o-choice);stroke-width:3"/>
+      <text x="780" y="295" font-size="16" font-weight="700" text-anchor="middle" style="fill:var(--o-choice)">Aides de choix</text>
+      <text x="780" y="319" font-size="14.6" class="mono sub" text-anchor="middle">ChoiceAdvisor</text>
+      <text x="780" y="339" font-size="14.6" class="sub" text-anchor="middle">découverte, trinket</text>
+
+      <path class="wire" d="M170 115 L218 178" marker-end="url(#aw-n)"/>
+      <path class="wire" d="M170 265 L218 212" marker-end="url(#aw-n)"/>
+      <path class="wire" d="M400 195 L448 195" marker-end="url(#aw-n)"/>
+      <path d="M640 180 L688 84" style="stroke:var(--o-panel);stroke-width:2.5;fill:none" marker-end="url(#aw-p)"/>
+      <path d="M640 195 L688 195" style="stroke:var(--o-frames);stroke-width:2.5;fill:none" marker-end="url(#aw-f)"/>
+      <path d="M640 210 L688 306" style="stroke:var(--o-choice);stroke-width:2.5;fill:none" marker-end="url(#aw-c)"/>
+      <path class="wire" d="M690 52 Q600 20 560 126" style="stroke-dasharray:6 5" marker-end="url(#aw-n)"/>
+      <text x="598" y="40" font-size="14.6" class="sub" text-anchor="end">case cochée</text>
+    </svg>
+
+    <svg class="flow-tall" viewBox="0 0 340 650" role="img" aria-labelledby="t-flow2">
+      <title id="t-flow2">Le même flux, de haut en bas</title>
+      <defs>
+        <marker id="bw-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+        <marker id="bw-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-panel)"/></marker>
+        <marker id="bw-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-frames)"/></marker>
+        <marker id="bw-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-choice)"/></marker>
+      </defs>
+      <rect class="box" x="2" y="4" width="160" height="76" rx="8"/>
+      <text x="82" y="36" font-size="16.5" font-weight="700" text-anchor="middle">Guides de HDT</text>
+      <text x="82" y="60" font-size="15" class="sub" text-anchor="middle">par tier</text>
+      <rect class="box" x="178" y="4" width="160" height="76" rx="8"/>
+      <text x="258" y="36" font-size="16.5" font-weight="700" text-anchor="middle">Plateau + main</text>
+      <text x="258" y="60" font-size="15" class="sub" text-anchor="middle">cartes tenues</text>
+      <path class="wire" d="M82 80 L150 114" marker-end="url(#bw-n)"/>
+      <path class="wire" d="M258 80 L190 114" marker-end="url(#bw-n)"/>
+
+      <rect class="box" x="2" y="118" width="336" height="84" rx="8"/>
+      <text x="170" y="148" font-size="16" class="mono" text-anchor="middle">CompGuideMatch.Rank</text>
+      <text x="170" y="174" font-size="15" class="sub" text-anchor="middle">3 × clé · 2 × enabler · 1 × add-on</text>
+      <path class="wire" d="M170 202 L170 230" marker-end="url(#bw-n)"/>
+
+      <rect class="box" x="2" y="234" width="336" height="108" rx="8"/>
+      <text x="170" y="262" font-size="16" class="mono" text-anchor="middle">CompTargetTracker</text>
+      <text x="170" y="288" font-size="15" class="sub" text-anchor="middle">cochées (≤ 4), puis les plus</text>
+      <text x="170" y="310" font-size="15" class="sub" text-anchor="middle">probables, jusqu'à n (1 à 4)</text>
+      <text x="170" y="332" font-size="15" text-anchor="middle" font-weight="600">couleur stable</text>
+
+      <path class="wire" d="M18 342 L18 608"/>
+      <path d="M18 418 L40 418" style="stroke:var(--o-panel);stroke-width:2.5;fill:none" marker-end="url(#bw-p)"/>
+      <path d="M18 518 L40 518" style="stroke:var(--o-frames);stroke-width:2.5;fill:none" marker-end="url(#bw-f)"/>
+      <path d="M18 608 L40 608" style="stroke:var(--o-choice);stroke-width:2.5;fill:none" marker-end="url(#bw-c)"/>
+
+      <path class="wire" d="M300 376 L300 346" style="stroke-dasharray:6 5" marker-end="url(#bw-n)"/>
+      <text x="290" y="366" font-size="15" class="sub" text-anchor="end">case cochée</text>
+
+      <rect x="42" y="378" width="296" height="80" rx="8" style="fill:var(--surface);stroke:var(--o-panel);stroke-width:3"/>
+      <text x="190" y="406" font-size="16.5" font-weight="700" text-anchor="middle" style="fill:var(--o-panel)">Panneau « Compositions »</text>
+      <text x="190" y="434" font-size="15" class="mono sub" text-anchor="middle">CompsPanel</text>
+      <rect x="42" y="478" width="296" height="80" rx="8" style="fill:var(--surface);stroke:var(--o-frames);stroke-width:3"/>
+      <text x="190" y="506" font-size="16.5" font-weight="700" text-anchor="middle" style="fill:var(--o-frames)">Cadres de Bob</text>
+      <text x="190" y="534" font-size="15" class="mono sub" text-anchor="middle">TavernHighlights</text>
+      <rect x="42" y="568" width="296" height="80" rx="8" style="fill:var(--surface);stroke:var(--o-choice);stroke-width:3"/>
+      <text x="190" y="596" font-size="16.5" font-weight="700" text-anchor="middle" style="fill:var(--o-choice)">Aides de choix</text>
+      <text x="190" y="624" font-size="15" class="mono sub" text-anchor="middle">ChoiceAdvisor</text>
+    </svg>
+    <figcaption>Les trois sorties lisent les mêmes cibles, avec les mêmes couleurs : elles ne peuvent pas se contredire. Une case cochée dans le panneau revient au choix des cibles.</figcaption>
+  </figure>
+
+  <h2>5. Ce qui n'a PAS été vu</h2>
+  <p>Rien n'a tourné sous HDT. La simulation fait tourner les vrais panneaux dans une fenêtre Windows ordinaire, mais elle ne reproduit pas la couche d'HDT au-dessus du jeu.</p>
+  <table>
+    <thead><tr><th>Ce qu'il faut voir</th><th>Simulation</th><th>Sous HDT</th></tr></thead>
+    <tbody>
+      <tr><td>Liste des guides, couleurs des cibles</td><td class="yes">✓ captures, auto-test</td><td class="no">✗</td></tr>
+      <tr><td>Détail au clic, « ← All comp guides »</td><td class="yes">✓</td><td class="no">✗</td></tr>
+      <tr><td>Cadres sur les cartes de Bob</td><td class="yes">✓ sur des cartes grises</td><td class="no">✗</td></tr>
+      <tr><td>Étiquettes des choix (découverte, trinket, Dark Gift)</td><td class="no">✗ absentes de la simulation</td><td class="no">✗</td></tr>
+      <tr><td>Clics à travers la couche d'HDT (cases, noms, ovales)</td><td class="no">✗ pas de couche HDT</td><td class="no">✗</td></tr>
+      <tr><td>Survol des ovales, sondé par HDT à 60 Hz</td><td class="no">✗</td><td class="no">✗</td></tr>
+      <tr><td>Vrais guides : noms longs, Tier 7, textes réels</td><td class="no">✗ guides inventés</td><td class="no">✗</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. À décider, ou à vérifier en partie</h2>
+  <table class="cards">
+    <thead><tr><th>#</th><th>Question</th><th>Ce qui est en place</th><th>Options</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="n">a</td>
+        <td data-label="Question">À la place par défaut en 1080p, le détail ne montre que 3 sections sur 6.</td>
+        <td data-label="En place">« 3 of 6 sections » sous le détail ; la poignée ◢ agrandit le panneau et tout s'affiche.</td>
+        <td data-label="Options">Agrandir à la poignée (rien à coder, mais la boîte agrandie couvre Bob ou Skip combat : 3ᵉ capture), ou changer la place par défaut.</td>
+      </tr>
+      <tr>
+        <td class="n">b</td>
+        <td data-label="Question">« S/A/B/C suffit, pas besoin de l'avg » : quelle lecture ?</td>
+        <td data-label="En place">Lu comme : le tier de HDT remplace la place moyenne Firestone par compo. La ligne « Board 142 · hero avg 120 at turn 8 · +18% » est gardée.</td>
+        <td data-label="Options">Si Ali visait cette ligne-là, la réduire à une lettre tient en une ligne de code.</td>
+      </tr>
+      <tr>
+        <td class="n">c</td>
+        <td data-label="Question">Le pont avec Firestone n'est plus affiché : affinité avec le héros (« ≈ 3,5 with your hero »), tour final médian.</td>
+        <td data-label="En place">Les données et le code restent (<code>HeroCompAffinity</code>, <code>CompDetail</code>).</td>
+        <td data-label="Options">Les rebrancher sur les guides de HDT en recoupant les cartes, si Ali y tient.</td>
+      </tr>
+      <tr>
+        <td class="n">d</td>
+        <td data-label="Question">Aider les découvertes quand aucune compo ne s'impose.</td>
+        <td data-label="En place">Les card-stats de Firestone sont autorisées par l'accord, mais jamais chargées.</td>
+        <td data-label="Options">Les charger pour noter les cartes proposées hors de toute cible.</td>
+      </tr>
+      <tr>
+        <td class="n">e</td>
+        <td data-label="Question">Le réglage « n targets » est borné à 4 (il allait à 8).</td>
+        <td data-label="En place">Une couleur par cible, quatre couleurs ; un <code>settings.json</code> réglé de 5 à 8 se lit 4.</td>
+        <td data-label="Options">Garder 4, ou ajouter des couleurs pour aller au-delà.</td>
+      </tr>
+      <tr>
+        <td class="n">f</td>
+        <td data-label="Question">Vérifications en jeu.</td>
+        <td data-label="En place">La liste tenue dans CLAUDE.md, « Ce qui reste ouvert ».</td>
+        <td data-label="Options">Une partie sous HDT, en commençant par le § 5.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>7. Preuves</h2>
+  <details>
+    <summary>Tests, mutations, mesures, commits</summary>
+    <table class="cards">
+      <thead><tr><th>Preuve</th><th>Chiffre</th><th>D'où</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Preuve">Tests de la solution au commit 9e0c7b6 (Stats + GameState + LogParser + App)</td><td data-label="Chiffre">489 + 52 + 23 + 7, 0 échec</td><td data-label="D'où"><code>dotnet test</code>, relancé le 2026-10-04</td></tr>
+        <tr><td data-label="Preuve">Les mêmes, après le retrait du code de mise en page devenu inutile (27ed59e)</td><td data-label="Chiffre">467 + 52 + 23 + 7, 0 échec</td><td data-label="D'où">22 cas retirés, qui ne visaient que ce code</td></tr>
+        <tr><td data-label="Preuve">Mutations côté bibliothèque Stats</td><td data-label="Chiffre">18 + 12 détectées</td><td data-label="D'où">12 : commit 9132714 ; 18 : session de fusion, pas consigné dans un commit</td></tr>
+        <tr><td data-label="Preuve">Mutations de la découpe des portraits</td><td data-label="Chiffre">3 sur 3 détectées</td><td data-label="D'où">commit 48406c5</td></tr>
+        <tr><td data-label="Preuve">Pixels blancs neutres au bord intérieur des anneaux (35 ovales)</td><td data-label="Chiffre">1325 → 0</td><td data-label="D'où">commit 48406c5</td></tr>
+        <tr><td data-label="Preuve">Auto-test de la simulation (<code>--selftest</code>)</td><td data-label="Chiffre">14 PASS</td><td data-label="D'où">session de fusion, pas consigné dans un commit</td></tr>
+        <tr><td data-label="Preuve">Build Release du plugin contre HDT 1.58.6 installé</td><td data-label="Chiffre">0 avertissement, 0 erreur</td><td data-label="D'où">relancé le 2026-10-04, après 27ed59e</td></tr>
+        <tr><td data-label="Preuve">Commits du travail</td><td data-label="Chiffre">3770d09 → 9e0c7b6, puis 27ed59e</td><td data-label="D'où"><code>git log</code></td></tr>
+      </tbody>
+    </table>
+    <pre>$ dotnet test        (au commit 9e0c7b6)
+Passed!  - Failed:     0, Passed:   489, Skipped:     0, Total:   489 - BronzebeardHud.Stats.Tests.dll (net8.0)
+Passed!  - Failed:     0, Passed:    23, Skipped:     0, Total:    23 - BronzebeardHud.LogParser.Tests.dll (net8.0)
+Passed!  - Failed:     0, Passed:    52, Skipped:     0, Total:    52 - BronzebeardHud.GameState.Tests.dll (net8.0)
+Passed!  - Failed:     0, Passed:     7, Skipped:     0, Total:     7 - BronzebeardHud.App.Tests.dll (net8.0)</pre>
+    <pre>$ dotnet build src/BronzebeardHud.HdtPlugin -c Release --no-incremental -p:HdtInstallDir=…/HearthstoneDeckTracker/app-1.58.6/
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)</pre>
+  </details>
+</main>
+</body>
+</html>

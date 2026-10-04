@@ -346,6 +346,7 @@ Fixtures can be chained to build up a full timeline.
 | Dossier | Contenu |
 |---|---|
 | `docs/plans/` | 2026-03-08 : conception et plan du portage Rust → C# ; 2026-09-26 : étude de stack, spec et plan du plugin HDT |
+| `docs/plans/2026-10-04-panneau-unique-ergonomie.html` | note de conception HTML pour Ali (images dans `img/2026-10-04-panneau-unique/`) : les 7 demandes du panneau unique → décisions, avant / après, flux des cibles, ce qui n'a pas été vu, ce qui reste à décider |
 | `docs/reference/` | format de `Power.log`, recherche HDT / Tier7 |
 | `docs/journal/` | ce qui s'est décidé, séance par séance |
 | `docs/archive/` | le dépôt Rust complet, en bundle git |
