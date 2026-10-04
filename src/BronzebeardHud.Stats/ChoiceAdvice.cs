@@ -95,73 +95,10 @@ public static class ChoiceClassifier
     };
 }
 
-/// <summary>What taking one card does to one composition.</summary>
-public sealed class CompEffect
-{
-    public CompEffect(Composition composition, bool isKeyPiece, int targetRank, int keyBefore, int keyAfter)
-    {
-        Composition = composition;
-        IsKeyPiece = isKeyPiece;
-        TargetRank = targetRank;
-        KeyBefore = keyBefore;
-        KeyAfter = keyAfter;
-    }
-
-    public Composition Composition { get; }
-    public bool IsKeyPiece { get; }
-
-    /// <summary>0: the composition being played (best target); 1, 2: other targets; -1: not a target.</summary>
-    public int TargetRank { get; }
-
-    public bool IsCurrent => TargetRank == 0;
-
-    /// <summary>Key pieces held now, and once the card is taken (a copy of a held key piece adds none).</summary>
-    public int KeyBefore { get; }
-    public int KeyAfter { get; }
-    public int KeyTotal => Composition.CoreCards.Count;
-}
-
-/// <summary>
-/// The one engine that says what a card does for the compositions: the tavern markers and the choice
-/// markers both ask it, so that they can never disagree.
-/// </summary>
-public static class CardEffect
-{
-    /// <summary>
-    /// Key piece of any composition playable in the lobby (held or not: a copy of a held key piece makes a
-    /// triple), add-on of a target when not held. Targets first, in their rank, then better placement.
-    /// </summary>
-    public static IReadOnlyList<CompEffect> On(string rawCardId, IReadOnlyList<CompProgress> targets, IReadOnlyList<Composition> playable, IReadOnlyCollection<string> ownedIds)
-    {
-        var cardId = CardIds.Normalize(rawCardId);
-        var held = ownedIds.Contains(cardId);
-        var rank = targets.Select((t, i) => (t.Composition.Id, i)).ToDictionary(x => x.Id, x => x.i, StringComparer.Ordinal);
-        int RankOf(Composition c) => rank.TryGetValue(c.Id, out var r) ? r : -1;
-
-        CompEffect Effect(Composition c, bool isKey)
-        {
-            var before = c.CoreCards.Count(ownedIds.Contains);
-            return new CompEffect(c, isKey, RankOf(c), before, isKey && !held ? before + 1 : before);
-        }
-
-        return playable
-            .Where(c => c.CoreCards.Contains(cardId))
-            .Select(c => Effect(c, isKey: true))
-            .Concat(targets
-                .Select(t => t.Composition)
-                .Where(c => !held && !c.CoreCards.Contains(cardId) && c.AddonCards.Contains(cardId))
-                .Select(c => Effect(c, isKey: false)))
-            .OrderBy(e => e.TargetRank < 0 ? int.MaxValue : e.TargetRank)
-            .ThenBy(e => e.Composition.AveragePlacement ?? double.MaxValue)
-            .ThenBy(e => e.Composition.Id, StringComparer.Ordinal)
-            .ToList();
-    }
-}
-
-/// <summary>A trinket's placement, and how far it moves once adjusted to the compositions in reach.</summary>
+/// <summary>A trinket's placement, and how far it moves once adjusted to the targets.</summary>
 public sealed class TrinketNote
 {
-    public TrinketNote(double? placement, double? pickRate, double adjustment, Composition? justifiedBy)
+    public TrinketNote(double? placement, double? pickRate, double adjustment, CompTarget? justifiedBy)
     {
         Placement = placement;
         PickRate = pickRate;
@@ -177,7 +114,8 @@ public sealed class TrinketNote
     /// <summary>Places taken off the placement, 0 to <see cref="TrinketAffinity.MaxAdjustment"/>.</summary>
     public double Adjustment { get; }
 
-    public Composition? JustifiedBy { get; }
+    /// <summary>The target whose tribe the trinket names; null when it names none.</summary>
+    public CompTarget? JustifiedBy { get; }
 
     public double? Adjusted => Placement - Adjustment;
 }
@@ -185,14 +123,15 @@ public sealed class TrinketNote
 /// <summary>
 /// Firestone publishes trinket placements per MMR bracket only, never per composition or tribe (checked on
 /// trinket-stats/last-patch, 2026-09-26), so the adjustment is a heuristic, shown with "≈": a trinket whose
-/// English text names a tribe of a targeted composition gains up to <see cref="MaxAdjustment"/> places,
-/// fully for the composition being played, half for another target.
+/// English text names the main tribe of a target (<see cref="CompGuide.PrimaryTribe"/>) gains up to
+/// <see cref="MaxAdjustment"/> places, fully for the first target, half for another one.
 /// </summary>
 public static class TrinketAffinity
 {
     /// <summary>The bound: never more than 0.3 of a place, a third of the spread between common trinkets.</summary>
     public const double MaxAdjustment = 0.3;
 
+    /// <summary>Weight of the first target (<see cref="CompTarget.Rank"/> 1), and of the others.</summary>
     public const double CurrentWeight = 1.0;
     public const double AttainableWeight = 0.5;
 
@@ -213,23 +152,24 @@ public static class TrinketAffinity
 
     private static Regex Word(string pattern) => new($@"\b(?:{pattern})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    /// <summary>1 when the text names one of the composition's tribes, else 0.</summary>
-    public static double Affinity(string? text, Composition composition) =>
-        !string.IsNullOrEmpty(text) && composition.Tribes.Any(t => TribeWords.TryGetValue(t, out var word) && word.IsMatch(text))
+    /// <summary>1 when the text names the tribe (a HearthDb Race value, <see cref="GuideTribes"/>), else 0; 0 for no tribe.</summary>
+    public static double Affinity(string? text, int primaryTribe) =>
+        !string.IsNullOrEmpty(text) && GuideTribes.NameOf(primaryTribe) is { } tribe && TribeWords.TryGetValue(tribe, out var word) && word.IsMatch(text)
             ? 1
             : 0;
 
-    public static (double Adjustment, Composition? JustifiedBy) Adjust(string? text, IReadOnlyList<CompProgress> targets)
+    /// <summary>The largest weighted affinity among the targets, never their sum: the bound holds.</summary>
+    public static (double Adjustment, CompTarget? JustifiedBy) Adjust(string? text, IReadOnlyList<CompTarget> targets)
     {
         var best = 0.0;
-        Composition? justifiedBy = null;
+        CompTarget? justifiedBy = null;
         for (var i = 0; i < targets.Count; i++)
         {
-            var weighted = Affinity(text, targets[i].Composition) * (i == 0 ? CurrentWeight : AttainableWeight);
+            var weighted = Affinity(text, targets[i].Guide.PrimaryTribe) * (i == 0 ? CurrentWeight : AttainableWeight);
             if (weighted > best)
             {
                 best = weighted;
-                justifiedBy = targets[i].Composition;
+                justifiedBy = targets[i];
             }
         }
 
@@ -237,25 +177,60 @@ public static class TrinketAffinity
     }
 }
 
+/// <summary>Why an option's label says what it says (the diagnostic line names it).</summary>
+public enum ChoiceReason
+{
+    /// <summary>Nothing specific: "—".</summary>
+    None,
+
+    /// <summary>A core card, enabler or add-on of a target: in the target's colour.</summary>
+    Target,
+
+    /// <summary>A core card of a guide that is no target, playable in the lobby: neutral.</summary>
+    Guide,
+
+    /// <summary>A trinket: its placement, adjusted when it names a target's tribe.</summary>
+    Trinket,
+}
+
 public sealed class OptionAdvice
 {
-    public OptionAdvice(int position, OfferedOption option, IReadOnlyList<CompEffect> effects, TrinketNote? trinket)
+    public OptionAdvice(int position, OfferedOption option, IReadOnlyList<GuideCardEffect> effects, IReadOnlyList<CompGuide> guides, TrinketNote? trinket)
     {
         Position = position;
         Option = option;
         Effects = effects;
+        Guides = guides;
         Trinket = trinket;
     }
 
     public int Position { get; }
     public OfferedOption Option { get; }
-    public IReadOnlyList<CompEffect> Effects { get; }
+
+    /// <summary>What the option does for the targets (<see cref="GuideCardEffects.On"/>): core cards first, then the rest.</summary>
+    public IReadOnlyList<GuideCardEffect> Effects { get; }
+
+    /// <summary>
+    /// When it does nothing for the targets: the guides it is a core card of, among the guides playable in the lobby that
+    /// are no target, the best tier first (then HDT's order); empty otherwise.
+    /// </summary>
+    public IReadOnlyList<CompGuide> Guides { get; }
+
     public TrinketNote? Trinket { get; }
+
+    public ChoiceReason Reason =>
+        Trinket != null ? ChoiceReason.Trinket
+        : Effects.Count > 0 ? ChoiceReason.Target
+        : Guides.Count > 0 ? ChoiceReason.Guide
+        : ChoiceReason.None;
+
+    /// <summary>The label's colour: the first target's (<see cref="CompTarget.Colour"/>); null for a neutral label or a trinket.</summary>
+    public string? Colour => Trinket == null && Effects.Count > 0 ? Effects[0].Target.Colour : null;
 }
 
 public sealed class ChoiceAdvice
 {
-    public ChoiceAdvice(ChoiceKind kind, IReadOnlyList<OptionAdvice> options, IReadOnlyList<CompProgress> targets)
+    public ChoiceAdvice(ChoiceKind kind, IReadOnlyList<OptionAdvice> options, IReadOnlyList<CompTarget> targets)
     {
         Kind = kind;
         Options = options;
@@ -264,53 +239,76 @@ public sealed class ChoiceAdvice
 
     public ChoiceKind Kind { get; }
     public IReadOnlyList<OptionAdvice> Options { get; }
-    public IReadOnlyList<CompProgress> Targets { get; }
+    public IReadOnlyList<CompTarget> Targets { get; }
     public bool HasMarkers => Kind is ChoiceKind.Discover or ChoiceKind.DarkGift or ChoiceKind.Trinket;
 }
 
+/// <summary>
+/// The labels above the options of a choice, from the comp guide targets: what a card does for a target first; failing
+/// that, which other guide it is a core card of; failing that, nothing. Never "no target comp": with nothing ticked, the
+/// targets are the most probable guides, and a card that serves none of them still says which guide it would start.
+/// </summary>
 public static class ChoiceAdvisor
 {
+    /// <param name="owned">The player's board and hand: the core cards held are counted on them.</param>
+    /// <param name="targets">The targets (<see cref="CompTargetTracker.Next"/>), in their order.</param>
+    /// <param name="guides">Every guide HDT lists, for the fallback; null when HDT gives none.</param>
+    /// <param name="lobbyTribes">The lobby's tribes as <see cref="Tribes.All"/> names; empty when unknown (no guide is then left out).</param>
     public static ChoiceAdvice Advise(
         IReadOnlyList<OfferedOption> options,
         IReadOnlyList<OwnedCard> owned,
-        IReadOnlyList<Composition> compositions,
+        IReadOnlyList<CompTarget> targets,
+        CompGuideSet? guides,
         IReadOnlyCollection<string> lobbyTribes,
         Func<string, TrinketStat?>? trinketStat = null,
-        int bracket = MmrBracket.EveryPlayer,
-        IReadOnlyList<string>? chosen = null,
-        IReadOnlyDictionary<string, HeroCompPick>? heroEffects = null,
-        int suggested = HudSettings.DefaultSuggested)
+        int bracket = MmrBracket.EveryPlayer)
     {
         var kind = ChoiceClassifier.Kind(options);
-        var playable = TavernAdvisor.Playable(compositions, lobbyTribes);
-        var focus = TavernAdvisor.Aim(compositions, playable, owned, chosen, suggested, heroEffects);
-        var (targets, pool) = (focus.Aimed, focus.Pool);
         if (kind is ChoiceKind.None or ChoiceKind.Unsupported)
         {
             return new ChoiceAdvice(kind, Array.Empty<OptionAdvice>(), targets);
         }
 
-        var ownedIds = new HashSet<string>(owned.Select(c => c.CardId), StringComparer.Ordinal);
+        var held = new HashSet<string>(owned.Select(c => c.CardId), StringComparer.Ordinal);
+        var targetIds = new HashSet<string>(targets.Select(t => t.Guide.Id), StringComparer.Ordinal);
+        var others = (guides?.All ?? (IReadOnlyList<CompGuide>)Array.Empty<CompGuide>())
+            .Where(g => !targetIds.Contains(g.Id) && GuideTribes.InLobby(g.PrimaryTribe, lobbyTribes))
+            .ToList();
+        var order = new Dictionary<CompGuide, int>();
+        foreach (var guide in others)
+        {
+            order[guide] = order.Count;
+        }
+
         var advice = options.Select((option, position) =>
         {
-            TrinketNote? note = null;
             if (kind == ChoiceKind.Trinket)
             {
                 var stat = trinketStat?.Invoke(option.CardId);
                 var (adjustment, justifiedBy) = stat == null ? (0.0, null) : TrinketAffinity.Adjust(option.Text, targets);
-                note = new TrinketNote(stat?.PlacementFor(bracket), stat?.PickRate, adjustment, justifiedBy);
+                var note = new TrinketNote(stat?.PlacementFor(bracket), stat?.PickRate, adjustment, justifiedBy);
+                return new OptionAdvice(position, option, Array.Empty<GuideCardEffect>(), Array.Empty<CompGuide>(), note);
             }
 
-            return new OptionAdvice(position, option, CardEffect.On(option.CardId, targets, pool, ownedIds), note);
+            var effects = GuideCardEffects.On(option.CardId, targets, held);
+            var fallback = effects.Count > 0
+                ? (IReadOnlyList<CompGuide>)Array.Empty<CompGuide>()
+                : others
+                    .Where(g => g.CoreCards.Contains(option.CardId))
+                    .OrderBy(g => g.Tier)
+                    .ThenBy(g => order[g])
+                    .ToList();
+            return new OptionAdvice(position, option, effects, fallback, null);
         }).ToList();
         return new ChoiceAdvice(kind, advice, targets);
     }
 
     /// <summary>
-    /// The lines above one option. A composition it advances: "★ Undead Butcher 2/5→3/5" (key piece, 2 of 5
-    /// held, 3 once taken), "★ … 3/5 copy" (a held key piece again), "+ Pirate Discover 1/3" (add-on of a
-    /// target). A trinket: its placement, "avg 3.80 → ≈3.50" and the composition behind the "≈". Nothing:
-    /// "no target comp". Built to fit <paramref name="maxChars"/>, shortest forms last, never cut by the renderer.
+    /// The lines above one option. For a target: "★ core Undead Butcher 2/3→3/3" (a core card, 2 of 3 held, 3 once taken),
+    /// "★ core … 3/3 copy" (a held core card again), "+ Undead Butcher" (an enabler or add-on). For another guide:
+    /// "core Naga Spells (S)" with its tier. A trinket: its placement, "avg 3.80 → ≈3.50" and the target behind the "≈".
+    /// Nothing: "—". Several targets or guides: as many lines as fit <paramref name="maxLines"/>, the last one saying how
+    /// many are left ("+2 more"). Built to fit <paramref name="maxChars"/>, shortest forms last, never cut by the renderer.
     /// </summary>
     public static IReadOnlyList<string> Lines(OptionAdvice option, int maxChars, bool statsLoaded, int maxLines = 2)
     {
@@ -327,7 +325,7 @@ public static class ChoiceAdvisor
                 return new[]
                 {
                     Fit($"avg {placement.ToString("0.00", inv)} → ≈{note.Adjusted!.Value.ToString("0.00", inv)}", maxChars),
-                    MarkerText.Label("≈", note.JustifiedBy.Name, string.Empty, maxChars),
+                    MarkerText.Label("≈", note.JustifiedBy.Guide.Name, string.Empty, maxChars),
                 };
             }
 
@@ -335,27 +333,35 @@ public static class ChoiceAdvisor
             return new[] { Fit($"avg {placement.ToString("0.00", inv)}{pick}", maxChars) };
         }
 
-        if (option.Effects.Count == 0)
+        string EffectLabel(GuideCardEffect e)
         {
-            return new[] { Fit("no target comp", maxChars) };
+            if (!e.IsCore)
+            {
+                return MarkerText.Label("+", e.Target.Guide.Name, string.Empty, maxChars);
+            }
+
+            var count = e.CoreAfter > e.CoreBefore
+                ? $"{e.CoreBefore}/{e.CoreTotal}→{e.CoreAfter}/{e.CoreTotal}"
+                : $"{e.CoreBefore}/{e.CoreTotal} copy";
+            return MarkerText.Label("★ core", e.Target.Guide.Name, count, maxChars);
         }
 
-        string LabelOf(CompEffect e)
+        var labels = option.Effects.Count > 0
+            ? option.Effects.Select(EffectLabel).ToList()
+            : option.Guides.Select(g => MarkerText.Label("core", g.Name, $"({g.TierLetter})", maxChars)).ToList();
+        if (labels.Count == 0)
         {
-            var count = !e.IsKeyPiece ? $"{e.KeyBefore}/{e.KeyTotal}"
-                : e.KeyAfter > e.KeyBefore ? $"{e.KeyBefore}/{e.KeyTotal}→{e.KeyAfter}/{e.KeyTotal}"
-                : $"{e.KeyBefore}/{e.KeyTotal} copy";
-            return MarkerText.Label(e.IsKeyPiece ? "★" : "+", e.Composition.Name, count, maxChars);
+            return new[] { Fit("—", maxChars) };
         }
 
-        if (option.Effects.Count <= maxLines)
+        if (labels.Count <= maxLines)
         {
-            return option.Effects.Select(LabelOf).ToList();
+            return labels;
         }
 
-        var lines = option.Effects.Take(maxLines - 1).Select(LabelOf).ToList();
-        var more = $"+{option.Effects.Count - (maxLines - 1)} more";
-        lines.Add(MarkerText.DisplayLength(more) <= maxChars ? more : $"+{option.Effects.Count - (maxLines - 1)}");
+        var lines = labels.Take(maxLines - 1).ToList();
+        var more = $"+{labels.Count - (maxLines - 1)} more";
+        lines.Add(MarkerText.DisplayLength(more) <= maxChars ? more : $"+{labels.Count - (maxLines - 1)}");
         return lines;
     }
 
@@ -363,18 +369,18 @@ public static class ChoiceAdvisor
         MarkerText.DisplayLength(text) <= maxChars ? text : text.Substring(0, Math.Max(0, Math.Min(text.Length, maxChars)));
 
     /// <summary>
-    /// One line per choice in HDT's log: what the choice was, in which order HDT gave it, what was targeted,
-    /// what each option said and where the first label went. An unsupported choice names its card types.
+    /// One line per choice in HDT's log: what the choice was, in which order HDT gave it, the targets and their colours,
+    /// what each option said and why (target, guide, trinket or none), and where the first label went. An unsupported
+    /// choice names its card types.
     /// </summary>
+    /// <param name="guideCount">Guides HDT lists (CompGuideSet.Count).</param>
+    /// <param name="guideState">Where they come from or why there are none (source, or HDT's state).</param>
     public static string DiagnosticLine(
-        IReadOnlyList<OfferedOption> options, ChoiceAdvice advice, int compositionCount, string compositionState,
+        IReadOnlyList<OfferedOption> options, ChoiceAdvice advice, int guideCount, string guideState,
         IReadOnlyList<IReadOnlyList<string>> lines, LayoutRect? firstLabel, double canvasWidth, double canvasHeight)
     {
         var inv = CultureInfo.InvariantCulture;
         string N(double v) => Math.Round(v).ToString("0", inv);
-        var targets = advice.Targets.Count == 0
-            ? "none"
-            : "[" + string.Join("; ", advice.Targets.Select(t => $"{t.Composition.Name} {t.Score.ToString("0.#", inv)}")) + "]";
         var head = $"Bronzebeard HUD: choice kind={ChoiceClassifier.Name(advice.Kind)} options={options.Count} " +
                    $"order=[{string.Join(",", options.Select(o => o.EntityId))}] cards=[{string.Join(",", options.Select(o => o.CardId))}]";
         if (!advice.HasMarkers)
@@ -382,8 +388,9 @@ public static class ChoiceAdvisor
             return head + $" types=[{string.Join(",", options.Select(o => o.CardType))}]";
         }
 
-        var said = "[" + string.Join("; ", lines.Select((l, i) => $"#{i} {string.Join(" / ", l)}")) + "]";
+        string Reason(int i) => i < advice.Options.Count ? advice.Options[i].Reason.ToString().ToLowerInvariant() : "?";
+        var said = "[" + string.Join("; ", lines.Select((l, i) => $"#{i} {Reason(i)}: {string.Join(" / ", l)}")) + "]";
         var first = firstLabel is { } rect ? $"x={N(rect.Left)} y={N(rect.Top)} w={N(rect.Width)} h={N(rect.Height)}" : "none";
-        return head + $" comps={compositionCount} ({compositionState}) targets={targets} advice={said} first={first} canvas={N(canvasWidth)}x{N(canvasHeight)}";
+        return head + $" guides={guideCount} ({guideState}) targets={CompTargets.Summary(advice.Targets)} advice={said} first={first} canvas={N(canvasWidth)}x{N(canvasHeight)}";
     }
 }

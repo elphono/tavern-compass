@@ -1,96 +1,125 @@
+using static BronzebeardHud.Stats.Tests.GuideTestData;
+
 namespace BronzebeardHud.Stats.Tests;
 
 public class TavernHighlightsTests
 {
-    // Synthetic tiers, every card distinct.
-    private static readonly Dictionary<string, int> Tiers = new()
-    {
-        ["KEY_A5"] = 5, ["SHARED_T3"] = 3, ["EARLY_A2"] = 2, ["KEY_B4"] = 4, ["EARLY_B1"] = 1, ["KEY_S6"] = 6, ["EARLY_S2"] = 2, ["OTHER_T1"] = 1,
-    };
+    // Undead: core KEY_U1 KEY_U2, enabler EN_U, add-on ADD_U; SHARED is an enabler of Undead and a core card of Mechs.
+    // Mechs: core KEY_M1 SHARED, add-on ADD_M. Pirates: core KEY_P1, add-on ADD_P. Every other card distinct.
+    private static readonly CompGuide Undead = Guide("Undead Butcher", 2, 0, new[] { "KEY_U1", "KEY_U2" }, addons: new[] { "ADD_U" }, enablers: new[] { "EN_U", "SHARED" });
+    private static readonly CompGuide Mechs = Guide("Mech Magnet", 2, 1, new[] { "KEY_M1", "SHARED" }, addons: new[] { "ADD_M" });
+    private static readonly CompGuide Pirates = Guide("Pirate Gold", 2, 2, new[] { "KEY_P1" }, addons: new[] { "ADD_P", "ADD_M" });
+    private static readonly CompGuideSet All = Set(Undead, Mechs, Pirates);
 
-    private static int? TierOf(string id) => Tiers.TryGetValue(id, out var t) ? t : null;
+    private static readonly string P0 = CompTargetTracker.Palette[0];
+    private static readonly string P1 = CompTargetTracker.Palette[1];
+    private static readonly string P2 = CompTargetTracker.Palette[2];
 
-    private static Composition Comp(string id, string name, string[] core, string[] addons) =>
-        new(id, name, Array.Empty<string>(), core, addons, finalBoards: new[] { new FinalBoard(9000, 11, core.Concat(addons).ToList()) });
+    /// <summary>Undead first (two core cards held), then Mechs (one), then Pirates (ticked last but probable: an add-on).</summary>
+    private static IReadOnlyList<CompTarget> ThreeTargets() => Targets(All, Board("KEY_U1", "KEY_U2", "KEY_M1", "ADD_P"), 3);
 
-    // A: key piece KEY_A5, early enablers EARLY_A2 and SHARED_T3. B: key pieces KEY_B4 and SHARED_T3, early enabler EARLY_B1.
-    // S (a suggestion): key piece KEY_S6, early enabler EARLY_S2.
-    private static readonly Composition A = Comp("a", "Undead Butcher", new[] { "KEY_A5" }, new[] { "EARLY_A2", "SHARED_T3" });
-    private static readonly Composition B = Comp("b", "Mech Magnet", new[] { "KEY_B4", "SHARED_T3" }, new[] { "EARLY_B1" });
-    private static readonly Composition S = Comp("s", "Pirate Gold", new[] { "KEY_S6" }, new[] { "EARLY_S2" });
-
-    private static readonly Dictionary<string, string> Palette = new() { ["a"] = "#FF2BD6", ["b"] = "#B8FF1F" };
-
-    private static IReadOnlyList<TavernHighlight> Run(string[] bob, Composition[] ticked, Composition[] suggestions) =>
-        TavernHighlights.For(bob, ticked, suggestions, c => CompDetail.For(c, TierOf), id => Palette.TryGetValue(id, out var c) ? c : null);
-
-    private static IEnumerable<(HighlightKind, string?, string?)> Summary(IEnumerable<TavernHighlight> highlights) =>
-        highlights.Select(h => (h.Kind, h.Composition?.Id, h.Colour));
+    private static IEnumerable<(HighlightKind, string?, string?, string)> Summary(IEnumerable<TavernHighlight> highlights) =>
+        highlights.Select(h => (h.Kind, h.Target?.Guide.Name, h.Colour, h.Tag));
 
     [Fact]
-    public void TickedCompositions_KeyPiecesAreCommit_EarlyCardsAreEnabler_InTheirColour()
+    public void CoreCardsAreCommit_EnablersAndAddOnsAreEnabler_InTheirTargetsColour()
     {
-        var bob = new[] { "KEY_A5_G", "EARLY_A2", "KEY_B4", "EARLY_B1", "OTHER_T1", "BG_SPELL" };
+        var targets = ThreeTargets();
+        Assert.Equal(new[] { "Undead Butcher", "Mech Magnet", "Pirate Gold" }, targets.Select(t => t.Guide.Name));
+        var bob = new[] { "KEY_U1_G", "EN_U", "ADD_U", "KEY_M1", "KEY_P1", "OTHER", "BG_SPELL" };
 
-        var highlights = Run(bob, new[] { A, B }, new[] { S });
+        var highlights = TavernHighlights.For(bob, targets);
 
-        Assert.Equal(new (HighlightKind, string?, string?)[]
+        Assert.Equal(new (HighlightKind, string?, string?, string)[]
         {
-            (HighlightKind.Commit, "a", "#FF2BD6"),  // golden copy of A's key piece
-            (HighlightKind.Enabler, "a", "#FF2BD6"),
-            (HighlightKind.Commit, "b", "#B8FF1F"),
-            (HighlightKind.Enabler, "b", "#B8FF1F"),
-            (HighlightKind.None, null, null),
-            (HighlightKind.None, null, null),
+            (HighlightKind.Commit, "Undead Butcher", P0, "core"),  // golden copy of a core card
+            (HighlightKind.Enabler, "Undead Butcher", P0, "enabler"),
+            (HighlightKind.Enabler, "Undead Butcher", P0, "+"),
+            (HighlightKind.Commit, "Mech Magnet", P1, "core"),
+            (HighlightKind.Commit, "Pirate Gold", P2, "core"),
+            (HighlightKind.None, null, null, ""),
+            (HighlightKind.None, null, null, ""),
         }, Summary(highlights));
     }
 
     [Fact]
-    public void ACardThatIsCommitForOneAndEnablerForAnother_IsCommit()
+    public void ACardThatIsCoreForOneAndEnablerForAnEarlierOne_IsCore_OfTheLaterOne()
     {
-        // SHARED_T3 is an early enabler of A (listed first) and a key piece of B.
-        var highlight = Run(new[] { "SHARED_T3" }, new[] { A, B }, Array.Empty<Composition>()).Single();
+        // SHARED is an enabler of Undead (first target) and a core card of Mechs (second).
+        var highlight = TavernHighlights.For(new[] { "SHARED" }, ThreeTargets()).Single();
 
-        Assert.Equal((HighlightKind.Commit, "b"), (highlight.Kind, highlight.Composition!.Id));
+        Assert.Equal((HighlightKind.Commit, "Mech Magnet", P1), (highlight.Kind, highlight.Target!.Guide.Name, highlight.Colour));
+        Assert.Equal(new[] { ("Undead Butcher", GuideCardRole.Enabler) }, highlight.Others.Select(e => (e.Target.Guide.Name, e.Role)));
     }
 
     [Fact]
-    public void TickedCompositionsComeFirst_SuggestionsOnlyWhenNothingIsTicked()
+    public void AmongTargetsOfTheSameKind_TheFirstInTargetOrderWins()
     {
-        var bob = new[] { "KEY_S6", "EARLY_S2", "KEY_A5" };
+        // ADD_M is an add-on of Mechs (second target) and of Pirates (third).
+        var highlight = TavernHighlights.For(new[] { "ADD_M" }, ThreeTargets()).Single();
 
-        Assert.Equal(new (HighlightKind, string?, string?)[] { (HighlightKind.None, null, null), (HighlightKind.None, null, null), (HighlightKind.Commit, "a", "#FF2BD6") },
-            Summary(Run(bob, new[] { A }, new[] { S })));
-        Assert.Equal(new (HighlightKind, string?, string?)[]
-            {
-                (HighlightKind.Commit, "s", TavernHighlights.SuggestionColour), (HighlightKind.Enabler, "s", TavernHighlights.SuggestionColour), (HighlightKind.None, null, null),
-            },
-            Summary(Run(bob, Array.Empty<Composition>(), new[] { S })));
+        Assert.Equal((HighlightKind.Enabler, "Mech Magnet", P1, "+"), (highlight.Kind, highlight.Target!.Guide.Name, highlight.Colour, highlight.Tag));
+        Assert.Equal(new[] { "Pirate Gold" }, highlight.Others.Select(e => e.Target.Guide.Name));
     }
 
     [Fact]
-    public void MarkerLines_TheHighlightFirst_ItsCompositionNeverTwice_TwoLinesAtMost()
+    public void OnlyTargetsCount_AGuideThatIsNoTargetHighlightsNothing()
     {
-        var commit = new TavernHighlight(HighlightKind.Commit, A, "#FF2BD6");
-        var advances = new (Composition, bool)[] { (A, true), (B, false) };
-        int KeyOwned(Composition c) => c.Id == "a" ? 1 : 0;
+        var oneTarget = Targets(All, Board("KEY_U1"), 1);
 
-        Assert.Equal(new[] { "commit UB 1/1", "+ M. Magnet 0/2" }, TavernHighlights.MarkerLines(commit, advances, KeyOwned, pinned: false, maxChars: 15));
-        Assert.Equal(new[] { "◆ pinned", "commit UB 1/1" }, TavernHighlights.MarkerLines(commit, advances, KeyOwned, pinned: true, maxChars: 15));
-        Assert.Equal(new[] { "enabler UB" }, TavernHighlights.MarkerLines(new TavernHighlight(HighlightKind.Enabler, A, "#FFFFFF"), new (Composition, bool)[] { (A, false) },
-            KeyOwned, pinned: false, maxChars: 15));
-        Assert.Equal(new[] { "★ UB 1/1", "+ M. Magnet 0/2" }, TavernHighlights.MarkerLines(TavernHighlight.None, advances, KeyOwned, pinned: false, maxChars: 15));
+        var highlights = TavernHighlights.For(new[] { "KEY_M1", "KEY_P1", "KEY_U2" }, oneTarget);
+
+        Assert.Equal(new[] { HighlightKind.None, HighlightKind.None, HighlightKind.Commit }, highlights.Select(h => h.Kind));
+        Assert.Empty(TavernHighlights.For(Array.Empty<string>(), oneTarget));
+        Assert.All(TavernHighlights.For(new[] { "KEY_U1" }, Array.Empty<CompTarget>()), h => Assert.Same(TavernHighlight.None, h));
+    }
+
+    [Fact]
+    public void ATickedTargetOutranksTheProbableOnes()
+    {
+        // Pirates ticked: first target, first colour; KEY_P1 and ADD_M are now Pirates' before anyone else's.
+        var targets = Targets(All, Board("KEY_U1", "KEY_U2", "KEY_M1"), 3, Pirates);
+
+        var highlights = TavernHighlights.For(new[] { "KEY_P1", "ADD_M", "KEY_U1" }, targets);
+
+        Assert.Equal(new (HighlightKind, string?, string?, string)[]
+        {
+            (HighlightKind.Commit, "Pirate Gold", P0, "core"),
+            (HighlightKind.Enabler, "Pirate Gold", P0, "+"),
+            (HighlightKind.Commit, "Undead Butcher", P1, "core"),
+        }, Summary(highlights));
+    }
+
+    [Fact]
+    public void MarkerLines_TheHighlightFirst_WithTheCoreCardsHeld_ThenTheOthers_TwoLinesAtMost()
+    {
+        var targets = ThreeTargets();
+        TavernHighlight For(string card) => TavernHighlights.For(new[] { card }, targets).Single();
+
+        Assert.Equal(new[] { "core UB 2/2" }, TavernHighlights.MarkerLines(For("KEY_U2"), pinned: false, maxChars: 15));
+        Assert.Equal(new[] { "core Mech Magnet 1/2", "+ Undead Butcher 2/2" }, TavernHighlights.MarkerLines(For("SHARED"), pinned: false, maxChars: 20));
+        Assert.Equal(new[] { "core M. Magnet 1/2", "+ U. Butcher 2/2" }, TavernHighlights.MarkerLines(For("SHARED"), pinned: false, maxChars: 18));
+        Assert.Equal(new[] { "◆ pinned", "core M. Magnet 1/2" }, TavernHighlights.MarkerLines(For("SHARED"), pinned: true, maxChars: 18));
+        Assert.Equal(new[] { "enabler UB" }, TavernHighlights.MarkerLines(For("EN_U"), pinned: false, maxChars: 15));
+        Assert.Equal(new[] { "+ U. Butcher" }, TavernHighlights.MarkerLines(For("ADD_U"), pinned: false, maxChars: 15));
+        Assert.Equal(new[] { "◆ pinned" }, TavernHighlights.MarkerLines(TavernHighlight.None, pinned: true, maxChars: 15));
+        Assert.Empty(TavernHighlights.MarkerLines(TavernHighlight.None, pinned: false, maxChars: 15));
     }
 
     [Fact]
     public void MarkerLines_Crowded_TheHighlightKeepsItsLine_TheOthersAreCounted()
     {
-        // The card is A's commit piece and also marks B and S: one line left after the highlight.
-        var commit = new TavernHighlight(HighlightKind.Commit, A, "#FF2BD6");
-        var advances = new (Composition, bool)[] { (B, false), (A, true), (S, false) };
+        // CROWD: a core card of the first target and an add-on of three others.
+        var a = Guide("Alpha", 1, 0, new[] { "CROWD" });
+        var b = Guide("Bravo", 1, 1, new[] { "B1" }, addons: new[] { "CROWD" });
+        var c = Guide("Charlie", 1, 2, new[] { "C1" }, addons: new[] { "CROWD" });
+        var d = Guide("Delta", 1, 3, new[] { "D1" }, addons: new[] { "CROWD" });
+        var targets = Targets(Set(a, b, c, d), Board("CROWD", "B1", "C1", "D1"), 4);
 
-        var lines = TavernHighlights.MarkerLines(commit, advances, _ => 0, pinned: false, maxChars: 15);
+        var lines = TavernHighlights.MarkerLines(TavernHighlights.For(new[] { "CROWD" }, targets).Single(), pinned: false, maxChars: 15);
 
-        Assert.Equal(new[] { "commit UB 0/1", "+2 more" }, lines);
+        Assert.Equal(new[] { "core Alpha 1/1", "+3 more" }, lines);
+        Assert.Equal(new[] { "core Alpha 1/1", "+ Bravo 1/1", "+2 more" },
+            TavernHighlights.MarkerLines(TavernHighlights.For(new[] { "CROWD" }, targets).Single(), pinned: false, maxChars: 15, maxLines: 3));
     }
 }

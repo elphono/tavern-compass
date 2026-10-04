@@ -7,98 +7,80 @@ namespace BronzebeardHud.Stats;
 public enum HighlightKind
 {
     None,
+
+    /// <summary>An enabler or an add-on of a target: dotted frame.</summary>
     Enabler,
+
+    /// <summary>A core card of a target: solid frame.</summary>
     Commit,
 }
 
-/// <summary>What one of Bob's cards is for the compositions aimed at: a key piece to commit on, an early enabler, or nothing.</summary>
+/// <summary>What one of Bob's cards is for the targets: a core card, an enabler or add-on, or nothing.</summary>
 public sealed class TavernHighlight
 {
-    public static readonly TavernHighlight None = new(HighlightKind.None, null, null);
+    public static readonly TavernHighlight None = new(HighlightKind.None, null, Array.Empty<GuideCardEffect>());
 
-    public TavernHighlight(HighlightKind kind, Composition? composition, string? colour)
+    public TavernHighlight(HighlightKind kind, GuideCardEffect? effect, IReadOnlyList<GuideCardEffect> others)
     {
         Kind = kind;
-        Composition = composition;
-        Colour = colour;
+        Effect = effect;
+        Others = others;
     }
 
     public HighlightKind Kind { get; }
-    public Composition? Composition { get; }
 
-    /// <summary>The frame and label colour: the composition's palette colour when ticked, else <see cref="TavernHighlights.SuggestionColour"/>.</summary>
-    public string? Colour { get; }
+    /// <summary>What the card does for the target that wins it; null for none.</summary>
+    public GuideCardEffect? Effect { get; }
 
-    /// <summary>"commit" or "enabler", the word the tavern label starts with; empty for none.</summary>
-    public string Tag => Kind switch
+    public CompTarget? Target => Effect?.Target;
+
+    /// <summary>The frame and label colour: the winning target's (<see cref="CompTarget.Colour"/>); null for none.</summary>
+    public string? Colour => Target?.Colour;
+
+    /// <summary>The other targets the card matters to, in <see cref="GuideCardEffects.On"/>'s order: listed under the label.</summary>
+    public IReadOnlyList<GuideCardEffect> Others { get; }
+
+    /// <summary>The word the tavern label starts with: "core", "enabler", or "+" for an add-on; empty for none.</summary>
+    public string Tag => Effect?.Role switch
     {
-        HighlightKind.Commit => "commit",
-        HighlightKind.Enabler => "enabler",
+        GuideCardRole.Core => "core",
+        GuideCardRole.Enabler => "enabler",
+        GuideCardRole.Addon => "+",
         _ => string.Empty,
     };
 }
 
 /// <summary>
-/// On Bob's cards, the ones that matter for the compositions aimed at (Ali, 2026-09-27: "highlight une carte
-/// dans la taverne qui est présente dans les when to commit ou early enablers"). Same content as HSReplay
-/// Tier7's hover section "Comps – Enabler / Commit Piece" (HDT BattlegroundsMinionPinningCard.xaml:87-100), but
-/// drawn on the card: a frame and a short label merged into the tavern marker.
-/// Rules: the ticked compositions come first; with none ticked, the suggestions shown in the panel. A card that
-/// is a key piece ("When to commit") of one composition and an early enabler of another is a commit piece:
-/// commit wins. Among compositions of the same kind, the first in the given order wins.
+/// On Bob's cards, the ones that matter for the targets (Ali, 2026-09-27: "highlight une carte dans la taverne qui est
+/// présente dans les when to commit ou early enablers"), drawn on the card: a frame and a short label merged into the
+/// tavern marker. A core card of any target is a commit piece (solid frame), even when it is only an enabler of an earlier
+/// target; otherwise an enabler or add-on of a target is an enabler (dotted frame). Among targets of the same kind, the
+/// first in target order wins, and gives its colour.
 /// </summary>
 public static class TavernHighlights
 {
-    /// <summary>Suggestions have no palette colour: one vivid neutral for all of them, the markers' own white.</summary>
-    public const string SuggestionColour = CompositionSelection.AutoColour;
-
     /// <param name="bobCards">Bob's row, left to right (the tavern spell included: it matches nothing).</param>
-    /// <param name="ticked">Compositions ticked by the player, in the panel's order.</param>
-    /// <param name="suggestions">Suggestions shown in the panel, in its order; used only when nothing is ticked.</param>
-    /// <param name="detailFor">A composition's derived detail (CompDetail); null when it cannot be computed.</param>
-    /// <param name="colourOf">A ticked composition's palette colour (CompositionSelection.ColourOf).</param>
-    public static IReadOnlyList<TavernHighlight> For(IReadOnlyList<string> bobCards, IReadOnlyList<Composition> ticked, IReadOnlyList<Composition> suggestions,
-        Func<Composition, CompDetail?> detailFor, Func<string, string?> colourOf)
-    {
-        var fromTicked = ticked.Count > 0;
-        var aimed = (fromTicked ? ticked : suggestions)
-            .Select(c => (Composition: c, Detail: detailFor(c)))
-            .Where(x => x.Detail != null)
-            .ToList();
-        string Colour(Composition c) => fromTicked ? colourOf(c.Id) ?? SuggestionColour : SuggestionColour;
-
-        return bobCards.Select(card =>
+    /// <param name="targets">The targets, in their order (<see cref="CompTargetTracker.Next"/>).</param>
+    public static IReadOnlyList<TavernHighlight> For(IReadOnlyList<string> bobCards, IReadOnlyList<CompTarget> targets) =>
+        bobCards.Select(card =>
         {
-            var id = CardIds.Normalize(card);
-            foreach (var (composition, detail) in aimed)
+            var effects = GuideCardEffects.On(card, targets);
+            if (effects.Count == 0)
             {
-                if (detail!.CommitCards.Any(c => c.CardId == id))
-                {
-                    return new TavernHighlight(HighlightKind.Commit, composition, Colour(composition));
-                }
+                return TavernHighlight.None;
             }
 
-            foreach (var (composition, detail) in aimed)
-            {
-                if (detail!.EarlyEnablers.Any(c => c.CardId == id))
-                {
-                    return new TavernHighlight(HighlightKind.Enabler, composition, Colour(composition));
-                }
-            }
-
-            return TavernHighlight.None;
+            var first = effects[0];
+            return new TavernHighlight(first.IsCore ? HighlightKind.Commit : HighlightKind.Enabler, first, effects.Skip(1).ToList());
         }).ToList();
-    }
 
     /// <summary>
-    /// The marker lines under one of Bob's cards, at most two: "◆ pinned" first when pinned, then the highlight
-    /// ("commit UD 1/2" with the key pieces held, "enabler UD"), then the card's other compositions as before
-    /// ("★ Beasts 1/2", "+ Mechs 0/2"), the highlighted composition never twice, "+2 more" when they do not fit.
+    /// The marker lines under one of Bob's cards, at most <paramref name="maxLines"/>: "◆ pinned" first when pinned, then
+    /// the highlight ("core Undead Butcher 1/3" with the core cards held, "enabler Undead Butcher", "+ Undead Butcher" for
+    /// an add-on), then the other targets the card matters to ("★ Beasts 1/2" for a core card, "+ Mechs 0/2" otherwise;
+    /// the count is always core cards), "+2 more" when they do not fit. Every line is built to fit <paramref name="maxChars"/>.
     /// </summary>
-    /// <param name="advances">The card's compositions (TavernAdvice): each composition, and whether the card is one of its key pieces.</param>
-    /// <param name="keyOwned">How many of a composition's key pieces the player holds.</param>
-    public static IReadOnlyList<string> MarkerLines(TavernHighlight highlight, IReadOnlyList<(Composition Composition, bool IsKeyPiece)> advances,
-        Func<Composition, int> keyOwned, bool pinned, int maxChars, int maxLines = 2)
+    public static IReadOnlyList<string> MarkerLines(TavernHighlight highlight, bool pinned, int maxChars, int maxLines = 2)
     {
         var lines = new List<string>();
         if (pinned)
@@ -106,18 +88,16 @@ public static class TavernHighlights
             lines.Add("◆ pinned");
         }
 
-        var others = advances.Where(a => highlight.Kind == HighlightKind.None || a.Composition.Id != highlight.Composition!.Id).ToList();
-        if (highlight.Kind != HighlightKind.None)
+        if (highlight.Effect is { } effect)
         {
-            var composition = highlight.Composition!;
-            var count = highlight.Kind == HighlightKind.Commit ? $"{keyOwned(composition)}/{composition.CoreCards.Count}" : string.Empty;
-            lines.Add(MarkerText.Label(highlight.Tag, composition.Name, count, maxChars));
+            var count = effect.IsCore ? $"{effect.CoreBefore}/{effect.CoreTotal}" : string.Empty;
+            lines.Add(MarkerText.Label(highlight.Tag, effect.Target.Guide.Name, count, maxChars));
         }
 
         var room = maxLines - lines.Count;
-        if (room > 0 && others.Count > 0)
+        if (room > 0 && highlight.Others.Count > 0)
         {
-            lines.AddRange(MarkerText.Lines(others.Select(a => (a.Composition.Name, keyOwned(a.Composition), a.Composition.CoreCards.Count, a.IsKeyPiece)).ToList(), maxChars, room));
+            lines.AddRange(MarkerText.Lines(highlight.Others.Select(e => (e.Target.Guide.Name, e.CoreBefore, e.CoreTotal, e.IsCore)).ToList(), maxChars, room));
         }
 
         return lines.Take(maxLines).ToList();

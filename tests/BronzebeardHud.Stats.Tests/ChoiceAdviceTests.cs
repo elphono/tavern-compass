@@ -1,24 +1,29 @@
+using static BronzebeardHud.Stats.Tests.GuideTestData;
+
 namespace BronzebeardHud.Stats.Tests;
 
 public class ChoiceAdviceTests
 {
-    private static readonly Composition Undead = new("undead_butcher", "Undead Butcher", new[] { "UNDEAD" },
-        coreCards: new[] { "BG32_324", "BG25_010", "BG28_309" }, addonCards: new[] { "BG32_880" }, averagePlacement: 3.81);
-    private static readonly Composition Pirate = new("pirate_discover", "Pirate Discover", new[] { "PIRATE" },
-        coreCards: new[] { "BG26_817", "BG33_823" }, addonCards: new[] { "BG33_825" }, averagePlacement: 3.93);
-    private static readonly Composition Mech = new("mech_magnet", "Mech Magnet", new[] { "MECHANICAL" },
-        coreCards: new[] { "BG24_022", "BG25_040" }, addonCards: new[] { "BG28_300" }, averagePlacement: 4.12);
+    // Synthetic guides (HearthDb Race values as tribes): two Mech guides share the core card M1, in tiers S and B; the
+    // Beast guide's tribe is not in the lobby.
+    private static readonly CompGuide MechShield = Guide("Mech Shield", 1, 0, new[] { "M1", "MS2" }, tribe: 17);
+    private static readonly CompGuide BeastLobster = Guide("Beast Lobster", 1, 1, new[] { "B1", "B2" }, tribe: 20);
+    private static readonly CompGuide Undead = Guide("Undead Butcher", 2, 0, new[] { "U1", "U2", "U3" }, addons: new[] { "UA" }, enablers: new[] { "UE" }, tribe: 11);
+    private static readonly CompGuide Pirates = Guide("Pirate Discover", 2, 1, new[] { "P1", "P2" }, addons: new[] { "PA" }, tribe: 23);
+    private static readonly CompGuide MechMagnet = Guide("Mech Magnet", 3, 0, new[] { "M1", "M2" }, addons: new[] { "MA" }, tribe: 17);
+    private static readonly CompGuideSet All = Set(MechShield, BeastLobster, Undead, Pirates, MechMagnet);
+    private static readonly string[] Lobby = { "UNDEAD", "PIRATE", "MECHANICAL", "DEMON", "DRAGON" };
 
-    private static readonly Composition[] All = { Undead, Pirate, Mech };
-    private static readonly string[] Lobby = { "UNDEAD", "PIRATE", "MECHANICAL", "BEAST", "DEMON" };
-
-    /// <summary>Undead is being played (two key pieces); a pirate that is no piece makes Pirate a second, weaker target.</summary>
-    private static readonly OwnedCard[] UndeadWithAPirate =
-    {
-        new("BG32_324", "UNDEAD"), new("BG28_309", "UNDEAD"), new("BG21_005", "PIRATE"),
-    };
+    /// <summary>Undead is being played (two core cards); a Pirate add-on makes Pirates the second, weaker target.</summary>
+    private static readonly OwnedCard[] UndeadWithAPirateAddOn = Owned("U1", "U3", "PA");
 
     private const int Wide = 40;
+
+    private static IReadOnlyList<CompTarget> TargetsFor(OwnedCard[] owned, int count = 2) =>
+        Targets(All, new PlayerCards(owned, Array.Empty<OwnedCard>()), count);
+
+    private static ChoiceAdvice Advise(OfferedOption[] options, OwnedCard[] owned, IReadOnlyCollection<string>? lobby = null) =>
+        ChoiceAdvisor.Advise(options, owned, TargetsFor(owned), All, lobby ?? Lobby);
 
     private static OfferedOption Minion(int id, string cardId, bool darkGift = false, int zone = ChoiceClassifier.SetAsideZone) =>
         new(id, cardId, "MINION", hasDarkGift: darkGift, zone: zone);
@@ -29,120 +34,167 @@ public class ChoiceAdviceTests
         advice.Options.Select(o => ChoiceAdvisor.Lines(o, Wide, statsLoaded)).ToList();
 
     [Fact]
-    public void ThreeOptions_CurrentCompKeyPiece_AttainableCompKeyPiece_Neutral_ThreeDistinctLabelsWithNmBeforeAfter()
+    public void ThreeOptions_CoreOfTheFirstTarget_CoreOfTheSecond_Neutral_InTheirColours()
     {
-        var options = new[] { Minion(501, "BG25_010"), Minion(502, "BG26_817"), Minion(503, "BG20_101") };
-
-        var advice = ChoiceAdvisor.Advise(options, UndeadWithAPirate, All, Lobby);
+        var advice = Advise(new[] { Minion(501, "U2"), Minion(502, "P1"), Minion(503, "NEUTRAL") }, UndeadWithAPirateAddOn);
 
         Assert.Equal(ChoiceKind.Discover, advice.Kind);
-        Assert.Equal(new[] { "undead_butcher", "pirate_discover" }, advice.Targets.Select(t => t.Composition.Id));
-        var current = Assert.Single(advice.Options[0].Effects);
-        Assert.Equal((0, 2, 3, 3), (current.TargetRank, current.KeyBefore, current.KeyAfter, current.KeyTotal));
-        var attainable = Assert.Single(advice.Options[1].Effects);
-        Assert.Equal((1, 0, 1, 2), (attainable.TargetRank, attainable.KeyBefore, attainable.KeyAfter, attainable.KeyTotal));
-        Assert.Empty(advice.Options[2].Effects);
+        Assert.Equal(new[] { "Undead Butcher", "Pirate Discover" }, advice.Targets.Select(t => t.Guide.Name));
+        var first = Assert.Single(advice.Options[0].Effects);
+        Assert.Equal((GuideCardRole.Core, 2, 3, 3), (first.Role, first.CoreBefore, first.CoreAfter, first.CoreTotal));
+        var second = Assert.Single(advice.Options[1].Effects);
+        Assert.Equal((GuideCardRole.Core, 0, 1, 2), (second.Role, second.CoreBefore, second.CoreAfter, second.CoreTotal));
 
-        Assert.Equal(new[] { "★ Undead Butcher 2/3→3/3" }, Labels(advice)[0]);
-        Assert.Equal(new[] { "★ Pirate Discover 0/2→1/2" }, Labels(advice)[1]);
-        Assert.Equal(new[] { "no target comp" }, Labels(advice)[2]);
+        Assert.Equal(new[] { "★ core Undead Butcher 2/3→3/3" }, Labels(advice)[0]);
+        Assert.Equal(new[] { "★ core Pirate Discover 0/2→1/2" }, Labels(advice)[1]);
+        Assert.Equal(new[] { "—" }, Labels(advice)[2]); // never "no target comp"
+        Assert.Equal(new[] { CompTargetTracker.Palette[0], CompTargetTracker.Palette[1], null }, advice.Options.Select(o => o.Colour));
+        Assert.Equal(new[] { ChoiceReason.Target, ChoiceReason.Target, ChoiceReason.None }, advice.Options.Select(o => o.Reason));
     }
 
     [Fact]
-    public void TwoOptions_AHeldKeyPieceIsACopy_AnAddOnKeepsTheCount()
+    public void AHeldCoreCardIsACopy_AnAddOnOrAnEnablerSaysPlus_WithoutCount()
     {
-        var advice = ChoiceAdvisor.Advise(new[] { Minion(601, "BG32_324_G"), Minion(602, "BG32_880") }, UndeadWithAPirate, All, Lobby);
+        var advice = Advise(new[] { Minion(601, "U1_G"), Minion(602, "UA"), Minion(603, "UE") }, UndeadWithAPirateAddOn);
 
-        Assert.Equal(new[] { "★ Undead Butcher 2/3 copy" }, Labels(advice)[0]);
-        Assert.Equal(new[] { "+ Undead Butcher 2/3" }, Labels(advice)[1]);
+        Assert.Equal(new[] { "★ core Undead Butcher 2/3 copy", "+ Undead Butcher", "+ Undead Butcher" }, Labels(advice).Select(l => Assert.Single(l)));
+        Assert.Equal(new[] { GuideCardRole.Core, GuideCardRole.Addon, GuideCardRole.Enabler }, advice.Options.Select(o => o.Effects.Single().Role));
     }
 
     [Fact]
-    public void FourOptions_DarkGift_UnreachableComp_AddOn_Copy_Neutral()
+    public void NoTarget_TheCoreCardOfAnotherGuide_BestTierFirst_OnlyInTheLobby()
     {
-        var options = new[]
-        {
-            Minion(701, "BG24_022", darkGift: true), Minion(702, "BG33_825", darkGift: true),
-            Minion(703, "BG28_309", darkGift: true), Minion(704, "BG20_101", darkGift: true),
-        };
+        // M1 is a core card of Mech Shield (S) and of Mech Magnet (B), neither a target; B1 is Beast Lobster's, not in the lobby.
+        var advice = Advise(new[] { Minion(701, "M1"), Minion(702, "B1"), Minion(703, "MA") }, UndeadWithAPirateAddOn);
 
-        var advice = ChoiceAdvisor.Advise(options, UndeadWithAPirate, All, Lobby);
+        Assert.Equal(new[] { "core Mech Shield (S)", "core Mech Magnet (B)" }, Labels(advice)[0]);
+        Assert.Equal(new[] { "—" }, Labels(advice)[1]);
+        Assert.Equal(new[] { "—" }, Labels(advice)[2]); // an add-on of a guide that is no target says nothing
+        Assert.Equal(new[] { ChoiceReason.Guide, ChoiceReason.None, ChoiceReason.None }, advice.Options.Select(o => o.Reason));
+        Assert.All(advice.Options, o => Assert.Null(o.Colour)); // neutral
+
+        var lobbyUnknown = Advise(new[] { Minion(711, "B1"), Minion(712, "M1") }, UndeadWithAPirateAddOn, Array.Empty<string>());
+        Assert.Equal(new[] { "core Beast Lobster (S)" }, Labels(lobbyUnknown)[0]);
+    }
+
+    [Fact]
+    public void ACardOfATarget_IsNeverAlsoGivenAsAnotherGuide()
+    {
+        var mechs = Owned("M1", "M2");
+        var advice = ChoiceAdvisor.Advise(new[] { Minion(1, "M1"), Minion(2, "MS2") }, mechs, TargetsFor(mechs, count: 1), All, Lobby);
+
+        Assert.Equal(new[] { "Mech Magnet" }, advice.Targets.Select(t => t.Guide.Name));
+        Assert.Equal(new[] { "★ core Mech Magnet 2/2 copy" }, Labels(advice)[0]); // Mech Shield is not listed after it
+        Assert.Empty(advice.Options[0].Guides);
+        Assert.Equal(new[] { "core Mech Shield (S)" }, Labels(advice)[1]);
+    }
+
+    [Fact]
+    public void DarkGift_UsesTheSameLabels()
+    {
+        var options = new[] { Minion(801, "M2", darkGift: true), Minion(802, "PA", darkGift: true), Minion(803, "U3", darkGift: true), Minion(804, "NEUTRAL", darkGift: true) };
+
+        var advice = Advise(options, UndeadWithAPirateAddOn);
 
         Assert.Equal(ChoiceKind.DarkGift, advice.Kind);
-        Assert.Empty(advice.Options[0].Effects); // Mech is playable but nothing of it is held: not shown, not aimed at
-        Assert.Equal(
-            new[] { "no target comp", "+ Pirate Discover 0/2", "★ Undead Butcher 2/3 copy", "no target comp" },
-            Labels(advice).Select(l => Assert.Single(l)));
+        Assert.Equal(new[] { "core Mech Magnet (B)", "+ Pirate Discover", "★ core Undead Butcher 2/3 copy", "—" }, Labels(advice).Select(l => Assert.Single(l)));
     }
 
     [Fact]
-    public void ThreeSuccessiveChoices_TheLabelsFollowTheCompositionsInReach()
+    public void ThreeSuccessiveChoices_TheLabelsFollowTheTargets()
     {
-        // Choice 1, nothing held: the pirate key piece counts for a playable composition, nothing is targeted yet.
-        var first = ChoiceAdvisor.Advise(new[] { Minion(801, "BG26_817"), Minion(802, "BG33_825") }, Array.Empty<OwnedCard>(), All, Lobby);
+        // Choice 1, nothing held: no target yet; the Pirate core card still says which guide it starts.
+        var first = Advise(new[] { Minion(901, "P1"), Minion(902, "PA") }, Array.Empty<OwnedCard>());
         Assert.Empty(first.Targets);
-        Assert.Equal(new[] { "★ Pirate Discover 0/2→1/2", "no target comp" }, Labels(first).Select(l => Assert.Single(l)));
+        Assert.Equal(new[] { "core Pirate Discover (A)", "—" }, Labels(first).Select(l => Assert.Single(l)));
 
-        // Choice 2, one pirate key piece held: Pirate is the target, its add-on is now worth taking.
-        var pirates = new[] { new OwnedCard("BG26_817", "PIRATE") };
-        var second = ChoiceAdvisor.Advise(new[] { Minion(811, "BG33_823"), Minion(812, "BG33_825") }, pirates, All, Lobby);
-        Assert.Equal(new[] { "★ Pirate Discover 1/2→2/2", "+ Pirate Discover 1/2" }, Labels(second).Select(l => Assert.Single(l)));
+        // Choice 2, one Pirate core card held: Pirates is the target, its add-on is now worth taking.
+        var second = Advise(new[] { Minion(911, "P2"), Minion(912, "PA") }, Owned("P1"));
+        Assert.Equal(new[] { "★ core Pirate Discover 1/2→2/2", "+ Pirate Discover" }, Labels(second).Select(l => Assert.Single(l)));
 
-        // Choice 3, pirates sold for undead: the pirate add-on no longer counts, the undead piece does.
-        var undead = new[] { new OwnedCard("BG32_324", "UNDEAD"), new OwnedCard("BG25_010", "UNDEAD") };
-        var third = ChoiceAdvisor.Advise(new[] { Minion(821, "BG33_825"), Minion(822, "BG28_309") }, undead, All, Lobby);
-        Assert.Equal(new[] { "no target comp", "★ Undead Butcher 2/3→3/3" }, Labels(third).Select(l => Assert.Single(l)));
+        // Choice 3, pirates sold for undead: the Pirate add-on says nothing any more, the undead core card does.
+        var third = Advise(new[] { Minion(921, "PA"), Minion(922, "U3") }, Owned("U1", "U2"));
+        Assert.Equal(new[] { "—", "★ core Undead Butcher 2/3→3/3" }, Labels(third).Select(l => Assert.Single(l)));
     }
 
     [Fact]
-    public void TheTavernMarkersAndTheChoiceMarkersUseTheSameEngine()
+    public void ACardOfSeveralTargets_TheFirstThenTheCount_CoreBeforeTheRest()
     {
-        var tavern = TavernAdvisor.Advise(new[] { "BG25_010", "BG26_817", "BG20_101", "BG32_880" }, UndeadWithAPirate, All, Lobby);
-        var choice = ChoiceAdvisor.Advise(new[] { Minion(1, "BG25_010"), Minion(2, "BG26_817"), Minion(3, "BG20_101"), Minion(4, "BG32_880") },
-            UndeadWithAPirate, All, Lobby);
+        // SHARED: an add-on of the first target, a core card of the second and of the third.
+        var a = Guide("Alpha", 1, 0, new[] { "A1" }, addons: new[] { "SHARED" });
+        var b = Guide("Bravo", 1, 1, new[] { "B1", "SHARED" });
+        var c = Guide("Charlie", 1, 2, new[] { "C1", "SHARED" });
+        var set = Set(a, b, c);
+        var owned = Owned("A1", "B1", "C1");
+        var targets = Targets(set, new PlayerCards(owned, Array.Empty<OwnedCard>()), 3);
+
+        var advice = ChoiceAdvisor.Advise(new[] { Minion(1, "SHARED"), Minion(2, "A1") }, owned, targets, set, Lobby);
+
+        Assert.Equal(new[] { "Alpha", "Bravo", "Charlie" }, targets.Select(t => t.Guide.Name));
+        Assert.Equal(new[] { "Bravo", "Charlie", "Alpha" }, advice.Options[0].Effects.Select(e => e.Target.Guide.Name));
+        Assert.Equal(new[] { "★ core Bravo 1/2→2/2", "+2 more" }, ChoiceAdvisor.Lines(advice.Options[0], Wide, statsLoaded: true));
+        Assert.Equal(new[] { "★ core Bravo 1/2→2/2", "★ core Charlie 1/2→2/2", "+ Alpha" }, ChoiceAdvisor.Lines(advice.Options[0], Wide, true, maxLines: 3));
+        Assert.Equal(targets[1].Colour, advice.Options[0].Colour); // the first label's colour: Bravo's
+    }
+
+    [Fact]
+    public void TheTavernFramesAndTheChoiceLabelsUseTheSameEngine()
+    {
+        var cards = new[] { "U2", "P1", "NEUTRAL", "UA", "UE", "PA", "M1" };
+        var targets = TargetsFor(UndeadWithAPirateAddOn);
+
+        var tavern = TavernHighlights.For(cards, targets);
+        var choice = ChoiceAdvisor.Advise(cards.Select((c, i) => Minion(i, c)).ToArray(), UndeadWithAPirateAddOn, targets, All, Lobby);
 
         Assert.Equal(
-            tavern.Cards.Select(c => c.Advances.Select(a => (a.Composition.Id, a.IsKeyPiece)).ToList()),
-            choice.Options.Select(o => o.Effects.Select(e => (e.Composition.Id, e.IsKeyPiece)).ToList()));
+            tavern.Select(h => h.Effect == null
+                ? new List<(string, GuideCardRole, int, int)>()
+                : new[] { h.Effect }.Concat(h.Others).Select(e => (e.Target.Guide.Name, e.Role, e.CoreBefore, e.CoreAfter)).ToList()),
+            choice.Options.Select(o => o.Effects.Select(e => (e.Target.Guide.Name, e.Role, e.CoreBefore, e.CoreAfter)).ToList()));
+        Assert.Equal(5, tavern.Count(h => h.Kind != HighlightKind.None)); // the comparison is not between empty lists
     }
 
     [Fact]
-    public void Trinkets_AdjustedForTheCurrentComp_LessForAnAttainableOne_NotForTheRest_WithinTheBound()
+    public void Trinkets_AdjustedForTheFirstTarget_LessForTheSecond_NotForTheRest_WithinTheBound()
     {
         var stats = new Dictionary<string, TrinketStat>
         {
-            ["BG30_MagicItem_706"] = new("BG30_MagicItem_706", 3.70, 900, 0.41, new Dictionary<int, double> { [25] = 3.80 }),
-            ["BG30_MagicItem_426"] = new("BG30_MagicItem_426", 4.00, 800, 0.22, new Dictionary<int, double> { [25] = 4.10 }),
-            ["BG30_MagicItem_703"] = new("BG30_MagicItem_703", 4.30, 700, 0.31, new Dictionary<int, double> { [25] = 4.40 }),
+            ["TRINKET_U"] = new("TRINKET_U", 3.70, 900, 0.41, new Dictionary<int, double> { [25] = 3.80 }),
+            ["TRINKET_P"] = new("TRINKET_P", 4.00, 800, 0.22, new Dictionary<int, double> { [25] = 4.10 }),
+            ["TRINKET_M"] = new("TRINKET_M", 4.30, 700, 0.31, new Dictionary<int, double> { [25] = 4.40 }),
         };
         var options = new[]
         {
-            Trinket(3436, "BG30_MagicItem_706", "Your <b>Undead</b> have +3 Attack."),
-            Trinket(3434, "BG30_MagicItem_426", "After you buy a Pirate, gain 1 Gold."),
-            Trinket(3437, "BG30_MagicItem_703", "Your Mechs have +2 Health."),
+            Trinket(3436, "TRINKET_U", "Your <b>Undead</b> have +3 Attack."),
+            Trinket(3434, "TRINKET_P", "After you buy a Pirate, gain 1 Gold."),
+            Trinket(3437, "TRINKET_M", "Your Mechs have +2 Health."),
         };
+        var targets = TargetsFor(UndeadWithAPirateAddOn);
 
-        var advice = ChoiceAdvisor.Advise(options, UndeadWithAPirate, All, Lobby, id => stats.TryGetValue(id, out var s) ? s : null, bracket: 25);
+        var advice = ChoiceAdvisor.Advise(options, UndeadWithAPirateAddOn, targets, All, Lobby, id => stats.TryGetValue(id, out var s) ? s : null, bracket: 25);
 
         Assert.Equal(ChoiceKind.Trinket, advice.Kind);
         var notes = advice.Options.Select(o => o.Trinket!).ToList();
         Assert.Equal(new[] { 0.3, 0.15, 0.0 }, notes.Select(n => Math.Round(n.Adjustment, 6)));
-        Assert.Equal(new[] { "undead_butcher", "pirate_discover", null }, notes.Select(n => n.JustifiedBy?.Id));
+        Assert.Equal(new[] { "Undead Butcher", "Pirate Discover", null }, notes.Select(n => n.JustifiedBy?.Guide.Name));
         Assert.Equal(new[] { "avg 3.80 → ≈3.50", "≈ Undead Butcher" }, Labels(advice)[0]);
         Assert.Equal(new[] { "avg 4.10 → ≈3.95", "≈ Pirate Discover" }, Labels(advice)[1]);
-        Assert.Equal(new[] { "avg 4.40 · 31%" }, Labels(advice)[2]); // Mech is not targeted: global note only
+        Assert.Equal(new[] { "avg 4.40 · 31%" }, Labels(advice)[2]); // Mechs is no target: the global note only
+        Assert.All(advice.Options, o => Assert.Equal(ChoiceReason.Trinket, o.Reason));
 
         // Naming both targets takes the larger weight, never the sum: the bound holds.
-        var both = TrinketAffinity.Adjust("Your Undead and Pirates have +1/+1.", advice.Targets);
-        Assert.Equal((TrinketAffinity.MaxAdjustment, "undead_butcher"), (both.Adjustment, both.JustifiedBy!.Id));
-        Assert.Equal((0.0, (Composition?)null), TrinketAffinity.Adjust("Gain 2 Gold.", advice.Targets));
+        var both = TrinketAffinity.Adjust("Your Undead and Pirates have +1/+1.", targets);
+        Assert.Equal((TrinketAffinity.MaxAdjustment, "Undead Butcher"), (both.Adjustment, both.JustifiedBy!.Guide.Name));
+        Assert.Equal((0.0, (CompTarget?)null), TrinketAffinity.Adjust("Gain 2 Gold.", targets));
+        Assert.Equal(0.0, TrinketAffinity.Affinity("Your Undead have +1 Attack.", primaryTribe: 0)); // a guide without tribe matches no text
+        Assert.Equal(1.0, TrinketAffinity.Affinity("Your Undead have +1 Attack.", primaryTribe: 11));
     }
 
     [Fact]
     public void Trinkets_WithoutStats_SayLoadingThenNoData()
     {
-        var advice = ChoiceAdvisor.Advise(new[] { Trinket(1, "BG31_MagicItem_001", "Undead"), Trinket(2, "BG31_MagicItem_002", "") },
-            UndeadWithAPirate, All, Lobby, _ => null);
+        var advice = ChoiceAdvisor.Advise(new[] { Trinket(1, "TRINKET_1", "Undead"), Trinket(2, "TRINKET_2", "") },
+            UndeadWithAPirateAddOn, TargetsFor(UndeadWithAPirateAddOn), All, Lobby, _ => null);
         Assert.Equal(new[] { "loading…" }, ChoiceAdvisor.Lines(advice.Options[0], Wide, statsLoaded: false));
         Assert.Equal(new[] { "no data" }, ChoiceAdvisor.Lines(advice.Options[1], Wide, statsLoaded: true));
     }
@@ -150,11 +202,12 @@ public class ChoiceAdviceTests
     [Fact]
     public void Labels_ShortenToFitNarrowMarkers()
     {
-        var advice = ChoiceAdvisor.Advise(new[] { Minion(501, "BG25_010"), Minion(502, "BG20_101") }, UndeadWithAPirate, All, Lobby);
-        Assert.Equal(new[] { "★ U. Butcher 2/3→3/3" }, ChoiceAdvisor.Lines(advice.Options[0], 21, statsLoaded: true));
-        Assert.Equal(new[] { "★ UB 2/3→3/3" }, ChoiceAdvisor.Lines(advice.Options[0], 14, statsLoaded: true));
-        Assert.All(new[] { 21, 14, 11 }, width =>
-            Assert.All(ChoiceAdvisor.Lines(advice.Options[0], width, true), line => Assert.True(MarkerText.DisplayLength(line) <= width, line)));
+        var advice = Advise(new[] { Minion(501, "U2"), Minion(502, "M1") }, UndeadWithAPirateAddOn);
+
+        Assert.Equal(new[] { "★ core U. Butcher 2/3→3/3" }, ChoiceAdvisor.Lines(advice.Options[0], 26, statsLoaded: true));
+        Assert.Equal(new[] { "★ core UB 2/3→3/3" }, ChoiceAdvisor.Lines(advice.Options[0], 18, statsLoaded: true));
+        Assert.All(new[] { 26, 18, 15, 11 }, width =>
+            Assert.All(advice.Options.SelectMany(o => ChoiceAdvisor.Lines(o, width, true)), line => Assert.True(MarkerText.DisplayLength(line) <= width, line)));
     }
 
     [Theory]
@@ -178,20 +231,20 @@ public class ChoiceAdviceTests
     [Fact]
     public void DiagnosticLine_HasTheExactFormat()
     {
-        var options = new[] { Minion(1285, "BG29_300"), Minion(1283, "BG25_010"), Minion(1284, "BG20_101") };
-        var advice = ChoiceAdvisor.Advise(options, UndeadWithAPirate, All, Lobby);
+        var options = new[] { Minion(1285, "NEUTRAL"), Minion(1283, "U2"), Minion(1284, "M1") };
+        var advice = Advise(options, UndeadWithAPirateAddOn);
         var first = ChoiceLayout.Labels(ChoiceKind.Discover, 3, 2291, 1360, 1)[0];
 
-        var line = ChoiceAdvisor.DiagnosticLine(options, advice, 24, "ok", Labels(advice), first, 2291, 1360);
+        var line = ChoiceAdvisor.DiagnosticLine(options, advice, All.Count, "hdt-free", Labels(advice), first, 2291, 1360);
 
-        Assert.Equal("Bronzebeard HUD: choice kind=discover options=3 order=[1285,1283,1284] cards=[BG29_300,BG25_010,BG20_101] " +
-                     "comps=24 (ok) targets=[Undead Butcher 7; Pirate Discover 0.5] " +
-                     "advice=[#0 no target comp; #1 ★ Undead Butcher 2/3→3/3; #2 no target comp] " +
+        Assert.Equal("Bronzebeard HUD: choice kind=discover options=3 order=[1285,1283,1284] cards=[NEUTRAL,U2,M1] " +
+                     "guides=5 (hdt-free) targets=[Undead Butcher #FF2BD6; Pirate Discover #B8FF1F] " +
+                     "advice=[#0 none: —; #1 target: ★ core Undead Butcher 2/3→3/3; #2 guide: core Mech Shield (S) / core Mech Magnet (B)] " +
                      "first=x=466 y=355 w=381 h=31 canvas=2291x1360", line);
 
         var powers = new[] { new OfferedOption(40, "BG28_HERO_p1", "HERO_POWER"), new OfferedOption(41, "BG28_HERO_p2", "HERO_POWER") };
         Assert.Equal("Bronzebeard HUD: choice kind=unsupported options=2 order=[40,41] cards=[BG28_HERO_p1,BG28_HERO_p2] types=[HERO_POWER,HERO_POWER]",
-            ChoiceAdvisor.DiagnosticLine(powers, ChoiceAdvisor.Advise(powers, UndeadWithAPirate, All, Lobby), 24, "ok",
+            ChoiceAdvisor.DiagnosticLine(powers, Advise(powers, UndeadWithAPirateAddOn), All.Count, "hdt-free",
                 Array.Empty<IReadOnlyList<string>>(), null, 2291, 1360));
     }
 }

@@ -186,6 +186,69 @@ public static class CompAdvisor
 }
 
 /// <summary>What the tavern overlay shows: the target compositions and one marker entry per tavern card.</summary>
+/// <summary>What taking one card does to one Firestone composition.</summary>
+public sealed class CompEffect
+{
+    public CompEffect(Composition composition, bool isKeyPiece, int targetRank, int keyBefore, int keyAfter)
+    {
+        Composition = composition;
+        IsKeyPiece = isKeyPiece;
+        TargetRank = targetRank;
+        KeyBefore = keyBefore;
+        KeyAfter = keyAfter;
+    }
+
+    public Composition Composition { get; }
+    public bool IsKeyPiece { get; }
+
+    /// <summary>0: the composition being played (best target); 1, 2: other targets; -1: not a target.</summary>
+    public int TargetRank { get; }
+
+    public bool IsCurrent => TargetRank == 0;
+
+    /// <summary>Key pieces held now, and once the card is taken (a copy of a held key piece adds none).</summary>
+    public int KeyBefore { get; }
+    public int KeyAfter { get; }
+    public int KeyTotal => Composition.CoreCards.Count;
+}
+
+/// <summary>
+/// What a card does for the Firestone compositions (TavernAdvisor). The choice labels no longer ask it: they follow the
+/// comp guide targets (<see cref="GuideCardEffects"/>).
+/// </summary>
+public static class CardEffect
+{
+    /// <summary>
+    /// Key piece of any composition playable in the lobby (held or not: a copy of a held key piece makes a
+    /// triple), add-on of a target when not held. Targets first, in their rank, then better placement.
+    /// </summary>
+    public static IReadOnlyList<CompEffect> On(string rawCardId, IReadOnlyList<CompProgress> targets, IReadOnlyList<Composition> playable, IReadOnlyCollection<string> ownedIds)
+    {
+        var cardId = CardIds.Normalize(rawCardId);
+        var held = ownedIds.Contains(cardId);
+        var rank = targets.Select((t, i) => (t.Composition.Id, i)).ToDictionary(x => x.Id, x => x.i, StringComparer.Ordinal);
+        int RankOf(Composition c) => rank.TryGetValue(c.Id, out var r) ? r : -1;
+
+        CompEffect Effect(Composition c, bool isKey)
+        {
+            var before = c.CoreCards.Count(ownedIds.Contains);
+            return new CompEffect(c, isKey, RankOf(c), before, isKey && !held ? before + 1 : before);
+        }
+
+        return playable
+            .Where(c => c.CoreCards.Contains(cardId))
+            .Select(c => Effect(c, isKey: true))
+            .Concat(targets
+                .Select(t => t.Composition)
+                .Where(c => !held && !c.CoreCards.Contains(cardId) && c.AddonCards.Contains(cardId))
+                .Select(c => Effect(c, isKey: false)))
+            .OrderBy(e => e.TargetRank < 0 ? int.MaxValue : e.TargetRank)
+            .ThenBy(e => e.Composition.AveragePlacement ?? double.MaxValue)
+            .ThenBy(e => e.Composition.Id, StringComparer.Ordinal)
+            .ToList();
+    }
+}
+
 public sealed class TavernAdvice
 {
     public TavernAdvice(IReadOnlyList<CompProgress> targets, IReadOnlyList<ShopAdvice> cards, IReadOnlyList<Composition> playable)

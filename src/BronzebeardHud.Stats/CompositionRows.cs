@@ -40,7 +40,7 @@ public sealed class CompositionRow
     public Composition Composition { get; }
     public double Score { get; }
 
-    /// <summary>Ticked by the player (<see cref="CompositionSelection"/>): shown first, whatever its rank.</summary>
+    /// <summary>Ticked by the player (the ids passed to <see cref="CompositionRows.Build"/>): shown first, whatever its rank.</summary>
     public bool IsChecked { get; }
 
     /// <summary>
