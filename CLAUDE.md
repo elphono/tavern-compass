@@ -47,6 +47,8 @@ Ce qui reste ouvert :
 - **Vérifier en jeu** les phases 5 et 6 (liste exhaustive : spec § 5), et les livraisons du 2026-09-27
   (panneau des compos en ovales au plancher de 12 px, détail au clic, lineups à part, surlignage en taverne,
   Skip combat relancé par Battle.net : `docs/journal/2026-09-27-*.md`).
+- **Vérifier en jeu** le panneau des Comp Guides de HDT (`comp-guides`, livré le 2026-10-04 :
+  `docs/journal/2026-10-04-comp-guides-hdt.md` § 3).
 - **Deux arbitrages d'Ali** : garder la ligne « comp ≈ » sous chaque héros (échantillons minces, 17
   parties en médiane) ; garder le bilan par adversaire s'il doublonne l'interface du jeu.
 - **Import HSReplay jamais utilisé** : `stats\manual\` est vide, seules les 24 compos Firestone tournent.
@@ -118,14 +120,14 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   si ce téléchargement échoue, la ligne `Bronzebeard HUD: tavern …` du journal d'HDT dit pourquoi
   (`comps=0 (cache: schema 3 ≠ 4, redownload failed: …)`). On ne supprime jamais le cache à la main. Le
   cache des compositions est du JSON compact (≈ 77 Ko sur last-patch).
-- Panneaux déplaçables (compos visées, lineups, Skip combat) : menu Plugins d'HDT › Bronzebeard HUD › « Move panels »
+- Panneaux déplaçables (compos visées, lineups, Skip combat, Comp Guides de HDT) : menu Plugins d'HDT › Bronzebeard HUD › « Move panels »
   (ou le bouton du plugin dans les options). Hors de ce mode, rien n'est cliquable au-dessus du jeu. Les
   positions sont gardées dans `%LocalAppData%\BronzebeardHud\layout.json`, en fractions de la taille de
   l'overlay : `{"schema": 1, "panels": {"lineups": {"left": 0.76, "top": 0.07}}}`. Un fichier illisible
   donne la disposition par défaut (message dans le journal d'HDT) ; « Reset panel positions » la rétablit.
   Une entrée d'un panneau qui n'existe plus (celui des combats, retiré) est ignorée sans message.
   Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
-- Redimensionner (même mode : poignée ◢ au coin bas-droit du panneau des compos et de celui des lineups, cadre
+- Redimensionner (même mode : poignée ◢ au coin bas-droit du panneau des compos, de celui des lineups et de celui des Comp Guides de HDT, cadre
   pointillé cyan autour de la place donnée ; **pas de poignée sur Skip combat**, un bouton n'a rien à montrer en plus
   ou en moins). On donne de la **place** au contenu, jamais un zoom (Ali, 2026-10-04) : le panneau montre plus ou
   moins de lignes (« 2 of 8 shown »), de pivots ou d'ovales par ligne, au même corps de texte, donc le plancher de
@@ -173,6 +175,22 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   le fait relancer **par Battle.net** (`--exec="launch WTCG"`, redemandé chaque seconde : ≈ 7 s mesurées),
   jamais par son exécutable (connexion refusée, mesuré) ; sans Battle.net, rien n'est tué. Un clic par combat,
   lignes `Bronzebeard HUD: skip combat …` (parent, commande, demandes, nouveau pid, vivant 3 s après).
+- Comp Guides de HDT (demande d'Ali du 2026-10-04, panneau **ajouté**, le panneau des compos Firestone reste tel
+  quel) : panneau déplaçable et redimensionnable `comp-guides` (même poignée ◢ que les deux autres, minimum
+  `CompGuideLayout.MinWidth` × `MinHeight`), en taverne et en combat, par défaut au bas gauche du cadre (symétrique
+  du panneau des compos, à droite des MMR du classement, à gauche du héros ; la marge gauche est la place par
+  défaut du widget de session de HDT). **Source** : la liste que HDT affiche lui-même, lue par son API publique
+  (`API.Core.OverlayWindow.BattlegroundsCompsGuidesVM` : `CurrentState`, `Comps` gratuite ou `CompsByTier`
+  Tier 7, objets `HSReplay.Responses.BattlegroundsCompGuide`) ; HDT la charge à chaque début de partie, le plugin
+  ne fait aucune requête. Groupée par tier comme la vue Tier 7 de HDT (S → D, puis `tier_rank`, puis le nom) ;
+  les 3 compos que le plateau **et** la main rendent les plus probables (3 × carte clé, 2 × enabler, 1 × appoint,
+  `CompGuideMatch`) sont encadrées de vert vif, numérotées, remontées en tête de leur tier, avec les cartes tenues
+  et les clés manquantes ; les autres disent ce qui est tenu (« ★2/4 +1 »). Ce qui ne tient pas est omis, les
+  compos mises en valeur en dernier (`CompGuideLayout.Fit`, « k of n shown »). Journal :
+  `Bronzebeard HUD: comp guides loaded from HDT (…)` à chaque nouvelle liste, `… comp guides round=… highlighted=[…]`
+  à la fin de chaque tour de taverne, `… comp guides: none from HDT (state …)` tant que HDT n'a rien. Mesure et
+  forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. Le `.csproj` référence `HSReplay.dll`
+  (fourni par HDT, jamais copié) pour ce seul type.
 - Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
   événements réels ne se vérifient que sous Windows, avec HDT installé.
 - Le dépôt est **privé** (il était public jusqu'au 2026-09-26) : on garde malgré tout la règle

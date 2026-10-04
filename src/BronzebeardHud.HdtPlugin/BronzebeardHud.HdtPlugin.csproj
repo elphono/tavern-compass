@@ -50,6 +50,12 @@
       <HintPath>$(HdtDir)HearthMirror.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Only for the comp guide type HDT hands over (HSReplay.Responses.BattlegroundsCompGuide); the plugin never
+         calls hsreplay.net itself. -->
+    <Reference Include="HSReplay">
+      <HintPath>$(HdtDir)HSReplay.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>

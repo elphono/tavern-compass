@@ -26,7 +26,7 @@ public sealed class PanelLayout
     /// combats panel, removed on 2026-09-27 (Ali: "l'onglet combat est inutile"), may still sit in an existing
     /// layout.json, and it must neither break the others nor raise a warning. It disappears at the next save.
     /// </summary>
-    public static readonly IReadOnlyCollection<string> KnownPanels = new[] { "target-compositions", "lineups", "skip-combat" };
+    public static readonly IReadOnlyCollection<string> KnownPanels = new[] { "target-compositions", "lineups", "skip-combat", CompGuideLayout.PanelId };
 
     private readonly struct Entry
     {

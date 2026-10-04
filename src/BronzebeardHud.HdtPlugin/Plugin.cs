@@ -46,6 +46,18 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _skipCombatGuard;
     private readonly FeatureGuard _highlightsGuard;
     private readonly FeatureGuard _dataGuard;
+    private readonly FeatureGuard _compGuidesGuard;
+
+    // HDT's own comp guides (HdtCompGuides), the player's progress on them, and the shop round being logged.
+    private CompGuidesPanel? _compGuides;
+    private string? _guidesState;
+    private object? _guidesList;
+    private HdtCompGuidesSnapshot? _guides;
+    private int _guidesVersion;
+    private string _guidesKey = string.Empty;
+    private CompGuideBoard _guidesBoard = CompGuideBoard.Empty;
+    private PlayerCards _guidesCards = BronzebeardHud.Stats.PlayerCards.None;
+    private int _guidesRound = -1;
 
     // "How top boards field it", opened by the "?" above one of Bob's minions.
     private LineupsPanel? _lineupsPanel;
@@ -118,6 +130,7 @@ public sealed class Plugin : IPlugin
             _shownCompStatus = "\u0000";
         }));
         _skipCombatGuard = new FeatureGuard("skip-combat", (n, e) => Disable(n, e, () => _skipCombat?.Hide()));
+        _compGuidesGuard = new FeatureGuard("comp-guides", (n, e) => Disable(n, e, () => _compGuides?.Hide()));
         _pinsGuard =new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
             if (_tavern != null)
@@ -592,6 +605,7 @@ public sealed class Plugin : IPlugin
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
         _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, OpenLineups, OpenMetaSnapshot, DetailFor, HighlightsFor);
+        _compGuides = new CompGuidesPanel(Core.OverlayCanvas, _mover);
         _lineupsPanel = new LineupsPanel(Core.OverlayCanvas, _mover); // added after the target panel: drawn over it
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
@@ -618,6 +632,13 @@ public sealed class Plugin : IPlugin
         _lastAdvice = null;
         _lastCards = BronzebeardHud.Stats.PlayerCards.None;
         _shownCompStatus = null;
+        _guidesState = null;
+        _guidesList = null;
+        _guides = null;
+        _guidesKey = string.Empty;
+        _guidesBoard = CompGuideBoard.Empty;
+        _guidesCards = BronzebeardHud.Stats.PlayerCards.None;
+        _guidesRound = -1;
     }
 
     public void OnUnload()
@@ -634,6 +655,8 @@ public sealed class Plugin : IPlugin
         _skipCombat = null;
         _lineupsPanel?.Detach();
         _lineupsPanel = null;
+        _compGuides?.Detach();
+        _compGuides = null;
         _mover?.Detach();
         _panel = null;
         _tavern = null;
@@ -660,6 +683,105 @@ public sealed class Plugin : IPlugin
         _choiceGuard.Run(() => UpdateChoice(game));
         _warbandGuard.Run(() => UpdateWarband(game));
         _skipCombatGuard.Run(() => UpdateSkipCombat(game));
+        _compGuidesGuard.Run(() => UpdateCompGuides(game));
+    }
+
+    /// <summary>
+    /// HDT's own comp guides, in their panel, in the shop and in combat. Read from HDT whenever its list or its state
+    /// changes (one log line: where from, how many, which tiers); ranked against the board and hand whenever those change
+    /// in the shop (CompGuideMatch); in combat the shop's ranking stays. One log line per shop round, when it ends, with
+    /// the guides highlighted.
+    /// </summary>
+    private void UpdateCompGuides(GameV2 game)
+    {
+        if (_compGuides == null)
+        {
+            return;
+        }
+
+        var phase = HdtEntityAdapter.Phase(game);
+        if (phase is not (OverlayPhase.Shop or OverlayPhase.Combat))
+        {
+            LogCompGuidesRound();
+            _guidesKey = string.Empty;
+            _compGuides.Hide();
+            return;
+        }
+
+        var (state, list) = HdtCompGuides.Peek();
+        if (_guides == null || state != _guidesState || !ReferenceEquals(list, _guidesList))
+        {
+            _guidesState = state;
+            _guidesList = list;
+            _guides = HdtCompGuides.Read();
+            _guidesVersion++;
+            Log.Info(_guides.Guides is { } loaded
+                ? $"Bronzebeard HUD: comp guides loaded from HDT ({loaded.Source}, state {_guides.State}): {loaded.Count} comps, tiers [{loaded.TierSummary}], unknown cards {loaded.UnknownCards}"
+                : $"Bronzebeard HUD: comp guides: none from HDT (state {_guides.State}){(_guides.Error != null ? ": " + _guides.Error : string.Empty)}");
+        }
+
+        var cards = _guidesCards;
+        if (phase == OverlayPhase.Shop)
+        {
+            var round = game.GetTurnNumber();
+            if (round != _guidesRound)
+            {
+                LogCompGuidesRound();
+                _guidesRound = round;
+            }
+
+            cards = HdtEntityAdapter.PlayerCards(game);
+        }
+        else
+        {
+            LogCompGuidesRound(); // the shop round is over: its last ranking is the one logged
+        }
+
+        var key = string.Join(",", cards.All.Select(c => c.CardId).OrderBy(id => id, StringComparer.Ordinal)) + "|" + _guidesVersion;
+        if (key == _guidesKey && _compGuides.IsVisible)
+        {
+            return;
+        }
+
+        _guidesKey = key;
+        _guidesCards = cards;
+        _guidesBoard = _guides.Guides is { } guides ? CompGuideMatch.Rank(guides, cards) : CompGuideBoard.Empty;
+        _compGuides.Show(_guidesBoard, _guides.Guides?.Source, CompGuidesStatus(_guides));
+    }
+
+    /// <summary>The line the panel shows when HDT gives no guides, in HDT's own terms; null when it gives some.</summary>
+    private static string? CompGuidesStatus(HdtCompGuidesSnapshot snapshot)
+    {
+        if (snapshot.Error != null)
+        {
+            return "HDT's comp guides could not be read: " + snapshot.Error;
+        }
+
+        if (snapshot.Guides != null)
+        {
+            return snapshot.Guides.Count == 0 ? "HDT lists no comp guide" : null;
+        }
+
+        return snapshot.State switch
+        {
+            "Loading" => "HDT is loading its comp guides…",
+            "Error" => "HDT could not load its comp guides",
+            "Empty" => "HDT lists no comp guide",
+            _ => $"HDT shows no comp guide ({snapshot.State})",
+        };
+    }
+
+    /// <summary>One line when a shop round ends: the guides highlighted for the cards held at its end.</summary>
+    private void LogCompGuidesRound()
+    {
+        if (_guidesRound < 0)
+        {
+            return;
+        }
+
+        Log.Info($"Bronzebeard HUD: comp guides round={_guidesRound} source={_guides?.Guides?.Source ?? "none"} comps={_guidesBoard.Count} " +
+                 $"board={_guidesCards.Board.Count} hand={_guidesCards.Hand.Count} highlighted={_guidesBoard.HighlightSummary}");
+        _guidesRound = -1;
     }
 
     /// <summary>
