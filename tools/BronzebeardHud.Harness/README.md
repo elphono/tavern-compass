@@ -10,7 +10,7 @@ redimensionner et les regarder **sans lancer une partie** ni HDT.
 ```
 
 Arguments en plus : `--size 1600x900`, `--layout <fichier>`, `--wait <ms>` (attente des noms et images avant la capture).
-Le script compile sous WSL, copie dans `C:\temp\BronzebeardHarness` et lance l'exécutable côté Windows.
+Le script compile sous WSL, copie dans `C:\temp\BronzebeardHarness` et lance l'exécutable côté Windows (par `Start-Process` : lancée par `cmd.exe /c start`, la fenêtre garde la console de WSL attachée et le script ne rend jamais la main). **Fermer la fenêtre avant de relancer** : un exécutable en cours ne se remplace pas, et le script le dit.
 
 ## Ce qui est réel, ce qui est simulé
 
