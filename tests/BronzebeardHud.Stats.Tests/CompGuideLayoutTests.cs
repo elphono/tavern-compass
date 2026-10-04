@@ -14,7 +14,6 @@ public class CompGuideLayoutTests
         var panel = CompGuideLayout.DefaultPanel(width, height);
 
         Assert.False(NoGoZones.Overlaps(panel, TavernLayout.TargetPanel(width, height)), "covers the target composition panel");
-        Assert.False(NoGoZones.Overlaps(panel, PanelFit.LineupsPanel(width, height)), "covers the lineups panel");
         Assert.False(NoGoZones.Overlaps(panel, SkipCombatLayout.Button(width, height)), "covers the Skip combat button");
         foreach (var (name, zone) in NoGoZones.For(width, height))
         {
@@ -45,26 +44,6 @@ public class CompGuideLayoutTests
         // The default box is a box the resize handle accepts: never under the panel's minimum.
         Assert.True(panel.Width / TavernLayout.Scale(height) >= CompGuideLayout.MinWidth, "narrower than the resize minimum");
         Assert.True(panel.Height / TavernLayout.Scale(height) >= CompGuideLayout.MinHeight, "shorter than the resize minimum");
-    }
-
-    [Fact]
-    public void Resize_TheCompGuidesPanelKeepsTheSizeGiven_RaisedToItsMinimum()
-    {
-        const double width = 1920, height = 1080;
-        var scale = TavernLayout.Scale(height);
-        var minimum = (CompGuideLayout.MinWidth * scale, CompGuideLayout.MinHeight * scale);
-        var layout = PanelLayout.Empty;
-        var start = layout.Resolve(CompGuideLayout.PanelId, CompGuideLayout.DefaultPanel(width, height), width, height, minimum);
-
-        layout.Resize(CompGuideLayout.PanelId, start, start.Left + 400, start.Top + 300, minimum, width, height);
-        var bigger = layout.Resolve(CompGuideLayout.PanelId, CompGuideLayout.DefaultPanel(width, height), width, height, minimum);
-        layout.Resize(CompGuideLayout.PanelId, bigger, bigger.Left + 10, bigger.Top + 10, minimum, width, height);
-        var tiny = layout.Resolve(CompGuideLayout.PanelId, CompGuideLayout.DefaultPanel(width, height), width, height, minimum);
-
-        Assert.True(layout.IsResized(CompGuideLayout.PanelId));
-        Assert.Equal((400.0, 300.0), (Math.Round(bigger.Width, 6), Math.Round(bigger.Height, 6)));
-        Assert.Equal((Math.Round(start.Left, 6), Math.Round(start.Top, 6)), (Math.Round(bigger.Left, 6), Math.Round(bigger.Top, 6)));
-        Assert.Equal((Math.Round(minimum.Item1, 6), Math.Round(minimum.Item2, 6)), (Math.Round(tiny.Width, 6), Math.Round(tiny.Height, 6)));
     }
 
     private static CompGuideFitItem Header(int group, double height = 20) => new(CompGuideItemKind.TierHeader, group, height);
@@ -122,19 +101,5 @@ public class CompGuideLayoutTests
 
         Assert.Empty(fit.Shown);
         Assert.Equal((0, 8, true), (fit.RowsShown, fit.RowsTotal, fit.ShowsMoreLine));
-    }
-
-    [Fact]
-    public void Layout_TheCompGuidesPanelIsKnown_ItsPlaceIsKept()
-    {
-        var layout = PanelLayout.Empty;
-        layout.Store(CompGuideLayout.PanelId, 500, 300, 2000, 1000);
-
-        var (reloaded, error) = PanelLayout.Parse(layout.Serialize());
-
-        Assert.Null(error);
-        Assert.Contains("comp-guides", PanelLayout.KnownPanels);
-        var rect = reloaded.Resolve("comp-guides", new LayoutRect(100, 100, 200, 200), 2000, 1000);
-        Assert.Equal((500.0, 300.0), (Math.Round(rect.Left, 1), Math.Round(rect.Top, 1)));
     }
 }

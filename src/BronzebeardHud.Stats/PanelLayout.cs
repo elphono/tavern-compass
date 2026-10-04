@@ -22,11 +22,12 @@ public sealed class PanelLayout
     public const int CurrentSchema = 1;
 
     /// <summary>
-    /// The movable panels that exist. An entry for any other name in the file is ignored without a word: the
-    /// combats panel, removed on 2026-09-27 (Ali: "l'onglet combat est inutile"), may still sit in an existing
-    /// layout.json, and it must neither break the others nor raise a warning. It disappears at the next save.
+    /// The movable panels that exist. An entry for any other name in the file is ignored without a word: a removed
+    /// panel may still sit in an existing layout.json, and it must neither break the others nor raise a warning. It
+    /// disappears at the next save. Removed so far: "combats" (2026-09-27, Ali: "l'onglet combat est inutile"),
+    /// "lineups" and "comp-guides" (2026-10-04, merged into the target panel, whose id stays "target-compositions").
     /// </summary>
-    public static readonly IReadOnlyCollection<string> KnownPanels = new[] { "target-compositions", "lineups", "skip-combat", CompGuideLayout.PanelId };
+    public static readonly IReadOnlyCollection<string> KnownPanels = new[] { "target-compositions", "skip-combat" };
 
     private readonly struct Entry
     {

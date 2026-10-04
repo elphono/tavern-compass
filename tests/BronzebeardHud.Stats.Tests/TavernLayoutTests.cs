@@ -59,8 +59,8 @@ public class TavernLayoutTests
 
         Assert.True(panel.Left >= 0 && panel.Top >= 0 && panel.Right <= width && panel.Top + panel.Height <= height, "outside the window");
         var s = height / 1080;
-        Assert.True(panel.Width - (2 * PanelFit.Border + 2 * PanelFit.Padding) * s >= (PanelFit.BoxColumn + PanelFit.NameColumn + 7 * (PanelFit.OvalWidth + PanelFit.OvalGap)) * s,
-            "a tick box, a name column and seven ovals do not fit on one line");
+        Assert.True(panel.Width - (2 * PanelFit.Border + 2 * PanelFit.Padding) * s >= (PanelFit.BoxColumn + PanelFit.NameColumn + PanelFit.CoreOvalsPerRow * (PanelFit.OvalWidth + PanelFit.OvalGap)) * s - 1e-9,
+            "a tick box, a name column and six ovals do not fit on one line");
         Assert.True(panel.Top + panel.Height <= PanelFit.BottomLimit * height, "the default panel reaches the gold");
     }
 

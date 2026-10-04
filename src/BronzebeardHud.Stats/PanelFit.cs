@@ -5,7 +5,7 @@ using System.Linq;
 namespace BronzebeardHud.Stats;
 
 /// <summary>
-/// Every font size of the plugin's text: the target composition panel, the lineups panel, the tavern and choice
+/// Every font size of the plugin's text: the target composition panel, the tavern and choice
 /// markers, the Skip combat button, the hero badges and the opponents' MMR, in design pixels at 1080p
 /// (× TavernLayout.Scale). Ali, 2026-09-27: no text under 12 px at 1080p,
 /// after any scaling. Nothing is ever shrunk to fit any more: when content runs out of room, less is shown
@@ -20,7 +20,7 @@ public static class PanelTypography
     public const double CompositionName = 14;
     public const double Button = 13;
 
-    /// <summary>Body text: lineups headings, "No composition reachable yet", a hero badge's figures and odds.</summary>
+    /// <summary>Body text: "No composition reachable yet", a hero badge's figures and odds.</summary>
     public const double Body = 13;
 
     /// <summary>
@@ -67,32 +67,50 @@ public static class PanelFit
     /// <summary>Title bar: "Target compositions", Meta, − n +; buttons 22 tall, a rule under them.</summary>
     public const double TitleBar = 32;
 
-    /// <summary>Oval card vignettes, everywhere: width, and height = width × TavernLayout.OvalAspect.</summary>
-    public const double OvalWidth = 40;
+    /// <summary>
+    /// Oval card vignettes, everywhere: width, and height = width × TavernLayout.OvalAspect. 54 since the comp guides became
+    /// the targets (2026-10-04): a guide has 2 to 6 core cards (measured on HSReplay's list), so a line shows six ovals at
+    /// most, larger, where it showed a Firestone board of seven.
+    /// </summary>
+    public const double OvalWidth = 54;
     public const double OvalGap = 4;
     public static double OvalHeight => OvalWidth * TavernLayout.OvalAspect;
 
-    /// <summary>One composition line: tick box column, name and placement column, seven ovals.</summary>
+    /// <summary>Ovals on one guide line: its core cards, never more (add-ons and enablers are never mixed into that line).</summary>
+    public const int CoreOvalsPerRow = 6;
+
+    /// <summary>
+    /// One guide line: tick box column, name column (the name may take two lines, the line is as tall as an oval), then
+    /// <see cref="CoreOvalsPerRow"/> ovals. The name column is what gave way to the larger ovals (118 → 96): the panel keeps
+    /// its width, the widest its default place allows (<see cref="PanelWidth"/>).
+    /// </summary>
     public const double BoxColumn = 24;
-    public const double NameColumn = 118;
-    public const double RowHeight = 50;
+    public const double NameColumn = 96;
+    public static double RowHeight => OvalHeight;
     public const double RowGap = 6;
 
     /// <summary>The warband line under the list, and the loading status line.</summary>
     public const double FooterLine = 20;
     public const double StatusLine = 16;
 
-    /// <summary>Panel width: 488 design pixels, so that its default place stays right of the hero power.</summary>
-    public const double PanelWidth = 2 * Border + 2 * Padding + 468;
+    /// <summary>
+    /// Panel width: the tick box, the name and six ovals, 488 design pixels. Not wider: at its default place
+    /// (TavernLayout.TargetPanel) the panel ends 0.01 × H inside the 4:3 frame's right edge and must start right of the hero
+    /// power (W/2 + 0.2 × H), which leaves 0.4567 × H, 493 design pixels.
+    /// </summary>
+    public const double PanelWidth = 2 * Border + 2 * Padding + BoxColumn + NameColumn + CoreOvalsPerRow * (OvalWidth + OvalGap);
 
     /// <summary>Lowest point a panel may reach, × H: above the player's gold, at the bottom right of the board.</summary>
     public const double BottomLimit = 0.945;
 
-    /// <summary>Detail view pieces: "← back" and name, the meta line (up to two lines), a section (title and ovals), a pivot line.</summary>
+    /// <summary>
+    /// Detail view pieces: "← back" and name, the meta line (up to two lines), a section (its 21 px title, then a line of
+    /// ovals), a pivot line (4 px above a line of ovals).
+    /// </summary>
     public const double DetailHeader = 36;
     public const double DetailMeta = 34;
-    public const double DetailSection = 15 + 50 + 4;
-    public const double PivotLine = 54;
+    public static double DetailSection => 21 + OvalHeight;
+    public static double PivotLine => 4 + OvalHeight;
 
     private static double Chrome(bool footer, bool status) =>
         2 * Border + 2 * Padding + TitleBar + (footer ? FooterLine : 0) + (status ? StatusLine : 0);
@@ -104,8 +122,8 @@ public static class PanelFit
     public static double Room(double height, double top, double? bottom = null) => ((bottom ?? BottomLimit * height) - top) / TavernLayout.Scale(height);
 
     /// <summary>
-    /// Smallest box of the target panel when resized (design pixels): the title and one composition line, as wide as
-    /// its seven ovals need. A footer or a status line under that one line does not widen it: the panel then grows
+    /// Smallest box of the target panel when resized (design pixels): the title and one guide line, as wide as
+    /// its six ovals need. A footer or a status line under that one line does not widen it: the panel then grows
     /// to hold what it shows, as it always showed at least one line.
     /// </summary>
     public const double TargetMinWidth = PanelWidth;
@@ -115,7 +133,7 @@ public static class PanelFit
     /// What the detail view always shows: "← back" and the name, the meta line and the two sections (enablers, key
     /// pieces), under the title bar. Only the pivots below it give way to a smaller box.
     /// </summary>
-    public const double DetailMinHeight = 2 * Border + 2 * Padding + TitleBar + DetailHeader + DetailMeta + 2 * DetailSection;
+    public static double DetailMinHeight => 2 * Border + 2 * Padding + TitleBar + DetailHeader + DetailMeta + 2 * DetailSection;
 
     /// <summary>
     /// How many composition lines the list shows: as many as fit between the panel's top and
@@ -144,61 +162,10 @@ public static class PanelFit
     public static int DetailPivots(double height, double top, int pivots, double? bottom = null)
     {
         var available = Room(height, top, bottom) - DetailMinHeight;
-        return Math.Max(0, Math.Min(pivots, (int)Math.Floor(available / PivotLine)));
+        return Math.Max(0, Math.Min(pivots, (int)Math.Floor((available + Tolerance) / PivotLine)));
     }
 
-    /// <summary>
-    /// The lineups panel's default place: the right-hand column, right of seven tavern cards (with their ◇ and ?
-    /// buttons), below HDT's top bar (top right corner of the window), above the Skip combat button and the
-    /// target composition panel; on a window wider than 4:3 it may reach past Hearthstone's frame, over the
-    /// board's side decoration. It never covers another plugin panel nor the game's cards, hero or leaderboard.
-    /// </summary>
-    public static LayoutRect LineupsPanel(double width, double height)
-    {
-        var s = TavernLayout.Scale(height);
-        var left = width / 2 + 3.5 * TavernLayout.ShopCardWidth * s + 8 * s;
-        var right = Math.Min(width - 0.01 * height, width / 2 + height * 2 / 3 - 0.01 * height + 0.25 * height);
-        var top = 0.07 * height;
-        var bottom = SkipCombatLayout.Button(width, height).Top - 0.01 * height;
-        return new LayoutRect((left + right) / 2, (top + bottom) / 2, Math.Max(0, right - left), Math.Max(0, bottom - top));
-    }
-
-    /// <summary>Lineups panel pieces: title and headline (two lines each at most), a composition label, an MMR line.</summary>
-    public const double LineupsHeader = 2 * Border + 2 * Padding + 36 + 32;
-    public const double LineupLabel = 32;
-    public const double LineupMmr = 16;
-
-    /// <summary>
-    /// Smallest box of the lineups panel when resized (design pixels): a line of seven ovals (a full board), and
-    /// under the title, headline and label one such board with its MMR line. No padding: one pixel less shows none.
-    /// </summary>
-    public const int MinLineupOvals = 7;
-    public const double LineupsMinWidth = 2 * Border + 2 * Padding + MinLineupOvals * (OvalWidth + OvalGap);
-    public static double LineupsMinHeight => LineupsHeader + LineupLabel + (OvalHeight + RowGap) + LineupMmr;
-
-    /// <summary>Ovals per line of a board in a panel <paramref name="panelWidth"/> wide (overlay pixels).</summary>
+    /// <summary>Ovals per line of cards in a panel <paramref name="panelWidth"/> wide (overlay pixels), padding and borders aside.</summary>
     public static int OvalsPerLine(double panelWidth, double height) =>
         Math.Max(1, (int)Math.Floor((panelWidth / TavernLayout.Scale(height) - 2 * Border - 2 * Padding + Tolerance) / (OvalWidth + OvalGap)));
-
-    /// <summary>How many compositions of <paramref name="boardSizes"/> (their best board's card count) the lineups panel shows.</summary>
-    public static int LineupCompositions(LayoutRect panel, double height, IReadOnlyList<int> boardSizes)
-    {
-        var perLine = OvalsPerLine(panel.Width, height);
-        var room = panel.Height / TavernLayout.Scale(height) - LineupsHeader;
-        var shown = 0;
-        foreach (var size in boardSizes)
-        {
-            var lines = (int)Math.Ceiling(Math.Max(1, size) / (double)perLine);
-            var need = LineupLabel + lines * (OvalHeight + RowGap) + LineupMmr;
-            if (need > room + Tolerance)
-            {
-                break;
-            }
-
-            room -= need;
-            shown++;
-        }
-
-        return shown;
-    }
 }

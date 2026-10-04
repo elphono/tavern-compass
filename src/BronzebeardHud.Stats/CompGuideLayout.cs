@@ -53,8 +53,8 @@ public sealed class CompGuideFit
 /// </summary>
 public static class CompGuideLayout
 {
-    /// <summary>Panel id in layout.json (PanelLayout).</summary>
-    public const string PanelId = "comp-guides";
+    // No panel id any more: the comp guides are shown in the target panel ("target-compositions") since 2026-10-04, and
+    // PanelLayout ignores a "comp-guides" entry. DefaultPanel and the minimum stay for whoever lays a guide list out alone.
 
     /// <summary>Space kept between the panel and its neighbours, × H.</summary>
     public const double Gap = 0.01;
@@ -71,11 +71,11 @@ public static class CompGuideLayout
     /// The default place: the lower left part of Hearthstone's 4:3 frame, mirror of the target composition panel
     /// (TavernLayout.TargetPanel) on the other side of the hero. Right of the leaderboard and of the opponents' MMR
     /// labels (LeaderboardLayout.MmrLabel), left of the hero and hero power (within W/2 ± 0.2 × H), below the player's
-    /// board row, down to PanelFit.BottomLimit. Clear of Bob's cards and their buttons, the target composition panel,
-    /// the lineups panel and the Skip combat button, which all sit right of the hero or above the board's bottom.
+    /// board row, down to PanelFit.BottomLimit. Clear of Bob's cards and their buttons, the target composition panel
+    /// and the Skip combat button, which all sit right of the hero or above the board's bottom.
     /// About 0.26 × H wide at any window ratio. HDT's own session widget defaults to the window's left edge at 15 %
     /// of its height (Config.SessionRecapLeft = 0, SessionRecapTop = 15), which is why the panel does not use the
-    /// margin left of the frame. It can be moved (PanelLayout, id "comp-guides").
+    /// margin left of the frame.
     /// </summary>
     public static LayoutRect DefaultPanel(double width, double height)
     {
