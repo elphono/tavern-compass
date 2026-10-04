@@ -217,6 +217,18 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   `MinionLineups`) restent chargées et dans le code, pour orienter les aides plus tard, mais ne sont plus affichées
   (hors ligne « comp ≈ » de l'encart des héros). Une erreur d'un fichier de `manual\` est dite une fois par
   `compositions data: …` (avertissement). `docs/mock/` est la maquette de l'ancien panneau Firestone.
+- **Pont guides HDT ↔ compos Firestone** (`GuideBridge`, 2026-10-04, dans `Stats` seulement : **le plugin ne le passe pas
+  encore**, rien ne change à l'écran tant qu'il ne le fait pas). Deux nomenclatures sans clé commune, rapprochées par les
+  cartes : core ∪ add-on du guide contre tout ce que Firestone donne de la compo (listes, plateau de référence, plateaux
+  finaux, dorées comprises). Pont seulement si **≥ 2 cartes partagées ET ≥ la moitié des cartes clés du guide** ; meilleure
+  compo = plus de clés, puis plus de cartes, puis plus de parties, puis l'id ; sinon aucun pont. Deux variantes d'un guide
+  peuvent partager une compo. Journal : `bridge: Guide → compo (k/N keys, m cards, n games); Autre → no match`. Ce qu'il
+  ouvre, en paramètre optionnel `bridge` : aides de choix (« ★ core T 2/3→3/3 · 4/5 boards » ; « + T 3/5 boards » pour une
+  carte qu'aucune liste du guide ne nomme mais sur ≥ 2 plateaux finaux de sa compo, `ChoiceReason.TopBoards` ; « pivot → G (S) »
+  pour une carte clé d'un guide pivot d'une cible, `ChoiceReason.Pivot` ; ordre cible, plateaux, pivot, repli), cadres en
+  taverne (« + T 3/5 » pointillé, après tous les rôles ; `TavernHighlights.Summary` pour le journal) et `TargetContext`
+  (« ≈ 3,4 with your hero (23) · final turn ≈ 13 · 5 top boards », jamais la place moyenne de la compo). Sans `bridge`
+  (null), les textes d'avant mot pour mot, pivots compris.
 - Bouton « Skip combat » (jaune, en combat seulement, panneau déplaçable `skip-combat`) : tue Hearthstone et
   le fait relancer **par Battle.net** (`--exec="launch WTCG"`, redemandé chaque seconde : ≈ 7 s mesurées),
   jamais par son exécutable (connexion refusée, mesuré) ; sans Battle.net, rien n'est tué. Un clic par combat,

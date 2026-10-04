@@ -91,9 +91,43 @@ public class ChoiceAdviceBridgeTests
         Assert.Equal(new[] { ChoiceReason.Pivot, ChoiceReason.TopBoards, ChoiceReason.Guide }, advice.Options.Select(o => o.Reason));
         Assert.Equal(new[] { null, Targets()[0].Colour, null }, advice.Options.Select(o => o.Colour));
 
-        // The pivot needs no bridge: without one, RTOP is the pivot's.
+        // The pivot needs no Firestone data: with an empty bridge, RTOP is the pivot's.
         Assert.Equal(new[] { "pivot → Undead Reborn (S)", "pivot → Undead Reborn (S)", "core Mech Shield (S)" },
-            Labels(Advise(null, "R1", "RTOP", "M1")).Select(l => Assert.Single(l)));
+            Labels(Advise(new Dictionary<string, GuideEvidence>(), "R1", "RTOP", "M1")).Select(l => Assert.Single(l)));
+
+        // Without a bridge (null: a caller that does not pass one), the labels from before, word for word: no pivot.
+        var before = Advise(null, "R1", "RTOP", "M1");
+        Assert.Equal(new[] { new[] { "core Undead Reborn (S)", "core Mech Shield (S)" }, new[] { "core Undead Reborn (S)" }, new[] { "core Mech Shield (S)" } },
+            Labels(before));
+        Assert.All(before.Options, o => Assert.Equal(ChoiceReason.Guide, o.Reason));
+    }
+
+    [Fact]
+    public void APivotToAGuideTheLobbyCannotPlay_OrToATarget_IsNoPivot()
+    {
+        // Undead Reborn is Undead Butcher's pivot, but a lobby without undead cannot play it: R1 says Mech Shield's fallback.
+        var noUndead = new[] { "PIRATE", "MECHANICAL", "DEMON", "DRAGON", "BEAST" };
+        var advice = ChoiceAdvisor.Advise(new[] { Minion(1, "R1"), Minion(2, "NEUTRAL") }, Held, Targets(), All, noUndead, bridge: Bridge());
+        Assert.Equal(new[] { "core Mech Shield (S)" }, Labels(advice)[0]);
+        Assert.Empty(advice.Options[0].Pivots);
+
+        // Undead Reborn ticked as a target too: R1 is its core card, a target's role, never a pivot to it.
+        var targets = GuideTestData.Targets(All, new PlayerCards(Held, Array.Empty<OwnedCard>()), 2, Undead, Reborn);
+        var asTarget = ChoiceAdvisor.Advise(new[] { Minion(1, "R1"), Minion(2, "NEUTRAL") }, Held, targets, All, Lobby, bridge: Bridge());
+        Assert.Equal(ChoiceReason.Target, asTarget.Options[0].Reason);
+        Assert.Empty(asTarget.Options[0].Pivots);
+    }
+
+    [Fact]
+    public void TopBoards_OnlyTheTargetsWhoseGuideDoesNotListTheCard()
+    {
+        // PA: Pirate Discover lists it (an add-on), Undead Butcher does not: only Undead Butcher's boards are "top boards".
+        var pa = Advise(Bridge(), "PA", "NEUTRAL").Options[0];
+        Assert.Equal(new[] { ("Undead Butcher", "3/5"), ("Pirate Discover", "2/5") }, pa.Boards.Select(b => (b.Target.Guide.Name, b.Card.Count!)));
+        Assert.Equal(new[] { "Undead Butcher" }, pa.TopBoards.Select(b => b.Target.Guide.Name));
+
+        // U2: a core card of Undead Butcher, on 4 of its 5 boards: no top boards at all.
+        Assert.Empty(Advise(Bridge(), "U2", "NEUTRAL").Options[0].TopBoards);
     }
 
     [Fact]

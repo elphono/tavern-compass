@@ -311,7 +311,8 @@ public sealed class ChoiceAdvice
 /// a target's bridged comp whose top boards hold it although its guide does not list it; failing that, a guide a target
 /// can pivot to that it is a core card of; failing that, which other guide it is a core card of; failing that, nothing.
 /// Never "no target comp": with nothing ticked, the targets are the most probable guides, and a card that serves none of
-/// them still says which guide it would start. Without a bridge the labels are those from before the bridge.
+/// them still says which guide it would start. Without a bridge (null) the labels are those from before the bridge, pivots
+/// included: none.
 /// </summary>
 public static class ChoiceAdvisor
 {
@@ -319,7 +320,11 @@ public static class ChoiceAdvisor
     /// <param name="targets">The targets (<see cref="CompTargetTracker.Next"/>), in their order.</param>
     /// <param name="guides">Every guide HDT lists, for the pivots and the fallback; null when HDT gives none.</param>
     /// <param name="lobbyTribes">The lobby's tribes as <see cref="Tribes.All"/> names; empty when unknown (no guide is then left out).</param>
-    /// <param name="bridge">Guide id → its Firestone comp (<see cref="GuideBridge.For"/>); null: no Firestone evidence.</param>
+    /// <param name="bridge">
+    /// Guide id → its Firestone comp (<see cref="GuideBridge.For"/>). Given, even empty (no Firestone data), it turns on the
+    /// enriched labels: boards where a comp is bridged, and pivots, which need no Firestone data. Null: the labels from before
+    /// the bridge, word for word (no boards, no pivot), so that a caller that does not pass it sees nothing change.
+    /// </param>
     public static ChoiceAdvice Advise(
         IReadOnlyList<OfferedOption> options,
         IReadOnlyList<OwnedCard> owned,
@@ -348,7 +353,7 @@ public static class ChoiceAdvisor
         }
 
         var otherIds = new HashSet<string>(others.Select(g => g.Id), StringComparer.Ordinal);
-        var targetPivots = guides == null
+        var targetPivots = guides == null || bridge == null
             ? new List<(CompTarget Target, IReadOnlyList<GuidePivot> Pivots)>()
             : targets.Select(t => (Target: t, Pivots: GuidePivots.For(t.Guide, guides, held))).ToList();
 
