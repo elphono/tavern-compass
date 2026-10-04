@@ -43,7 +43,7 @@ Ce qui reste ouvert :
 
 - **Vérifier en jeu le panneau unique « Compositions »** (2026-10-04, `docs/journal/2026-10-04-panneau-unique.md`) :
   liste des guides de HDT et couleurs des cibles, détail au clic, cadres sur les cartes de Bob, étiquettes des choix,
-  tribus du lobby (bêtes). Vu seulement dans la simulation (captures, `--selftest`).
+  tribus du lobby (bêtes). Vu seulement dans la simulation (captures, `--selftest`), sauf les étiquettes des choix : le harnais ne compile pas `ChoiceAdvicePanel`, elles n'ont été vues nulle part.
 - **Vérifier en jeu la poignée de redimensionnement** (2026-10-04) : le calcul est testé et éprouvé par mutation,
   mais le pointage sous HDT, le cadre pointillé, le rendu d'un panneau étroit et le retour au défaut par « Reset » ne
   se voient que sous Windows.
@@ -145,7 +145,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   égales) et `panel moved`. Le calcul en lignes de l'ancien panneau (`PanelFit.Rows`, `DetailPivots`, et leur
   `Tolerance` : une boîte exactement de la hauteur de n lignes, divisée par une échelle qui n'est pas une fraction
   binaire, rendait n − 1 lignes) est retiré depuis la fusion : le panneau unique mesure ses pièces en place, en pixels
-  de l'overlay, et `CompGuideLayout` décide ce qui tient (`Sections` avec une tolérance, `Fit` sans).
+  de l'overlay, et `CompGuideLayout` décide ce qui tient (`Fit` et `Sections`, avec la même tolérance).
 - Encart des héros proposés (sélection du héros, fixe) : sous le bouton de reroll du jeu (« Réinitialiser »,
   0,632 → 0,718 H), de 0,725 à 0,805 H, 0,17 H de large, dans la colonne du héros (grille d'HDT, un héros tous
   les 340/1080 H). Un encart qui approcherait à moins de 0,01 H du bouton OK (0,751 → 0,825 H) se décale de
