@@ -115,3 +115,57 @@ double `MouseEnter` réel, le `MouseLeave` de WPF quand la fenêtre repasse en c
 que le curseur est encore dans la ligne), et l'emplacement unique d'infobulle de HDT ailleurs que dans sa copie, écrite
 d'après le code décompilé.
 
+## Stats Firestone → aides
+
+Depuis la fusion, les compositions de Firestone étaient chargées sans servir à rien d'autre que l'encart des héros. Le
+pont (`GuideBridge`, écrit et testé dans `Stats` la même journée) est maintenant passé par le plugin.
+
+**Ce qui est branché.**
+
+| Où | Ce qui change à l'écran | Code |
+|---|---|---|
+| journal | `bridge: Guide → compo (k/N keys, m cards, n games); Autre → no match (k/n guides bridged, against m compositions; Firestone <état>)`, à chaque recalcul | `Plugin.UpdateBridge` : nouvelle liste de guides de HDT, ou chargement des compos (`CompService.Version`) |
+| choix | « + T · 4/5 boards » après le rôle d'une cible ; « + T 3/5 boards » (couleur de T) pour une carte qu'aucune liste de T ne nomme mais sur ≥ 2 plateaux finaux de sa compo ; « pivot → G (S) » (neutre) pour une carte clé d'un guide vers lequel une cible peut pivoter | `ChoiceAdvisor.Advise(…, bridge)`, aucun texte nouveau côté plugin |
+| taverne | cadre pointillé « + T 3/5 » sur une carte de Bob dans le même cas, après tous les rôles ; la ligne `tavern highlights=[…]` le dit (`carte:boards 3/5:guide`) | `TavernHighlights.For(Bob, cibles, pont)`, `TavernHighlights.Summary` |
+| détail et popup d'un guide | une ligne sous l'en-tête : « ≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards » (12 px, gris), omise sans pont | `TargetContext.For`, `GuideView.Context` |
+
+Le morceau « with your hero » vient de `HeroCompAffinity.Effects`, qui n'était plus calculé depuis la fusion : il est
+rebranché à moindre coût (recalculé quand le héros joué ou les compos changent, comme avant la fusion). Un garde-fou à
+part, `guide-bridge` : s'il tombe, plus de pont, et les textes d'avant mot pour mot.
+
+**Les critères d'honnêteté du pont**, inchangés (tâche précédente) : un guide n'est relié à une compo que si elle partage
+**au moins deux** de ses cartes (clés et add-ons ; ses enablers ne comptent pas, presque toutes les compos les jouent)
+**et au moins la moitié de ses cartes clés** ; un guide sans carte clé n'est jamais relié ; entre plusieurs compos
+honnêtes, le plus de cartes clés, puis de cartes, puis de parties, puis l'id ; sinon **aucun pont plutôt qu'un pont
+douteux**. Les « + T k/n boards » et les cadres « plateaux » exigent en plus ≥ 2 des plateaux finaux. Jamais la place
+moyenne de la compo (Ali l'avait écartée).
+
+**Masquage pendant un choix — décision du pilote, à confirmer en jeu par Ali.** Vu dans la simulation : pendant une
+découverte ou un Dark Gift, les cadres, étiquettes et ◇ de Bob restaient dessinés sur les options, et en Dark Gift les ◇
+cliquables tombaient **dans** les cartes (un clic épinglait au lieu de choisir) ; le panneau, à sa place par défaut en
+1080p, couvre le bas de la 3e option (mesuré par le self-test sur `ChoiceLayout`, constantes de HDT : 302 × 43 px en
+découverte, 359 × 162 px en Dark Gift). Maintenant (`ChoiceCover`) : tant qu'un choix est ouvert **en taverne**, ces
+marqueurs, le panneau et son popup sont retirés de l'écran, puis remis tels quels à la fermeture, sans recalcul (le
+panneau garde les mêmes éléments si rien n'a changé ; la capture refermée est identique au pixel près à une taverne
+sans choix). Les étiquettes du choix portent les cibles et leurs couleurs pendant ce temps. Une ligne par transition.
+Arbitrages pris en route : un choix **sans disposition connue** (héros, pouvoirs, quêtes…) masque aussi, ses options
+couvrant la rangée de Bob de la même façon ; seulement en taverne (en sélection des héros rien n'est affiché, et le combat
+rétablit tout même si un choix reste listé). Réversible : `ChoiceCover.IsOpen`, ou le garde-fou `choice-cover`.
+
+**Ce que coûte la ligne de contexte**, mesuré dans la simulation : à la place par défaut en 1080p, le détail de Pirate
+Discover passe de 3 à 2 sections sur 5 ; le popup en combat (au-dessus de Skip combat) de 6 à 5 sections sur 6. En
+taverne, le popup tient toujours ses six sections.
+
+**Ce qui n'est pas mesuré.**
+
+- **Le taux de pontage réel** : 24 compos Firestone contre ≈ 23 guides de HDT, deux nomenclatures écrites par des gens
+  différents ; personne n'a compté combien se recoupent au seuil choisi. Dans la simulation, 2 guides sur 15 sont pontés,
+  sur des compos **inventées pour l'être** : ce chiffre ne dit rien du jeu. La ligne `bridge:` du journal d'HDT, à la
+  première partie, est la mesure qui manque ; si presque tout est « no match », les nouvelles aides ne s'afficheront
+  presque jamais, et c'est le seuil qu'il faudra rediscuter, pas le code.
+- **Un choix qui resterait « ouvert »** : le masquage suit la même lecture que les étiquettes des choix (options en zone
+  SETASIDE, `ChoiceClassifier`). Si HDT gardait une liste d'options périmée dans cet état, le panneau disparaîtrait pour le
+  reste du tour ; jamais vu, mais jamais vu en jeu non plus.
+- Rien de tout ceci n'a tourné sous HDT : vu dans la simulation (`--selftest`, captures `--choice discover`,
+  `--choice discover --close-choice`, `--hover 1`), sur des compos Firestone synthétiques (`HarnessData.FirestoneComps`).
+

@@ -46,6 +46,11 @@ Ce qui reste ouvert :
   tribus du lobby (bêtes), popup du guide au survol d'une ligne (et l'aperçu de carte au premier survol d'un ovale). Vu
   seulement dans la simulation (captures, `--selftest` ; les étiquettes des choix depuis le 2026-10-04, `--choice` ; le
   survol, `--hover`).
+- **Vérifier en jeu le pont guides HDT ↔ compos Firestone et le masquage pendant un choix** (2026-10-04,
+  `docs/journal/2026-10-04-panneau-unique.md` § « Stats Firestone → aides ») : le taux de recoupement réel (24 compos
+  Firestone contre ≈ 23 guides de HDT) n'a **jamais été mesuré** — lire la ligne `bridge:` du journal d'HDT à la première
+  partie ; le masquage des marqueurs et du panneau pendant un choix est une décision du pilote, **à confirmer par Ali**.
+  Vus seulement dans la simulation, sur des compos Firestone synthétiques.
 - **Vérifier en jeu la poignée de redimensionnement** (2026-10-04) : le calcul est testé et éprouvé par mutation,
   mais le pointage sous HDT, le cadre pointillé, le rendu d'un panneau étroit et le retour au défaut par « Reset » ne
   se voient que sous Windows.
@@ -185,7 +190,8 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   premier survol — vu dans la simulation le 2026-10-04, pas encore en jeu).
 - **Survol d'une ligne** (`GuidePopup`, Ali, 2026-10-04 : « le guide complet, comme dans HDT, en popup au survol ») :
   après 250 ms sur une ligne de la liste, tout le guide dans une boîte à part, hors de la boîte du panneau — nom (couleur
-  de la cible, sinon blanc), badges de tier et de difficulté, les six sections dans l'ordre de HDT (mêmes constructeurs
+  de la cible, sinon blanc), badges de tier et de difficulté, la ligne de contexte Firestone d'un guide ponté (comme le
+  détail, ci-dessous), les six sections dans l'ordre de HDT (mêmes constructeurs
   que le détail : `GuideView`), « k of n sections » si tout ne tient pas. Place (`GuidePopupLayout.Place`, testée) :
   au-dessus du panneau, à droite des plateaux (1080p : x = 1452, bas à 9 px du panneau ; au-dessus de Skip combat
   quand il est là), bord droit sur celui du panneau quand rien ne gêne, poussé de côté sinon ; jamais sur une zone du jeu,
@@ -195,40 +201,56 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   le popup est un élément du canvas, rien n'y est survolable ni cliquable, et l'aperçu d'un ovale de la ligne peut se
   montrer en même temps. Événements de la sonde de HDT et de WPF traités pareil (`GuideHover`) : une deuxième entrée ne
   change rien, une sortie alors que le curseur est encore dans le rectangle de la ligne est ignorée. Caché : sortie de
-  la ligne, clic qui ouvre le détail, changement de phase, mode déplacement, panneau caché. Journal :
+  la ligne, clic qui ouvre le détail, changement de phase, mode déplacement, panneau caché, choix ouvert. Journal :
   `guide popup <nom> shown at (x,y w×h) sections=k/n` par affichage. Mesure et décision :
   `docs/journal/2026-10-04-panneau-unique.md` § « Survol ».
 - **Détail** (clic sur un nom ou un ovale, comme dans HDT) : « ← All comp guides » à la place du titre, case, nom, badges
-  de tier et de difficulté (couleurs de HDT, `CompGuideDifficulty`), puis HOW TO PLAY (première ligne, noms de cartes en
+  de tier et de difficulté (couleurs de HDT, `CompGuideDifficulty`), la ligne de contexte Firestone d'un guide ponté
+  (`TargetContext`, `GuideView.Context` : « ≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards », 12 px, gris ;
+  omise sans pont), puis HOW TO PLAY (première ligne, noms de cartes en
   gras), CORE CARDS, ADDON CARDS, WHEN TO COMMIT (une pastille par ligne), COMMON ENABLERS, PIVOTS (`GuidePivots`). Une
   section qui ne tient pas est omise entière (« k of n sections », `CompGuideLayout.Sections`) : à la place par défaut
-  en 1080p, deux ou trois tiennent ; agrandir le panneau, ou survoler la ligne (popup ci-dessous), pour tout voir.
-- **Taverne** (`TavernMarkers`, `TavernHighlights.For(Bob, cibles)`) : carte clé d'une cible → cadre plein, enabler ou
+  en 1080p, deux ou trois tiennent (deux pour un guide ponté : la ligne de contexte prend la place d'une) ; agrandir le
+  panneau, ou survoler la ligne (popup ci-dessous), pour tout voir.
+- **Taverne** (`TavernMarkers`, `TavernHighlights.For(Bob, cibles, pont)`) : carte clé d'une cible → cadre plein, enabler ou
   add-on → pointillés, dans la couleur de la cible (carte clé d'abord, puis l'ordre des cibles), étiquette « core Nom
-  k/N », « enabler Nom » ou « + Nom » ; le ◇ au-dessus de chaque sbire l'épingle (cadre blanc). **Choix** (découverte,
-  Dark Gift, trinket : `ChoiceAdvisor`) : carte d'une cible → étiquette dans sa couleur (« ★ core Nom 2/3→3/3 »,
-  « + Nom ») ; sinon le guide jouable dans le lobby dont elle est carte clé (« core Nom (S) », neutre) ; sinon « — ».
-  Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est à la fois BEAST et PET).
+  k/N », « enabler Nom » ou « + Nom » ; avec le pont, une carte qu'aucun guide de cible ne nomme mais qui est sur ≥ 2
+  plateaux finaux de la compo Firestone d'une cible → pointillés « + Nom 3/5 », après tous les rôles ; le ◇ au-dessus
+  de chaque sbire l'épingle (cadre blanc). **Choix** (découverte, Dark Gift, trinket : `ChoiceAdvisor`, avec le pont) :
+  carte d'une cible → étiquette dans sa couleur (« ★ core Nom 2/3→3/3 », « + Nom », suivies de « · 4/5 boards » quand la
+  compo pontée de la cible a des plateaux finaux) ; sinon une carte qu'aucune liste de la cible ne nomme mais sur ≥ 2
+  plateaux de sa compo pontée (« + Nom 3/5 boards », dans sa couleur) ; sinon une carte clé d'un guide vers lequel une
+  cible peut pivoter (« pivot → Nom (S) », neutre) ; sinon le guide jouable dans le lobby dont elle est carte clé
+  (« core Nom (S) », neutre) ; sinon « — ». Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est
+  à la fois BEAST et PET). **Pendant un choix** ouvert en taverne (toute sorte que `ChoiceClassifier` distingue de
+  `None`, y compris sans disposition connue), cadres, étiquettes et ◇ des cartes de Bob, le panneau « Compositions » et
+  son popup sont retirés de l'écran (`ChoiceCover`, `TavernMarkers.Suspend`, `CompsPanel.Suspend`), puis remis tels quels
+  à sa fermeture, sans recalcul (le panneau : les mêmes éléments si rien n'a changé). Raison, mesurée dans la simulation :
+  les ◇ tombaient dans les cartes d'un Dark Gift (un clic épinglait au lieu de choisir) et le panneau, à sa place par
+  défaut en 1080p, couvrait le bas de la 3e option (302 × 43 px en découverte, 359 × 162 px en Dark Gift). Décision du
+  pilote, réversible, **à confirmer en jeu par Ali** ; garde-fou `choice-cover` (s'il tombe, tout est rétabli).
 - **Journal** : `comp guides loaded from HDT (…)` à chaque nouvelle liste, `… comp guides: none from HDT (state …)` tant
-  que HDT n'a rien ; `comps round=… source=… comps=… board=… hand=… targets=[1. Nom #couleur ★k/N; …]` à la fin de
-  chaque tour de taverne ; `tavern highlights=[carte:core|enabler|addon:guide, …] targets=[…]` quand ils changent ;
-  `choice kind=…` par choix ; `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]`.
+  que HDT n'a rien ; `bridge: Guide → compo (k/N keys, m cards, n games); Autre → no match (k/n guides bridged, against m
+  compositions; Firestone ok)` à chaque recalcul du pont ; `comps round=… source=… comps=… board=… hand=… targets=[1. Nom
+  #couleur ★k/N; …]` à la fin de chaque tour de taverne ; `tavern highlights=[carte:core|enabler|addon:guide, carte:boards
+  3/5:guide, …] targets=[…]` quand ils changent (`TavernHighlights.Summary`) ; `choice kind=…` par choix (raison et
+  évidence de chaque étiquette) ; `choice open: markers and panel hidden` / `choice closed: restored` à chaque transition ;
+  `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]`.
 - Les compositions de Firestone (`CompService`, `TavernAdvisor`, `CompositionRows`, `CompDetail`, `CompTransitions`,
-  `MinionLineups`) restent chargées et dans le code, pour orienter les aides plus tard, mais ne sont plus affichées
-  (hors ligne « comp ≈ » de l'encart des héros). Une erreur d'un fichier de `manual\` est dite une fois par
-  `compositions data: …` (avertissement). `docs/mock/` est la maquette de l'ancien panneau Firestone.
-- **Pont guides HDT ↔ compos Firestone** (`GuideBridge`, 2026-10-04, dans `Stats` seulement : **le plugin ne le passe pas
-  encore**, rien ne change à l'écran tant qu'il ne le fait pas). Deux nomenclatures sans clé commune, rapprochées par les
+  `MinionLineups`) restent chargées et dans le code ; elles ne sont plus affichées en liste (hors ligne « comp ≈ » de
+  l'encart des héros), mais orientent les aides par le pont ci-dessous. Une erreur d'un fichier de `manual\` est dite une
+  fois par `compositions data: …` (avertissement). `docs/mock/` est la maquette de l'ancien panneau Firestone.
+- **Pont guides HDT ↔ compos Firestone** (`GuideBridge`, 2026-10-04 ; branché par `Plugin.UpdateBridge`, garde-fou
+  `guide-bridge`). Deux nomenclatures sans clé commune, rapprochées par les
   cartes : core ∪ add-on du guide contre tout ce que Firestone donne de la compo (listes, plateau de référence, plateaux
   finaux, dorées comprises). Pont seulement si **≥ 2 cartes partagées ET ≥ la moitié des cartes clés du guide** ; meilleure
   compo = plus de clés, puis plus de cartes, puis plus de parties, puis l'id ; sinon aucun pont. Deux variantes d'un guide
-  peuvent partager une compo. Journal : `bridge: Guide → compo (k/N keys, m cards, n games); Autre → no match`. Ce qu'il
-  ouvre, en paramètre optionnel `bridge` : aides de choix (« ★ core T 2/3→3/3 · 4/5 boards » ; « + T 3/5 boards » pour une
-  carte qu'aucune liste du guide ne nomme mais sur ≥ 2 plateaux finaux de sa compo, `ChoiceReason.TopBoards` ; « pivot → G (S) »
-  pour une carte clé d'un guide pivot d'une cible, `ChoiceReason.Pivot` ; ordre cible, plateaux, pivot, repli), cadres en
-  taverne (« + T 3/5 » pointillé, après tous les rôles ; `TavernHighlights.Summary` pour le journal) et `TargetContext`
-  (« ≈ 3,4 with your hero (23) · final turn ≈ 13 · 5 top boards », jamais la place moyenne de la compo). Sans `bridge`
-  (null), les textes d'avant mot pour mot, pivots compris.
+  peuvent partager une compo. Recalculé à chaque nouvelle liste de guides de HDT et à chaque chargement des compos
+  (`CompService.Version`), contre toutes les compos connues (Firestone, et `manual\` s'il y en a) ; sans guides de HDT, pas
+  de pont. Ce qu'il ouvre : les aides de choix et les cadres ci-dessus, et `TargetContext` (« ≈ 3,4 with your hero (23) ·
+  final turn ≈ 13 · 5 top boards », jamais la place moyenne de la compo ; le morceau héros vient de `HeroCompAffinity`,
+  recalculé quand le héros joué ou les compos changent). Sans `bridge` (null, ou le garde-fou tombé), les textes d'avant
+  mot pour mot, pivots compris.
 - Bouton « Skip combat » (jaune, en combat seulement, panneau déplaçable `skip-combat`) : tue Hearthstone et
   le fait relancer **par Battle.net** (`--exec="launch WTCG"`, redemandé chaque seconde : ≈ 7 s mesurées),
   jamais par son exécutable (connexion refusée, mesuré) ; sans Battle.net, rien n'est tué. Un clic par combat,
@@ -236,7 +258,8 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 - Sous WSL, on vérifie les tests et le build. Le chargement par HDT et les événements réels ne se vérifient que
   sous Windows, avec HDT installé. **Exception : la simulation** `tools/BronzebeardHud.Harness/` (README) fait tourner
   les vrais panneaux (`PanelMover`, « Compositions » et son popup de survol, cadres sur les cartes de Bob, Skip combat, étiquettes des choix) dans une fenêtre Windows ordinaire, sans
-  HDT ni partie, avec des données synthétiques ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
+  HDT ni partie, avec des données synthétiques (dont deux compos Firestone inventées pour le pont, et un contre-exemple
+  « no match ») ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
   la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. Elle ne simule
   pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) : un défaut qui y vivrait ne s'y voit pas.
 - Le dépôt est **privé** (il était public jusqu'au 2026-09-26) : on garde malgré tout la règle
