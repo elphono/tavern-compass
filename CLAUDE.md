@@ -196,8 +196,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   à la fin de chaque tour de taverne, `… comp guides: none from HDT (state …)` tant que HDT n'a rien. Mesure et
   forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. Le `.csproj` référence `HSReplay.dll`
   (fourni par HDT, jamais copié) pour ce seul type.
-- Sous WSL, on vérifie les tests et le build, rien de plus. Le chargement par HDT, le rendu et les
-  événements réels ne se vérifient que sous Windows, avec HDT installé.
+- Sous WSL, on vérifie les tests et le build. Le chargement par HDT et les événements réels ne se vérifient que
+  sous Windows, avec HDT installé. **Exception : la simulation** `tools/BronzebeardHud.Harness/` (README) fait tourner
+  les vrais panneaux (`PanelMover`, compos, lineups, Comp Guides, Skip combat) dans une fenêtre Windows ordinaire, sans
+  HDT ni partie, avec des données synthétiques ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
+  la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. Elle ne simule
+  pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) : un défaut qui y vivrait ne s'y voit pas.
 - Le dépôt est **privé** (il était public jusqu'au 2026-09-26) : on garde malgré tout la règle
   qu'aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests utilisent des données
   synthétiques.
