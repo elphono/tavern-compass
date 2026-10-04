@@ -16,9 +16,12 @@ namespace BronzebeardHud.Stats;
 /// </summary>
 public sealed class CompGuide
 {
+    /// <param name="howToPlayLines">"how_to_play" as lines of runs, card references kept apart; null: <paramref name="howToPlay"/> split into lines of plain text.</param>
+    /// <param name="whenToCommitLines">"when_to_commit" the same way; null: <paramref name="whenToCommit"/> split into lines of plain text.</param>
     public CompGuide(string name, int tier, int tierRank, IReadOnlyList<string> coreCards, IReadOnlyList<string> addonCards,
         IReadOnlyList<string> enablers, IReadOnlyList<string> commitCards, string? whenToCommit = null, string? commonEnablers = null,
-        string? howToPlay = null, int difficulty = 0, int primaryTribe = 0, string? representativeCard = null)
+        string? howToPlay = null, int difficulty = 0, int primaryTribe = 0, string? representativeCard = null,
+        IReadOnlyList<IReadOnlyList<CompGuideTextRun>>? howToPlayLines = null, IReadOnlyList<IReadOnlyList<CompGuideTextRun>>? whenToCommitLines = null)
     {
         Name = name;
         Tier = tier;
@@ -34,7 +37,21 @@ public sealed class CompGuide
         PrimaryTribe = primaryTribe;
         RepresentativeCard = representativeCard;
         Id = name + "/" + primaryTribe.ToString(CultureInfo.InvariantCulture);
+        HowToPlayLines = CompGuideText.NonBlank(howToPlayLines ?? CompGuideText.PlainLines(howToPlay));
+        WhenToCommitLines = CompGuideText.NonBlank(whenToCommitLines ?? CompGuideText.PlainLines(whenToCommit));
     }
+
+    /// <summary>"how_to_play" line by line, blank lines left out, card names apart (drawn in bold, as HDT draws them).</summary>
+    public IReadOnlyList<IReadOnlyList<CompGuideTextRun>> HowToPlayLines { get; }
+
+    /// <summary>
+    /// The first line of "how_to_play", the one the panel shows (HDT's guides open on a one-line summary; what follows is
+    /// detail the overlay has no room for); empty when there is none.
+    /// </summary>
+    public IReadOnlyList<CompGuideTextRun> HowToPlayFirstLine => HowToPlayLines.Count > 0 ? HowToPlayLines[0] : Array.Empty<CompGuideTextRun>();
+
+    /// <summary>"when_to_commit" line by line, blank lines left out: one condition per line, as HDT lists them.</summary>
+    public IReadOnlyList<IReadOnlyList<CompGuideTextRun>> WhenToCommitLines { get; }
 
     /// <summary>
     /// The guide's id for the plugin, stable across HDT's reloads of its list: the name and the tribe, "Undead Butcher/11".
@@ -75,7 +92,7 @@ public sealed class CompGuide
     /// <summary>"how_to_play" as plain text; null when absent.</summary>
     public string? HowToPlay { get; }
 
-    /// <summary>1 = hard, 2 = medium, 3 = easy, as HDT reads it.</summary>
+    /// <summary>1 = hard, 2 = medium, 3 = easy, as HDT reads it (<see cref="CompGuideDifficulty"/>).</summary>
     public int Difficulty { get; }
 
     /// <summary>HearthDb Race value of the guide's main tribe (0 when none); its name: <see cref="GuideTribes.NameOf"/>.</summary>
@@ -113,11 +130,46 @@ public static class GuideTribes
     public static string? NameOf(int race) => Names.TryGetValue(race, out var name) ? name : null;
 
     /// <summary>
+    /// The name of a race read from the game (HdtEntityAdapter: a minion's tribe, the lobby's tribes): the Battlegrounds
+    /// name of a Battlegrounds tribe, whatever name the runtime gives the value, otherwise <paramref name="enumName"/>
+    /// (Race.ToString(), e.g. "ALL" for an amalgam). Measured on 2026-10-04 with HearthDb.dll of HDT 1.58.6: ((Race)20)
+    /// .ToString() is "BEAST" under .NET Framework 4.8, the runtime HDT runs on, but "PET" under .NET 8. Two names share
+    /// the value, and which one comes out is the runtime's choice: the lobby's beasts would read as "PET", which no tribe
+    /// list knows, and every beast guide would be taken for one the lobby cannot play.
+    /// </summary>
+    public static string NameOrEnum(int race, string enumName) => NameOf(race) ?? enumName;
+
+    /// <summary>
     /// Whether a guide of this tribe can be played in the lobby. True when the lobby is unknown (empty), when the guide
     /// has no tribe, and when its tribe is not one this table knows: a guide is left out only on a positive mismatch.
     /// </summary>
     public static bool InLobby(int race, IReadOnlyCollection<string> lobbyTribes) =>
         lobbyTribes.Count == 0 || NameOf(race) is not { } name || lobbyTribes.Contains(name);
+}
+
+/// <summary>
+/// The difficulty badge of a guide, as HDT draws it: BattlegroundsCompGuideViewModel's constructor (HDT 1.58.6, read from
+/// its IL on 2026-10-04) switches on Difficulty − 1 into "Hard", "Medium", "Easy", else "Unknown", and the colours
+/// #7f303e, #917b43, #49634b, else #404040.
+/// </summary>
+public static class CompGuideDifficulty
+{
+    public static string Text(int difficulty) => difficulty switch
+    {
+        1 => "Hard",
+        2 => "Medium",
+        3 => "Easy",
+        _ => "Unknown",
+    };
+
+    /// <summary>"#RRGGBB", lower case as HDT writes it.</summary>
+    public static string Colour(int difficulty) => difficulty switch
+    {
+        1 => "#7f303e",
+        2 => "#917b43",
+        3 => "#49634b",
+        _ => "#404040",
+    };
 }
 
 public static class CompGuideTiers
@@ -356,21 +408,44 @@ public static class CompGuideParser
         var representative = Text("representative_card");
         return new CompGuide(name, tier, Int("tier_rank", 0), core, addon, enablers.CardIds, commit.CardIds,
             commit.PlainText, enablers.PlainText, howToPlay.PlainText, Int("difficulty", 0), Int("primary_tribe", 0),
-            string.IsNullOrEmpty(representative) ? null : representative);
+            string.IsNullOrEmpty(representative) ? null : representative, howToPlay.Lines, commit.Lines);
     }
 }
 
-/// <summary>A guide's text with its card references: the plain text, and the cards referenced, in order.</summary>
+/// <summary>A piece of one line of a guide's text: plain text, or a card reference (its name, drawn in bold).</summary>
+public sealed class CompGuideTextRun
+{
+    public CompGuideTextRun(string text, bool isCard, string? cardId = null)
+    {
+        Text = text;
+        IsCard = isCard;
+        CardId = cardId;
+    }
+
+    public string Text { get; }
+
+    /// <summary>A card reference, <c>[[Name||dbf]]</c> or <c>[[Name]]</c>: its name is the text.</summary>
+    public bool IsCard { get; }
+
+    /// <summary>The card, when the reference carries a dbf id the card database knows; null otherwise.</summary>
+    public string? CardId { get; }
+}
+
+/// <summary>A guide's text with its card references: the plain text, the cards referenced, in order, and the lines as runs.</summary>
 public sealed class CompGuideTextParts
 {
-    public CompGuideTextParts(string? plainText, IReadOnlyList<string> cardIds)
+    public CompGuideTextParts(string? plainText, IReadOnlyList<string> cardIds, IReadOnlyList<IReadOnlyList<CompGuideTextRun>>? lines = null)
     {
         PlainText = plainText;
         CardIds = cardIds;
+        Lines = lines ?? CompGuideText.PlainLines(plainText);
     }
 
     public string? PlainText { get; }
     public IReadOnlyList<string> CardIds { get; }
+
+    /// <summary>Line by line (blank lines kept), each line its plain text and card names in order; empty when there is no text.</summary>
+    public IReadOnlyList<IReadOnlyList<CompGuideTextRun>> Lines { get; }
 }
 
 /// <summary>
@@ -388,6 +463,7 @@ public static class CompGuideText
 
         var plain = new StringBuilder();
         var cards = new List<string>();
+        var runLines = new List<IReadOnlyList<CompGuideTextRun>>();
         var lines = text!.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
         for (var l = 0; l < lines.Length; l++)
         {
@@ -397,22 +473,34 @@ public static class CompGuideText
             }
 
             var line = lines[l];
+            var runs = new List<CompGuideTextRun>();
+            void Plain(int from, int length)
+            {
+                if (length <= 0)
+                {
+                    return;
+                }
+
+                plain.Append(line, from, length);
+                runs.Add(new CompGuideTextRun(line.Substring(from, length), isCard: false));
+            }
+
             var index = 0;
             while (index < line.Length)
             {
                 var open = line.IndexOf("[[", index, StringComparison.Ordinal);
                 if (open == -1)
                 {
-                    plain.Append(line, index, line.Length - index);
+                    Plain(index, line.Length - index);
                     break;
                 }
 
-                plain.Append(line, index, open - index);
+                Plain(index, open - index);
                 var start = open + 2;
                 var close = line.IndexOf("]]", start, StringComparison.Ordinal);
                 if (close == -1)
                 {
-                    plain.Append(line, open, line.Length - open);
+                    Plain(open, line.Length - open);
                     break;
                 }
 
@@ -423,19 +511,43 @@ public static class CompGuideText
                 }
 
                 var nameEnd = separator != -1 ? separator : close;
-                plain.Append(line, start, nameEnd - start);
+                var cardName = line.Substring(start, nameEnd - start);
+                plain.Append(cardName);
+                string? resolved = null;
                 if (separator != -1
                     && int.TryParse(line.Substring(separator + 2, close - separator - 2), NumberStyles.Integer, CultureInfo.InvariantCulture, out var dbfId)
-                    && resolve(dbfId) is { } cardId
-                    && !cards.Contains(cardId))
+                    && resolve(dbfId) is { } cardId)
                 {
-                    cards.Add(cardId);
+                    resolved = cardId;
+                    if (!cards.Contains(cardId))
+                    {
+                        cards.Add(cardId);
+                    }
+                }
+
+                if (cardName.Length > 0)
+                {
+                    runs.Add(new CompGuideTextRun(cardName, isCard: true, resolved));
                 }
 
                 index = close + 2;
             }
+
+            runLines.Add(runs);
         }
 
-        return new CompGuideTextParts(plain.ToString(), cards);
+        return new CompGuideTextParts(plain.ToString(), cards, runLines);
     }
+
+    /// <summary>Plain text split into lines of one plain run each (blank lines kept); empty for no text.</summary>
+    public static IReadOnlyList<IReadOnlyList<CompGuideTextRun>> PlainLines(string? text) =>
+        string.IsNullOrEmpty(text)
+            ? Array.Empty<IReadOnlyList<CompGuideTextRun>>()
+            : text!.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
+                .Select(line => (IReadOnlyList<CompGuideTextRun>)(line.Length == 0 ? Array.Empty<CompGuideTextRun>() : new[] { new CompGuideTextRun(line, isCard: false) }))
+                .ToList();
+
+    /// <summary>The lines that say something: a line whose runs are all blank is left out.</summary>
+    public static IReadOnlyList<IReadOnlyList<CompGuideTextRun>> NonBlank(IReadOnlyList<IReadOnlyList<CompGuideTextRun>> lines) =>
+        lines.Where(line => line.Any(run => !string.IsNullOrWhiteSpace(run.Text))).ToList();
 }

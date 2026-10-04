@@ -119,6 +119,23 @@ public static class CompTargets
     /// <summary>"[Undead Butcher #FF2BD6; Beast Lobster #B8FF1F]", for the log lines; "none" when there is no target.</summary>
     public static string Summary(IReadOnlyList<CompTarget> targets) =>
         targets.Count == 0 ? "none" : "[" + string.Join("; ", targets.Select(t => $"{t.Guide.Name} {t.Colour}")) + "]";
+
+    /// <summary>
+    /// The line written in HDT's log once per shop round, when it ends: where the guides come from, how many, the cards
+    /// they were ranked on, and each target with its rank, colour and core cards held (★k/N, core cards only), "ticked"
+    /// when the player ticked it:
+    /// "Bronzebeard HUD: comps round=6 source=hdt-free comps=23 board=5 hand=1 targets=[1. Undead Butcher #FF2BD6 ★2/3 ticked; 2. …]".
+    /// </summary>
+    /// <param name="source">CompGuideSources, or null when HDT shows no guides ("none").</param>
+    public static string RoundLine(int round, string? source, int comps, PlayerCards cards, IReadOnlyList<CompTarget> targets)
+    {
+        var list = targets.Count == 0
+            ? "none"
+            : "[" + string.Join("; ", targets.Select(t =>
+                $"{t.Rank}. {t.Guide.Name} {t.Colour} ★{t.Progress.KeyHeld.Count}/{t.Guide.CoreCards.Count}{(t.Ticked ? " ticked" : string.Empty)}")) + "]";
+        return $"Bronzebeard HUD: comps round={round.ToString(System.Globalization.CultureInfo.InvariantCulture)} source={source ?? "none"} " +
+               $"comps={comps.ToString(System.Globalization.CultureInfo.InvariantCulture)} board={cards.Board.Count} hand={cards.Hand.Count} targets={list}";
+    }
 }
 
 /// <summary>

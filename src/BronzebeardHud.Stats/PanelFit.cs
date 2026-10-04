@@ -80,6 +80,14 @@ public static class PanelFit
     public const int CoreOvalsPerRow = 6;
 
     /// <summary>
+    /// How a guide line shows <paramref name="coreCards"/> core cards: all of them up to <see cref="CoreOvalsPerRow"/>;
+    /// beyond, one oval fewer and a "+k" in the last place (k = the cards not shown), since six ovals fill the line and
+    /// a text after them would be cut. The detail shows them all.
+    /// </summary>
+    public static (int Ovals, int More) ListOvals(int coreCards) =>
+        coreCards <= CoreOvalsPerRow ? (Math.Max(0, coreCards), 0) : (CoreOvalsPerRow - 1, coreCards - (CoreOvalsPerRow - 1));
+
+    /// <summary>
     /// One guide line: tick box column, name column (the name may take two lines, the line is as tall as an oval), then
     /// <see cref="CoreOvalsPerRow"/> ovals. The name column is what gave way to the larger ovals (118 → 96): the panel keeps
     /// its width, the widest its default place allows (<see cref="PanelWidth"/>).

@@ -47,6 +47,20 @@ public sealed class CompGuideFit
     public bool ShowsMoreLine => RowsShown < RowsTotal;
 }
 
+/// <summary>Which sections of a guide's detail are shown (indexes, in order), and whether "k of n sections" goes under them.</summary>
+public sealed class SectionFit
+{
+    public SectionFit(IReadOnlyList<int> shown, int total)
+    {
+        Shown = shown;
+        Total = total;
+    }
+
+    public IReadOnlyList<int> Shown { get; }
+    public int Total { get; }
+    public bool ShowsMoreLine => Shown.Count < Total;
+}
+
 /// <summary>
 /// Where the comp guides panel goes by default, and how much of it fits. Nothing is shrunk: what does not fit is
 /// left out, and the panel says how many guides it shows.
@@ -92,7 +106,11 @@ public static class CompGuideLayout
     /// does not fit. A tier's header shows when at least one of its guides does. When some guides are left out, a line
     /// <paramref name="moreLineHeight"/> tall is kept for "k of n shown". The result keeps the display order.
     /// </summary>
-    public static CompGuideFit Fit(IReadOnlyList<CompGuideFitItem> items, double room, double moreLineHeight)
+    /// <param name="atLeastOne">
+    /// When no row fits at all, the first highlighted row (else the first row) is shown anyway, with its tier's header:
+    /// a panel that always shows one line grows to hold it rather than show none.
+    /// </param>
+    public static CompGuideFit Fit(IReadOnlyList<CompGuideFitItem> items, double room, double moreLineHeight, bool atLeastOne = false)
     {
         var rows = items.Count(i => i.Kind == CompGuideItemKind.Row);
         var all = Try(items, room);
@@ -102,8 +120,50 @@ public static class CompGuideLayout
         }
 
         var some = Try(items, room - moreLineHeight);
-        return new CompGuideFit(some, some.Count(i => items[i].Kind == CompGuideItemKind.Row), rows);
+        var shown = some.Count(i => items[i].Kind == CompGuideItemKind.Row);
+        if (shown == 0 && atLeastOne && rows > 0)
+        {
+            var first = Enumerable.Range(0, items.Count).Where(i => items[i].Kind == CompGuideItemKind.Row)
+                .OrderBy(i => items[i].Highlighted ? 0 : 1)
+                .ThenBy(i => i)
+                .First();
+            var header = Enumerable.Range(0, first).Where(i => items[i].Kind == CompGuideItemKind.TierHeader && items[i].Group == items[first].Group).ToList();
+            some = header.Take(1).Append(first).ToList();
+            shown = 1;
+        }
+
+        return new CompGuideFit(some, shown, rows);
     }
+
+    /// <summary>
+    /// Which sections of a guide's detail fit in <paramref name="room"/> (overlay pixels), each measured in place: all of
+    /// them when they fit; otherwise, with a line <paramref name="moreLineHeight"/> tall kept for "k of n sections", each
+    /// section in order when it fits in what is left, a section that does not being left out whole (never cut). The first
+    /// sections are served first; a later, shorter one may still take the room a longer one left.
+    /// </summary>
+    public static SectionFit Sections(IReadOnlyList<double> heights, double room, double moreLineHeight)
+    {
+        if (heights.Sum() <= room + Tolerance)
+        {
+            return new SectionFit(Enumerable.Range(0, heights.Count).ToList(), heights.Count);
+        }
+
+        var shown = new List<int>();
+        var used = 0.0;
+        for (var i = 0; i < heights.Count; i++)
+        {
+            if (used + heights[i] <= room - moreLineHeight + Tolerance)
+            {
+                used += heights[i];
+                shown.Add(i);
+            }
+        }
+
+        return new SectionFit(shown, heights.Count);
+    }
+
+    /// <summary>Overlay pixels of slack: a box dragged to exactly the height of its content holds it.</summary>
+    private const double Tolerance = 1e-6;
 
     private static IReadOnlyList<int> Try(IReadOnlyList<CompGuideFitItem> items, double room)
     {
