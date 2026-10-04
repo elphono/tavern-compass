@@ -12,7 +12,8 @@ namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
 /// A label above each option of a Battlegrounds choice (discover, Dark Gift, trinket): what it does for
-/// the compositions in reach, and for a trinket its Firestone placement, adjusted when it suits them.
+/// the targets (HDT's comp guides, ChoiceAdvisor), in the colour of the first target it serves (the colour of that
+/// target in the panel and on Bob's cards), and for a trinket its Firestone placement, adjusted when it suits them.
 /// Text from <see cref="ChoiceAdvisor.Lines"/>, positions from <see cref="ChoiceLayout"/> (HDT's constants),
 /// both recomputed when the overlay is resized. Trinket stats come from the daily cache, fetched off the
 /// UI thread from the plugin's start on (the first fetch always asks Firestone's server, see StatsCache), then
@@ -25,17 +26,15 @@ internal sealed class ChoiceAdvicePanel : IDisposable
     private static readonly Brush TrinketBorder = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F));
 
     private readonly Canvas _canvas;
-    private readonly CompositionSelection _selection;
     private readonly HttpStatsFetcher _fetcher = new();
     private readonly StatsCache _cache;
     private readonly List<UIElement> _labels = new();
     private readonly TrinketStatsRefresh _trinkets;
     private ChoiceAdvice? _advice;
 
-    public ChoiceAdvicePanel(Canvas canvas, string statsDirectory, CompositionSelection selection)
+    public ChoiceAdvicePanel(Canvas canvas, string statsDirectory)
     {
         _canvas = canvas;
-        _selection = selection;
         _cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
         _trinkets = new TrinketStatsRefresh("trinket-stats last-patch",
             () => Task.Run(() => _cache.GetTrinketStatsAsync("last-patch", RefreshPolicy.HeroStats, CancellationToken.None)));
@@ -130,10 +129,10 @@ internal sealed class ChoiceAdvicePanel : IDisposable
         for (var i = 0; i < rects.Count; i++)
         {
             var option = advice.Options[i];
-            // The same colours as the tavern markers: the ticked composition's, white when nothing is ticked.
+            // The same colours as the frames on Bob's cards: the first target the option serves (OptionAdvice.Colour).
             var background = option.Trinket != null ? TrinketBrush
-                : option.Effects.Count == 0 ? NeutralBrush
-                : TavernAdvicePanel.Brush(_selection.MarkerColour(option.Effects.Select(e => e.Composition.Id)));
+                : option.Colour is { } colour ? HexBrush.Of(colour)
+                : NeutralBrush;
             var foreground = background == TrinketBrush || background == NeutralBrush ? Brushes.White : Brushes.Black;
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             foreach (var line in lines[i])

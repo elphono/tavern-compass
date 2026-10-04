@@ -13,10 +13,11 @@ using Hearthstone_Deck_Tracker.Utility.Logging;
 namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
-/// Entry point HDT discovers in its Plugins folder. Hero selection: a stats badge under each offered
-/// hero. Shop: markers under the tavern minions that fit a target composition, and the target
-/// composition panel. The plugin never reads game memory; it only uses what HDT exposes, plus
-/// local files and the Firestone downloads managed by <see cref="StatsService"/> and <see cref="CompService"/>.
+/// Entry point HDT discovers in its Plugins folder. Hero selection: a stats badge under each offered hero. Shop and
+/// combat: the "Compositions" panel (HDT's own comp guides; the ticked ones and the most probable ones are the targets,
+/// each in its colour), the frames on Bob's cards that serve the targets, the labels of choices. The plugin never reads
+/// game memory; it only uses what HDT exposes, plus local files and the Firestone downloads managed by
+/// <see cref="StatsService"/> and <see cref="CompService"/>.
 /// </summary>
 public sealed class Plugin : IPlugin
 {
@@ -24,43 +25,43 @@ public sealed class Plugin : IPlugin
     private PanelMover? _mover;
     private MenuItem? _menu;
     private MenuItem? _moveItem;
-    private TavernAdvicePanel? _tavern;
+    private CompsPanel? _compsPanel;
+    private TavernMarkers? _markers;
     private OpponentMmrPanel? _opponentMmr;
     private ChoiceAdvicePanel? _choices;
 
     // One guard per feature: an unexpected exception disables that feature alone (see FeatureGuard).
     private readonly FeatureGuard _heroSelectionGuard;
-    private readonly FeatureGuard _tavernGuard;
+    private readonly FeatureGuard _dataGuard;
+    private readonly FeatureGuard _compsGuard;
+    private readonly FeatureGuard _markersGuard;
     private readonly FeatureGuard _opponentMmrGuard;
     private readonly FeatureGuard _choiceGuard;
     private readonly FeatureGuard _selectionGuard;
     private readonly FeatureGuard _warbandGuard;
     private readonly FeatureGuard _heroCompsGuard;
-    private readonly FeatureGuard _heroAffinityGuard;
     private readonly FeatureGuard _compCountGuard;
     private readonly FeatureGuard _pinsGuard;
-    private readonly FeatureGuard _transitionsGuard;
-    private readonly FeatureGuard _lineupsGuard;
+    private readonly FeatureGuard _pivotsGuard;
     private readonly FeatureGuard _metaGuard;
     private readonly FeatureGuard _compDetailGuard;
     private readonly FeatureGuard _skipCombatGuard;
-    private readonly FeatureGuard _highlightsGuard;
-    private readonly FeatureGuard _dataGuard;
-    private readonly FeatureGuard _compGuidesGuard;
 
-    // HDT's own comp guides (HdtCompGuides), the player's progress on them, and the shop round being logged.
-    private CompGuidesPanel? _compGuides;
+    // HDT's own comp guides (HdtCompGuides), as last read.
     private string? _guidesState;
     private object? _guidesList;
     private HdtCompGuidesSnapshot? _guides;
     private int _guidesVersion;
-    private string _guidesKey = string.Empty;
-    private CompGuideBoard _guidesBoard = CompGuideBoard.Empty;
-    private PlayerCards _guidesCards = BronzebeardHud.Stats.PlayerCards.None;
-    private int _guidesRound = -1;
 
-    // "How top boards field it", opened by the "?" above one of Bob's minions.
-    private LineupsPanel? _lineupsPanel;
+    // The targets: ticks and colours kept across a plugin reload within a game, forgotten at the next game.
+    private readonly CompTargetTracker _tracker = new();
+    private CompGuideBoard _compsBoard = CompGuideBoard.Empty;
+    private PlayerCards _compsCards = BronzebeardHud.Stats.PlayerCards.None;
+    private string _compsKey = string.Empty;
+    private int _compsRound = -1;
+    private int _targetsVersion;
+    private int _selectionVersion;
+    private int _gameNumber;
 
     // The "Skip combat" button: shown in combat, acts once per combat (SkipCombatState).
     private SkipCombatPanel? _skipCombat;
@@ -71,87 +72,68 @@ public sealed class Plugin : IPlugin
     private int _pinsVersion;
     private HudSettings _settings = HudSettings.Default;
 
-    // The hero being played on each composition (HeroCompAffinity), recomputed when the hero or the compositions change.
-    private IReadOnlyDictionary<string, HeroCompPick> _heroEffects = new Dictionary<string, HeroCompPick>();
-    private string? _heroEffectsHero;
-    private int _heroEffectsVersion = -1;
     private string? _warbandLine;
     private int _warbandRound = -1;
     private int _warbandLoggedRound = -1;
 
-    // The compositions Ali ticks: kept across a plugin reload within a game, forgotten at the next game.
-    private readonly CompositionSelection _selection = new();
-    private int _selectionVersion;
-    private int _rowsSelectionVersion = -1;
-    private int _gameNumber;
-
     public Plugin()
     {
         _heroSelectionGuard = new FeatureGuard("hero-selection", (n, e) => Disable(n, e, () => _panel?.Hide()));
-        // Without it the features still load their data themselves, only later (at hero pick, shop, trinket choice).
+        // Without it the features still load their data themselves, only later (at hero pick, trinket choice).
         _dataGuard = new FeatureGuard("data-refresh", (n, e) => Disable(n, e, () => { }));
-        _tavernGuard = new FeatureGuard("tavern-advice", (n, e) => Disable(n, e, () => { _tavern?.HideMarkers(); _tavern?.HidePanel(); }));
+        // The panel, HDT's guides and the targets: one feature since the two composition panels became one (2026-10-04).
+        _compsGuard = new FeatureGuard("compositions", (n, e) => Disable(n, e, () =>
+        {
+            _compsPanel?.Hide();
+            _tracker.Reset(); // no target any more: the frames and the labels of choices stop following stale ones
+            _targetsVersion++;
+        }));
+        // The frames and labels on Bob's cards, and the pin buttons above them.
+        _markersGuard = new FeatureGuard("tavern-markers", (n, e) => Disable(n, e, () => _markers?.Hide()));
         _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
         // Replaces "trinket-choice": trinkets are now one kind of choice among discovers and Dark Gifts.
         _choiceGuard = new FeatureGuard("discover-advice", (n, e) => Disable(n, e, () => _choices?.Hide()));
-        _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _tavern?.SetFooter(null)));
+        _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _compsPanel?.SetFooter(null)));
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
         _metaGuard = new FeatureGuard("meta-snapshot", (n, e) => Disable(n, e, () =>
         {
-            if (_tavern != null)
+            if (_compsPanel != null)
             {
-                _tavern.MetaEnabled = false;
+                _compsPanel.MetaEnabled = false;
             }
 
-            _shownCompStatus = "\u0000";
+            _compsKey = string.Empty;
         }));
-        _lineupsGuard = new FeatureGuard("minion-lineups", (n, e) => Disable(n, e, () =>
-        {
-            if (_tavern != null)
-            {
-                _tavern.LineupsEnabled = false;
-            }
-
-            _lineupsPanel?.Hide();
-            _pinsVersion++;
-        }));
-        _transitionsGuard = new FeatureGuard("comp-transitions", (n, e) => Disable(n, e, () => _shownCompStatus = "\u0000"));
-        // Its highlights are drawn with the tavern markers; once switched off, the markers are drawn as before.
-        _highlightsGuard = new FeatureGuard("tavern-highlights", (n, e) => Disable(n, e, () => _tavernKey = string.Empty));
+        // Once switched off, a guide's detail simply shows no pivots.
+        _pivotsGuard = new FeatureGuard("comp-pivots", (n, e) => Disable(n, e, () => _compsKey = string.Empty));
         _compDetailGuard = new FeatureGuard("comp-detail", (n, e) => Disable(n, e, () =>
         {
-            if (_tavern != null)
+            if (_compsPanel != null)
             {
-                _tavern.DetailEnabled = false;
+                _compsPanel.DetailEnabled = false;
             }
 
-            _shownCompStatus = "\u0000";
+            _compsKey = string.Empty;
         }));
         _skipCombatGuard = new FeatureGuard("skip-combat", (n, e) => Disable(n, e, () => _skipCombat?.Hide()));
-        _compGuidesGuard = new FeatureGuard("comp-guides", (n, e) => Disable(n, e, () => _compGuides?.Hide()));
-        _pinsGuard =new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
+        _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
-            if (_tavern != null)
+            if (_markers != null)
             {
-                _tavern.PinButtonsEnabled = false;
+                _markers.PinButtonsEnabled = false;
             }
 
             _pinsVersion++;
-        }));
-        _heroAffinityGuard = new FeatureGuard("hero-affinity", (n, e) => Disable(n, e, () =>
-        {
-            _heroEffects = new Dictionary<string, HeroCompPick>();
-            _tavernKey = string.Empty;
         }));
         _selectionGuard = new FeatureGuard("comp-selection", (n, e) => Disable(n, e, () =>
         {
-            _selection.Clear();
+            _tracker.Reset();
             _selectionVersion++;
-            if (_tavern != null)
+            if (_compsPanel != null)
             {
-                _tavern.SelectionEnabled = false;
+                _compsPanel.SelectionEnabled = false;
             }
         }));
     }
@@ -159,7 +141,7 @@ public sealed class Plugin : IPlugin
     /// <summary>%LocalAppData%\BronzebeardHud\settings.json, next to layout.json.</summary>
     private static string SettingsPath => Path.Combine(Path.GetDirectoryName(StatsDirectory)!, "settings.json");
 
-    /// <summary>The − or + of the target panel: one suggestion less or more, 1 to 8, kept in settings.json.</summary>
+    /// <summary>The − or + of the panel: one target less or more, 1 to 4, kept in settings.json.</summary>
     private void ChangeSuggested(int step) => _compCountGuard.Run(() =>
     {
         _settings = _settings.WithSuggested(_settings.SuggestedCompositions + step);
@@ -176,79 +158,95 @@ public sealed class Plugin : IPlugin
         }
 
         Log.Info($"Bronzebeard HUD: suggested compositions={_settings.SuggestedCompositions}");
-        _selectionVersion++; // redraws the markers, the choices and the panel, in the shop and in combat
+        _selectionVersion++; // the targets, the panel, the frames and the choices follow, in the shop and in combat
     });
 
-    /// <summary>The "Meta" button of the target panel: Firestone's composition tier list in the default browser.</summary>
+    /// <summary>The "Meta" button of the panel: Firestone's composition tier list in the default browser.</summary>
     private void OpenMetaSnapshot() => _metaGuard.Run(() =>
     {
         Process.Start(new ProcessStartInfo(MetaSnapshot.Url) { UseShellExecute = true });
         Log.Info($"Bronzebeard HUD: meta snapshot opened {MetaSnapshot.Url}");
     });
 
-    /// <summary>How top players field a minion, from the compositions playable in this lobby; null if the feature failed.</summary>
-    private MinionLineups? LineupsFor(string cardId)
+    /// <summary>A guide's tick box was clicked in the panel: a ticked guide is a target whatever its score (four at most).</summary>
+    private void ToggleGuide(string guideId) => _selectionGuard.Run(() =>
     {
-        MinionLineups? lineups = null;
-        _lineupsGuard.Run(() =>
+        var accepted = _tracker.Toggle(guideId);
+        Log.Info(_tracker.ToggleLine(guideId, accepted));
+        _selectionVersion++;
+    });
+
+    /// <summary>The cards the targets were last ranked on (board and hand), as base card ids.</summary>
+    private HashSet<string> HeldCards() => new(_compsCards.All.Select(c => c.CardId), StringComparer.Ordinal);
+
+    /// <summary>A guide's pivots (GuidePivots) among the guides HDT lists, under their own guard; null if that feature failed.</summary>
+    private IReadOnlyList<GuidePivot>? PivotsFor(CompGuide guide)
+    {
+        IReadOnlyList<GuidePivot>? pivots = null;
+        _pivotsGuard.Run(() =>
         {
-            var playable = _lastAdvice?.Playable ?? _comps?.Compositions() ?? Array.Empty<Composition>();
-            lineups = MinionLineups.For(cardId, playable);
-            Log.Info($"Bronzebeard HUD: lineups card={lineups.CardId} position={lineups.UsualPosition?.ToString() ?? "none"} " +
-                     $"comps=[{string.Join("; ", lineups.Compositions.Select(c => c.Label))}]");
+            if (_guides?.Guides is { } all)
+            {
+                pivots = GuidePivots.For(guide, all, HeldCards());
+            }
         });
-        return lineups;
+        return pivots;
     }
 
-    /// <summary>
-    /// A composition's detail block (its ▸ in the target panel), derived from its card lists and final boards;
-    /// null if the feature failed. Tiers come from HearthDb through HDT (0 = no TECH_LEVEL, counted as unknown).
-    /// </summary>
-    private CompDetail? DetailFor(Composition composition)
+    /// <summary>One line each time a guide's detail is opened: what the guide lists, and how much of it the panel shows.</summary>
+    private void DetailShown(CompGuide guide, SectionFit fit) => _compDetailGuard.Run(() =>
     {
-        if (_details.TryGetValue(composition, out var known))
-        {
-            return known;
-        }
+        var pivots = PivotsFor(guide) ?? Array.Empty<GuidePivot>();
+        Log.Info($"Bronzebeard HUD: comp detail id={guide.Id} tier={guide.TierLetter} difficulty={CompGuideDifficulty.Text(guide.Difficulty)} " +
+                 $"core=[{string.Join(",", guide.CoreCards)}] addons=[{string.Join(",", guide.AddonCards)}] enablers=[{string.Join(",", guide.Enablers)}] " +
+                 $"commit lines={guide.WhenToCommitLines.Count} pivots=[{string.Join("; ", pivots.Select(p => $"{p.To.Name} {p.Shared.Count} shared"))}] " +
+                 $"sections={fit.Shown.Count} of {fit.Total}");
+    });
 
-        CompDetail? detail = null;
-        _compDetailGuard.Run(() =>
-        {
-            detail = CompDetail.For(composition, id => Database.GetCardFromId(id)?.TechLevel);
-            _details[composition] = detail;
-            static string Cards(IEnumerable<CompDetailCard> cards) =>
-                string.Join(",", cards.Select(c => $"{c.CardId}:T{c.TechLevel?.ToString() ?? "?"}x{c.FinalBoards}"));
-            Log.Info($"Bronzebeard HUD: comp detail id={composition.Id} boards={composition.FinalBoards.Count} " +
-                     $"enablers=[{Cards(detail.EarlyEnablers)}] commit=[{Cards(detail.CommitCards)}] " +
-                     $"turn={detail.TypicalFinalTurn?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none"}");
-        });
-        return detail;
-    }
-
-    // Each composition's detail, computed and logged once (compositions are the same objects until the cache is reloaded).
-    private readonly Dictionary<Composition, CompDetail> _details = new();
     private string _loggedHighlights = string.Empty;
 
     /// <summary>
-    /// Bob's cards that matter for the compositions aimed at (TavernHighlights), under their own guard; null if the
-    /// feature failed. One log line whenever the highlights change.
+    /// In the shop: Bob's cards that serve the targets (TavernHighlights: core card → solid frame, enabler or add-on →
+    /// dotted frame, in the target's colour), the pins, and a pin button above each minion. Redrawn when Bob's row, the
+    /// targets or the pins change; one log line whenever the highlights change.
     /// </summary>
-    private IReadOnlyList<TavernHighlight>? HighlightsFor(IReadOnlyList<string> bob, IReadOnlyList<Composition> ticked, IReadOnlyList<Composition> suggestions)
+    private void UpdateTavern(GameV2 game)
     {
-        IReadOnlyList<TavernHighlight>? highlights = null;
-        _highlightsGuard.Run(() =>
+        if (_markers == null)
         {
-            highlights = TavernHighlights.For(bob, ticked, suggestions, DetailFor, _selection.ColourOf);
-            var line = string.Join(",", bob.Zip(highlights, (card, h) => (card, h))
-                .Where(x => x.h.Kind != HighlightKind.None)
-                .Select(x => $"{x.card}:{x.h.Tag}:{x.h.Composition!.Id}"));
-            if (line != _loggedHighlights)
-            {
-                _loggedHighlights = line;
-                Log.Info($"Bronzebeard HUD: tavern highlights=[{line}] from {(ticked.Count > 0 ? "ticked" : "suggested")} compositions");
-            }
-        });
-        return highlights;
+            return;
+        }
+
+        if (HdtEntityAdapter.Phase(game) != OverlayPhase.Shop)
+        {
+            _tavernKey = string.Empty;
+            _markers.Hide();
+            return;
+        }
+
+        // Bob's whole row, the tavern spell included: the game centres minions and spell together. Followed by entity:
+        // a purchase, a reroll or an added card redraws the markers at once.
+        var row = HdtEntityAdapter.TavernRow(game);
+        var key = string.Join(",", row.Select(s => $"{s.EntityId}:{s.CardId}")) + "|" + _targetsVersion + "|" + _pinsVersion;
+        if (key == _tavernKey)
+        {
+            return;
+        }
+
+        _tavernKey = key;
+        var bob = row.Select(s => s.CardId).ToList();
+        var targets = _tracker.Targets;
+        var highlights = TavernHighlights.For(bob, targets);
+        var line = string.Join(",", bob.Zip(highlights, (card, h) => (card, h))
+            .Where(x => x.h.Effect != null)
+            .Select(x => $"{x.card}:{x.h.Effect!.Role.ToString().ToLowerInvariant()}:{x.h.Effect.Target.Guide.Id}"));
+        if (line != _loggedHighlights)
+        {
+            _loggedHighlights = line;
+            Log.Info($"Bronzebeard HUD: tavern highlights=[{line}] targets={CompTargets.Summary(targets)}");
+        }
+
+        _markers.Show(bob, highlights, _gamePins.Merge(_comps?.Pins ?? TavernPins.Empty), row.Select(s => s.IsMinion).ToList());
     }
 
     /// <summary>Shows the "Skip combat" button in combat only, and not again in a combat already skipped.</summary>
@@ -465,15 +463,6 @@ public sealed class Plugin : IPlugin
         }
     });
 
-    /// <summary>The "?" above one of Bob's minions: its own panel shows how top boards field that minion.</summary>
-    private void OpenLineups(string cardId)
-    {
-        if (_lineupsPanel != null && LineupsFor(cardId) is { } lineups)
-        {
-            _lineupsGuard.Run(() => _lineupsPanel.Show(lineups, _lastCards.All.Select(c => c.CardId)));
-        }
-    }
-
     /// <summary>A pin button was clicked above one of Bob's cards.</summary>
     private void TogglePin(string cardId) => _pinsGuard.Run(() =>
     {
@@ -481,21 +470,6 @@ public sealed class Plugin : IPlugin
         _gamePins.Toggle(cardId, file);
         Log.Info($"Bronzebeard HUD: pinned=[{string.Join(",", _gamePins.Merge(file).CardIds)}]");
         _pinsVersion++;
-    });
-
-    /// <summary>A composition's box was clicked in the target panel.</summary>
-    private void ToggleComposition(string compositionId) => _selectionGuard.Run(() =>
-    {
-        if (_selection.Toggle(compositionId))
-        {
-            Log.Info($"Bronzebeard HUD: ticked compositions=[{string.Join(",", _selection.Checked)}]");
-        }
-        else
-        {
-            Log.Info($"Bronzebeard HUD: {compositionId} not ticked, four compositions already are");
-        }
-
-        _selectionVersion++;
     });
 
     /// <summary>Report a disabled feature once in HDT's log, then take its panel off the screen.</summary>
@@ -512,21 +486,16 @@ public sealed class Plugin : IPlugin
             // The panel is already broken; the other features keep running.
         }
     }
+
     private string _choiceKey = string.Empty;
     private string _loggedChoice = string.Empty;
     private StatsService? _stats;
     private CompService? _comps;
     private bool _inHeroSelection;
     private bool _compsLoadedThisGame;
+    private string? _loggedCompStatus;
     private string _shownKey = string.Empty;
     private string _tavernKey = string.Empty;
-    private TavernRowTracker _rowTracker = new();
-    private int _lastMinions;
-    private LayoutRect? _lastFirstMarker;
-    private CompositionPanelState _compPanel = new();
-    private TavernAdvice? _lastAdvice;
-    private PlayerCards _lastCards = BronzebeardHud.Stats.PlayerCards.None;
-    private string? _shownCompStatus;
     private string _opponentKey = string.Empty;
 
     /// <summary>%LocalAppData%\BronzebeardHud\stats; hand-typed HSReplay files go in its "manual" subfolder.</summary>
@@ -536,11 +505,11 @@ public sealed class Plugin : IPlugin
     public string Name => "Bronzebeard HUD";
 
     public string Description =>
-        "Battlegrounds hero-pick stats and composition advice (Firestone public aggregates, hand-typed HSReplay data) on top of HDT's overlay.";
+        "Battlegrounds hero-pick stats (Firestone public aggregates, hand-typed HSReplay data) and HDT's comp guides as targets, on top of HDT's overlay.";
 
     public string ButtonText => "Move panels (on/off)";
     public string Author => "elphono";
-    public Version Version => new(0, 2, 0);
+    public Version Version => new(0, 3, 0);
     /// <summary>HDT's Plugins menu: move mode on/off, reset panel places, open the data folder.</summary>
     public MenuItem MenuItem => _menu ??= BuildMenu();
 
@@ -604,11 +573,11 @@ public sealed class Plugin : IPlugin
             Log.Warn($"Bronzebeard HUD: cannot read {SettingsPath}: {e.Message}");
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
-        _tavern = new TavernAdvicePanel(Core.OverlayCanvas, _mover, _selection, ToggleComposition, () => _settings.SuggestedCompositions, ChangeSuggested, TogglePin, OpenLineups, OpenMetaSnapshot, DetailFor, HighlightsFor);
-        _compGuides = new CompGuidesPanel(Core.OverlayCanvas, _mover);
-        _lineupsPanel = new LineupsPanel(Core.OverlayCanvas, _mover); // added after the target panel: drawn over it
+        _compsPanel = new CompsPanel(Core.OverlayCanvas, _mover, ToggleGuide, () => _settings.SuggestedCompositions, ChangeSuggested, OpenMetaSnapshot,
+            PivotsFor, DetailShown, action => _compsGuard.Run(action));
+        _markers = new TavernMarkers(Core.OverlayCanvas, TogglePin);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
-        _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory, _selection);
+        _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory);
         _skipCombat = new SkipCombatPanel(Core.OverlayCanvas, _mover, SkipCombat);
     }
 
@@ -616,35 +585,32 @@ public sealed class Plugin : IPlugin
     {
         _inHeroSelection = false;
         _compsLoadedThisGame = false;
+        _loggedCompStatus = null;
         _shownKey = string.Empty;
         _tavernKey = string.Empty;
+        _loggedHighlights = string.Empty;
         _choiceKey = string.Empty;
         _loggedChoice = string.Empty;
         _opponentKey = string.Empty;
-        _rowTracker = new TavernRowTracker();
         _warbandLine = null;
         _warbandRound = -1;
-        _heroEffects = new Dictionary<string, HeroCompPick>();
-        _heroEffectsHero = null;
-        _heroEffectsVersion = -1;
         _warbandLoggedRound = -1;
-        _compPanel = new CompositionPanelState();
-        _lastAdvice = null;
-        _lastCards = BronzebeardHud.Stats.PlayerCards.None;
-        _shownCompStatus = null;
         _guidesState = null;
         _guidesList = null;
         _guides = null;
-        _guidesKey = string.Empty;
-        _guidesBoard = CompGuideBoard.Empty;
-        _guidesCards = BronzebeardHud.Stats.PlayerCards.None;
-        _guidesRound = -1;
+        _compsKey = string.Empty;
+        _compsBoard = CompGuideBoard.Empty;
+        _compsCards = BronzebeardHud.Stats.PlayerCards.None;
+        _compsRound = -1;
     }
 
     public void OnUnload()
     {
         _panel?.Detach();
-        _tavern?.Detach();
+        _compsPanel?.Detach();
+        _compsPanel = null;
+        _markers?.Detach();
+        _markers = null;
         _opponentMmr?.Detach();
         _opponentMmr?.Dispose();
         _opponentMmr = null;
@@ -653,13 +619,8 @@ public sealed class Plugin : IPlugin
         _choices = null;
         _skipCombat?.Detach();
         _skipCombat = null;
-        _lineupsPanel?.Detach();
-        _lineupsPanel = null;
-        _compGuides?.Detach();
-        _compGuides = null;
         _mover?.Detach();
         _panel = null;
-        _tavern = null;
         _stats?.Dispose();
         _comps?.Dispose();
         _stats = null;
@@ -678,23 +639,25 @@ public sealed class Plugin : IPlugin
 
         _dataGuard.Run(() => RefreshData(game));
         _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
-        _tavernGuard.Run(() => UpdateTavern(game));
+        _compsGuard.Run(() => UpdateComps(game)); // the targets first: the frames and the choices follow them
+        _markersGuard.Run(() => UpdateTavern(game));
         _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
         _choiceGuard.Run(() => UpdateChoice(game));
         _warbandGuard.Run(() => UpdateWarband(game));
         _skipCombatGuard.Run(() => UpdateSkipCombat(game));
-        _compGuidesGuard.Run(() => UpdateCompGuides(game));
     }
 
     /// <summary>
-    /// HDT's own comp guides, in their panel, in the shop and in combat. Read from HDT whenever its list or its state
-    /// changes (one log line: where from, how many, which tiers); ranked against the board and hand whenever those change
-    /// in the shop (CompGuideMatch); in combat the shop's ranking stays. One log line per shop round, when it ends, with
-    /// the guides highlighted.
+    /// The "Compositions" panel, in the shop and in combat. HDT's guides are read whenever its list or its state changes
+    /// (one log line: where from, how many, which tiers); in the shop they are ranked against the board and the hand
+    /// whenever those change (CompGuideMatch), and the targets follow (CompTargetTracker: the ticked guides, then the most
+    /// probable ones, up to the number set by − n +, each keeping its colour while it stays a target). In combat the shop's
+    /// cards stay (minions die there); a tick or a change of the number still redraws at once. One log line per shop
+    /// round, when it ends, with the targets (CompTargets.RoundLine).
     /// </summary>
-    private void UpdateCompGuides(GameV2 game)
+    private void UpdateComps(GameV2 game)
     {
-        if (_compGuides == null)
+        if (_compsPanel == null)
         {
             return;
         }
@@ -702,9 +665,9 @@ public sealed class Plugin : IPlugin
         var phase = HdtEntityAdapter.Phase(game);
         if (phase is not (OverlayPhase.Shop or OverlayPhase.Combat))
         {
-            LogCompGuidesRound();
-            _guidesKey = string.Empty;
-            _compGuides.Hide();
+            LogCompsRound();
+            _compsKey = string.Empty;
+            _compsPanel.Hide();
             return;
         }
 
@@ -720,33 +683,36 @@ public sealed class Plugin : IPlugin
                 : $"Bronzebeard HUD: comp guides: none from HDT (state {_guides.State}){(_guides.Error != null ? ": " + _guides.Error : string.Empty)}");
         }
 
-        var cards = _guidesCards;
+        var cards = _compsCards;
         if (phase == OverlayPhase.Shop)
         {
             var round = game.GetTurnNumber();
-            if (round != _guidesRound)
+            if (round != _compsRound)
             {
-                LogCompGuidesRound();
-                _guidesRound = round;
+                LogCompsRound();
+                _compsRound = round;
             }
 
             cards = HdtEntityAdapter.PlayerCards(game);
         }
         else
         {
-            LogCompGuidesRound(); // the shop round is over: its last ranking is the one logged
+            LogCompsRound(); // the shop round is over: its last targets are the ones logged
         }
 
-        var key = string.Join(",", cards.All.Select(c => c.CardId).OrderBy(id => id, StringComparer.Ordinal)) + "|" + _guidesVersion;
-        if (key == _guidesKey && _compGuides.IsVisible)
+        var count = _settings.SuggestedCompositions;
+        var key = string.Join(",", cards.All.Select(c => c.CardId).OrderBy(id => id, StringComparer.Ordinal)) + "|" + _guidesVersion + "|" + _selectionVersion + "|" + count;
+        if (key == _compsKey && _compsPanel.IsVisible)
         {
             return;
         }
 
-        _guidesKey = key;
-        _guidesCards = cards;
-        _guidesBoard = _guides.Guides is { } guides ? CompGuideMatch.Rank(guides, cards) : CompGuideBoard.Empty;
-        _compGuides.Show(_guidesBoard, _guides.Guides?.Source, CompGuidesStatus(_guides));
+        _compsKey = key;
+        _compsCards = cards;
+        _compsBoard = _guides.Guides is { } guides ? CompGuideMatch.Rank(guides, cards, count) : CompGuideBoard.Empty;
+        _tracker.Next(_compsBoard, count);
+        _targetsVersion++;
+        _compsPanel.Show(_compsBoard, _tracker.Targets, cards.All.Select(c => c.CardId), _guides.Guides?.Source, CompGuidesStatus(_guides));
     }
 
     /// <summary>The line the panel shows when HDT gives no guides, in HDT's own terms; null when it gives some.</summary>
@@ -771,30 +737,37 @@ public sealed class Plugin : IPlugin
         };
     }
 
-    /// <summary>One line when a shop round ends: the guides highlighted for the cards held at its end.</summary>
-    private void LogCompGuidesRound()
+    /// <summary>One line when a shop round ends: the targets for the cards held at its end.</summary>
+    private void LogCompsRound()
     {
-        if (_guidesRound < 0)
+        if (_compsRound < 0)
         {
             return;
         }
 
-        Log.Info($"Bronzebeard HUD: comp guides round={_guidesRound} source={_guides?.Guides?.Source ?? "none"} comps={_guidesBoard.Count} " +
-                 $"board={_guidesCards.Board.Count} hand={_guidesCards.Hand.Count} highlighted={_guidesBoard.HighlightSummary}");
-        _guidesRound = -1;
+        Log.Info(CompTargets.RoundLine(_compsRound, _guides?.Guides?.Source, _compsBoard.Count, _compsCards, _tracker.Targets));
+        _compsRound = -1;
     }
 
     /// <summary>
     /// From the first update after the plugin starts, in or out of a game: load every Firestone file (hero stats,
     /// compositions, trinkets). Each one's first load in a plugin session asks Firestone's server whatever the
-    /// age of the cache (StatsCache), so starting HDT brings the freshest data; later loads keep the age rules.
-    /// One line in HDT's log per finished load (DataRefresh).
+    /// age of the cache (StatsCache), so starting HDT brings the freshest data; later loads keep the age rules; the
+    /// compositions are asked again at each game's first shop. One line in HDT's log per finished load (DataRefresh).
+    /// Firestone's compositions are no longer shown (HDT's guides replaced them on 2026-10-04): the hero badges still use
+    /// them, and the hand-typed pins of stats\manual\pins.txt come with them.
     /// </summary>
     private void RefreshData(GameV2 game)
     {
         if (_stats == null || _comps == null || _choices == null)
         {
             return;
+        }
+
+        if (HdtEntityAdapter.Phase(game) == OverlayPhase.Shop && !_compsLoadedThisGame)
+        {
+            _compsLoadedThisGame = true;
+            _comps.BeginGame();
         }
 
         _stats.EnsureStarted(game.CurrentBattlegroundsRating);
@@ -812,15 +785,26 @@ public sealed class Plugin : IPlugin
         _stats.PendingLogLine = null;
         _comps.PendingLogLine = null;
         _choices.PendingLogLine = null;
+
+        // A hand-typed file that cannot be read (pins.txt, *.comps.txt) is said once: no panel shows it any more.
+        var status = _comps.State == "loading" ? _loggedCompStatus : _comps.Status;
+        if (status != _loggedCompStatus)
+        {
+            _loggedCompStatus = status;
+            if (status != null)
+            {
+                Log.Warn($"Bronzebeard HUD: compositions data: {status}");
+            }
+        }
     }
 
     /// <summary>
-    /// Under the target compositions, in the shop and in combat: the board's attack plus health against the
+    /// Under the list of the panel, in the shop and in combat: the board's attack plus health against the
     /// average of the same hero at the same turn (Firestone warbandStats), and one line per round in HDT's log.
     /// </summary>
     private void UpdateWarband(GameV2 game)
     {
-        if (_tavern == null || _stats == null)
+        if (_compsPanel == null || _stats == null)
         {
             return;
         }
@@ -830,7 +814,7 @@ public sealed class Plugin : IPlugin
         if (hero == null)
         {
             _warbandLine = null;
-            _tavern.SetFooter(null);
+            _compsPanel.SetFooter(null);
             return;
         }
 
@@ -852,16 +836,17 @@ public sealed class Plugin : IPlugin
         var comparison = WarbandCurve.Compare(round, WarbandCurve.BoardStats(HdtEntityAdapter.BoardMinionStats(game)), hero, _stats.Sources());
         _warbandRound = round;
         _warbandLine = comparison.Line;
-        _tavern.SetFooter(comparison.Line);
+        _compsPanel.SetFooter(comparison.Line);
     }
 
     /// <summary>
-    /// Any choice of the player (discover, Dark Gift, trinket): a label above each option. One line in HDT's
-    /// log per choice, including the ones without a known layout, so that uncovered kinds show up.
+    /// Any choice of the player (discover, Dark Gift, trinket): a label above each option, from the targets
+    /// (ChoiceAdvisor), in the colour of the first target the option serves. One line in HDT's log per choice,
+    /// including the ones without a known layout, so that uncovered kinds show up.
     /// </summary>
     private void UpdateChoice(GameV2 game)
     {
-        if (_choices == null || _stats == null || _comps == null)
+        if (_choices == null || _stats == null)
         {
             return;
         }
@@ -875,7 +860,6 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        _comps.Poll();
         var ids = string.Join(",", options.Select(o => o.EntityId));
         if (kind == ChoiceKind.Trinket)
         {
@@ -884,15 +868,16 @@ public sealed class Plugin : IPlugin
         }
 
         var loaded = kind == ChoiceKind.Trinket && _choices.PollTrinketStats();
-        var key = $"{ids}|{_comps.Version}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_selectionVersion}";
+        var key = $"{ids}|{_targetsVersion}|{_stats.Bracket}|{_choices.TrinketStatsVersion}";
         if (key == _choiceKey && !loaded)
         {
             return;
         }
 
         _choiceKey = key;
-        var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
-            _choices.TrinketStat, _stats.Bracket, _selection.Checked, _heroEffects, _settings.SuggestedCompositions);
+        var guides = _guides?.Guides;
+        var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _tracker.Targets, guides, HdtEntityAdapter.LobbyTribeNames(),
+            _choices.TrinketStat, _stats.Bracket);
         if (advice.HasMarkers)
         {
             _choices.Show(advice);
@@ -905,7 +890,8 @@ public sealed class Plugin : IPlugin
         if (ids != _loggedChoice)
         {
             _loggedChoice = ids;
-            Log.Info(ChoiceAdvisor.DiagnosticLine(options, advice, _comps.Compositions().Count, _comps.State, _choices.LastLines, _choices.FirstLabel,
+            var guideState = guides?.Source ?? $"none from HDT, state {_guides?.State ?? "unread"}";
+            Log.Info(ChoiceAdvisor.DiagnosticLine(options, advice, guides?.Count ?? 0, guideState, _choices.LastLines, _choices.FirstLabel,
                 Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
         }
     }
@@ -958,10 +944,9 @@ public sealed class Plugin : IPlugin
         {
             _inHeroSelection = true;
             _compsLoadedThisGame = false;
-            _selection.BeginGame(++_gameNumber);
+            _tracker.BeginGame(++_gameNumber); // a new game: no tick, no colour, no target
             _gamePins.BeginGame(_gameNumber);
             _selectionVersion++;
-            _rowTracker = new TavernRowTracker();
             _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
         }
 
@@ -997,121 +982,6 @@ public sealed class Plugin : IPlugin
                 }
             });
             _panel.Show(HeroPickAdvisor.BuildRows(offered, sources), _stats.Status, compLines);
-        }
-    }
-
-    private void UpdateTavern(GameV2 game)
-    {
-        if (_tavern == null || _comps == null)
-        {
-            return;
-        }
-
-        var phase = HdtEntityAdapter.Phase(game);
-        if (phase == OverlayPhase.Shop && !_compsLoadedThisGame)
-        {
-            _compsLoadedThisGame = true;
-            _comps.BeginGame();
-        }
-
-        _comps.Poll();
-        var changed = false;
-        if (phase == OverlayPhase.Shop)
-        {
-            var cards = HdtEntityAdapter.PlayerCards(game);
-            var owned = cards.All;
-            // Bob's whole row, the tavern spell included: the game centres minions and spell together.
-            var row = HdtEntityAdapter.TavernRow(game);
-            // Followed by entity: a purchase, a reroll or an added card redraws the markers at once.
-            var rowChanged = _rowTracker.Observe(game.GetTurnNumber(), row.Select(s => s.EntityId).ToList());
-            var hero = HdtEntityAdapter.PlayerHeroId(game);
-            if (hero != _heroEffectsHero || _comps.Version != _heroEffectsVersion)
-            {
-                _heroEffectsHero = hero;
-                _heroEffectsVersion = _comps.Version;
-                _heroEffects = new Dictionary<string, HeroCompPick>();
-                _heroAffinityGuard.Run(() =>
-                {
-                    _heroEffects = HeroCompAffinity.Effects(hero, _comps.Compositions());
-                    if (hero != null && _comps.State == "ok")
-                    {
-                        var inv = System.Globalization.CultureInfo.InvariantCulture;
-                        Log.Info($"Bronzebeard HUD: hero affinity hero={hero} comps=[{string.Join("; ", _heroEffects.Values.OrderByDescending(e => e.Gain).Select(e => $"{e.Composition.Name} {e.ShopText} {(CompAdvisor.HeroPlacementWeight * e.Gain).ToString("+0.00;-0.00", inv)}pt"))}]");
-                    }
-                });
-            }
-
-            var key = string.Join(",", owned.Select(c => c.CardId)) + "|" + _comps.Version + "|" + _selectionVersion + "|" + hero + ":" + _heroEffects.Count
-                      + "|" + _pinsVersion;
-            if (rowChanged || key != _tavernKey || _lastAdvice == null)
-            {
-                _tavernKey = key;
-                changed = true;
-                _lastCards = cards;
-                _lastMinions = row.Count(s => s.IsMinion);
-                _lastAdvice = TavernAdvisor.Advise(row.Select(s => s.CardId).ToList(), owned, _comps.Compositions(), HdtEntityAdapter.LobbyTribeNames(),
-                    _selection.Checked, _heroEffects, _settings.SuggestedCompositions);
-                _tavern.ShowMarkers(_lastAdvice, owned.Select(c => c.CardId), _gamePins.Merge(_comps.Pins), row.Select(s => s.IsMinion).ToList());
-                _lastFirstMarker = _tavern.FirstMarker;
-            }
-        }
-        else if (_rowTracker.IsOpen)
-        {
-            // One diagnostic line per shop round, written when it ends: whether compositions were loaded,
-            // what was targeted, where the first marker last was, and how often Bob's row changed.
-            if (_lastAdvice is { Cards.Count: > 0 } lastAdvice)
-            {
-                Log.Info(TavernAdvisor.DiagnosticLine(_rowTracker.Round, _comps.Compositions().Count, _comps.State, lastAdvice, _lastCards,
-                    _lastMinions, _rowTracker.Changes, _rowTracker.Refreshes, _lastFirstMarker, Core.OverlayCanvas.ActualWidth, Core.OverlayCanvas.ActualHeight));
-            }
-
-            _rowTracker.Close();
-        }
-
-        var wasVisible = _compPanel.PanelVisible;
-        var advice = _lastAdvice;
-        var ownedNow = _lastCards.All;
-        var chosen = _selection.Checked;
-        IReadOnlyList<CompositionRow> BuildRows()
-        {
-            _rowsSelectionVersion = _selectionVersion;
-            // The same focus as the markers, recomputed so that a box ticked or a count changed in combat shows at once.
-            var shown = TavernAdvisor.Aim(_comps.Compositions(), advice!.Playable, ownedNow, chosen, _settings.SuggestedCompositions, _heroEffects).Shown;
-            return CompositionRows.Build(shown, ownedNow, chosen, _heroEffects);
-        }
-
-        _compPanel.Update(phase, () => advice != null && (changed || _compPanel.Rows.Count == 0) ? BuildRows() : _compPanel.Rows);
-        if (phase == OverlayPhase.Combat && advice != null && _rowsSelectionVersion != _selectionVersion)
-        {
-            // A box ticked during combat: the rows follow at once, the markers at the next shop.
-            _compPanel.Replace(BuildRows());
-            changed = true;
-        }
-        if (!_compPanel.MarkersVisible)
-        {
-            _tavernKey = string.Empty;
-            _tavern.HideMarkers();
-            _lineupsPanel?.Hide(); // about Bob's minions: gone with the shop
-        }
-
-        if (!_compPanel.PanelVisible)
-        {
-            _tavern.HidePanel();
-            if (phase != OverlayPhase.Combat)
-            {
-                _lastAdvice = null;
-            }
-        }
-        else if (changed || !wasVisible || _comps.Status != _shownCompStatus)
-        {
-            _shownCompStatus = _comps.Status;
-            // Pivots for each composition shown, among the playable ones: guarded on their own.
-            IReadOnlyDictionary<string, IReadOnlyList<CompTransition>> transitions = new Dictionary<string, IReadOnlyList<CompTransition>>();
-            var pool = advice?.Playable ?? _comps.Compositions();
-            _transitionsGuard.Run(() => transitions = _compPanel.Rows
-                .GroupBy(r => r.Composition.Id)
-                .ToDictionary(g => g.Key, g => CompTransitions.For(g.First().Composition, pool)));
-            _tavern.ShowPanel(_compPanel.Rows, _comps.Status, transitions);
         }
     }
 }

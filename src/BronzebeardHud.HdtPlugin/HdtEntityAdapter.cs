@@ -131,10 +131,11 @@ internal static class HdtEntityAdapter
     private static string BaseCardId(string cardId) =>
         BronzebeardHud.Stats.CardIds.Normalize(HearthDb.Cards.TripleToNormalCardIds.TryGetValue(cardId, out var normal) ? normal : cardId);
 
+    /// <summary>The Battlegrounds tribe name by value, never Race.ToString() alone: 20 is both BEAST and PET (GuideTribes.NameOrEnum).</summary>
     private static string? TribeOf(HdtEntity entity)
     {
         var race = (Race)entity.GetTag(GameTag.CARDRACE);
-        return race == Race.INVALID ? null : race.ToString();
+        return race == Race.INVALID ? null : GuideTribes.NameOrEnum((int)race, race.ToString());
     }
 
     /// <summary>The player's hero as a base hero id (skins mapped to their parent); null before one is picked.</summary>
@@ -217,13 +218,16 @@ internal static class HdtEntityAdapter
         }
     }
 
-    /// <summary>Tribes in this lobby as HDT knows them (BattlegroundsUtils.GetAvailableRaces); empty when unknown.</summary>
+    /// <summary>
+    /// Tribes in this lobby as HDT knows them (BattlegroundsUtils.GetAvailableRaces); empty when unknown. Named by value
+    /// (GuideTribes.NameOrEnum): Race 20 is both BEAST and PET, and a lobby read as "PET" would drop every beast guide.
+    /// </summary>
     public static IReadOnlyList<string> LobbyTribeNames()
     {
         var races = BattlegroundsUtils.GetAvailableRaces();
         return races == null
             ? Array.Empty<string>()
-            : races.Select(r => r.ToString()).Where(Tribes.All.Contains).OrderBy(r => r, StringComparer.Ordinal).ToList();
+            : races.Select(r => GuideTribes.NameOrEnum((int)r, r.ToString())).Where(Tribes.All.Contains).Distinct().OrderBy(r => r, StringComparer.Ordinal).ToList();
     }
 
     private static Dictionary<string, string>? _cardIdsByName;
