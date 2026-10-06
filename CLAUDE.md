@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Tavern Compass** (nom de code `BronzebeardHud`, nom affiché « Bronzebeard HUD » jusqu'au 2026-10-06) est un plugin
 Hearthstone Deck Tracker (HDT) pour Battlegrounds : les compos à viser, des cadres sur les cartes de Bob, des aides pour
 les choix et une jauge de puissance du board. Dépôt public `github.com/elphono/tavern-compass` (ex-`bg_ultimate_hud`),
-licence MIT. **Langue** : `README.md` et `ROADMAP.md` en anglais (le public), toute l'autre documentation en français,
+licence MIT (le dossier local s'appelle encore `bg_ultimate_hud`). **Langue** : `README.md` et `ROADMAP.md` en anglais (le public), toute l'autre documentation en français,
 code et commentaires en anglais.
 
 Le plugin vise la parité avec Firestone et HSReplay-Tier7 ; la stack a été retenue le 2026-09-26 par l'étude
@@ -19,7 +19,7 @@ l'historique git (tag `archive/standalone-app`, dernier état avant son retrait)
 privé, `github.com/elphono/bg_treehudder`. Le format annoté de `Power.log`, les plans de portage Rust → C# et la maquette
 de l'ancien panneau (`docs/mock/`) ont été retirés avec elle.
 
-## État du projet (au 2026-09-26)
+## État du projet (au 2026-10-06)
 
 Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des décisions est dans
 `docs/journal/2026-09-26-plugin-hdt.md`.
@@ -88,6 +88,15 @@ Ce qui reste ouvert :
 - Diagnostic : le journal d'HDT (`/mnt/c/Users/elphono/AppData/Roaming/HearthstoneDeckTracker/Logs/hdt_log.txt`)
   porte une ligne `Bronzebeard HUD: …` par tour et par fonctionnalité ; une fonctionnalité qui lève
   est coupée seule par `FeatureGuard` et le dit une fois. Lire cette ligne **avant** de supposer une cause.
+- **Avant de pousser** (la CI GitHub, `.github/workflows/ci.yml`, refait la même chose et construit en plus le plugin et la
+  simulation contre HDT 1.55.6) : `dotnet format whitespace --folder --verify-no-changes .` (le style est celui du
+  `.editorconfig`), `dotnet test -warnaserror` et les builds Release du plugin et de la simulation en `-warnaserror` : le
+  code n'a aucun avertissement, un nouveau fait échouer la construction. `RepositoryHygieneTests` refuse tout BattleTag,
+  pseudo de joueur ou numéro de compte réel dans un fichier du dépôt (les données de test sont inventées).
+- **Historique réécrit le 2026-10-06** (purge des données personnelles, voir « Décisions ») : les hashes de commit cités
+  dans les documents ont été recalculés ; un clone fait avant cette date est à refaire (`git clone`, ou `git fetch` puis
+  `git reset --hard origin/main` si l'arbre est propre). L'ancienne app autonome reste atteignable par le tag
+  `archive/standalone-app`.
 - Retours constants d'Ali sur l'UI : aucun texte tronqué, chaque indication alignée sur la carte ou
   le héros qu'elle concerne, couleurs vives et distinctes, rien ne masque l'interface du jeu, ne pas
   dupliquer ce que le jeu ou HDT affichent déjà.
