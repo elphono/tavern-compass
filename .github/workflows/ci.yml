@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # The plugin build downloads HDT's assemblies (a 20 MB zip) into lib/hdt/: keep them between runs.
+      - uses: actions/cache@v4
+        with:
+          path: lib/hdt
+          key: hdt-${{ hashFiles('src/BronzebeardHud.HdtPlugin/BronzebeardHud.HdtPlugin.csproj') }}
+
+      - name: Tests (business logic)
+        run: dotnet test BronzebeardHud.sln -c Release
+
+      - name: Build the HDT plugin
+        run: dotnet build src/BronzebeardHud.HdtPlugin -c Release
+
+      - name: Build the simulation harness
+        run: dotnet build tools/BronzebeardHud.Harness -c Release
