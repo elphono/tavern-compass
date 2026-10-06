@@ -6,10 +6,10 @@
 composition to go for, frames the cards in Bob's tavern that move you toward it, and shows whether your board is
 keeping up.**
 
-![The Compositions panel at 1, 2, 3 and 4 targets, with the power inset under it](docs/plans/img/2026-10-06-encart-puissance/n1-a-n4.png)
+![Bob's cards framed in the colour of each target comp, the Compositions panel and the power inset at the bottom right](docs/img/tavern-scene.png)
 
-*From 1 to 4 targets, the panel resizes to show them. Under it, the power inset: your board and your opponent's.
-Captured in the [simulation](tools/BronzebeardHud.Harness/README.md), not in a live game: the real plugin on made-up data.*
+*Captured in the [simulation](tools/BronzebeardHud.Harness/README.md), not in a live game: the real plugin on made-up data. The red areas
+stand for the parts of the game screen the panels keep clear of.*
 
 ## What you get
 
@@ -24,6 +24,8 @@ Captured in the [simulation](tools/BronzebeardHud.Harness/README.md), not in a l
 | **Hover and click for the full guide** | Hover a line for HDT's whole guide in a popup, click it to read it in the panel, as in HDT. |
 | **Hero pick, MMR, Skip combat** | Firestone stats on the heroes offered, MMR of your opponents (leaderboard), and an experimental *Skip combat* button. |
 | **Your layout** | *Plugins → Tavern Compass → Move panels*: drag the panel, size it with the corner handle. That sets its default place and size; `−` / `+` then resize it for N comps. The size gives the content more or less room, it never scales it: no text below 12 px at 1080p, nothing truncated. |
+
+![From 1 to 4 targets, the panel resizes to show them](docs/plans/img/2026-10-06-encart-puissance/n1-a-n4.png)
 
 ![The power inset: red, yellow, green and shiny, and the grey states](docs/plans/img/2026-10-06-encart-puissance/feux-joueur.png)
 
