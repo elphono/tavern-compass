@@ -6,9 +6,16 @@ public class CompDetailTests
     // UNKNOWN has no tier at all.
     private static readonly Dictionary<string, int> Tiers = new()
     {
-        ["KEY_T5"] = 5, ["KEY_T3"] = 3,
-        ["ADD_T2"] = 2, ["ADD_T4"] = 4, ["ADD_T1"] = 1,
-        ["EARLY_T1"] = 1, ["EARLY_T3"] = 3, ["EARLY_T2"] = 2, ["LATE_T4"] = 4, ["LATE_T6"] = 6,
+        ["KEY_T5"] = 5,
+        ["KEY_T3"] = 3,
+        ["ADD_T2"] = 2,
+        ["ADD_T4"] = 4,
+        ["ADD_T1"] = 1,
+        ["EARLY_T1"] = 1,
+        ["EARLY_T3"] = 3,
+        ["EARLY_T2"] = 2,
+        ["LATE_T4"] = 4,
+        ["LATE_T6"] = 6,
     };
 
     private static int? TierOf(string cardId) => Tiers.TryGetValue(cardId, out var tier) ? tier : null;

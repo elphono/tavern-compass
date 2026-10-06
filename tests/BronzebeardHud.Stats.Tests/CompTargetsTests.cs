@@ -316,8 +316,17 @@ public class CompTargetsTests
         // Written out from HearthDb.dll (HDT 1.58.6): the constants of HearthDb.Enums.Race.
         var expected = new Dictionary<int, string>
         {
-            [11] = "UNDEAD", [14] = "MURLOC", [15] = "DEMON", [17] = "MECHANICAL", [18] = "ELEMENTAL", [20] = "BEAST",
-            [23] = "PIRATE", [24] = "DRAGON", [43] = "QUILBOAR", [92] = "NAGA", [126] = "ABERRATION",
+            [11] = "UNDEAD",
+            [14] = "MURLOC",
+            [15] = "DEMON",
+            [17] = "MECHANICAL",
+            [18] = "ELEMENTAL",
+            [20] = "BEAST",
+            [23] = "PIRATE",
+            [24] = "DRAGON",
+            [43] = "QUILBOAR",
+            [92] = "NAGA",
+            [126] = "ABERRATION",
         };
 
         Assert.All(expected, kv => Assert.Equal(kv.Value, GuideTribes.NameOf(kv.Key)));

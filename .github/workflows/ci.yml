@@ -21,11 +21,14 @@ jobs:
           path: lib/hdt
           key: hdt-${{ hashFiles('src/BronzebeardHud.HdtPlugin/BronzebeardHud.HdtPlugin.csproj') }}
 
+      - name: Formatting
+        run: dotnet format whitespace --folder --verify-no-changes .
+
       - name: Tests (business logic)
-        run: dotnet test BronzebeardHud.sln -c Release
+        run: dotnet test BronzebeardHud.sln -c Release -warnaserror
 
       - name: Build the HDT plugin
-        run: dotnet build src/BronzebeardHud.HdtPlugin -c Release
+        run: dotnet build src/BronzebeardHud.HdtPlugin -c Release -warnaserror
 
       - name: Build the simulation harness
-        run: dotnet build tools/BronzebeardHud.Harness -c Release
+        run: dotnet build tools/BronzebeardHud.Harness -c Release -warnaserror

@@ -96,8 +96,17 @@ public static class FirestoneHeroStatsImporter
     // Race ids of python-hearthstone's enums.Race, as Firestone writes them in tribeStats.
     private static readonly Dictionary<int, string> TribeByRace = new()
     {
-        [11] = "UNDEAD", [14] = "MURLOC", [15] = "DEMON", [17] = "MECHANICAL", [18] = "ELEMENTAL", [20] = "BEAST",
-        [23] = "PIRATE", [24] = "DRAGON", [43] = "QUILBOAR", [92] = "NAGA", [126] = "ABERRATION",
+        [11] = "UNDEAD",
+        [14] = "MURLOC",
+        [15] = "DEMON",
+        [17] = "MECHANICAL",
+        [18] = "ELEMENTAL",
+        [20] = "BEAST",
+        [23] = "PIRATE",
+        [24] = "DRAGON",
+        [43] = "QUILBOAR",
+        [92] = "NAGA",
+        [126] = "ABERRATION",
     };
 
     /// <summary>Firestone's tribeStats, reduced to what the lobby-tribe adjustment reads; unknown races are dropped.</summary>

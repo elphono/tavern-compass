@@ -28,9 +28,18 @@ public static class FirestoneCompImporter
     // Firestone archetype ids start with the tribe ("mech_glambot", "abberation_discard" [sic]).
     private static readonly Dictionary<string, string> TribeByPrefix = new(StringComparer.Ordinal)
     {
-        ["beast"] = "BEAST", ["demon"] = "DEMON", ["dragon"] = "DRAGON", ["elemental"] = "ELEMENTAL",
-        ["mech"] = "MECHANICAL", ["murloc"] = "MURLOC", ["naga"] = "NAGA", ["pirate"] = "PIRATE",
-        ["quilboar"] = "QUILBOAR", ["undead"] = "UNDEAD", ["abberation"] = "ABERRATION", ["aberration"] = "ABERRATION",
+        ["beast"] = "BEAST",
+        ["demon"] = "DEMON",
+        ["dragon"] = "DRAGON",
+        ["elemental"] = "ELEMENTAL",
+        ["mech"] = "MECHANICAL",
+        ["murloc"] = "MURLOC",
+        ["naga"] = "NAGA",
+        ["pirate"] = "PIRATE",
+        ["quilboar"] = "QUILBOAR",
+        ["undead"] = "UNDEAD",
+        ["abberation"] = "ABERRATION",
+        ["aberration"] = "ABERRATION",
     };
 
     public static CompositionFile Import(string firestoneJson, string sourceUrl, DateTimeOffset fetchedAt)

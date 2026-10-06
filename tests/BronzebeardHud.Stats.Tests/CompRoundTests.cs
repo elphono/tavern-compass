@@ -19,9 +19,16 @@ public class CompRoundTests
     private static readonly IReadOnlyDictionary<string, string[]> CardTribes = new Dictionary<string, string[]>
     {
         ["TITUS"] = Array.Empty<string>(),
-        ["BUTCHER"] = new[] { "UNDEAD" }, ["RISEN"] = new[] { "UNDEAD" }, ["SCALER"] = new[] { "UNDEAD" }, ["UA"] = new[] { "UNDEAD" },
-        ["LOBSTER"] = new[] { "BEAST" }, ["GRYPHON"] = new[] { "BEAST" }, ["HYENA"] = new[] { "BEAST" },
-        ["CONVERTER"] = new[] { "ABERRATION" }, ["IMP"] = new[] { "DEMON" }, ["FELBOAR"] = new[] { "QUILBOAR" },
+        ["BUTCHER"] = new[] { "UNDEAD" },
+        ["RISEN"] = new[] { "UNDEAD" },
+        ["SCALER"] = new[] { "UNDEAD" },
+        ["UA"] = new[] { "UNDEAD" },
+        ["LOBSTER"] = new[] { "BEAST" },
+        ["GRYPHON"] = new[] { "BEAST" },
+        ["HYENA"] = new[] { "BEAST" },
+        ["CONVERTER"] = new[] { "ABERRATION" },
+        ["IMP"] = new[] { "DEMON" },
+        ["FELBOAR"] = new[] { "QUILBOAR" },
     };
 
     private static readonly string[] Lobby = { "DEMON", "MECHANICAL", "PIRATE", "QUILBOAR", "UNDEAD" };
