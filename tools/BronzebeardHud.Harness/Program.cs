@@ -10,7 +10,8 @@ namespace BronzebeardHud.Harness;
 /// without anyone at the keyboard (the window is parked far off screen), write their result under <c>--out</c> and
 /// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--tick a,b</c> ticks guides,
 /// <c>--choice k</c> opens a choice above the scene (discover, dark-gift, trinket), <c>--close-choice</c> closes it again
-/// before the screenshot (the scene restored), and <c>--detail x</c> opens a guide's
+/// before the screenshot (the scene restored), <c>--power p</c> shows the board's power p under the list (behind, even,
+/// ahead, shiny, none, early), and <c>--detail x</c> opens a guide's
 /// detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name). <c>--hover x</c> hovers a guide's
 /// line (move mode off) so that its popup shows in the screenshot, <c>--hover-card k</c> also hovers the k-th oval of that
 /// line (its card preview), and <c>--no-skip</c> hides the Skip combat button, as in the tavern.
@@ -24,7 +25,10 @@ internal sealed class Options
     public string? Layout { get; private set; }
 
     /// <summary>The board held (HarnessData.Scenarios): 2, three targets, by default.</summary>
-    public int Scenario { get; private set; } = 2;
+    public int Scenario { get; private set; } = HarnessData.DefaultScenario;
+
+    /// <summary>The board's power under the list (HarnessData.PowerScenes: behind, even, ahead, shiny, none, early); null: even.</summary>
+    public string? Power { get; private set; }
 
     /// <summary>A guide whose detail is opened before the screenshot: a target's rank ("1") or a guide's name; null: the list.</summary>
     public string? Detail { get; private set; }
@@ -82,6 +86,9 @@ internal sealed class Options
                     break;
                 case "--choice" when i + 1 < args.Length:
                     options.Choice = args[++i];
+                    break;
+                case "--power" when i + 1 < args.Length:
+                    options.Power = args[++i];
                     break;
                 case "--close-choice":
                     options.CloseChoice = true;

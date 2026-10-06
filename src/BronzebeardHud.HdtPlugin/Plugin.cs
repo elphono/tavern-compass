@@ -14,8 +14,9 @@ namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
 /// Entry point HDT discovers in its Plugins folder. Hero selection: a stats badge under each offered hero. Shop and
-/// combat: the "Compositions" panel (HDT's own comp guides; the ticked ones and the most probable ones are the targets,
-/// each in its colour), the frames on Bob's cards that serve the targets, the labels of choices. The plugin never reads
+/// combat: the "Compositions" panel (HDT's own comp guides that the lobby can play; the ticked ones and those in progress,
+/// or the most probable ones, are the targets, each in its colour; the board's power under the list), the frames on Bob's
+/// cards that serve the targets, the labels of choices. The plugin never reads
 /// game memory; it only uses what HDT exposes, plus local files and the Firestone downloads managed by
 /// <see cref="StatsService"/> and <see cref="CompService"/>.
 /// </summary>
@@ -48,6 +49,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _skipCombatGuard;
     private readonly FeatureGuard _bridgeGuard;
     private readonly FeatureGuard _coverGuard;
+    private readonly FeatureGuard _lobbyGuard;
 
     // While a choice is open in the shop, the markers on Bob's cards and the panel are off the screen (ChoiceCover).
     private readonly ChoiceCover _cover = new();
@@ -57,6 +59,16 @@ public sealed class Plugin : IPlugin
     private object? _guidesList;
     private HdtCompGuidesSnapshot? _guides;
     private int _guidesVersion;
+
+    // The guides this lobby can play (LobbyGuides): the only list the panel, the targets, the frames, the choices and the
+    // pivots are given. Null without guides from HDT. The lobby's tribes are read once known, for the game (ReadLobbyTribes).
+    private LobbyGuides? _lobby;
+    private string _lobbyKey = string.Empty;
+    private int _lobbyVersion;
+    private IReadOnlyList<string> _lobbyTribes = Array.Empty<string>();
+    private int _lobbyTribesGame = -1;
+    private Stopwatch? _lobbyRead;
+    private bool _lobbyUnknownLogged;
 
     // Firestone's compositions bridged to HDT's guides (GuideBridge), and the hero being played on each composition
     // (HeroCompAffinity): what the labels of choices, the frames on Bob's cards and a guide's context line draw on. Null
@@ -112,6 +124,9 @@ public sealed class Plugin : IPlugin
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
+        // Once switched off, the panel and the targets are those of the whole list (LobbyGuides.Unknown, UpdateComps), as
+        // before the lobby was read: guides of absent tribes come back, rather than no panel at all.
+        _lobbyGuard = new FeatureGuard("lobby-filter", (n, e) => Disable(n, e, () => _lobbyKey = string.Empty));
         _metaGuard = new FeatureGuard("meta-snapshot", (n, e) => Disable(n, e, () =>
         {
             if (_compsPanel != null)
@@ -197,7 +212,10 @@ public sealed class Plugin : IPlugin
         Log.Info($"Bronzebeard HUD: meta snapshot opened {MetaSnapshot.Url}");
     });
 
-    /// <summary>A guide's tick box was clicked in the panel: a ticked guide is a target whatever its score (four at most).</summary>
+    /// <summary>
+    /// A guide's tick box was clicked in the panel: a ticked guide is a target whatever its score (four at most); while one
+    /// is ticked, the other targets are the guides in progress only (CompTargets.Choose).
+    /// </summary>
     private void ToggleGuide(string guideId) => _selectionGuard.Run(() =>
     {
         var accepted = _tracker.Toggle(guideId);
@@ -214,9 +232,9 @@ public sealed class Plugin : IPlugin
         IReadOnlyList<GuidePivot>? pivots = null;
         _pivotsGuard.Run(() =>
         {
-            if (_guides?.Guides is { } all)
+            if (_lobby?.Playable is { } all)
             {
-                pivots = GuidePivots.For(guide, all, HeldCards());
+                pivots = GuidePivots.For(guide, all, HeldCards()); // never towards a guide the lobby cannot play
             }
         });
         return pivots;
@@ -627,6 +645,12 @@ public sealed class Plugin : IPlugin
         _guidesState = null;
         _guidesList = null;
         _guides = null;
+        _lobby = null;
+        _lobbyKey = string.Empty;
+        _lobbyTribes = Array.Empty<string>();
+        _lobbyTribesGame = -1;
+        _lobbyRead = null;
+        _lobbyUnknownLogged = false;
         _compsKey = string.Empty;
         _compsBoard = CompGuideBoard.Empty;
         _compsCards = BronzebeardHud.Stats.PlayerCards.None;
@@ -685,11 +709,12 @@ public sealed class Plugin : IPlugin
 
     /// <summary>
     /// The "Compositions" panel, in the shop and in combat. HDT's guides are read whenever its list or its state changes
-    /// (one log line: where from, how many, which tiers); in the shop they are ranked against the board and the hand
-    /// whenever those change (CompGuideMatch), and the targets follow (CompTargetTracker: the ticked guides, then the most
-    /// probable ones, up to the number set by − n +, each keeping its colour while it stays a target). In combat the shop's
-    /// cards stay (minions die there); a tick or a change of the number still redraws at once. One log line per shop
-    /// round, when it ends, with the targets (CompTargets.RoundLine).
+    /// (one log line: where from, how many, which tiers), and narrowed to the ones the lobby can play (UpdateLobby,
+    /// LobbyGuides: one log line); in the shop those are ranked against the board and the hand whenever those change
+    /// (CompTargets.Round, CompGuideMatch), and the targets follow (CompTargetTracker: the ticked guides, then the guides in
+    /// progress; with nothing ticked the most probable ones, up to the number set by − n +; each keeping its colour while it
+    /// stays a target). In combat the shop's cards stay (minions die there); a tick or a change of the number still redraws
+    /// at once. One log line per shop round, when it ends, with the targets (CompTargets.RoundLine).
     /// </summary>
     private void UpdateComps(GameV2 game)
     {
@@ -726,6 +751,17 @@ public sealed class Plugin : IPlugin
         }
 
         _bridgeGuard.Run(() => UpdateBridge(game));
+        _lobbyGuard.Run(() => UpdateLobby(game, phase));
+        if (_guides.Guides is { } listed && (_lobby == null || !ReferenceEquals(_lobby.All, listed)))
+        {
+            _lobby = LobbyGuides.Unknown(listed); // the filter switched off by its guard: every guide, as before it
+            _lobbyVersion++;
+        }
+        else if (_guides.Guides == null && _lobby != null)
+        {
+            _lobby = null;
+            _lobbyVersion++;
+        }
 
         var cards = _compsCards;
         if (phase == OverlayPhase.Shop)
@@ -746,7 +782,8 @@ public sealed class Plugin : IPlugin
 
         var count = _settings.SuggestedCompositions;
         var key = string.Join(",", cards.All.Select(c => c.CardId).OrderBy(id => id, StringComparer.Ordinal)) + "|" + _guidesVersion + "|" + _selectionVersion + "|" + count
-                  + "|" + _bridgeVersion; // a guide's context line (detail, popup) follows the bridge and the hero
+                  + "|" + _bridgeVersion   // a guide's context line (detail, popup) follows the bridge and the hero
+                  + "|" + _lobbyVersion;   // the lobby's tribes, once known, take guides out of the list and the targets
         if (key == _compsKey && _compsPanel.IsVisible)
         {
             return;
@@ -754,10 +791,89 @@ public sealed class Plugin : IPlugin
 
         _compsKey = key;
         _compsCards = cards;
-        _compsBoard = _guides.Guides is { } guides ? CompGuideMatch.Rank(guides, cards, count) : CompGuideBoard.Empty;
-        _tracker.Next(_compsBoard, count);
+        if (_lobby != null)
+        {
+            // Only the guides the lobby can play are ranked, listed and targeted: CompTargets.Round takes LobbyGuides, never
+            // a bare list (2026-10-06: guides of absent tribes were targets in 15 of Ali's 69 shop rounds).
+            var round = CompTargets.Round(_lobby, cards, _tracker, count);
+            foreach (var line in round.Unticked)
+            {
+                Log.Info(line);
+            }
+
+            _compsBoard = round.Board;
+        }
+        else
+        {
+            _compsBoard = CompGuideBoard.Empty;
+            _tracker.Next(_compsBoard, count);
+        }
+
         _targetsVersion++;
-        _compsPanel.Show(_compsBoard, _tracker.Targets, cards.All.Select(c => c.CardId), _guides.Guides?.Source, CompGuidesStatus(_guides));
+        var note = _lobby is { Known: false } && _lobby.All.Count > 0 ? "Lobby tribes unknown: every guide listed" : null;
+        _compsPanel.Show(_compsBoard, _tracker.Targets, cards.All.Select(c => c.CardId), _guides.Guides?.Source, CompGuidesStatus(_guides), note);
+    }
+
+    /// <summary>
+    /// The lobby's tribes (HdtEntityAdapter.LobbyTribeNames: HDT's BattlegroundsUtils.GetAvailableRaces, which HDT reads from
+    /// the game's memory and keeps per game), asked for until known, once a second at most, then kept for the game. One log
+    /// line when they are first known, saying when ("hero selection", "shop turn 1"), so that when HDT has them can be
+    /// measured; one line if the shop opens without them.
+    /// </summary>
+    private IReadOnlyList<string> ReadLobbyTribes(string when)
+    {
+        if (_lobbyTribesGame != _gameNumber)
+        {
+            _lobbyTribesGame = _gameNumber;
+            _lobbyTribes = Array.Empty<string>();
+            _lobbyRead = null;
+            _lobbyUnknownLogged = false;
+        }
+
+        if (_lobbyTribes.Count == 0 && (_lobbyRead == null || _lobbyRead.ElapsedMilliseconds >= LobbyReadEveryMs))
+        {
+            _lobbyRead = Stopwatch.StartNew();
+            _lobbyTribes = HdtEntityAdapter.LobbyTribeNames();
+            if (_lobbyTribes.Count > 0)
+            {
+                Log.Info($"Bronzebeard HUD: lobby tribes=[{string.Join(",", _lobbyTribes)}] read at {when}");
+            }
+        }
+
+        if (_lobbyTribes.Count == 0 && !_lobbyUnknownLogged && when.StartsWith("shop", StringComparison.Ordinal))
+        {
+            _lobbyUnknownLogged = true;
+            Log.Info($"Bronzebeard HUD: lobby tribes unknown at {when}: no guide left out until HDT has them");
+        }
+
+        return _lobbyTribes;
+    }
+
+    /// <summary>While the lobby's tribes are unknown, HDT is asked again after this long (each ask may read the game's memory).</summary>
+    private const int LobbyReadEveryMs = 1000;
+
+    /// <summary>
+    /// The guides the lobby can play (LobbyGuides.Of, with HearthDb's tribes of each key card), again whenever HDT's list or
+    /// the lobby's tribes change, with one log line: the tribes, how many guides are playable, and why each other one is left
+    /// out ("a beast guide (no BEAST)").
+    /// </summary>
+    private void UpdateLobby(GameV2 game, OverlayPhase phase)
+    {
+        var when = $"{(phase == OverlayPhase.Shop ? "shop" : "combat")} turn {game.GetTurnNumber()}";
+        var tribes = ReadLobbyTribes(when);
+        var key = _guidesVersion + "|" + string.Join(",", tribes);
+        if (key == _lobbyKey)
+        {
+            return;
+        }
+
+        _lobbyKey = key;
+        _lobby = _guides?.Guides is { } guides ? LobbyGuides.Of(guides, tribes, HdtEntityAdapter.CardTribes) : null;
+        _lobbyVersion++;
+        if (_lobby != null)
+        {
+            Log.Info(_lobby.Line(when));
+        }
     }
 
     /// <summary>
@@ -889,8 +1005,10 @@ public sealed class Plugin : IPlugin
     }
 
     /// <summary>
-    /// Under the list of the panel, in the shop and in combat: the board's attack plus health against the
-    /// average of the same hero at the same turn (Firestone warbandStats), and one line per round in HDT's log.
+    /// Under the list of the panel, in the shop and in combat: the board's power, its attack plus health against the
+    /// average of the same hero at the same turn (Firestone warbandStats), drawn as a gauge and a coloured badge
+    /// (BoardPowerView, WarbandCurve.Compare's level), and one line per round in HDT's log, with the level
+    /// ("… · +18% power=even", "power=none (too early)").
     /// </summary>
     private void UpdateWarband(GameV2 game)
     {
@@ -925,8 +1043,8 @@ public sealed class Plugin : IPlugin
 
         var comparison = WarbandCurve.Compare(round, WarbandCurve.BoardStats(HdtEntityAdapter.BoardMinionStats(game)), hero, _stats.Sources());
         _warbandRound = round;
-        _warbandLine = comparison.Line;
-        _compsPanel.SetFooter(comparison.Line);
+        _warbandLine = comparison.Line + " " + comparison.PowerText;
+        _compsPanel.SetFooter(comparison);
     }
 
     /// <summary>
@@ -984,8 +1102,9 @@ public sealed class Plugin : IPlugin
         }
 
         _choiceKey = key;
-        var guides = _guides?.Guides;
-        var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _tracker.Targets, guides, HdtEntityAdapter.LobbyTribeNames(),
+        // The lobby's guides only: the fallback "core G (S)" and the pivots never name a guide of an absent tribe.
+        var guides = _lobby?.Playable;
+        var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _tracker.Targets, guides, _lobby?.Tribes ?? Array.Empty<string>(),
             _choices.TrinketStat, _stats.Bracket, _bridge);
         if (advice.HasMarkers)
         {
@@ -1067,7 +1186,7 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        var tribes = HdtEntityAdapter.LobbyTribeNames();
+        var tribes = ReadLobbyTribes("hero selection");
         _comps?.Poll();
         var key = string.Join(",", offered.Select(h => $"{h.EntityId}:{h.CardId}")) + "|" + _stats.Version + "|" + string.Join(",", tribes)
                   + "|" + (_comps?.Version ?? 0);

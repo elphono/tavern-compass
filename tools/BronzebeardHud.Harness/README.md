@@ -8,7 +8,10 @@ redimensionner et les regarder **sans lancer une partie** ni HDT.
 ./tools/BronzebeardHud.Harness/launch.sh --selftest      # vérifie la scène sans personne au clavier (code de sortie 0 = tout passe)
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot    # écrit C:\temp\BronzebeardHarness-ci\out\shot.png (le canvas à sa taille réelle)
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --detail 2   # la même, détail de la 2e cible ouvert (rang, ou nom d'un guide)
-./tools/BronzebeardHud.Harness/launch.sh --screenshot --tick 1   # la même, la compo n° 1 cochée : elle devient la seule cible
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --tick 1   # la même, la compo n° 1 cochée : elle passe en tête, les compos en cours restent
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --scenario 3   # lobby sans morts-vivants ni dragons : leurs guides ni listés ni ciblés
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --scenario 5 --tick 3   # cases : la compo pariée cochée, la compo en cours gardée (« in progress »)
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --power shiny   # la jauge de puissance : behind, even, ahead, shiny, none, early
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover   # la même, un choix ouvert : discover, dark-gift ou trinket
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover --close-choice   # le choix ouvert puis refermé : la scène rétablie
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --hover 1 --no-skip   # la ligne de la 1re cible survolée : son popup, comme en taverne
@@ -31,8 +34,22 @@ chacune, sur les ids de `Pool`, un héros inventé) : `pirate_fs` → Pirate Dis
 trois cartes avec `mech_fs` mais seulement 3 de ses 7 cartes clés : « no match », le contre-exemple. La ligne `bridge:` est au journal.
 
 Arguments en plus : `--size 1600x900`, `--layout <fichier>`, `--wait <ms>` (attente des noms et images avant la capture),
-`--scenario 0|1|2` (plateau tenu : rien, deux cartes d'une compo, un plateau fort ; 2 par défaut), `--detail <rang ou nom>`
+`--scenario 0…5` (plateau tenu et tribus du lobby, `HarnessData.Scenarios` ; 2 par défaut), `--power <scène>` (la jauge de
+puissance sous la liste, `HarnessData.Power` ; even par défaut), `--detail <rang ou nom>`
 (ouvre le détail avant la capture ; un rang qui n'existe pas fait échouer la capture plutôt que de capturer la liste).
+Un nom de guide avec des espaces ne passe pas par `launch.sh` (PowerShell le coupe) : donner le rang de la cible.
+
+| Scénario | Plateau, main | Lobby | Cibles (3 voulues) |
+|---|---|---|---|
+| 0 Nothing yet | rien | 5 tribus (bêtes, élémentaires, mécas, pirates, morts-vivants) | 0 |
+| 1 Two cards of one composition | 2 cartes clés d'Elemental Cycle | idem | 1 |
+| 2 A strong board, one in hand | Pirate Discover, Mech Magnet, Mech Divine Shield | idem | 3 |
+| 3 A neutral key card of absent tribes | la carte neutre `Pool[0]`, carte clé de 3 guides morts-vivants et dragons, + 2 mécas | sans morts-vivants ni dragons | 2 (les mécas) |
+| 4 The lobby not known yet | la carte neutre et une carte clé méca | inconnu | 3 (rien n'est écarté ; la ligne « Lobby tribes unknown » cède sa place à une cible à la taille par défaut, se montre avec une seule cible) |
+| 5 Ticks: in progress and guesses | Elemental Cycle ★2/4, une carte clé de quatre autres guides | 5 tribus | 3 ; cocher Pirate Discover garde Elemental Cycle (« in progress ») et fait taire les paris |
+
+Les tribus des cartes de la simulation sont synthétiques (`HarnessData.CardTribes` : celle du premier guide qui la liste,
+`Pool[0]` neutre) ; la courbe de puissance est inventée (×1,8 par tour, 120 au tour 8).
 Le script compile sous WSL, copie dans `C:\temp\BronzebeardHarness` et lance l'exécutable côté Windows (par `Start-Process` : lancée par `cmd.exe /c start`, la fenêtre garde la console de WSL attachée et le script ne rend jamais la main). **Fermer la fenêtre avant de la relancer** : un exécutable en cours ne se remplace pas, et le script le dit.
 `--selftest` et `--screenshot` tournent depuis leur propre copie, `C:\temp\BronzebeardHarness-ci` (sortie dans son `out\`) : ils passent même fenêtre ouverte, sans toucher à son dossier.
 Ils lisent aussi leur propre disposition, `C:\temp\BronzebeardHarness-ci\layout.json` (jamais écrite : la disposition par défaut), sauf `--layout` explicite : la capture ne dépend pas de la fenêtre. Le journal et le cache d'images restent partagés.
@@ -62,7 +79,9 @@ leur mise en page et leur remplissage.
 - La rangée de Bob : deux cartes clés d'une cible (cadre plein), un add-on et un enabler (pointillés), une carte épinglée
   (◆, blanc), une qui ne sert à rien, et une qu'aucun guide de cible ne nomme mais qui est sur 3 des 5 plateaux de la compo
   Firestone de Mech Magnet (pointillés « + M. Magnet 3/5 », par le pont).
-- Trois plateaux (liste déroulante) : 0, 1 et 3 cibles ; le bouton « Detail of target 1 / list » ouvre et ferme le détail.
+- Six scénarios (liste déroulante, tableau ci-dessus : chacun est une partie, cases et couleurs oubliées en changeant) ;
+  le bouton « Detail of target 1 / list » ouvre et ferme le détail.
+- La jauge de puissance sous la liste (liste déroulante « power … ») : les quatre paliers et deux cas sans donnée.
 - Un choix (liste déroulante) : ses options au-dessus de la rangée de Bob, comme dans le jeu, sous les étiquettes du
   plugin. Tant qu'il est ouvert, les cadres, étiquettes et ◇ des cartes de Bob et le panneau « Compositions » (et son popup)
   sont retirés de l'écran, puis remis tels quels à sa fermeture (`ChoiceCover`, comme le plugin).
@@ -74,7 +93,15 @@ leur mise en page et leur remplissage.
 ## Ce que vérifie `--selftest`
 
 Deux panneaux visibles et dans l'overlay ; une poignée et un cadre (seul le panneau des compositions se redimensionne) ;
-le mode déplacement ; 0, 1 et 3 cibles selon le plateau, de couleurs distinctes ; les cadres sur les cartes de Bob, pleins
+le mode déplacement ; 0, 1, 3, 2, 3 et 3 cibles selon le scénario, de couleurs distinctes ; **les cases** (scénario 5,
+cases cliquées dans la ligne du guide nommé) : la cochée en tête, la compo en cours gardée dans sa couleur avec « in
+progress », le pari parti, les cadres de Bob qui suivent, « 1 chosen » puis « 2 chosen », − et + grisés sans effet, tout
+décocher rend les mêmes cibles dans les mêmes couleurs ; **les tribus du lobby** (scénarios 3 et 4) : aucune cible, ligne
+ni cadre d'un guide d'une tribu absente (calculé sur les données de la simulation, pas pris à `LobbyGuides`), la ligne de
+journal qui les nomme ; lobby inconnu : rien d'écarté et la ligne « Lobby tribes unknown » ; une case cochée lobby
+inconnu puis écartée une fois le lobby connu : décochée, une ligne `unticked`, plus cible ; **la jauge de puissance**,
+pour chaque scène : badge, signe et pourcentage, couleur, segment allumé à sa place, chiffres écrits, rien de coupé ;
+sans donnée, tout gris et « – » ; les cadres sur les cartes de Bob, pleins
 et pointillés, tels que `TavernHighlights` les demande ; un clic sur le nom d'une cible ouvre son détail, « ← All comp
 guides » rend la liste ; les sections du détail dans l'ordre de HDT et « k of n sections » quand il en manque ; **aucun
 texte du panneau sous 12 px × échelle, aucun texte coupé** (liste et détail : l'encre de chaque texte, pas sa boîte, doit

@@ -230,6 +230,26 @@ internal static class HdtEntityAdapter
             : races.Select(r => GuideTribes.NameOrEnum((int)r, r.ToString())).Where(Tribes.All.Contains).Distinct().OrderBy(r => r, StringComparer.Ordinal).ToList();
     }
 
+    /// <summary>
+    /// A card's tribes from HearthDb (Card.Race and Card.SecondaryRace, a dual type's second tribe), by value
+    /// (GuideTribes.NameOrEnum: "BEAST", never "PET"), "ALL" for an amalgam; empty for a card without tribe; null for a card
+    /// HearthDb does not know (LobbyGuides never holds an unknown card against a guide). For LobbyGuides: which key cards can
+    /// show up in this lobby.
+    /// </summary>
+    public static IReadOnlyCollection<string>? CardTribes(string cardId)
+    {
+        if (!HearthDb.Cards.All.TryGetValue(cardId, out var card))
+        {
+            return null;
+        }
+
+        return new[] { card.Race, card.SecondaryRace }
+            .Where(r => r != Race.INVALID && r != Race.BLANK)
+            .Select(r => GuideTribes.NameOrEnum((int)r, r.ToString()))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
     private static Dictionary<string, string>? _cardIdsByName;
 
     /// <summary>Card name (English or French, any case) → card id, Battlegrounds pool minions first.</summary>

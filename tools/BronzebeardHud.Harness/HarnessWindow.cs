@@ -46,6 +46,11 @@ internal sealed class HarnessWindow : Window
     private readonly string _folder;
     private CompGuideSet _guides = CompGuideSet.Empty(CompGuideSources.HdtFree);
 
+    // The guides the scenario's lobby can play (LobbyGuides), as Plugin.UpdateLobby narrows HDT's list.
+    private LobbyGuides _lobby = LobbyGuides.Unknown(CompGuideSet.Empty(CompGuideSources.HdtFree));
+    private string _lobbyKey = string.Empty;
+    private string _power = "even";
+
     // The bridge to the synthetic Firestone compositions and the hero's figures on them, as Plugin.UpdateBridge computes them.
     private IReadOnlyDictionary<string, GuideEvidence>? _bridge;
     private readonly IReadOnlyDictionary<string, HeroCompPick> _heroEffects = HeroCompAffinity.Effects(HarnessData.Hero, HarnessData.FirestoneComps);
@@ -64,6 +69,41 @@ internal sealed class HarnessWindow : Window
 
     /// <summary>The targets of the scene as it stands (the panel's colours).</summary>
     public IReadOnlyList<CompTarget> Targets => _tracker.Targets;
+
+    /// <summary>The guides the scenario's lobby can play, and the ones it leaves out.</summary>
+    public LobbyGuides Lobby => _lobby;
+
+    /// <summary>The board held (HarnessData.Scenarios).</summary>
+    public int Scenario => _scenario;
+
+    /// <summary>The board's power scene under the list (HarnessData.Power).</summary>
+    public string PowerScene => _power;
+
+    /// <summary>
+    /// Holds another scenario's cards in its lobby (the bar's list, the self-test). A scenario is a game of its own: ticks and
+    /// colours are forgotten, as the plugin forgets them at the next game (CompTargetTracker.BeginGame), unless
+    /// <paramref name="sameGame"/> (the lobby becoming known in the same game, say).
+    /// </summary>
+    public void SetScenario(int scenario, bool sameGame = false)
+    {
+        _scenario = Math.Max(0, Math.Min(HarnessData.Scenarios.Count - 1, scenario));
+        if (!sameGame)
+        {
+            _tracker.BeginGame(++_game);
+        }
+
+        Refresh();
+    }
+
+    private int _game;
+
+    /// <summary>Shows another board's power under the list (HarnessData.PowerScenes).</summary>
+    public void SetPower(string scene)
+    {
+        HarnessData.Power(scene); // an unknown name throws here, before anything changes
+        _power = scene;
+        Refresh();
+    }
 
     /// <summary>How many automatic targets are wanted (the panel's − n +): what a click on − or + would change.</summary>
     public int Count => _count;
@@ -183,6 +223,17 @@ internal sealed class HarnessWindow : Window
         Directory.CreateDirectory(_folder);
         LayoutPath = options.Layout ?? Path.Combine(_folder, "layout.json");
         _scenario = Math.Max(0, Math.Min(HarnessData.Scenarios.Count - 1, options.Scenario));
+        if (options.Power != null)
+        {
+            if (HarnessData.PowerScenes.Contains(options.Power))
+            {
+                _power = options.Power;
+            }
+            else
+            {
+                Log.Warn($"--power {options.Power}: expected {string.Join(", ", HarnessData.PowerScenes)}"); // the self-test's log check reports it
+            }
+        }
 
         Log.Written += line => Dispatcher.BeginInvoke(new Action(() => AppendLog(line)));
         AssetDownloaders.Initialize(Path.Combine(_folder, "images"));
@@ -193,7 +244,7 @@ internal sealed class HarnessWindow : Window
 
         _mover = new PanelMover(Overlay, LayoutPath);
         Comps = new CompsPanel(Overlay, _mover, ToggleGuide, () => _count, ChangeCount, () => Log.Info("Meta clicked"),
-            guide => GuidePivots.For(guide, _guides, Held()),
+            guide => GuidePivots.For(guide, _lobby.Playable, Held()),
             (guide, fit) => Log.Info($"comp detail id={guide.Id} sections={fit.Shown.Count} of {fit.Total}"),
             guide => TargetContext.For(guide, _bridge, _heroEffects),
             action => action(),
@@ -230,12 +281,12 @@ internal sealed class HarnessWindow : Window
     }
 
     /// <summary>How many pivots a guide's detail lists (GuidePivots, as the panel asks them).</summary>
-    public int PivotCount(CompGuide guide) => GuidePivots.For(guide, _guides, Held()).Count;
+    public int PivotCount(CompGuide guide) => GuidePivots.For(guide, _lobby.Playable, Held()).Count;
 
     private HashSet<string> Held() => new(HarnessData.Scenarios[_scenario].Cards.All.Select(c => c.CardId), StringComparer.Ordinal);
 
     /// <summary>The targets a scenario gives with the current ticks and count, without changing the scene (the self-test asks).</summary>
-    public int TargetCount(int scenario)
+    public IReadOnlyList<CompTarget> TargetsOf(int scenario)
     {
         var probe = new CompTargetTracker();
         foreach (var id in _tracker.Ticked)
@@ -243,7 +294,8 @@ internal sealed class HarnessWindow : Window
             probe.Toggle(id);
         }
 
-        return probe.Next(CompGuideMatch.Rank(_guides, HarnessData.Scenarios[scenario].Cards, _count), _count).Count;
+        var (_, cards, lobby) = HarnessData.Scenarios[scenario];
+        return CompTargets.Round(LobbyGuides.Of(_guides, lobby, HarnessData.CardTribes), cards, probe, _count).Targets;
     }
 
     /// <summary>Shows the panel and the markers again from the current board, count and ticks: what a game update does in the plugin.</summary>
@@ -251,11 +303,18 @@ internal sealed class HarnessWindow : Window
     {
         _guides = HarnessData.Guides(id => Database.GetCardFromId(id)?.LocalizedName ?? id);
         UpdateBridge();
-        var cards = HarnessData.Scenarios[_scenario].Cards;
-        var board = CompGuideMatch.Rank(_guides, cards, _count);
-        var targets = _tracker.Next(board, _count);
-        Comps.Show(board, targets, cards.All.Select(c => c.CardId), CompGuideSources.HdtFree, null);
-        Comps.SetFooter("Board 142 · hero avg 120 at turn 8 · +18%");
+        var (_, cards, tribes) = HarnessData.Scenarios[_scenario];
+        UpdateLobby(tribes);
+        var round = CompTargets.Round(_lobby, cards, _tracker, _count); // as Plugin.UpdateComps: the lobby's guides only
+        foreach (var unticked in round.Unticked)
+        {
+            Log.Info(unticked);
+        }
+
+        var targets = round.Targets;
+        var note = !_lobby.Known && _lobby.All.Count > 0 ? "Lobby tribes unknown: every guide listed" : null;
+        Comps.Show(round.Board, targets, cards.All.Select(c => c.CardId), CompGuideSources.HdtFree, null, note);
+        Comps.SetFooter(HarnessData.Power(_power));
         DrawScene(); // Bob's cards by name, once the names are known
         Highlights = TavernHighlights.For(HarnessData.Shop, targets, _bridge);
         var line = TavernHighlights.Summary(HarnessData.Shop, Highlights);
@@ -272,6 +331,23 @@ internal sealed class HarnessWindow : Window
         }
 
         UpdateChoice(targets, cards);
+    }
+
+    /// <summary>
+    /// The guides the lobby can play, as Plugin.UpdateLobby narrows them: again when the guides or the tribes change, with
+    /// the plugin's log line.
+    /// </summary>
+    private void UpdateLobby(IReadOnlyList<string> tribes)
+    {
+        var key = string.Join(",", _guides.All.Select(g => g.Id)) + "|" + string.Join(",", tribes);
+        if (key == _lobbyKey)
+        {
+            return;
+        }
+
+        _lobbyKey = key;
+        _lobby = LobbyGuides.Of(_guides, tribes, HarnessData.CardTribes);
+        Log.Info(_lobby.Line($"scenario {_scenario}"));
     }
 
     /// <summary>
@@ -295,8 +371,8 @@ internal sealed class HarnessWindow : Window
 
     /// <summary>
     /// The choice open above the scene, advised as Plugin.UpdateChoice advises it: ChoiceAdvisor on the board and hand, the
-    /// targets, HDT's guides and the bridge, then the panel, then the plugin's diagnostic line. The lobby's tribes are unknown
-    /// here (empty: no guide is left out), and the trinket stats are the harness's (HarnessData.TrinketStat, for HarnessData.Bracket).
+    /// targets, the guides the scenario's lobby can play and the bridge, then the panel, then the plugin's diagnostic line.
+    /// The trinket stats are the harness's (HarnessData.TrinketStat, for HarnessData.Bracket).
     /// </summary>
     private void UpdateChoice(IReadOnlyList<CompTarget> targets, PlayerCards cards)
     {
@@ -318,7 +394,7 @@ internal sealed class HarnessWindow : Window
             return;
         }
 
-        var advice = ChoiceAdvisor.Advise(options, cards.All, targets, _guides, Array.Empty<string>(), HarnessData.TrinketStat, HarnessData.Bracket, _bridge);
+        var advice = ChoiceAdvisor.Advise(options, cards.All, targets, _lobby.Playable, _lobby.Tribes, HarnessData.TrinketStat, HarnessData.Bracket, _bridge);
         Choice = advice;
         if (advice.HasMarkers)
         {
@@ -414,9 +490,12 @@ internal sealed class HarnessWindow : Window
         var board = new ComboBox { ItemsSource = HarnessData.Scenarios.Select(s => s.Name).ToList(), Width = 220, Margin = new Thickness(0, 0, 14, 0), SelectedIndex = _scenario };
         board.SelectionChanged += (_, _) =>
         {
-            _scenario = board.SelectedIndex;
-            Refresh();
+            SetScenario(board.SelectedIndex);
         };
+
+        var power = new ComboBox { ItemsSource = HarnessData.PowerScenes.Select(p => "power " + p).ToList(), Width = 120, Margin = new Thickness(0, 0, 14, 0) };
+        power.SelectedIndex = Math.Max(0, HarnessData.PowerScenes.ToList().IndexOf(_power));
+        power.SelectionChanged += (_, _) => SetPower(HarnessData.PowerScenes[power.SelectedIndex]);
 
         var choice = new ComboBox { ItemsSource = HarnessData.Choices.Select(c => c.Label).ToList(), Width = 110, Margin = new Thickness(0, 0, 14, 0) };
         choice.SelectedIndex = Math.Max(0, HarnessData.Choices.Select(c => c.Kind).ToList().IndexOf(_choiceKind));
@@ -461,7 +540,7 @@ internal sealed class HarnessWindow : Window
         };
 
         var bar = new WrapPanel { Margin = new Thickness(8) };
-        foreach (var element in new UIElement[] { move, reset, size, board, choice, skip, detail, clear })
+        foreach (var element in new UIElement[] { move, reset, size, board, power, choice, skip, detail, clear })
         {
             bar.Children.Add(element);
         }

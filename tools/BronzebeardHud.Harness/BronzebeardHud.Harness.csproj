@@ -32,6 +32,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\PanelMover.cs" Link="Plugin\PanelMover.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\CompsPanel.cs" Link="Plugin\CompsPanel.cs" />
+    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\BoardPowerView.cs" Link="Plugin\BoardPowerView.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\GuideView.cs" Link="Plugin\GuideView.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\GuidePopup.cs" Link="Plugin\GuidePopup.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\TavernMarkers.cs" Link="Plugin\TavernMarkers.cs" />

@@ -13,7 +13,8 @@ namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
 /// The single "Compositions" panel (Ali, 2026-10-04: the two panels of before said the same thing twice, and HDT's way of
-/// showing a guide reads better): HDT's own comp guides, grouped by tier as HDT groups them, the targets first in their tier
+/// showing a guide reads better): HDT's own comp guides that the lobby can play (LobbyGuides: a guide of an absent tribe is
+/// not listed), grouped by tier as HDT groups them, the targets first in their tier
 /// (CompTargets.Tiers), each guide on one line — its tick box, its name, its core cards as ovals (held: green ring and
 /// tick). A target carries its colour (CompTargetTracker.Palette): a 3 px bar on the left, a tint, its rank in a round
 /// badge, its name in bold in that colour; the frames on Bob's cards and the labels of choices use the same colour. A click
@@ -75,7 +76,9 @@ internal sealed class CompsPanel
     private HashSet<string> _held = new(StringComparer.Ordinal);
     private string? _source;
     private string? _status;
-    private string? _footer;
+    private string? _note;
+    private WarbandComparison? _footer;
+    private string? _footerKey;
     private string? _loggedDetail;
 
     // A redraw was asked while a choice hid the panel (Suspend): it is redrawn when it comes back, not merely shown again.
@@ -185,30 +188,34 @@ internal sealed class CompsPanel
     /// <summary>When false, no tick boxes (the comp-selection feature was switched off by its guard).</summary>
     public bool SelectionEnabled { get; set; } = true;
 
-    /// <param name="board">HDT's guides ranked against the player's board and hand (CompGuideMatch.Rank).</param>
+    /// <param name="board">The lobby's guides ranked against the player's board and hand (CompTargets.Round: LobbyGuides.Playable).</param>
     /// <param name="targets">The targets and their colours (CompTargetTracker.Next).</param>
     /// <param name="held">Base card ids of the player's board and hand: the green rings.</param>
     /// <param name="source">CompGuideSources.HdtFree or HdtTier7; null when HDT shows no guides.</param>
     /// <param name="status">Why there are no guides (HDT's state), or null.</param>
-    public void Show(CompGuideBoard board, IReadOnlyList<CompTarget> targets, IEnumerable<string> held, string? source, string? status)
+    /// <param name="note">A muted line under the title ("Lobby tribes unknown: every guide listed"), or null.</param>
+    public void Show(CompGuideBoard board, IReadOnlyList<CompTarget> targets, IEnumerable<string> held, string? source, string? status, string? note = null)
     {
         _board = board;
         _targets = targets;
         _held = new HashSet<string>(held, StringComparer.Ordinal);
         _source = source;
         _status = status;
+        _note = note;
         IsVisible = true;
         Relayout();
     }
 
-    /// <summary>A last line under the list (the warband against its curve); null for none.</summary>
-    public void SetFooter(string? footer)
+    /// <summary>The board's power under the list (BoardPowerView, from WarbandCurve.Compare); null for none.</summary>
+    public void SetFooter(WarbandComparison? footer)
     {
-        if (footer == _footer)
+        var key = footer == null ? null : footer.Line + "|" + footer.PowerText;
+        if (key == _footerKey)
         {
             return;
         }
 
+        _footerKey = key;
         _footer = footer;
         if (IsVisible)
         {
@@ -411,7 +418,18 @@ internal sealed class CompsPanel
 
         var colour = target != null ? HexBrush.Of(target.Colour) : row.Score > 0 ? Brushes.White : MutedBrush;
         var name = Text(guide.Name, PanelTypography.CompositionName, scale, colour, bold: target != null);
-        var nameCell = new Border { Background = Brushes.Transparent, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(0, 0, 6 * scale, 0), Child = name };
+        FrameworkElement nameContent = name;
+        if (target?.Kind == TargetKind.InProgress)
+        {
+            // Kept beside a ticked guide because it is being built (two key cards held): said under its name, so that a
+            // coloured line nobody ticked does not read as a tick that did not take.
+            var names = new StackPanel();
+            names.Children.Add(name);
+            names.Children.Add(Text("in progress", PanelTypography.Small, scale, MutedBrush));
+            nameContent = names;
+        }
+
+        var nameCell = new Border { Background = Brushes.Transparent, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(0, 0, 6 * scale, 0), Child = nameContent };
         if (open != null)
         {
             nameCell.Cursor = System.Windows.Input.Cursors.Hand;
@@ -489,8 +507,9 @@ internal sealed class CompsPanel
             right.Children.Add(meta);
         }
 
-        // Ticked guides are the targets, alone: the number of automatic targets no longer applies, so − and + are dim and
-        // the title counts what was chosen.
+        // A tick silences the automatic guesses, which − n + counts: with a guide ticked, the targets are the ticked guides and
+        // the guides in progress (CompTargets.Choose), − and + have nothing to change, so they are dim and the title counts
+        // what was chosen.
         var chosen = _targets.Count(t => t.Ticked);
         var n = chosen > 0 ? chosen : _count();
         right.Children.Add(PanelButton("−", scale, () => _changeCount(-1), enabled: chosen == 0));
@@ -592,6 +611,14 @@ internal sealed class CompsPanel
             chrome.Add(status);
         }
 
+        TextBlock? note = null;
+        if (!string.IsNullOrEmpty(_note))
+        {
+            note = Text(_note!, PanelTypography.Small, scale, MutedBrush);
+            note.Margin = new Thickness(0, 4 * scale, 0, 0);
+            chrome.Add(note);
+        }
+
         var pieces = new List<(FrameworkElement Element, Action? FillOvals, CompGuideItemKind Kind, int Group, bool Target, string? GuideId)>();
         var tiers = CompTargets.Tiers(_board, _targets);
         for (var g = 0; g < tiers.Count; g++)
@@ -604,12 +631,8 @@ internal sealed class CompsPanel
             }
         }
 
-        TextBlock? footer = null;
-        if (!string.IsNullOrEmpty(_footer))
-        {
-            footer = Text(_footer!, PanelTypography.Small, scale, Brushes.White, bold: true);
-            footer.Margin = new Thickness(0, 4 * scale, 0, 0);
-        }
+        // The board's power: chrome, as the warband line was, so that guide lines give way before it does.
+        var footer = _footer != null ? BoardPowerView.Build(_footer, scale) : null;
 
         // Measured in place, so that the canvas's inherited font applies: the heights are the ones drawn.
         foreach (var element in chrome.Concat(pieces.Select(p => p.Element)).Concat(footer != null ? new FrameworkElement[] { footer } : Array.Empty<FrameworkElement>()))
@@ -619,9 +642,14 @@ internal sealed class CompsPanel
 
         lines.Measure(new Size(inner, double.PositiveInfinity));
         var used = chrome.Sum(e => e.DesiredSize.Height) + (footer?.DesiredSize.Height ?? 0);
-        var fit = CompGuideLayout.Fit(
-            pieces.Select(p => new CompGuideFitItem(p.Kind, p.Group, p.Element.DesiredSize.Height, p.Target)).ToList(),
-            room - used, moreLineHeight: 0, atLeastOne: true);
+        var items = pieces.Select(p => new CompGuideFitItem(p.Kind, p.Group, p.Element.DesiredSize.Height, p.Target)).ToList();
+        if (note != null && !CompGuideLayout.KeepsOptionalLine(items, room - used + note.DesiredSize.Height, note.DesiredSize.Height))
+        {
+            chrome.Remove(note); // the note gives way to a target's line, never the reverse
+            used -= note.DesiredSize.Height;
+        }
+
+        var fit = CompGuideLayout.Fit(items, room - used, moreLineHeight: 0, atLeastOne: true);
 
         lines.Children.Clear();
         foreach (var element in chrome)

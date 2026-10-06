@@ -74,16 +74,94 @@ internal static class HarnessData
         new("Beast Deathrattle", 4, 20, new[] { 19, 24, 25 }, new[] { 23 }, new[] { 22 }),
     };
 
-    /// <summary>What the player holds, as the plugin sees it: board then hand; 0, 1 and 3 targets with three targets wanted.</summary>
-    public static IReadOnlyList<(string Name, PlayerCards Cards)> Scenarios { get; } = new[]
+    /// <summary>
+    /// The lobby of the first scenarios: five tribes, as a game has, so that seven of the fifteen guides (murlocs, demons,
+    /// quilboar, naga, dragons, aberrations) are left out of the list.
+    /// </summary>
+    public static readonly string[] Lobby = { "BEAST", "ELEMENTAL", "MECHANICAL", "PIRATE", "UNDEAD" };
+
+    /// <summary>A lobby without undead nor dragons: the three guides that list the neutral card <c>Pool[0]</c> as a key card are left out.</summary>
+    public static readonly string[] LobbyWithoutUndead = { "BEAST", "ELEMENTAL", "MECHANICAL", "MURLOC", "PIRATE" };
+
+    /// <summary>
+    /// What the player holds, as the plugin sees it (board then hand), and the lobby's tribes (empty: not known yet).
+    /// 0, 1 and 3 targets with three targets wanted; then the two bugs of 2026-10-06:
+    /// - "A neutral key card of absent tribes": <c>Pool[0]</c>, made neutral here (<see cref="CardTribes"/>), is a key card of
+    ///   Undead Butcher, Undead Attack and Dragon Shields, none of which the lobby can play: with the filter, only Mech Magnet
+    ///   and Mech Divine Shield (13 and 14) are targets; without it, Undead Attack (key card 0 and enabler 13) was the third;
+    /// - "The lobby not known yet": the neutral card and a mech key card, the tribes unknown: nothing is left out (Undead
+    ///   Attack, Mech Magnet and Undead Butcher are the targets, in two tiers), and the panel says so — unless its note would
+    ///   push a target out of the list at the default size, which it does with three targets and not with one;
+    /// - "Ticks: in progress and guesses": Elemental Cycle has two key cards held (40, 41: in progress); 19 and 6 are one key
+    ///   card each of Beast Deathrattle, Beast Pack, Mech Divine Shield and Pirate Discover (guesses). Ticking Pirate Discover
+    ///   keeps Elemental Cycle, silences Beast Deathrattle.
+    /// </summary>
+    public static IReadOnlyList<(string Name, PlayerCards Cards, IReadOnlyList<string> Lobby)> Scenarios { get; } = new (string, PlayerCards, IReadOnlyList<string>)[]
     {
-        ("Nothing yet", PlayerCards.None),
-        ("Two cards of one composition", Hold(board: new[] { 40, 41 }, hand: Array.Empty<int>())),               // Elemental Cycle only
-        ("A strong board, one in hand", Hold(board: new[] { 6, 7, 8, 13, 14 }, hand: new[] { 9 })),             // Pirate Discover, Mech Magnet, Mech Divine Shield
+        ("Nothing yet", PlayerCards.None, Lobby),
+        ("Two cards of one composition", Hold(board: new[] { 40, 41 }, hand: Array.Empty<int>()), Lobby),         // Elemental Cycle only
+        ("A strong board, one in hand", Hold(board: new[] { 6, 7, 8, 13, 14 }, hand: new[] { 9 }), Lobby),       // Pirate Discover, Mech Magnet, Mech Divine Shield
+        ("A neutral key card of absent tribes", Hold(board: new[] { 0, 13, 14 }, hand: Array.Empty<int>()), LobbyWithoutUndead),
+        ("The lobby not known yet", Hold(board: new[] { 0, 13 }, hand: Array.Empty<int>()), Array.Empty<string>()),
+        ("Ticks: in progress and guesses", Hold(board: new[] { 40, 41, 19 }, hand: new[] { 6 }), Lobby),
     };
 
     /// <summary>Targets each scenario must give with three targets wanted (the self-test checks it).</summary>
-    public static readonly int[] ExpectedTargets = { 0, 1, 3 };
+    public static readonly int[] ExpectedTargets = { 0, 1, 3, 2, 3, 3 };
+
+    /// <summary>The scenario of the scene by default (<c>--scenario</c>): three targets.</summary>
+    public const int DefaultScenario = 2;
+
+    /// <summary>
+    /// The synthetic tribes of a card of <see cref="Pool"/>, as LobbyGuides asks them (HearthDb's in the plugin): the tribe of
+    /// the first guide listing it as a key card, else of the first guide listing it at all; <c>Pool[0]</c> is neutral (a key
+    /// card of guides of two tribes, as Titus Rivendare is in HSReplay's guides); null for a card no guide lists.
+    /// </summary>
+    public static IReadOnlyCollection<string>? CardTribes(string cardId)
+    {
+        var index = Array.IndexOf(Pool, cardId);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        if (index == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var spec = Specs.FirstOrDefault(s => s.Core.Contains(index)) ?? Specs.FirstOrDefault(s => s.Addons.Contains(index) || s.Enablers.Contains(index));
+        return spec == null ? null : GuideTribes.NameOf(spec.Tribe) is { } name ? new[] { name } : Array.Empty<string>();
+    }
+
+    /// <summary>The board's power scenes (<c>--power</c>, the self-test): a level, or none for lack of data.</summary>
+    public static IReadOnlyList<string> PowerScenes { get; } = new[] { "behind", "even", "ahead", "shiny", "none", "early" };
+
+    /// <summary>
+    /// The board's power for a scene, as Plugin.UpdateWarband computes it (WarbandCurve.Compare) on an invented curve for
+    /// <see cref="Hero"/> (×1.8 a turn, 120 at turn 8; nothing from Firestone): boards of 80, 142, 190 and 260 at turn 8 give
+    /// the four levels; "none" is a hero without curve, "early" turn 2 (an average of 6, under the minimum).
+    /// </summary>
+    public static WarbandComparison Power(string scene)
+    {
+        var sources = new[] { HeroStats };
+        return scene switch
+        {
+            "behind" => WarbandCurve.Compare(8, 80, Hero, sources),
+            "ahead" => WarbandCurve.Compare(8, 190, Hero, sources),
+            "shiny" => WarbandCurve.Compare(8, 260, Hero, sources),
+            "none" => WarbandCurve.Compare(8, 142, "TB_BaconShop_HERO_28", sources),
+            "early" => WarbandCurve.Compare(2, 3, Hero, sources),
+            "even" => WarbandCurve.Compare(8, 142, Hero, sources),
+            _ => throw new ArgumentException($"--power {scene}: expected {string.Join(", ", PowerScenes)}"),
+        };
+    }
+
+    private static readonly HeroStatsFile HeroStats = new(StatsSources.Firestone, new[]
+    {
+        new HeroStat(Hero, 4.1, 1000, warbandCurve: new[] { (1, 4.0), (2, 6.0), (3, 11.0), (4, 19.0), (5, 35.0), (6, 37.0), (7, 67.0), (8, 120.0), (9, 216.0), (10, 389.0) }
+            .Select(p => new WarbandPoint(p.Item1, p.Item2)).ToList()),
+    });
 
     /// <summary>
     /// Bob's row for the scene: with the third scenario's targets, a core card of a target not held yet (16, Mech Divine

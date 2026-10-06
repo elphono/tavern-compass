@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using BronzebeardHud.HdtPlugin;
 using BronzebeardHud.Stats;
 using BronzebeardHud.Stats.Tests;
 using Rectangle = System.Windows.Shapes.Rectangle;
@@ -36,6 +37,25 @@ internal static class SelfTest
         var checks = new List<(string Name, bool Ok, string Detail)>();
         void Check(string name, bool ok, string detail) => checks.Add((name, ok, detail));
 
+        // A group of checks that throws (a line it looks for is not drawn, say) is one failed check, and the others still
+        // run: a self-test that stops on an exception writes no report, and its "detection" says nothing about what broke.
+        void Group(string name, Action<HarnessWindow, Action<string, bool, string>> group)
+        {
+            try
+            {
+                group(window, Check);
+            }
+            catch (Exception e)
+            {
+                Check($"{name}: ran to the end", false, $"{e.GetType().Name}: {e.Message} at {e.StackTrace?.Split('\n').FirstOrDefault(l => l.Contains("SelfTest"))?.Trim()}");
+                window.SetMoveMode(false);
+                window.CursorInside = null;
+                window.ShowChoice(ChoiceKind.None);
+                window.SetScenario(HarnessData.DefaultScenario);
+                window.UpdateLayout();
+            }
+        }
+
         var canvas = window.Overlay;
         var scale = TavernLayout.Scale(canvas.ActualHeight);
         var handles = canvas.Children.OfType<Border>().Where(b => Equals(b.Cursor, Cursors.SizeNWSE)).ToList();
@@ -56,8 +76,8 @@ internal static class SelfTest
         Check("one handle and one frame in move mode", handles.Count(h => h.Visibility == Visibility.Visible) == 1 && frames.Count == 1,
             $"{handles.Count(h => h.Visibility == Visibility.Visible)} visible handles, {frames.Count} frames");
 
-        var counts = Enumerable.Range(0, HarnessData.Scenarios.Count).Select(window.TargetCount).ToList();
-        Check("the scenarios give 0, 1 and 3 targets", counts.SequenceEqual(HarnessData.ExpectedTargets),
+        var counts = Enumerable.Range(0, HarnessData.Scenarios.Count).Select(s => window.TargetsOf(s).Count).ToList();
+        Check($"the scenarios give {string.Join(", ", HarnessData.ExpectedTargets)} targets", counts.SequenceEqual(HarnessData.ExpectedTargets),
             string.Join(", ", HarnessData.Scenarios.Select((s, i) => $"\"{s.Name}\": {counts[i]}")));
         var colours = window.Targets.Select(t => t.Colour).ToList();
         Check("the scene's targets have distinct colours", colours.Count == 3 && colours.Distinct().Count() == 3, CompTargets.Summary(window.Targets));
@@ -101,49 +121,14 @@ internal static class SelfTest
         Check("\"← All comp guides\" brings the list back", returned && !window.Comps.ShowsDetail && FindText(comps, name) != null && FindText(comps, "← All comp guides") == null,
             $"clicked: {returned}, detail shown: {window.Comps.ShowsDetail}");
 
-        // Ticking restricts: the boxes are clicked as the mouse would (their Click event); ticked guides are the targets, alone.
-        var autoTargets = window.Targets.Select(t => t.Guide.Id).ToList();
-        ClickBox(comps, firstUnticked: true);
-        window.UpdateLayout();
-        var one = window.Targets;
-        var oneGuide = one.FirstOrDefault()?.Guide.Id;
-        var framesOfOne = window.Highlights.Where(h => h.Kind != HighlightKind.None).Select(h => h.Target?.Guide.Id).Distinct().ToList();
-        Check("ticking a guide makes it the only target, and Bob's frames follow it", autoTargets.Count == 3 && one.Count == 1 && one[0].Ticked
-            && framesOfOne.All(id => id == oneGuide) && FindText(comps, "1 chosen") != null,
-            $"{autoTargets.Count} automatic targets, then {CompTargets.Summary(one)}; frames for {string.Join(",", framesOfOne)}; title: {(FindText(comps, "1 chosen") != null ? "1 chosen" : "not 1 chosen")}");
+        Group("ticks", TickChecks);
+        Group("lobby", LobbyChecks);
+        Group("board power", PowerChecks);
 
-        ClickBox(comps, firstUnticked: true);
-        window.UpdateLayout();
-        var two = window.Targets;
-        Check("ticking a second one adds it, in the order ticked", two.Count == 2 && two.All(t => t.Ticked) && two[0].Guide.Id == oneGuide && FindText(comps, "2 chosen") != null,
-            CompTargets.Summary(two));
-
-        // − and + are dim, and a click on either changes nothing. One at a time and on the count itself: the log lines of
-        // a click reach the window's list later, through the dispatcher, and − then + would cancel out.
-        var minus = FindText(comps, "−");
-        var plus = FindText(comps, "+");
-        var wanted = window.Count;
-        var clickedMinus = Click(comps, "−");
-        var afterMinus = window.Count;
-        var clickedPlus = Click(comps, "+");
-        window.UpdateLayout();
-        Check("− and + are dim and do nothing while a guide is ticked", clickedMinus && clickedPlus && afterMinus == wanted && window.Count == wanted
-            && minus?.Parent is Border { Opacity: < 1 } && plus?.Parent is Border { Opacity: < 1 } && window.Targets.Count == 2,
-            $"clicked: {clickedMinus}/{clickedPlus}, count {wanted} -> {afterMinus} -> {window.Count}, opacity {(minus?.Parent as Border)?.Opacity}/{(plus?.Parent as Border)?.Opacity}, {window.Targets.Count} targets");
-
-        ClickBox(comps, firstUnticked: false);
-        window.UpdateLayout();
-        ClickBox(comps, firstUnticked: false);
-        window.UpdateLayout();
-        var minusAgain = FindText(comps, "−");
-        Check("unticking everything gives the automatic targets back", window.Targets.Select(t => t.Guide.Id).SequenceEqual(autoTargets) && window.Targets.All(t => !t.Ticked)
-            && FindText(comps, "3 targets") != null && minusAgain?.Parent is Border { Opacity: 1 },
-            CompTargets.Summary(window.Targets));
-
-        ChoiceChecks(window, Check);
-        HoverChecks(window, Check);
-        ContextChecks(window, Check);
-        CoverChecks(window, Check);
+        Group("choices", ChoiceChecks);
+        Group("hover", HoverChecks);
+        Group("context line", ContextChecks);
+        Group("choice cover", CoverChecks);
 
         // The log lines reach the window through Dispatcher.BeginInvoke (HarnessWindow): read before they land, the list was
         // empty and the check passed on nothing. Let the dispatcher run what is queued first, then require lines.
@@ -159,6 +144,243 @@ internal static class SelfTest
                      + Environment.NewLine + (passed ? "ALL PASSED" : "FAILED") + Environment.NewLine;
         return (passed, report);
     }
+
+    /// <summary>
+    /// (Second bug of 2026-10-06, "when I click a checkbox it removes other compositions, I think the ones I was already
+    /// playing") A tick names where the player wants to go, and keeps what he is building. In the scenario "Ticks: in progress
+    /// and guesses" the automatic targets are Elemental Cycle (two key cards held: in progress), Beast Deathrattle and Pirate
+    /// Discover (one each: guesses). Ticking Pirate Discover makes it the first target, keeps Elemental Cycle in its colour
+    /// with "in progress" under its name, and silences Beast Deathrattle; Bob's frames follow; a second tick adds a chosen
+    /// guide; − and + are dim and do nothing; unticking everything gives back the automatic targets in the colours they had.
+    /// The boxes are clicked as the mouse would (their Click event), found in the line of the guide named, never by place.
+    /// </summary>
+    private static void TickChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var comps = window.Comps.Element;
+        window.SetScenario(5);
+        window.UpdateLayout();
+        static string Kinds(IEnumerable<CompTarget> targets) => string.Join("; ", targets.Select(t => $"{t.Rank}. {t.Guide.Name} {t.Colour} {t.Kind}"));
+        var auto = window.Targets.ToList();
+        var colourOf = auto.ToDictionary(t => t.Guide.Name, t => t.Colour);
+        var autoNames = new[] { "Elemental Cycle", "Beast Deathrattle", "Pirate Discover" };
+        check("ticks scene: the automatic targets are a guide in progress and two guesses",
+            auto.Select(t => t.Guide.Name).SequenceEqual(autoNames) && auto.All(t => t.Kind == TargetKind.Probable), Kinds(auto));
+
+        var clicked = ClickBoxOf(window, "Pirate Discover");
+        window.UpdateLayout();
+        var one = window.Targets.ToList();
+        var frames = window.Highlights.Where(h => h.Kind != HighlightKind.None).Select(h => h.Target?.Guide.Name).Distinct().ToList();
+        var caption = window.Comps.ShownLines.TryGetValue(window.GuideOf("Elemental Cycle")!.Id, out var inProgressLine)
+                      && Texts(inProgressLine).Any(t => t.IsVisible && Content(t) == "in progress");
+        var captions = Texts(comps).Count(t => t.IsVisible && Content(t) == "in progress");
+        check("ticking a guide: it comes first, the guide in progress stays in its colour and says so, the guess leaves; Bob's frames follow",
+            clicked && one.Select(t => (t.Guide.Name, t.Kind)).SequenceEqual(new[] { ("Pirate Discover", TargetKind.Chosen), ("Elemental Cycle", TargetKind.InProgress) })
+            && one.All(t => colourOf.TryGetValue(t.Guide.Name, out var c) && c == t.Colour) && caption && captions == 1
+            && frames.Count >= 2 && frames.All(n => n is "Pirate Discover" or "Elemental Cycle") && FindText(comps, "1 chosen") != null,
+            $"{Kinds(one)}; \"in progress\" under Elemental Cycle: {caption} ({captions} drawn); frames for [{string.Join(", ", frames)}]; "
+            + $"title: {(FindText(comps, "1 chosen") != null ? "1 chosen" : "not 1 chosen")}");
+
+        ClickBoxOf(window, "Undead Butcher");
+        window.UpdateLayout();
+        var two = window.Targets.ToList();
+        check("ticking a second one adds it after the first, the guide in progress still after them",
+            two.Select(t => (t.Guide.Name, t.Kind)).SequenceEqual(new[] { ("Pirate Discover", TargetKind.Chosen), ("Undead Butcher", TargetKind.Chosen), ("Elemental Cycle", TargetKind.InProgress) })
+            && FindText(comps, "2 chosen") != null, Kinds(two));
+
+        // − and + are dim, and a click on either changes nothing. One at a time and on the count itself: the log lines of
+        // a click reach the window's list later, through the dispatcher, and − then + would cancel out.
+        var minus = FindText(comps, "−");
+        var plus = FindText(comps, "+");
+        var wanted = window.Count;
+        var clickedMinus = Click(comps, "−");
+        var afterMinus = window.Count;
+        var clickedPlus = Click(comps, "+");
+        window.UpdateLayout();
+        check("− and + are dim and do nothing while a guide is ticked", clickedMinus && clickedPlus && afterMinus == wanted && window.Count == wanted
+            && minus?.Parent is Border { Opacity: < 1 } && plus?.Parent is Border { Opacity: < 1 } && window.Targets.Count == 3,
+            $"clicked: {clickedMinus}/{clickedPlus}, count {wanted} -> {afterMinus} -> {window.Count}, opacity {(minus?.Parent as Border)?.Opacity}/{(plus?.Parent as Border)?.Opacity}, {window.Targets.Count} targets");
+
+        ClickBoxOf(window, "Undead Butcher");
+        window.UpdateLayout();
+        ClickBoxOf(window, "Pirate Discover");
+        window.UpdateLayout();
+        var back = window.Targets.ToList();
+        var minusAgain = FindText(comps, "−");
+        // The same three in the same colours; Pirate Discover, a target all along, may keep its place ahead of Beast
+        // Deathrattle, tied with it (CompTargets.Choose: a target keeps its place at an equal score).
+        check("unticking everything gives the automatic targets back, in the colours they had",
+            back.Select(t => t.Guide.Name).OrderBy(n => n).SequenceEqual(autoNames.OrderBy(n => n))
+            && back.All(t => t.Kind == TargetKind.Probable && colourOf.TryGetValue(t.Guide.Name, out var c) && c == t.Colour)
+            && FindText(comps, "3 targets") != null && minusAgain?.Parent is Border { Opacity: 1 },
+            Kinds(back));
+
+        window.SetScenario(HarnessData.DefaultScenario);
+        window.UpdateLayout();
+    }
+
+    /// <summary>
+    /// Clicks the tick box of a guide's line, as the mouse would (its Click event); false when the line is not shown or has no
+    /// box: the check that asked fails and says so, rather than the whole self-test stopping on an exception.
+    /// </summary>
+    private static bool ClickBoxOf(HarnessWindow window, string guideName)
+    {
+        var line = window.GuideOf(guideName) is { } guide && window.Comps.ShownLines.TryGetValue(guide.Id, out var shown) ? shown : null;
+        var box = line == null ? null : Boxes(line).FirstOrDefault(b => b.IsVisible);
+        box?.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        return box != null;
+    }
+
+    /// <summary>
+    /// (First bug of 2026-10-06, "do not advise compositions with tribes absent from the game") (a) In a lobby without undead
+    /// or dragons, holding the neutral card that is a key card of Undead Butcher, Undead Attack and Dragon Shields: none of
+    /// them is a target, a line of the list or a frame on Bob's cards — the guides of absent tribes are worked out here from
+    /// the harness's data, not taken from LobbyGuides —, and the log line names them with why. (b) The same cards, the lobby
+    /// not known yet: nothing is left out (Undead Attack is a target: what (a) would have caught) and the panel says so.
+    /// (c) A guide ticked while the lobby was not known, which the lobby then turns out not to play: unticked, said once in
+    /// the log, never a target.
+    /// </summary>
+    private static void LobbyChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var comps = window.Comps.Element;
+        var guides = HarnessData.Guides(id => id).All;
+        FlushLog(window);
+        var logStart = window.LogLines.Count;
+
+        window.SetScenario(3);
+        window.UpdateLayout();
+        var lobby = HarnessData.Scenarios[3].Lobby;
+        bool Absent(CompGuide g) => GuideTribes.NameOf(g.PrimaryTribe) is { } tribe && !lobby.Contains(tribe);
+        var off = guides.Where(Absent).Select(g => g.Name).ToList();
+        var targets = window.Targets.ToList();
+        var drawn = Texts(comps).Where(t => t.IsVisible).Select(Content).ToList();
+        var offDrawn = drawn.Where(off.Contains).ToList();
+        var onDrawn = drawn.Count(text => guides.Any(g => g.Name == text && !Absent(g)));
+        var framed = window.Highlights.Where(h => h.Target != null).Select(h => h.Target!.Guide).Where(Absent).Select(g => g.Name).Distinct().ToList();
+        FlushLog(window);
+        var line = window.LogLines.Skip(logStart).FirstOrDefault(l => l.Contains("Bronzebeard HUD: lobby tribes=[BEAST,ELEMENTAL,MECHANICAL,MURLOC,PIRATE]")) ?? string.Empty;
+        check("lobby without undead or dragons: the neutral key card makes none of their guides a target, a line or a frame; the log says which and why",
+            off.Count >= 3 && targets.Select(t => t.Guide.Name).SequenceEqual(new[] { "Mech Magnet", "Mech Divine Shield" }) && targets.All(t => !Absent(t.Guide))
+            && offDrawn.Count == 0 && onDrawn >= 2 && framed.Count == 0 && line.Contains("Undead Attack (no UNDEAD)") && line.Contains("Dragon Shields (no DRAGON)"),
+            $"targets {CompTargets.Summary(targets)}; {off.Count} guides of absent tribes, {offDrawn.Count} drawn [{string.Join(", ", offDrawn)}], {onDrawn} playable names drawn; "
+            + $"frames for absent tribes [{string.Join(", ", framed)}]; log: {(line.IndexOf(">> ", StringComparison.Ordinal) is var at and >= 0 ? line.Substring(at + 3) : "no lobby line with these tribes")}");
+
+        // (b) Three targets in two tiers: at the default size the note would push the third out, so it gives way
+        // (CompGuideLayout.KeepsOptionalLine); with one target wanted (− twice) it has the room, and shows.
+        const string unknownNote = "Lobby tribes unknown: every guide listed";
+        window.SetScenario(4);
+        window.UpdateLayout();
+        var unknownTargets = window.Targets.ToList();
+        var targetLines = unknownTargets.Count(t => window.Comps.ShownLines.ContainsKey(t.Guide.Id));
+        var noteThree = FindText(comps, unknownNote) != null;
+        var fewer = Click(comps, "−") & Click(comps, "−");
+        window.UpdateLayout();
+        var noteOne = FindText(comps, unknownNote) != null;
+        var oneTarget = window.Targets.Count;
+        Click(comps, "+");
+        Click(comps, "+");
+        window.UpdateLayout();
+        check("lobby not known yet: nothing left out (Undead Attack is a target); the note says so, giving way to a target's line",
+            unknownTargets.Any(t => t.Guide.Name == "Undead Attack") && unknownTargets.Count == 3 && targetLines == 3 && !noteThree
+            && fewer && oneTarget == 1 && noteOne && window.Count == 3,
+            $"targets {CompTargets.Summary(unknownTargets)}, {targetLines} of their lines drawn, note {(noteThree ? "drawn" : "given way")}; "
+            + $"one target wanted: {oneTarget} target(s), note {(noteOne ? "drawn" : "missing")}; count back to {window.Count}");
+
+        window.Tick("Undead Attack");
+        window.UpdateLayout();
+        var tickedBefore = window.Targets.Any(t => t.Guide.Name == "Undead Attack" && t.Ticked);
+        FlushLog(window);
+        var before = window.LogLines.Count;
+        window.SetScenario(3, sameGame: true); // the same game: its lobby now known
+        window.UpdateLayout();
+        FlushLog(window);
+        var unticked = window.LogLines.Skip(before).Count(l => l.Contains("Bronzebeard HUD: unticked Undead Attack/11: no UNDEAD"));
+        check("a tick on a guide the lobby turns out not to play: dropped, said once, never a target",
+            tickedBefore && unticked == 1 && window.Targets.All(t => t.Guide.Name != "Undead Attack") && FindText(comps, "1 chosen") == null,
+            $"ticked while unknown: {tickedBefore}; {unticked} log line(s); targets {CompTargets.Summary(window.Targets)}");
+
+        window.SetScenario(HarnessData.DefaultScenario);
+        window.UpdateLayout();
+    }
+
+    /// <summary>
+    /// The board's power under the list (BoardPowerView), read from what is drawn: for each level, the badge in the level's
+    /// colour with its sign and percentage, the lit segment of the gauge at the level's place (red, yellow, green, gold),
+    /// the figures beside it; without data ("none": a hero without curve; "early": turn 2), a grey badge "–", no segment lit,
+    /// no colour, and the reason written. Texts at least 12 px and uncut, the indicator inside the panel, at the panel's
+    /// default width, which is also its minimum.
+    /// </summary>
+    private static void PowerChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var comps = window.Comps.Element;
+        var scale = TavernLayout.Scale(window.Overlay.ActualHeight);
+        var scenes = new (string Scene, int Lit, string Badge, string Text)[]
+        {
+            ("behind", 0, "▼ −33%", "Board 80 · hero avg 120 at turn 8"),
+            ("even", 1, "≈ +18%", "Board 142 · hero avg 120 at turn 8"),
+            ("ahead", 2, "▲ +58%", "Board 190 · hero avg 120 at turn 8"),
+            ("shiny", 3, "★ +117%", "Board 260 · hero avg 120 at turn 8"),
+            ("none", -1, "–", "Board 142 · no curve for this hero"),
+            ("early", -1, "–", "Board 3 · hero avg 6 at turn 2 · too early"),
+        };
+        var gaugeColours = new List<Color?>();
+        foreach (var (scene, lit, badgeText, text) in scenes)
+        {
+            window.SetPower(scene);
+            window.UpdateLayout();
+            var badge = Tagged(comps, BoardPowerView.BadgeTag).OfType<Border>().FirstOrDefault();
+            var segments = Enumerable.Range(0, 4).Select(i => Tagged(comps, BoardPowerView.GaugeTag + i).OfType<Border>().FirstOrDefault()).ToList();
+            var badgeColour = (badge?.Background as SolidColorBrush)?.Color;
+            var said = badge == null ? "none" : string.Join(" ", Texts(badge).Select(Content));
+            var litNow = segments.Select((s, i) => (s, i)).Where(x => x.s != null && Math.Abs(x.s.Opacity - 1) < 1e-9).Select(x => x.i).ToList();
+            var colours = segments.Select(s => (s?.Background as SolidColorBrush)?.Color).ToList();
+            var expectedColour = lit >= 0 ? colours[lit] : (Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(BoardPower.None));
+            if (scene == "even")
+            {
+                gaugeColours = colours;
+            }
+
+            var details = FindText(comps, text) != null;
+            var inside = badge != null && RectIn(badge, comps) is var r && r.Left >= -0.5 && r.Right <= comps.ActualWidth + 0.5 && r.Bottom <= comps.ActualHeight + 0.5;
+            var texts = TextProblems(comps, scale);
+            var ok = badge != null && segments.All(s => s != null) && said == badgeText && details && inside && texts.Problems.Count == 0
+                     && (lit >= 0
+                         ? litNow.SequenceEqual(new[] { lit }) && badgeColour == expectedColour && badgeColour == (Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(BoardPowerLevels.Gauge[lit]))
+                         : litNow.Count == 0 && badgeColour == expectedColour && colours.All(c => c == expectedColour));
+            check($"board power \"{scene}\": badge \"{badgeText}\" in its colour, gauge lit at {(lit >= 0 ? lit.ToString() : "nothing")}, the figures beside it, nothing cut",
+                ok, $"badge \"{said}\" {badgeColour}, lit [{string.Join(",", litNow)}], segments [{string.Join(" ", colours)}], figures {(details ? "drawn" : "missing")}, inside {inside}, "
+                    + $"{texts.Checked} texts checked" + Problems(texts.Problems));
+        }
+
+        check("board power: the gauge's four segments are four colours, red to gold, whatever the level",
+            gaugeColours.Count == 4 && gaugeColours.Distinct().Count() == 4
+            && gaugeColours.SequenceEqual(BoardPowerLevels.Gauge.Select(l => (Color?)(Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(l)))),
+            string.Join(" ", gaugeColours));
+
+        window.SetPower("even");
+        window.UpdateLayout();
+    }
+
+    /// <summary>The elements under <paramref name="root"/> whose Tag is <paramref name="tag"/>.</summary>
+    private static IEnumerable<FrameworkElement> Tagged(DependencyObject root, string tag)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is FrameworkElement element && Equals(element.Tag, tag))
+            {
+                yield return element;
+            }
+
+            foreach (var inner in Tagged(child, tag))
+            {
+                yield return inner;
+            }
+        }
+    }
+
+    /// <summary>An element's box in an ancestor's coordinates.</summary>
+    private static Rect RectIn(FrameworkElement element, FrameworkElement ancestor) =>
+        element.TransformToAncestor(ancestor).TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
 
     /// <summary>
     /// The labels of ChoiceAdvicePanel above each choice (discover, Dark Gift, trinket), on the scene's automatic targets:
