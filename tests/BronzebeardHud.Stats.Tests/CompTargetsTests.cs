@@ -39,18 +39,20 @@ public class CompTargetsTests
         var third = tracker.Next(CompGuideMatch.Rank(All, Board("V1", "V2", "Z1", "W1")), 3);
         Assert.Equal(new[] { ("Vile", P1), ("Zeal", P2), ("Wolf", P0) }, NamesAndColours(third));
 
-        // 4: Ursa is ticked, though nothing of it is held: it is the only target, the automatic ones are set aside.
+        // 4: Ursa is ticked, though nothing of it is held: it comes first. Vile, both of its key cards held, is in progress and
+        // stays a target with its colour; Zeal and Wolf, one key card each, were only guesses: set aside.
         Assert.True(tracker.Toggle(U.Id));
         var fourth = tracker.Next(CompGuideMatch.Rank(All, Board("V1", "V2", "Z1", "W1")), 3);
-        Assert.Equal(new[] { ("Ursa", P0) }, NamesAndColours(fourth));
-        Assert.Equal(new[] { true }, fourth.Select(t => t.Ticked));
+        Assert.Equal(new[] { ("Ursa", P0), ("Vile", P1) }, NamesAndColours(fourth));
+        Assert.Equal(new[] { TargetKind.Chosen, TargetKind.InProgress }, fourth.Select(t => t.Kind));
+        Assert.Equal(new[] { true, false }, fourth.Select(t => t.Ticked));
         Assert.Same(fourth, tracker.Targets);
 
-        // 5: Ursa is unticked: the automatic targets are back, and none of them kept a colour while they were set aside.
+        // 5: Ursa is unticked: the automatic targets are back; Vile kept its colour all along, Zeal and Wolf did not.
         Assert.True(tracker.Toggle(U.Id));
         var fifth = tracker.Next(CompGuideMatch.Rank(All, Board("V1", "V2", "Z1", "W1")), 3);
-        Assert.Equal(new[] { ("Vile", P0), ("Zeal", P1), ("Wolf", P2) }, NamesAndColours(fifth));
-        Assert.All(fifth, t => Assert.False(t.Ticked));
+        Assert.Equal(new[] { ("Vile", P1), ("Zeal", P0), ("Wolf", P2) }, NamesAndColours(fifth));
+        Assert.All(fifth, t => Assert.Equal(TargetKind.Probable, t.Kind));
     }
 
     [Fact]
@@ -67,27 +69,75 @@ public class CompTargetsTests
     }
 
     [Fact]
-    public void TickedGuides_AreTheOnlyTargets_InTheOrderTheyWereTicked_WhateverTheirScoreAndTheCount()
+    public void TickedGuides_ComeFirst_InTheOrderTheyWereTicked_ThenOnlyTheGuidesInProgress_WhateverTheCount()
     {
         var board = CompGuideMatch.Rank(All, Board("X1", "X2", "Y1", "Z1"));
 
         var chosen = CompTargets.Choose(board, new[] { U.Id, W.Id }, 3);
 
-        // Xeno, Yeti and Zeal score and would be the automatic targets: ticking Ursa and Wolf leaves them out.
-        Assert.Equal(new[] { ("Ursa", true), ("Wolf", true) }, chosen.Select(c => (c.Progress.Guide.Name, c.Ticked)));
+        // Xeno (both key cards held) is in progress; Yeti and Zeal (one each) were the speculative automatic targets: left out.
+        Assert.Equal(new[] { ("Ursa", TargetKind.Chosen), ("Wolf", TargetKind.Chosen), ("Xeno", TargetKind.InProgress) },
+            chosen.Select(c => (c.Progress.Guide.Name, c.Kind)));
         Assert.Equal(0.0, chosen[0].Progress.Score); // ticked: a target whatever its score
-        Assert.Equal(new[] { "Ursa", "Wolf" }, CompTargets.Choose(board, new[] { U.Id, W.Id }, 1).Select(c => c.Progress.Guide.Name));
-        Assert.Equal(new[] { "Ursa", "Wolf" }, CompTargets.Choose(board, new[] { U.Id, W.Id }, 4).Select(c => c.Progress.Guide.Name));
+        // The count sets the automatic guesses, which ticking silences: a guide in progress is no guess, whatever the count.
+        Assert.Equal(new[] { "Ursa", "Wolf", "Xeno" }, CompTargets.Choose(board, new[] { U.Id, W.Id }, 1).Select(c => c.Progress.Guide.Name));
+        Assert.Equal(new[] { "Ursa", "Wolf", "Xeno" }, CompTargets.Choose(board, new[] { U.Id, W.Id }, 4).Select(c => c.Progress.Guide.Name));
     }
 
     [Fact]
-    public void ATickedGuide_IsTheOnlyTarget_EvenWhenItIsAlsoTheMostProbable()
+    public void TickingTheGuideAlreadyFirst_KeepsTheOtherGuidesInProgress_AndOnlyThem()
     {
-        var board = CompGuideMatch.Rank(All, Board("X1", "X2", "Y1", "Z1"));
+        // As on 2026-10-06 17:14 in Ali's game: he ticked the first target, and the second one went away (he unticked 2 s later).
+        // Here the second has two key cards held: it stays, in its colour; the third, one key card, was a guess: it goes.
+        var tracker = new CompTargetTracker();
+        var board = CompGuideMatch.Rank(All, Board("X1", "X2", "Y1", "Y2", "Z1"));
+        Assert.Equal(new[] { ("Xeno", P0), ("Yeti", P1), ("Zeal", P2) }, NamesAndColours(tracker.Next(board, 3)));
 
-        var chosen = CompTargets.Choose(board, new[] { Y.Id }, 3);
+        tracker.Toggle(X.Id);
+        var ticked = tracker.Next(board, 3);
 
-        Assert.Equal(new[] { "Yeti" }, chosen.Select(c => c.Progress.Guide.Name)); // not Xeno, not Zeal
+        Assert.Equal(new[] { ("Xeno", P0), ("Yeti", P1) }, NamesAndColours(ticked));
+        Assert.Equal(new[] { TargetKind.Chosen, TargetKind.InProgress }, ticked.Select(t => t.Kind));
+    }
+
+    [Theory]
+    [InlineData(new[] { "X1" }, false)]             // one of two key cards: a guess
+    [InlineData(new[] { "X1", "X2" }, true)]        // two key cards
+    [InlineData(new[] { "X1", "X1_G" }, false)]     // the same card twice (a golden copy) is one key card
+    [InlineData(new[] { "SOLO" }, true)]            // a guide of one key card: holding it is all there is
+    public void InProgress_IsTwoKeyCardsHeld_OrTheOnlyOneOfAOneCardGuide(string[] held, bool expected)
+    {
+        var solo = Guide("Solo", 3, 0, new[] { "SOLO" });
+        var board = CompGuideMatch.Rank(Set(X, solo), Board(held));
+        var progress = board.All.Single(p => p.Guide.Name == (held[0] == "SOLO" ? "Solo" : "Xeno"));
+
+        Assert.Equal(expected, CompTargets.IsInProgress(progress));
+    }
+
+    [Fact]
+    public void WithTicks_GuidesInProgress_FillOnlyWhatFourTargetsLeave()
+    {
+        // Xeno, Yeti and Zeal are all in progress; three ticked guides leave room for one: the most probable.
+        var board = CompGuideMatch.Rank(All, Board("X1", "X2", "Y1", "Y2", "Z1", "Z2", "X1_G"));
+
+        var chosen = CompTargets.Choose(board, new[] { U.Id, W.Id, V.Id }, 3);
+
+        Assert.Equal(new[] { "Ursa", "Wolf", "Vile", "Xeno" }, chosen.Select(c => c.Progress.Guide.Name));
+    }
+
+    [Fact]
+    public void ATargetTiedWithANewcomer_KeepsItsPlace_UntilItIsBeaten_FourRounds()
+    {
+        // One automatic target. Ties used to go to HDT's order (Xeno before Yeti before Zeal), so the target jumped to Xeno as
+        // soon as one of its cards was bought, then back; a target now keeps its place against an equal score.
+        var tracker = new CompTargetTracker();
+        string Target(params string[] held) => tracker.Next(CompGuideMatch.Rank(All, Board(held)), 1).Single().Guide.Name;
+
+        Assert.Equal("Yeti", Target("Y1"));               // the only one that scores
+        Assert.Equal("Yeti", Target("Y1", "X1"));         // Xeno ties at 3: Yeti stays
+        Assert.Equal("Yeti", Target("Y1", "X1", "Z1"));   // a three-way tie: Yeti stays
+        Assert.Equal("Xeno", Target("Y1", "X1", "X2"));   // Xeno 6 against 3: beaten, it changes
+        Assert.Equal("Xeno", Target("Y1", "Y2", "X1", "X2")); // tied again at 6: the new target stays
     }
 
     [Fact]
@@ -118,7 +168,7 @@ public class CompTargetsTests
     }
 
     [Fact]
-    public void TickingRestricts_UntickingEverythingGivesBackTheAutomaticTargets_ThreeRounds()
+    public void TickingSilencesTheGuesses_UntickingEverythingGivesThemBack_ThreeRounds()
     {
         // Two rounds validate the transition; the third shows that nothing keeps the restriction alive.
         var tracker = new CompTargetTracker();
@@ -128,18 +178,18 @@ public class CompTargetsTests
         Assert.Equal(new[] { "Xeno", "Yeti", "Zeal" }, Names());       // nothing ticked: the probable ones
 
         tracker.Toggle(W.Id);
-        Assert.Equal(new[] { "Wolf" }, Names());                       // one ticked: that one alone
+        Assert.Equal(new[] { "Wolf", "Xeno" }, Names());               // one ticked: it, then Xeno, in progress
         tracker.Toggle(U.Id);
-        Assert.Equal(new[] { "Wolf", "Ursa" }, Names());               // two ticked: those two, in the order ticked
+        Assert.Equal(new[] { "Wolf", "Ursa", "Xeno" }, Names());       // two ticked: in the order ticked
         tracker.Toggle(W.Id);
-        Assert.Equal(new[] { "Ursa" }, Names());
+        Assert.Equal(new[] { "Ursa", "Xeno" }, Names());
         tracker.Toggle(U.Id);
         Assert.Equal(new[] { "Xeno", "Yeti", "Zeal" }, Names());       // nothing ticked again
 
         tracker.Toggle(Z.Id);
-        Assert.Equal(new[] { "Zeal" }, Names());                       // third round
+        Assert.Equal(new[] { "Zeal", "Xeno" }, Names());               // third round: Zeal, ticked, comes first
         tracker.Toggle(Z.Id);
-        Assert.Equal(new[] { "Xeno", "Yeti", "Zeal" }, Names());
+        Assert.Equal(new[] { "Xeno", "Zeal", "Yeti" }, Names());       // Zeal, a target until now, keeps its place over Yeti (both 3)
         Assert.All(tracker.Targets, t => Assert.False(t.Ticked));
     }
 
@@ -156,13 +206,13 @@ public class CompTargetsTests
     }
 
     [Fact]
-    public void Untick_TheGuideStaysATargetWhenItIsProbable_WithItsColour_AndTheOthersJoinIt()
+    public void Untick_TheGuideStaysATargetWhenItIsProbable_WithItsColour_AndTheOthersKeepTheirs()
     {
         var tracker = new CompTargetTracker();
         var board = CompGuideMatch.Rank(All, Board("X1", "X2", "Y1"));
         tracker.Toggle(Y.Id);
         var ticked = tracker.Next(board, 2);
-        Assert.Equal(new[] { ("Yeti", P0) }, NamesAndColours(ticked)); // ticked: alone
+        Assert.Equal(new[] { ("Yeti", P0), ("Xeno", P1) }, NamesAndColours(ticked)); // ticked first, Xeno in progress
 
         Assert.True(tracker.Toggle(Y.Id));
         var unticked = tracker.Next(board, 2);
@@ -212,8 +262,8 @@ public class CompTargetsTests
     [Fact]
     public void Tiers_TheTargetsComeFirstInTheirTier_TheOthersKeepHdtsOrder()
     {
-        var s1 = Guide("S one", 1, 0, new[] { "S1" });
-        var s2 = Guide("S two", 1, 1, new[] { "S2" });
+        var s1 = Guide("S one", 1, 0, new[] { "S1", "S3" });
+        var s2 = Guide("S two", 1, 1, new[] { "S2", "S4" });
         var set = Set(s1, s2, X, Y, Z);
         var tracker = new CompTargetTracker();
         tracker.Toggle(Z.Id);
@@ -222,13 +272,13 @@ public class CompTargetsTests
         var targets = tracker.Next(board, 2);
         var tiers = CompTargets.Tiers(board, targets);
 
-        Assert.Equal(new[] { "Zeal" }, targets.Select(t => t.Guide.Name)); // ticked: the only target, Xeno and S two are set aside
+        Assert.Equal(new[] { "Zeal", "Xeno" }, targets.Select(t => t.Guide.Name)); // ticked, then in progress; S two (one key card) set aside
         Assert.Equal(new[] { "S one", "S two" }, tiers[0].Rows.Select(r => r.Guide.Name)); // S two is highlighted, but no target: HDT's place
         Assert.Equal(new[] { "Zeal", "Xeno", "Yeti" }, tiers[1].Rows.Select(r => r.Guide.Name));
         Assert.Same(targets[0], CompTargets.Find(targets, Z));
         Assert.Null(CompTargets.Find(targets, Y));
-        Assert.Null(CompTargets.Find(targets, X)); // the most probable guide of the board, but not ticked
-        Assert.Equal($"[Zeal {P0}]", CompTargets.Summary(targets));
+        Assert.Null(CompTargets.Find(targets, s2)); // the second most probable guide of the board, a guess the tick silenced
+        Assert.Equal($"[Zeal {P0}; Xeno {P1}]", CompTargets.Summary(targets));
         Assert.Equal("none", CompTargets.Summary(Array.Empty<CompTarget>()));
     }
 

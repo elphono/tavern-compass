@@ -75,17 +75,20 @@ public class TavernHighlightsTests
     }
 
     [Fact]
-    public void ATickedTarget_IsTheOnlyOne_TheProbableOnesGetNoFrame()
+    public void ATickedTarget_ComesFirst_AGuideInProgressKeepsItsFrames_AGuessGetsNone()
     {
-        // Pirates ticked: the only target. The Undead Butcher board is as good as before, but nobody means to head for it.
+        // Pirates ticked: it comes first. Undead Butcher, both of its key cards held, is being built: its cards keep their
+        // frames. Mech Magnet, one key card held, was only a guess: the tick silences it, its cards get no frame.
         var targets = Targets(All, Board("KEY_U1", "KEY_U2", "KEY_M1"), 3, Pirates);
+        Assert.Equal(new[] { TargetKind.Chosen, TargetKind.InProgress }, targets.Select(t => t.Kind));
 
-        var highlights = TavernHighlights.For(new[] { "KEY_P1", "ADD_M", "KEY_U1" }, targets);
+        var highlights = TavernHighlights.For(new[] { "KEY_P1", "ADD_M", "KEY_U1", "KEY_M1" }, targets);
 
         Assert.Equal(new (HighlightKind, string?, string?, string)[]
         {
             (HighlightKind.Commit, "Pirate Gold", P0, "core"),
             (HighlightKind.Enabler, "Pirate Gold", P0, "+"),
+            (HighlightKind.Commit, "Undead Butcher", P1, "core"),
             (HighlightKind.None, null, null, ""),
         }, Summary(highlights));
     }
