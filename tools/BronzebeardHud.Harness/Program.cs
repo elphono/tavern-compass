@@ -10,8 +10,10 @@ namespace BronzebeardHud.Harness;
 /// without anyone at the keyboard (the window is parked far off screen), write their result under <c>--out</c> and
 /// exit: 0 when everything passed. <c>--scenario n</c> picks the board held, <c>--tick a,b</c> ticks guides,
 /// <c>--choice k</c> opens a choice above the scene (discover, dark-gift, trinket), <c>--close-choice</c> closes it again
-/// before the screenshot (the scene restored), <c>--power p</c> shows the board's power p under the list (behind, even,
-/// ahead, shiny, none, early), and <c>--detail x</c> opens a guide's
+/// before the screenshot (the scene restored), <c>--power p</c> shows the board's power p in the inset (behind, even,
+/// ahead, shiny, none, early), <c>--opp-power p</c> the opponent's (behind, even, ahead, shiny, none, next, unseen),
+/// <c>--play</c> switches move mode off (as in a game), <c>--count n</c> clicks − or + until n compositions are wanted (move
+/// mode off: the panel sized to them), and <c>--detail x</c> opens a guide's
 /// detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name). <c>--hover x</c> hovers a guide's
 /// line (move mode off) so that its popup shows in the screenshot, <c>--hover-card k</c> also hovers the k-th oval of that
 /// line (its card preview), and <c>--no-skip</c> hides the Skip combat button, as in the tavern.
@@ -27,8 +29,20 @@ internal sealed class Options
     /// <summary>The board held (HarnessData.Scenarios): 2, three targets, by default.</summary>
     public int Scenario { get; private set; } = HarnessData.DefaultScenario;
 
-    /// <summary>The board's power under the list (HarnessData.PowerScenes: behind, even, ahead, shiny, none, early); null: even.</summary>
+    /// <summary>The board's power in the inset (HarnessData.PowerScenes: behind, even, ahead, shiny, none, early); null: even.</summary>
     public string? Power { get; private set; }
+
+    /// <summary>The opponent's power in the inset (HarnessData.OpponentPowerScenes: behind, even, ahead, shiny, none, next, unseen); null: even.</summary>
+    public string? OpponentPower { get; private set; }
+
+    /// <summary>
+    /// How many compositions are wanted before the screenshot (1 to 4), reached by clicking − or + in the inset as the player
+    /// does, move mode off: the panel sized to them. 0: the default (3), nothing clicked.
+    /// </summary>
+    public int Count { get; private set; }
+
+    /// <summary>Move mode off before the screenshot (as in a game): the panel shows itself as the player sees it.</summary>
+    public bool Play { get; private set; }
 
     /// <summary>A guide whose detail is opened before the screenshot: a target's rank ("1") or a guide's name; null: the list.</summary>
     public string? Detail { get; private set; }
@@ -89,6 +103,15 @@ internal sealed class Options
                     break;
                 case "--power" when i + 1 < args.Length:
                     options.Power = args[++i];
+                    break;
+                case "--opp-power" when i + 1 < args.Length:
+                    options.OpponentPower = args[++i];
+                    break;
+                case "--count" when i + 1 < args.Length:
+                    options.Count = int.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
+                    break;
+                case "--play":
+                    options.Play = true;
                     break;
                 case "--close-choice":
                     options.CloseChoice = true;
@@ -158,6 +181,17 @@ internal static class Headless
                 foreach (var which in options.Tick)
                 {
                     window.Tick(which);
+                }
+
+                if (options.Play || options.Count > 0)
+                {
+                    window.SetMoveMode(false); // as in a game: the panel sized to its content, no handle
+                    window.UpdateLayout();
+                }
+
+                if (options.Count > 0)
+                {
+                    window.ClickCountTo(options.Count);
                 }
 
                 if (options.Choice != null)

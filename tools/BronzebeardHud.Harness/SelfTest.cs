@@ -18,8 +18,12 @@ namespace BronzebeardHud.Harness;
 /// its popup where it covers nothing and hides it as it should (HoverChecks), the bridge to the synthetic Firestone comps
 /// is logged and shows in the labels of a discover, on Bob's cards and in a guide's context line (BridgeLine,
 /// TopBoardFrame, ChoiceChecks, ContextChecks), an open choice takes the markers and the panel off the screen and its
-/// closing puts them back as they were (CoverChecks), nothing was logged as a warning or an error (the log read once the
-/// dispatcher has delivered it), and the layout file is the harness's own, never the real plugin's.
+/// closing puts them back as they were (CoverChecks), the power inset sits under the frame between − and + (InsetChecks),
+/// each of its rows lights and makes glow the lamp of its level only, grey without data (PowerChecks, OpponentChecks), + and
+/// − size the panel to N lines, the best targets first, on no zone of the game, against the bottom upwards, a handle's box
+/// kept until a press, back at the next game and at "Reset" (ResizeChecks), a row that throws is left out alone
+/// (GuardChecks), nothing was logged as a warning or an error (the log read once the dispatcher has delivered it), and the
+/// layout file is the harness's own, never the real plugin's.
 /// </summary>
 internal static class SelfTest
 {
@@ -123,12 +127,16 @@ internal static class SelfTest
 
         Group("ticks", TickChecks);
         Group("lobby", LobbyChecks);
+        Group("inset", InsetChecks);
         Group("board power", PowerChecks);
+        Group("opponent power", OpponentChecks);
+        Group("resize", ResizeChecks);
 
         Group("choices", ChoiceChecks);
         Group("hover", HoverChecks);
         Group("context line", ContextChecks);
         Group("choice cover", CoverChecks);
+        Group("guard", GuardChecks);
 
         // The log lines reach the window through Dispatcher.BeginInvoke (HarnessWindow): read before they land, the list was
         // empty and the check passed on nothing. Let the dispatcher run what is queued first, then require lines.
@@ -158,6 +166,14 @@ internal static class SelfTest
     {
         var comps = window.Comps.Element;
         window.SetScenario(5);
+
+        // A tall box (the handle, in move mode), so that every guide's line is there to be ticked: sized to N lines, the list
+        // shows the targets and the next ones only, and this check is about what a tick does, not about sizes.
+        var scale = TavernLayout.Scale(window.Overlay.ActualHeight);
+        var place = TavernLayout.TargetPanel(window.Overlay.ActualWidth, window.Overlay.ActualHeight);
+        window.SetMoveMode(true);
+        window.DropPanel(place.Left, 40 * scale);
+        window.ResizePanel(place.Right, (40 + 900) * scale);
         window.UpdateLayout();
         static string Kinds(IEnumerable<CompTarget> targets) => string.Join("; ", targets.Select(t => $"{t.Rank}. {t.Guide.Name} {t.Colour} {t.Kind}"));
         var auto = window.Targets.ToList();
@@ -214,6 +230,7 @@ internal static class SelfTest
             && FindText(comps, "3 targets") != null && minusAgain?.Parent is Border { Opacity: 1 },
             Kinds(back));
 
+        window.ResetLayout();
         window.SetScenario(HarnessData.DefaultScenario);
         window.UpdateLayout();
     }
@@ -243,6 +260,7 @@ internal static class SelfTest
     {
         var comps = window.Comps.Element;
         var guides = HarnessData.Guides(id => id).All;
+        window.SetMoveMode(false); // as in a game: the panel sized to N lines
         FlushLog(window);
         var logStart = window.LogLines.Count;
 
@@ -299,21 +317,65 @@ internal static class SelfTest
             $"ticked while unknown: {tickedBefore}; {unticked} log line(s); targets {CompTargets.Summary(window.Targets)}");
 
         window.SetScenario(HarnessData.DefaultScenario);
+        window.SetMoveMode(true);
         window.UpdateLayout();
     }
 
     /// <summary>
-    /// The board's power under the list (BoardPowerView), read from what is drawn: for each level, the badge in the level's
-    /// colour with its sign and percentage, the lit segment of the gauge at the level's place (red, yellow, green, gold),
-    /// the figures beside it; without data ("none": a hero without curve; "early": turn 2), a grey badge "–", no segment lit,
-    /// no colour, and the reason written. Texts at least 12 px and uncut, the indicator inside the panel, at the panel's
-    /// default width, which is also its minimum.
+    /// One row of the power inset (BoardPowerView), read from what is drawn: for each level, the badge in the level's colour
+    /// with its sign and percentage, the lit lamp at the level's place (red, yellow, green, gold) and only it glowing, in the
+    /// level's halo colour (BoardPowerLevels.Halo: gold for shiny), the others dimmed without glow; the figures beside it;
+    /// without data, a grey badge "–", no lamp lit, nothing glowing, no colour, and the reason written. Texts at least 12 px
+    /// and uncut in the inset.
     /// </summary>
+    private static void RowChecks(HarnessWindow window, Action<string, bool, string> check, string row, string what,
+        IReadOnlyList<(string Scene, int Lit, string Badge, string Text)> scenes, Action<string> show)
+    {
+        var inset = window.Comps.Inset;
+        var scale = TavernLayout.Scale(window.Overlay.ActualHeight);
+        var grey = (Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(BoardPower.None));
+        var lampColours = new List<Color?>();
+        foreach (var (scene, lit, badgeText, text) in scenes)
+        {
+            show(scene);
+            window.UpdateLayout();
+            var badge = Tagged(inset, BoardPowerView.BadgeTag(row)).OfType<Border>().FirstOrDefault();
+            var lamps = Enumerable.Range(0, 4).Select(i => Tagged(inset, BoardPowerView.LampTag(row, i)).OfType<System.Windows.Shapes.Ellipse>().FirstOrDefault()).ToList();
+            var badgeColour = (badge?.Background as SolidColorBrush)?.Color;
+            var said = badge == null ? "none" : string.Join(" ", Texts(badge).Select(Content));
+            var litNow = lamps.Select((l, i) => (l, i)).Where(x => x.l != null && Math.Abs(x.l.Opacity - 1) < 1e-9).Select(x => x.i).ToList();
+            var glowing = lamps.Select((l, i) => (l, i)).Where(x => x.l?.Effect != null).Select(x => x.i).ToList();
+            var glow = lit >= 0 ? (lamps[lit]?.Effect as System.Windows.Media.Effects.DropShadowEffect)?.Color : null;
+            var colours = lamps.Select(l => (l?.Fill as SolidColorBrush)?.Color).ToList();
+            if (scene == "even")
+            {
+                lampColours = colours;
+            }
+
+            var details = FindText(inset, text) != null;
+            var texts = TextProblems(inset, scale);
+            var dim = lamps.Where((l, i) => i != lit).All(l => l != null && Math.Abs(l.Opacity - BoardPowerView.OffOpacity) < 1e-9);
+            var ok = badge != null && lamps.All(l => l != null) && said == badgeText && details && texts.Problems.Count == 0 && dim
+                     && (lit >= 0
+                         ? litNow.SequenceEqual(new[] { lit }) && glowing.SequenceEqual(new[] { lit })
+                           && glow == (Color)ColorConverter.ConvertFromString(BoardPowerLevels.Halo(BoardPowerLevels.Gauge[lit])!)
+                           && badgeColour == (Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(BoardPowerLevels.Gauge[lit]))
+                         : litNow.Count == 0 && glowing.Count == 0 && badgeColour == grey && colours.All(c => c == grey));
+            check($"{what} \"{scene}\": badge \"{badgeText}\", lamp {(lit >= 0 ? lit + " lit and glowing in its level's colour, the others dim" : "none lit, none glowing, all grey")}, the figures beside it, nothing cut",
+                ok, $"badge \"{said}\" {badgeColour}, lit [{string.Join(",", litNow)}], glowing [{string.Join(",", glowing)}] {glow}, lamps [{string.Join(" ", colours)}], "
+                    + $"figures \"{text}\" {(details ? "drawn" : "missing")}, {texts.Checked} texts checked" + Problems(texts.Problems));
+        }
+
+        check($"{what}: the four lamps are four colours, red to gold, whatever the level",
+            lampColours.Count == 4 && lampColours.Distinct().Count() == 4
+            && lampColours.SequenceEqual(BoardPowerLevels.Gauge.Select(l => (Color?)(Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(l)))),
+            string.Join(" ", lampColours));
+    }
+
+    /// <summary>The player's row: their board against their hero's invented curve (120 at turn 8), HarnessData.Power.</summary>
     private static void PowerChecks(HarnessWindow window, Action<string, bool, string> check)
     {
-        var comps = window.Comps.Element;
-        var scale = TavernLayout.Scale(window.Overlay.ActualHeight);
-        var scenes = new (string Scene, int Lit, string Badge, string Text)[]
+        RowChecks(window, check, BoardPowerView.Own, "board power", new (string, int, string, string)[]
         {
             ("behind", 0, "▼ −33%", "Board 80 · hero avg 120 at turn 8"),
             ("even", 1, "≈ +18%", "Board 142 · hero avg 120 at turn 8"),
@@ -321,42 +383,232 @@ internal static class SelfTest
             ("shiny", 3, "★ +117%", "Board 260 · hero avg 120 at turn 8"),
             ("none", -1, "–", "Board 142 · no curve for this hero"),
             ("early", -1, "–", "Board 3 · hero avg 6 at turn 2 · too early"),
-        };
-        var gaugeColours = new List<Color?>();
-        foreach (var (scene, lit, badgeText, text) in scenes)
-        {
-            window.SetPower(scene);
-            window.UpdateLayout();
-            var badge = Tagged(comps, BoardPowerView.BadgeTag).OfType<Border>().FirstOrDefault();
-            var segments = Enumerable.Range(0, 4).Select(i => Tagged(comps, BoardPowerView.GaugeTag + i).OfType<Border>().FirstOrDefault()).ToList();
-            var badgeColour = (badge?.Background as SolidColorBrush)?.Color;
-            var said = badge == null ? "none" : string.Join(" ", Texts(badge).Select(Content));
-            var litNow = segments.Select((s, i) => (s, i)).Where(x => x.s != null && Math.Abs(x.s.Opacity - 1) < 1e-9).Select(x => x.i).ToList();
-            var colours = segments.Select(s => (s?.Background as SolidColorBrush)?.Color).ToList();
-            var expectedColour = lit >= 0 ? colours[lit] : (Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(BoardPower.None));
-            if (scene == "even")
-            {
-                gaugeColours = colours;
-            }
+        }, window.SetPower);
+        window.SetPower("even");
+        window.UpdateLayout();
+    }
 
-            var details = FindText(comps, text) != null;
-            var inside = badge != null && RectIn(badge, comps) is var r && r.Left >= -0.5 && r.Right <= comps.ActualWidth + 0.5 && r.Bottom <= comps.ActualHeight + 0.5;
-            var texts = TextProblems(comps, scale);
-            var ok = badge != null && segments.All(s => s != null) && said == badgeText && details && inside && texts.Problems.Count == 0
-                     && (lit >= 0
-                         ? litNow.SequenceEqual(new[] { lit }) && badgeColour == expectedColour && badgeColour == (Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(BoardPowerLevels.Gauge[lit]))
-                         : litNow.Count == 0 && badgeColour == expectedColour && colours.All(c => c == expectedColour));
-            check($"board power \"{scene}\": badge \"{badgeText}\" in its colour, gauge lit at {(lit >= 0 ? lit.ToString() : "nothing")}, the figures beside it, nothing cut",
-                ok, $"badge \"{said}\" {badgeColour}, lit [{string.Join(",", litNow)}], segments [{string.Join(" ", colours)}], figures {(details ? "drawn" : "missing")}, inside {inside}, "
-                    + $"{texts.Checked} texts checked" + Problems(texts.Problems));
+    /// <summary>
+    /// (2026-10-06, "the same indicator for the enemy's composition when it shows") The opponent's row: their board against
+    /// THEIR hero's invented curve (143 at turn 8, 50 at turn 5; the player's is 120 at turn 8, so a gauge on the wrong curve
+    /// reads other figures), in combat; the next opponent's last board in the shop, against their average at the turn it was
+    /// seen; grey and saying why without a curve or a board. One log line each time it changes, with the measure.
+    /// </summary>
+    private static void OpponentChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        static string Name(string id) => Hearthstone_Deck_Tracker.Hearthstone.Database.GetCardFromId(id)?.LocalizedName ?? id;
+        FlushLog(window);
+        var logStart = window.LogLines.Count;
+        RowChecks(window, check, BoardPowerView.Opponent, "opponent power", new (string, int, string, string)[]
+        {
+            ("behind", 0, "▼ −37%", "Opp. 90 · their hero avg 143 at turn 8"),
+            ("even", 1, "≈ +12%", "Opp. 160 · their hero avg 143 at turn 8"),
+            ("ahead", 2, "▲ +47%", "Opp. 210 · their hero avg 143 at turn 8"),
+            ("shiny", 3, "★ +110%", "Opp. 300 · their hero avg 143 at turn 8"),
+            ("none", -1, "–", $"Opp. 160 · no curve for {Name(HarnessData.UnchartedHero)}"),
+            ("next", 2, "▲ +40%", "Next opp. 70 at turn 5 · their hero avg 50"),
+            ("unseen", -1, "–", $"Next opp. {Name(HarnessData.OpponentHero)} – not fought yet"),
+        }, window.SetOpponentPower);
+
+        FlushLog(window);
+        var lines = window.LogLines.Skip(logStart).Where(l => l.Contains("Bronzebeard HUD: opponent power ")).ToList();
+        var fight = lines.FirstOrDefault(l => l.Contains("scope=combat") && l.Contains("board=210"));
+        check("opponent power: one log line per change, naming their hero and yours, the turn seen, the board and the average it rests on",
+            lines.Count == 7 && fight != null && fight.Contains($"hero={HarnessData.OpponentHero} (yours {HarnessData.Hero}) turn=8 seen=8 board=210 (3 minions)")
+            && fight.Contains("their hero avg 143 at turn 8 · +47% power=ahead") && lines.Any(l => l.Contains("scope=next") && l.Contains("seen=5 board=70")),
+            $"{lines.Count} lines; " + string.Join(" | ", lines.Take(3).Select(l => l.Substring(l.IndexOf("opponent power", StringComparison.Ordinal)))));
+
+        window.SetOpponentPower("even");
+        window.UpdateLayout();
+    }
+
+    /// <summary>
+    /// (2026-10-06, "the indicator out into a small inset under the main frame, framed by the + and −") The inset: out of the
+    /// frame (no lamp of either row inside it), under it, as wide as the panel; − at its left and + at its right, centred on
+    /// it; the player's row above the opponent's between them; its texts at least 12 px and uncut.
+    /// </summary>
+    private static void InsetChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var comps = window.Comps;
+        var panel = comps.Element;
+        var scale = TavernLayout.Scale(window.Overlay.ActualHeight);
+        window.UpdateLayout();
+        var frame = RectIn(comps.Frame, panel);
+        var inset = RectIn(comps.Inset, panel);
+        var inFrame = Tagged(comps.Frame, BoardPowerView.LampTag(BoardPowerView.Own, 0)).Count() + Tagged(comps.Frame, BoardPowerView.LampTag(BoardPowerView.Opponent, 0)).Count();
+        check("inset: out of the frame, under it, as wide as the panel",
+            comps.Inset.IsVisible && inFrame == 0 && inset.Top >= frame.Bottom + 0.5 && inset.Top - frame.Bottom <= 6 * scale
+            && Math.Abs(inset.Width - panel.ActualWidth) < 0.5 && Math.Abs(inset.Bottom - panel.ActualHeight) < 0.5,
+            $"frame {Describe(frame)}, inset {Describe(inset)}, panel {panel.ActualWidth:0}x{panel.ActualHeight:0}, lamps inside the frame: {inFrame}");
+
+        var minus = Tagged(comps.Inset, CompsPanel.MinusTag).FirstOrDefault();
+        var plus = Tagged(comps.Inset, CompsPanel.PlusTag).FirstOrDefault();
+        var own = Tagged(comps.Inset, BoardPowerView.LampTag(BoardPowerView.Own, 0)).FirstOrDefault();
+        var theirs = Tagged(comps.Inset, BoardPowerView.LampTag(BoardPowerView.Opponent, 3)).FirstOrDefault();
+        var ownBadge = Tagged(comps.Inset, BoardPowerView.BadgeTag(BoardPowerView.Own)).FirstOrDefault();
+        var theirBadge = Tagged(comps.Inset, BoardPowerView.BadgeTag(BoardPowerView.Opponent)).FirstOrDefault();
+        var ok = minus != null && plus != null && own != null && theirs != null && ownBadge != null && theirBadge != null;
+        if (ok)
+        {
+            var m = RectIn(minus!, comps.Inset);
+            var p = RectIn(plus!, comps.Inset);
+            var first = RectIn(own!, comps.Inset);
+            var last = RectIn(theirs!, comps.Inset);
+            var centre = comps.Inset.ActualHeight / 2;
+            ok = m.Right <= first.Left && p.Left >= last.Right && m.Left < 12 * scale && comps.Inset.ActualWidth - p.Right < 12 * scale
+                 && Math.Abs((m.Top + m.Bottom) / 2 - centre) < 1 && Math.Abs((p.Top + p.Bottom) / 2 - centre) < 1
+                 && RectIn(ownBadge!, comps.Inset).Bottom <= RectIn(theirBadge!, comps.Inset).Top + 0.5;
+            check("inset: − at its left, + at its right, centred on it; the player's row above the opponent's between them", ok,
+                $"− {Describe(m)}, + {Describe(p)}, first lamp {Describe(first)}, last lamp of the opponent {Describe(last)}, inset {comps.Inset.ActualWidth:0}x{comps.Inset.ActualHeight:0}");
+        }
+        else
+        {
+            check("inset: − at its left, + at its right, centred on it; the player's row above the opponent's between them", false,
+                $"found: − {minus != null}, + {plus != null}, own lamp {own != null}, opponent lamp {theirs != null}, badges {ownBadge != null}/{theirBadge != null}");
         }
 
-        check("board power: the gauge's four segments are four colours, red to gold, whatever the level",
-            gaugeColours.Count == 4 && gaugeColours.Distinct().Count() == 4
-            && gaugeColours.SequenceEqual(BoardPowerLevels.Gauge.Select(l => (Color?)(Color)ColorConverter.ConvertFromString(BoardPowerLevels.Colour(l)))),
-            string.Join(" ", gaugeColours));
+        var texts = TextProblems(comps.Inset, scale);
+        check("inset: no text under 12 px, none cut", texts.Checked >= 6 && texts.Problems.Count == 0, $"{texts.Checked} texts checked" + Problems(texts.Problems));
+    }
 
-        window.SetPower("even");
+    /// <summary>
+    /// (2026-10-06, "a press on + or − resizes the window to show the N best compositions") Move mode off, in the default
+    /// place: N from 1 to 4 and back, three times, by clicking − and + as the mouse would. Each N shows N lines — the targets
+    /// first — or, when N lines do not fit between the boards and the gold, as many as fit in all that room; never on a zone
+    /// of the game, never off the overlay; the same N lands on the same rectangle every time (no creeping); one log line per
+    /// press, its figures those drawn; + at 4 still logs its resize. Then against the bottom of the screen it keeps its bottom
+    /// and grows upwards; a box given by the handle stays until + is pressed, a new game returns to it, "Reset" to the default.
+    /// </summary>
+    private static void ResizeChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var canvas = window.Overlay;
+        var comps = window.Comps;
+        var panel = comps.Element;
+        var height = canvas.ActualHeight;
+        var boards = TavernLayout.PlayerRowBottom(height);
+        var gold = PanelFit.BottomLimit * height;
+        window.SetMoveMode(false);
+        window.UpdateLayout();
+        FlushLog(window);
+        var logStart = window.LogLines.Count;
+
+        var seen = new List<(int N, Rect Rect, int Lines)>();
+        var problems = new List<string>();
+        var clicks = 0;
+        foreach (var n in new[] { 1, 2, 3, 4, 3, 2, 1, 2, 3, 4 })
+        {
+            clicks += Math.Abs(window.Count - n);
+            window.ClickCountTo(n);
+            window.UpdateLayout();
+            var rect = RectOf(panel);
+            var lines = comps.ShownLines.Count;
+            var ranks = window.Targets.Where(t => comps.ShownLines.ContainsKey(t.Guide.Id)).Select(t => t.Rank).OrderBy(r => r).ToList();
+            var targetsShown = ranks.SequenceEqual(Enumerable.Range(1, ranks.Count)) ? ranks.Count : -1; // the best ranks, none skipped
+            seen.Add((n, rect, lines));
+            var zones = NoGoZones.For(canvas.ActualWidth, height).Where(z => Overlap(rect, RectOf(z.Rect))).Select(z => z.Name).ToList();
+            // Fewer lines than N: the next one did not fit between the boards and the gold, so the panel grew up to the
+            // boards and kept its bottom on the gold, then fitted what it shows.
+            var outOfRoom = Math.Abs(rect.Bottom - gold) < 1 && rect.Top >= boards - 0.5 && comps.Span is { Anchor: PanelAnchor.Bottom };
+            if (!(lines == n || (lines < n && lines >= 1 && outOfRoom)) || targetsShown != Math.Min(window.Targets.Count, lines)
+                || zones.Count > 0 || rect.Top < -0.5 || rect.Bottom > height + 0.5)
+            {
+                problems.Add($"N={n}: {lines} lines ({targetsShown} of the {window.Targets.Count} targets) at {Describe(rect)}, zones [{string.Join(",", zones)}]");
+            }
+        }
+
+        var steady = seen.GroupBy(s => s.N).All(g => g.Select(s => s.Rect).Distinct().Count() == 1);
+        var growing = Enumerable.Range(1, 3).All(n => seen.First(s => s.N == n + 1).Rect.Height > seen.First(s => s.N == n).Rect.Height
+                                                      || seen.First(s => s.N == n + 1).Lines == seen.First(s => s.N == n).Lines);
+        check("+ / −: N = 1 to 4 and back, three times: N lines, the best targets first (or, out of room, its bottom on the gold), on no zone, each N on the same rectangle",
+            problems.Count == 0 && steady && growing,
+            string.Join("; ", seen.Take(4).Select(s => $"N={s.N}: {s.Lines} lines {Describe(s.Rect)}")) + $"; steady {steady}, growing {growing}"
+            + (problems.Count > 0 ? " | " + string.Join(" | ", problems) : string.Empty));
+
+        // + at 4: the number stays, the panel is sized again all the same, and says so.
+        window.ClickCount(+1);
+        window.UpdateLayout();
+        clicks++;
+        FlushLog(window);
+        var resizes = window.LogLines.Skip(logStart).Where(l => l.Contains("Bronzebeard HUD: targets n=")).ToList();
+        var last = resizes.LastOrDefault() ?? string.Empty;
+        var r = RectOf(panel);
+        var said = $"targets n=4 panel resized to ({r.Left:0},{r.Top:0} {r.Width:0}x{r.Height:0}) anchor=";
+        check("+ / −: one log line per press, its rectangle and lines those drawn (+ at 4 included)",
+            resizes.Count == clicks && last.Contains(said) && last.Contains($"lines={comps.ShownLines.Count}/4 shown") && window.Count == 4,
+            $"{resizes.Count} lines for {clicks} presses; last: {(last.Length > 0 ? last.Substring(last.IndexOf("targets", StringComparison.Ordinal)) : "none")}; drawn {Describe(r)}");
+
+        // Against the bottom of the screen: it keeps its bottom, growing upwards.
+        var defaultBox = TavernLayout.TargetPanel(canvas.ActualWidth, height);
+        window.DropPanel(defaultBox.Left, height - defaultBox.Height);
+        window.ClickCountTo(1);
+        window.UpdateLayout();
+        var low = RectOf(panel);
+        window.ClickCountTo(3);
+        window.UpdateLayout();
+        var high = RectOf(panel);
+        check("+ / −: a panel against the bottom of the screen keeps its bottom and grows upwards, never onto the boards",
+            Math.Abs(low.Bottom - height) < 1 && Math.Abs(high.Bottom - height) < 1 && high.Top < low.Top - 1 && high.Top >= boards - 0.5
+            && comps.Span is { Anchor: PanelAnchor.Bottom },
+            $"N=1 {Describe(low)}, N=3 {Describe(high)}, anchor {comps.Span?.Anchor}");
+
+        // A box given by the handle: shown as is until + or − is pressed; a new game goes back to it; "Reset" to the default.
+        var chosen = 330 * TavernLayout.Scale(height);
+        window.ResetLayout();
+        window.SetMoveMode(true);
+        window.ResizePanel(defaultBox.Right, defaultBox.Top + chosen);
+        var wasResized = window.PanelResized;
+        window.SetMoveMode(false);
+        window.UpdateLayout();
+        var box = RectOf(panel);
+        window.ClickCount(-1);
+        window.UpdateLayout();
+        var fitted = RectOf(panel);
+        window.SetScenario(HarnessData.DefaultScenario); // a new game
+        window.UpdateLayout();
+        var nextGame = RectOf(panel);
+        var nextGameFits = comps.FitsContent;
+        window.ResetLayout();
+        window.UpdateLayout();
+        var reset = RectOf(panel);
+        check("+ / −: a box given by the handle stays until + or − is pressed; a new game goes back to it; \"Reset\" to the default place, sized to its content",
+            // The box: its content up to the size chosen ("the box fits its content up to the chosen size", 2026-10-04), so
+            // its height follows the targets; what tells it from the panel sized by − is that it is not sized to N lines.
+            wasResized && !window.PanelResized && box.Height <= chosen + 0.5 && Math.Abs(box.Top - defaultBox.Top) < 0.5
+            && Math.Abs(fitted.Height - box.Height) > 1 && Math.Abs(fitted.Top - box.Top) < 0.5
+            && !nextGameFits && nextGame.Height <= chosen + 0.5 && Math.Abs(nextGame.Top - box.Top) < 0.5 && Math.Abs(nextGame.Height - fitted.Height) > 1
+            && Math.Abs(reset.Left - defaultBox.Left) < 0.5 && Math.Abs(reset.Top - defaultBox.Top) < 0.5 && comps.FitsContent,
+            $"box {Describe(box)} (resized {wasResized}), after − {Describe(fitted)}, next game {Describe(nextGame)} (sized to N lines {nextGameFits}), "
+            + $"after Reset {Describe(reset)} (default top {defaultBox.Top:0}), resized {window.PanelResized}");
+
+        window.ClickCountTo(HudSettings.DefaultSuggested);
+        window.SetMoveMode(true);
+        window.UpdateLayout();
+    }
+
+    /// <summary>
+    /// The opponent's row switched off by its guard (drawing it throws): the player's row, the inset's buttons and the panel
+    /// stay; the log says it, once. Its guard then back on, as a new session would have it.
+    /// </summary>
+    private static void GuardChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var comps = window.Comps;
+        FlushLog(window);
+        var logStart = window.LogLines.Count;
+        window.BreakOpponentRow = true;
+        window.SetOpponentPower("ahead");
+        window.UpdateLayout();
+        var theirs = Tagged(comps.Inset, BoardPowerView.LampTag(BoardPowerView.Opponent, 0)).Count();
+        var own = Tagged(comps.Inset, BoardPowerView.LampTag(BoardPowerView.Own, 0)).Count();
+        var buttons = Tagged(comps.Inset, CompsPanel.MinusTag).Count() + Tagged(comps.Inset, CompsPanel.PlusTag).Count();
+        FlushLog(window);
+        var said = window.LogLines.Skip(logStart).Count(l => l.Contains("feature \"opponent-power\" disabled"));
+        check("guard: the opponent's row that throws is left out alone; the player's row, − and + and the panel stay",
+            theirs == 0 && own == 1 && buttons == 2 && comps.Element.IsVisible && said == 1,
+            $"opponent lamps {theirs}, player's {own}, buttons {buttons}, panel visible {comps.Element.IsVisible}, {said} log line(s)");
+
+        window.BreakOpponentRow = false;
+        window.ResetGuards();
+        window.SetOpponentPower("even");
         window.UpdateLayout();
     }
 
@@ -638,6 +890,12 @@ internal static class SelfTest
         (string Detail, string Popup) Look(string name)
         {
             var guide = window.GuideOf(name)!;
+            if (!comps.ShownLines.ContainsKey(guide.Id))
+            {
+                throw new InvalidOperationException($"{name} not in the list: lines [{string.Join(", ", comps.ShownLines.Keys)}], panel {Describe(RectOf(comps.Element))}, "
+                                                    + $"fits {comps.FitsContent}, count {window.Count}, targets {CompTargets.Summary(window.Targets)}, detail {comps.ShowsDetail}");
+            }
+
             Click(comps.Element, guide.Name);
             window.UpdateLayout();
             var detail = comps.ShowsDetail ? LookAt(comps.Element, ContextIn(comps.Element)) : "detail not opened";
@@ -715,7 +973,8 @@ internal static class SelfTest
         var targetsBefore = CompTargets.Summary(window.Targets);
         var highlightsBefore = window.Highlights;
         var panelBefore = RectOf(comps.Element);
-        var contentBefore = comps.Element.Child;
+        var contentBefore = comps.Content; // the frame's content: a new element at every redraw (the panel's own child never changes)
+        var insetBefore = comps.Inset.IsVisible;
         var guide = window.Targets[0].Guide;
         var line = comps.ShownLines[guide.Id];
         Raise(line, UIElement.MouseEnterEvent);
@@ -733,6 +992,7 @@ internal static class SelfTest
         window.UpdateLayout();
         var markersDuring = MarkerSignatures(window);
         var panelDuring = comps.Element.IsVisible;
+        var insetDuring = comps.Inset.IsVisible;
         var popupDuring = popup.IsVisible;
         Raise(line, UIElement.MouseLeaveEvent);
         Raise(line, UIElement.MouseEnterEvent); // the line "entered" again while the choice is open: no popup
@@ -744,11 +1004,11 @@ internal static class SelfTest
         window.UpdateLayout();
         var markersStill = MarkerSignatures(window);
         var panelStill = comps.Element.IsVisible;
-        check("choice open: Bob's frames, labels and ◇, the panel and a popup on show leave the screen; no popup on hover meanwhile",
+        check("choice open: Bob's frames, labels and ◇, the panel with its power inset and a popup on show leave the screen; no popup on hover meanwhile",
             popupBefore && pinsBefore > 0 && markersBefore.Count > pinsBefore && markersDuring.Count == 0 && markersStill.Count == 0
-            && !panelDuring && !panelStill && !popupDuring && !popupOnHover,
-            $"before: {markersBefore.Count} marker elements ({pinsBefore} ◇), panel shown, popup {popupBefore}; Dark Gift open: {markersDuring.Count} marker elements"
-            + $"{(markersDuring.Count > 0 ? " (" + string.Join(" | ", markersDuring.Take(3)) + ")" : string.Empty)}, panel {panelDuring}, popup {popupDuring}, "
+            && !panelDuring && !panelStill && !popupDuring && !popupOnHover && insetBefore && !insetDuring,
+            $"before: {markersBefore.Count} marker elements ({pinsBefore} ◇), panel shown, inset {insetBefore}, popup {popupBefore}; Dark Gift open: {markersDuring.Count} marker elements"
+            + $"{(markersDuring.Count > 0 ? " (" + string.Join(" | ", markersDuring.Take(3)) + ")" : string.Empty)}, panel {panelDuring}, inset {insetDuring}, popup {popupDuring}, "
             + $"popup on hover {popupOnHover}; discover after it: {markersStill.Count}, panel {panelStill}; {measure}");
 
         window.ShowChoice(ChoiceKind.None);
@@ -756,10 +1016,10 @@ internal static class SelfTest
         var markersAfter = MarkerSignatures(window);
         var lost = markersBefore.Except(markersAfter).ToList();
         var added = markersAfter.Except(markersBefore).ToList();
-        var sameContent = ReferenceEquals(comps.Element.Child, contentBefore);
-        check("choice closed: the same targets, frames, labels and ◇ as before, the panel back as it was (the same elements)",
+        var sameContent = ReferenceEquals(comps.Content, contentBefore);
+        check("choice closed: the same targets, frames, labels and ◇ as before, the panel and its inset back as they were (the same elements)",
             markersAfter.SequenceEqual(markersBefore) && CompTargets.Summary(window.Targets) == targetsBefore && ReferenceEquals(window.Highlights, highlightsBefore)
-            && comps.Element.IsVisible && RectOf(comps.Element) == panelBefore && sameContent,
+            && comps.Element.IsVisible && comps.Inset.IsVisible && RectOf(comps.Element) == panelBefore && sameContent,
             $"{markersAfter.Count} marker elements, identical {markersAfter.SequenceEqual(markersBefore)}"
             + (lost.Count + added.Count > 0 ? $" (gone: {string.Join(" | ", lost)}; new: {string.Join(" | ", added)})" : string.Empty)
             + $"; targets {CompTargets.Summary(window.Targets)}; panel {Describe(RectOf(comps.Element))} visible {comps.Element.IsVisible}, same content {sameContent}");

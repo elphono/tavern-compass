@@ -161,7 +161,52 @@ internal static class HarnessData
     {
         new HeroStat(Hero, 4.1, 1000, warbandCurve: new[] { (1, 4.0), (2, 6.0), (3, 11.0), (4, 19.0), (5, 35.0), (6, 37.0), (7, 67.0), (8, 120.0), (9, 216.0), (10, 389.0) }
             .Select(p => new WarbandPoint(p.Item1, p.Item2)).ToList()),
+        new HeroStat(OpponentHero, 4.3, 800, warbandCurve: new[] { (1, 4.0), (2, 7.0), (3, 12.0), (4, 22.0), (5, 50.0), (6, 60.0), (7, 90.0), (8, 143.0), (9, 250.0), (10, 420.0) }
+            .Select(p => new WarbandPoint(p.Item1, p.Item2)).ToList()),
     });
+
+    /// <summary>The opponent's hero in the simulation: a Battlegrounds hero id, its curve invented (143 at turn 8, 50 at turn 5).</summary>
+    public const string OpponentHero = "TB_BaconShop_HERO_17";
+
+    /// <summary>A hero no curve covers (the "none" scenes): a Battlegrounds hero id.</summary>
+    public const string UnchartedHero = "TB_BaconShop_HERO_28";
+
+    /// <summary>The opponent's gauge scenes (<c>--opp-power</c>, the self-test): a level, or none for lack of data.</summary>
+    public static IReadOnlyList<string> OpponentPowerScenes { get; } = new[] { "behind", "even", "ahead", "shiny", "none", "next", "unseen" };
+
+    /// <summary>
+    /// What the opponent's gauge reads for a scene, as Plugin.UpdateOpponentPower reads HDT (HdtEntityAdapter.OpponentFacts): in
+    /// combat at turn 8 the opponent (player 3) on boards of 90, 160, 210 and 300 against THEIR hero's invented curve (143 at
+    /// turn 8: the four levels; against the player's own curve, 120, 160 would read +33 %); "none" a hero no curve covers;
+    /// in the shop at turn 9, "next" the next opponent's board last seen at turn 5 (70 against their 50 then: ahead, where
+    /// their 250 of turn 9 would read behind), "unseen" a next opponent never fought.
+    /// </summary>
+    public static OpponentFacts OpponentFacts(string scene)
+    {
+        IReadOnlyList<(int, int)> Minions(int stats) => new[] { (3, 4), (5, 3), (stats - 15, 0) };
+        OpponentFacts Fight(string hero, int stats) => new(OverlayPhase.Combat, 8, Hero, 3, 0,
+            new Dictionary<int, BoardSeen> { [3] = new(hero, 8, Minions(stats)) }, new Dictionary<int, string> { [3] = hero });
+        return scene switch
+        {
+            "behind" => Fight(OpponentHero, 90),
+            "even" => Fight(OpponentHero, 160),
+            "ahead" => Fight(OpponentHero, 210),
+            "shiny" => Fight(OpponentHero, 300),
+            "none" => Fight(UnchartedHero, 160),
+            "next" => new(OverlayPhase.Shop, 9, Hero, 0, 3, new Dictionary<int, BoardSeen> { [3] = new(OpponentHero, 5, Minions(70)) },
+                new Dictionary<int, string> { [3] = OpponentHero }),
+            "unseen" => new(OverlayPhase.Shop, 4, Hero, 0, 6, new Dictionary<int, BoardSeen>(), new Dictionary<int, string> { [6] = OpponentHero }),
+            _ => throw new ArgumentException($"--opp-power {scene}: expected {string.Join(", ", OpponentPowerScenes)}"),
+        };
+    }
+
+    /// <summary>The opponent's gauge for a scene (OpponentPower.Compare on the harness's curves), and its log line.</summary>
+    public static (WarbandComparison Power, string Line) OpponentPower(string scene, Func<string, string> heroName)
+    {
+        var facts = OpponentFacts(scene);
+        var power = BronzebeardHud.Stats.OpponentPower.Compare(facts, new[] { HeroStats }, heroName);
+        return (power, BronzebeardHud.Stats.OpponentPower.LogLine(facts, power));
+    }
 
     /// <summary>
     /// Bob's row for the scene: with the third scenario's targets, a core card of a target not held yet (16, Mech Divine

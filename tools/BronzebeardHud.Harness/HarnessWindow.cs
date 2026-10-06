@@ -50,6 +50,27 @@ internal sealed class HarnessWindow : Window
     private LobbyGuides _lobby = LobbyGuides.Unknown(CompGuideSet.Empty(CompGuideSources.HdtFree));
     private string _lobbyKey = string.Empty;
     private string _power = "even";
+    private string _opponentPower = "even";
+    private string _opponentLine = string.Empty;
+
+    // The two rows of the inset, each under its own guard, as in the plugin ("warband-curve", "opponent-power"). A guard
+    // switched off says so in the log as information (the self-test switches one off on purpose: BreakOpponentRow).
+    private FeatureGuard _powerGuard = null!;
+    private FeatureGuard _opponentGuard = null!;
+
+    /// <summary>When true, drawing the opponent's row throws, as a broken row would in the plugin (the self-test's guard check).</summary>
+    public bool BreakOpponentRow { get; set; }
+
+    /// <summary>The two guards back on (a new session in the plugin): the self-test's guard check leaves no row switched off.</summary>
+    public void ResetGuards()
+    {
+        _powerGuard = new FeatureGuard("warband-curve", (n, e) => Log.Info($"simulated: feature \"{n}\" disabled after {e.GetType().Name}: {e.Message}"));
+        _opponentGuard = new FeatureGuard("opponent-power", (n, e) =>
+        {
+            Log.Info($"simulated: feature \"{n}\" disabled after {e.GetType().Name}: {e.Message}");
+            Comps.SetOpponentPower(null);
+        });
+    }
 
     // The bridge to the synthetic Firestone compositions and the hero's figures on them, as Plugin.UpdateBridge computes them.
     private IReadOnlyDictionary<string, GuideEvidence>? _bridge;
@@ -76,12 +97,16 @@ internal sealed class HarnessWindow : Window
     /// <summary>The board held (HarnessData.Scenarios).</summary>
     public int Scenario => _scenario;
 
-    /// <summary>The board's power scene under the list (HarnessData.Power).</summary>
+    /// <summary>The board's power scene in the inset (HarnessData.Power).</summary>
     public string PowerScene => _power;
+
+    /// <summary>The opponent's power scene in the inset (HarnessData.OpponentPower).</summary>
+    public string OpponentPowerScene => _opponentPower;
 
     /// <summary>
     /// Holds another scenario's cards in its lobby (the bar's list, the self-test). A scenario is a game of its own: ticks and
-    /// colours are forgotten, as the plugin forgets them at the next game (CompTargetTracker.BeginGame), unless
+    /// colours are forgotten, as the plugin forgets them at the next game (CompTargetTracker.BeginGame), and the panel is
+    /// hidden between the two games as the plugin hides it (CompsPanel.Hide: a size given by + / − is forgotten), unless
     /// <paramref name="sameGame"/> (the lobby becoming known in the same game, say).
     /// </summary>
     public void SetScenario(int scenario, bool sameGame = false)
@@ -90,9 +115,83 @@ internal sealed class HarnessWindow : Window
         if (!sameGame)
         {
             _tracker.BeginGame(++_game);
+            Comps.Hide();
         }
 
         Refresh();
+    }
+
+    /// <summary>Shows another opponent's board in the inset (HarnessData.OpponentPowerScenes).</summary>
+    public void SetOpponentPower(string scene)
+    {
+        HarnessData.OpponentFacts(scene); // an unknown name throws here, before anything changes
+        _opponentPower = scene;
+        Refresh();
+    }
+
+    /// <summary>
+    /// The panel dropped at (<paramref name="left"/>, <paramref name="top"/>) as a hand would drop it in move mode
+    /// (PanelMover.Drop), then redrawn as the next update of the plugin would redraw it. A layout file that did not exist
+    /// before is removed again (C:\temp\BronzebeardHarness-ci\layout.json stays unwritten).
+    /// </summary>
+    public void DropPanel(double left, double top) => KeepingNoLayoutFile(() =>
+    {
+        _mover.Drop(Comps.Element, left, top);
+        Refresh();
+    });
+
+    /// <summary>The panel's corner pulled to (<paramref name="cornerX"/>, <paramref name="cornerY"/>) by its handle (PanelMover.ResizeTo).</summary>
+    public void ResizePanel(double cornerX, double cornerY) => KeepingNoLayoutFile(() => _mover.ResizeTo(Comps.Element, cornerX, cornerY));
+
+    /// <summary>
+    /// Clicks − (<paramref name="step"/> &lt; 0) or + in the inset as the mouse would: a button-up raised on its text bubbles to
+    /// the button's own handler. False when the button is not drawn.
+    /// </summary>
+    public bool ClickCount(int step)
+    {
+        var tag = step < 0 ? CompsPanel.MinusTag : CompsPanel.PlusTag;
+        var button = Descendants(Comps.Inset).OfType<Border>().FirstOrDefault(b => Equals(b.Tag, tag));
+        if (button?.Child is not TextBlock text)
+        {
+            return false;
+        }
+
+        text.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = UIElement.MouseUpEvent,
+        });
+        return true;
+    }
+
+    /// <summary>Clicks − or + until <paramref name="count"/> compositions are wanted (1 to 4); throws when the buttons cannot get there (a tick).</summary>
+    public void ClickCountTo(int count)
+    {
+        for (var tries = 0; _count != count && tries < 8; tries++)
+        {
+            ClickCount(count < _count ? -1 : +1);
+            UpdateLayout();
+        }
+
+        if (_count != count)
+        {
+            throw new ArgumentException($"--count {count}: − and + left it at {_count} (a guide ticked dims them)");
+        }
+    }
+
+    /// <summary>"Reset panel positions" (the bar's button, PanelMover.Reset).</summary>
+    public void ResetLayout() => KeepingNoLayoutFile(_mover.Reset);
+
+    /// <summary>True once the panel was given a size by its handle (PanelLayout.IsResized).</summary>
+    public bool PanelResized => _mover.IsResized(CompsPanel.PanelId);
+
+    private void KeepingNoLayoutFile(Action action)
+    {
+        var existed = File.Exists(LayoutPath);
+        action();
+        if (!existed && File.Exists(LayoutPath))
+        {
+            File.Delete(LayoutPath);
+        }
     }
 
     private int _game;
@@ -235,6 +334,18 @@ internal sealed class HarnessWindow : Window
             }
         }
 
+        if (options.OpponentPower != null)
+        {
+            if (HarnessData.OpponentPowerScenes.Contains(options.OpponentPower))
+            {
+                _opponentPower = options.OpponentPower;
+            }
+            else
+            {
+                Log.Warn($"--opp-power {options.OpponentPower}: expected {string.Join(", ", HarnessData.OpponentPowerScenes)}");
+            }
+        }
+
         Log.Written += line => Dispatcher.BeginInvoke(new Action(() => AppendLog(line)));
         AssetDownloaders.Initialize(Path.Combine(_folder, "images"));
         HarnessCards.Install();
@@ -248,7 +359,19 @@ internal sealed class HarnessWindow : Window
             (guide, fit) => Log.Info($"comp detail id={guide.Id} sections={fit.Shown.Count} of {fit.Total}"),
             guide => TargetContext.For(guide, _bridge, _heroEffects),
             action => action(),
+            action => _powerGuard.Run(action),
+            action => _opponentGuard.Run(() =>
+            {
+                if (BreakOpponentRow)
+                {
+                    throw new InvalidProgramException("simulated failure of the opponent's row");
+                }
+
+                action();
+            }),
+            line => Log.Info(line),
             element => CursorInside?.Invoke(element) ?? GuidePopup.IsCursorOver(element));
+        ResetGuards();
         Markers = new TavernMarkers(Overlay, id => Log.Info($"pin toggled: {id}"));
         _skip = new SkipCombatPanel(Overlay, _mover, () => Log.Info("Skip combat clicked (nothing is killed here)"));
         // Its own trinket stats cache is never polled here, so it never fetches: the harness hands ChoiceAdvisor synthetic
@@ -314,7 +437,15 @@ internal sealed class HarnessWindow : Window
         var targets = round.Targets;
         var note = !_lobby.Known && _lobby.All.Count > 0 ? "Lobby tribes unknown: every guide listed" : null;
         Comps.Show(round.Board, targets, cards.All.Select(c => c.CardId), CompGuideSources.HdtFree, null, note);
-        Comps.SetFooter(HarnessData.Power(_power));
+        Comps.SetPower(HarnessData.Power(_power));
+        var (opponent, opponentLine) = HarnessData.OpponentPower(_opponentPower, id => Database.GetCardFromId(id)?.LocalizedName ?? id);
+        if (opponentLine != _opponentLine)
+        {
+            _opponentLine = opponentLine; // as Plugin.UpdateOpponentPower: one line each time it changes
+            Log.Info(opponentLine);
+        }
+
+        Comps.SetOpponentPower(opponent);
         DrawScene(); // Bob's cards by name, once the names are known
         Highlights = TavernHighlights.For(HarnessData.Shop, targets, _bridge);
         var line = TavernHighlights.Summary(HarnessData.Shop, Highlights);
@@ -497,6 +628,10 @@ internal sealed class HarnessWindow : Window
         power.SelectedIndex = Math.Max(0, HarnessData.PowerScenes.ToList().IndexOf(_power));
         power.SelectionChanged += (_, _) => SetPower(HarnessData.PowerScenes[power.SelectedIndex]);
 
+        var opponentPower = new ComboBox { ItemsSource = HarnessData.OpponentPowerScenes.Select(p => "opp " + p).ToList(), Width = 110, Margin = new Thickness(0, 0, 14, 0) };
+        opponentPower.SelectedIndex = Math.Max(0, HarnessData.OpponentPowerScenes.ToList().IndexOf(_opponentPower));
+        opponentPower.SelectionChanged += (_, _) => SetOpponentPower(HarnessData.OpponentPowerScenes[opponentPower.SelectedIndex]);
+
         var choice = new ComboBox { ItemsSource = HarnessData.Choices.Select(c => c.Label).ToList(), Width = 110, Margin = new Thickness(0, 0, 14, 0) };
         choice.SelectedIndex = Math.Max(0, HarnessData.Choices.Select(c => c.Kind).ToList().IndexOf(_choiceKind));
         choice.SelectionChanged += (_, _) => ShowChoice(HarnessData.Choices[choice.SelectedIndex].Kind);
@@ -540,7 +675,7 @@ internal sealed class HarnessWindow : Window
         };
 
         var bar = new WrapPanel { Margin = new Thickness(8) };
-        foreach (var element in new UIElement[] { move, reset, size, board, power, choice, skip, detail, clear })
+        foreach (var element in new UIElement[] { move, reset, size, board, power, opponentPower, choice, skip, detail, clear })
         {
             bar.Children.Add(element);
         }

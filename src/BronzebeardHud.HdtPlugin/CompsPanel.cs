@@ -23,8 +23,19 @@ namespace BronzebeardHud.HdtPlugin;
 /// line shows that whole guide in a popup beside the panel, free of the panel's box (GuidePopup, after a short delay); the
 /// detail and the popup draw the sections with the same code (GuideView).
 ///
-/// Movable and resizable ("target-compositions", the id the panel always had: a place Ali saved stays valid), in the shop
-/// and in combat, off the screen while a choice is open in the shop (<see cref="Suspend"/>). Nothing is shrunk: every piece is built and measured in place, then what fits is shown (CompGuideLayout:
+/// Under the frame, the power inset (Ali, 2026-10-06: "the composition strength indicator out into a small inset under the
+/// main frame, framed by the + and − of the other feature"): the player's board against their hero's average, the opponent's
+/// against theirs (BoardPowerView, one row each, each under its own feature guard), between − on the left and + on the right.
+///
+/// Movable and resizable ("target-compositions", the id the panel always had: a place Ali saved stays valid), frame and inset
+/// together, in the shop and in combat, off the screen while a choice is open in the shop (<see cref="Suspend"/>). Its height
+/// (Ali, 2026-10-06: "with Move panels we set the window's default size and place; a press on + or − resizes the window to
+/// show the N best compositions"): a panel never resized by its handle is always sized to its content, N guide lines (− n +,
+/// or with a tick the targets shown: CompTargets.FitRows) and the inset; a panel resized by its handle keeps that box — its
+/// default size — until + or − is pressed in a game, then is sized to its content for the rest of the game. Sized to its
+/// content, it keeps the top of its box, or its bottom when the box is against the bottom, and grows up when there is no room
+/// below (PanelGrowth), never onto the game's zones. In move mode it shows its box, the one the handle edits.
+/// Nothing is shrunk: every piece is built and measured in place, then what fits is shown (CompGuideLayout:
 /// the targets never give way to the others, "k of n shown" by the title; a detail section that does not fit is left out whole, "k of n
 /// sections"). The tick boxes, the names, the ovals and the buttons are clickable while the overlay stays locked: HDT
 /// makes its window catch the mouse only over elements declared with IsOverlayHitTestVisible
@@ -58,7 +69,12 @@ internal sealed class CompsPanel
 
     private readonly Canvas _canvas;
     private readonly PanelMover _mover;
+
+    // The panel PanelMover moves: the frame with the list, and the power inset under it. Its own box has no background and no
+    // border; the frame wears the panel's background and its orange (cyan in move mode) border.
     private readonly Border _panel;
+    private readonly Border _frame;
+    private readonly Border _inset;
     private readonly Action<string> _toggle;
     private readonly Func<int> _count;
     private readonly Action<int> _changeCount;
@@ -67,6 +83,9 @@ internal sealed class CompsPanel
     private readonly Action<CompGuide, SectionFit> _detailShown;
     private readonly Func<CompGuide, string?> _contextFor;
     private readonly Action<Action> _run;
+    private readonly Action<Action> _powerRun;
+    private readonly Action<Action> _opponentRun;
+    private readonly Action<string> _log;
     private readonly TargetPanelView _view = new();
     private readonly GuidePopup _popup;
     private Dictionary<string, FrameworkElement> _shownLines = new(StringComparer.Ordinal);
@@ -77,15 +96,41 @@ internal sealed class CompsPanel
     private string? _source;
     private string? _status;
     private string? _note;
-    private WarbandComparison? _footer;
-    private string? _footerKey;
+    private WarbandComparison? _power;
+    private string? _powerKey;
+    private WarbandComparison? _opponent;
+    private string? _opponentKey;
     private string? _loggedDetail;
+    private string? _loggedInset;
+
+    // + or − was pressed in this game (outside move mode): a panel resized by its handle is sized to its content from then on,
+    // until the next game, a switch of move mode or "Reset panel positions". A panel never resized always is.
+    private bool _fitted;
+
+    // A press on + or − asks for one log line once the panel is resized: at the next redraw that comes with the targets the
+    // new number gives (Show), or at once when the number did not change (already 1 or 4).
+    private ResizeLog _resizeLog;
+
+    private enum ResizeLog
+    {
+        None,
+        AfterTargets,
+        Now,
+    }
+
+    // What the last redraw gave, for the log line of a resize: where the panel went, which edge it kept, the lines shown.
+    private PanelSpan? _span;
+    private CompGuideFit? _listFit;
+    private int _fitRows;
+
+    private bool _inRelayout;
+    private bool _relayoutAgain;
 
     // A redraw was asked while a choice hid the panel (Suspend): it is redrawn when it comes back, not merely shown again.
     private bool _staleWhileSuspended;
 
     /// <param name="toggle">Called with a guide id (CompGuide.Id) when its tick box is clicked.</param>
-    /// <param name="count">How many targets are wanted (settings.json), shown between − and +.</param>
+    /// <param name="count">How many targets are wanted (settings.json), shown in the title, set by − and + in the inset.</param>
     /// <param name="changeCount">Called with −1 or +1 when − or + is clicked.</param>
     /// <param name="pivotsFor">A guide's pivots (GuidePivots), under their own guard; null when that feature failed.</param>
     /// <param name="detailShown">Called once each time a guide's detail is opened, with what of it fits (the log line).</param>
@@ -94,13 +139,16 @@ internal sealed class CompsPanel
     /// the detail and the popup; null: no line.
     /// </param>
     /// <param name="run">Runs what a click or a resize triggers, under the panel's feature guard (a WPF handler is under none).</param>
+    /// <param name="powerRun">Draws the player's row of the inset, under its own guard: a row that throws is left out alone.</param>
+    /// <param name="opponentRun">Draws the opponent's row of the inset, under its own guard.</param>
+    /// <param name="log">Writes a line in HDT's log: a resize by + / −, a change of what the inset shows.</param>
     /// <param name="cursorOver">
     /// Whether the cursor is within an element, for the guide popup's MouseLeave (GuidePopup.IsCursorOver when null; the
     /// simulation's self-test swaps it).
     /// </param>
     public CompsPanel(Canvas canvas, PanelMover mover, Action<string> toggle, Func<int> count, Action<int> changeCount, Action openMeta,
         Func<CompGuide, IReadOnlyList<GuidePivot>?> pivotsFor, Action<CompGuide, SectionFit> detailShown, Func<CompGuide, string?> contextFor,
-        Action<Action> run, Func<FrameworkElement, bool>? cursorOver = null)
+        Action<Action> run, Action<Action> powerRun, Action<Action> opponentRun, Action<string> log, Func<FrameworkElement, bool>? cursorOver = null)
     {
         _canvas = canvas;
         _mover = mover;
@@ -112,20 +160,42 @@ internal sealed class CompsPanel
         _detailShown = detailShown;
         _contextFor = contextFor;
         _run = run;
-        _panel = new Border
+        _powerRun = powerRun;
+        _opponentRun = opponentRun;
+        _log = log;
+        _frame = new Border
         {
             Background = PanelBrush,
             BorderBrush = FrameBrush,
             BorderThickness = new Thickness(PanelFit.Border),
             CornerRadius = new CornerRadius(6),
             ClipToBounds = true,
+        };
+        _inset = new Border
+        {
+            Background = InsetBrush,
+            BorderBrush = FrameBrush,
+            BorderThickness = new Thickness(PanelFit.InsetBorder),
+            CornerRadius = new CornerRadius(6),
+        };
+        var stack = new StackPanel();
+        stack.Children.Add(_frame);
+        stack.Children.Add(_inset);
+        _panel = new Border
+        {
+            Background = Brushes.Transparent, // the gap between the frame and the inset catches a drag in move mode
+            Child = stack,
             Visibility = Visibility.Collapsed,
         };
         OverlayLayer.Add(_canvas, _panel);
         _canvas.SizeChanged += OnCanvasSizeChanged;
         _popup = new GuidePopup(canvas, PopupContent, () => _mover.MoveMode || _view.ShowsDetail || !IsVisible || Suspended, cursorOver ?? GuidePopup.IsCursorOver, run);
         _mover.MoveModeChanged += OnMoveModeChanged;
+        _mover.LayoutReset += OnLayoutReset;
     }
+
+    /// <summary>The inset's background: the panel's, a shade lighter at the top, so that it reads as a piece of its own.</summary>
+    private static readonly Brush InsetBrush = new LinearGradientBrush(Color.FromArgb(0xF2, 0x24, 0x24, 0x32), Color.FromArgb(0xF2, 0x10, 0x10, 0x18), 90);
 
     /// <summary>Shown by the plugin (in the shop and in combat), even while a choice hides it (<see cref="Suspended"/>).</summary>
     public bool IsVisible { get; private set; }
@@ -176,6 +246,12 @@ internal sealed class CompsPanel
     /// <summary>The panel on the canvas (the simulation's self-test reads its texts).</summary>
     public Border Element => _panel;
 
+    /// <summary>
+    /// What the frame draws now (its title and list, or a detail): a new element at every redraw, so that the self-test can
+    /// tell a panel put back as it was from one rebuilt. The panel's own child never changes (the frame and the inset).
+    /// </summary>
+    public UIElement Content => _frame.Child;
+
     /// <summary>True while a guide's detail stands in place of the list.</summary>
     public bool ShowsDetail => _view.ShowsDetail;
 
@@ -203,21 +279,53 @@ internal sealed class CompsPanel
         _status = status;
         _note = note;
         IsVisible = true;
+        if (_resizeLog == ResizeLog.AfterTargets)
+        {
+            _resizeLog = ResizeLog.Now; // the targets of the new number: this redraw is the resize + or − asked for
+        }
+
         Relayout();
     }
 
-    /// <summary>The board's power under the list (BoardPowerView, from WarbandCurve.Compare); null for none.</summary>
-    public void SetFooter(WarbandComparison? footer)
+    /// <summary>The player's row of the inset: the board against their hero's average (WarbandCurve.Compare); null for none.</summary>
+    public void SetPower(WarbandComparison? power)
     {
-        var key = footer == null ? null : footer.Line + "|" + footer.PowerText;
-        if (key == _footerKey)
+        var key = power == null ? null : power.Line + "|" + power.PowerText;
+        if (key == _powerKey)
         {
             return;
         }
 
-        _footerKey = key;
-        _footer = footer;
-        if (IsVisible)
+        _powerKey = key;
+        _power = power;
+        RelayoutIfShown();
+    }
+
+    /// <summary>The opponent's row of the inset: their board against their hero's average (OpponentPower.Compare); null for none.</summary>
+    public void SetOpponentPower(WarbandComparison? opponent)
+    {
+        var key = opponent == null ? null : opponent.Line + "|" + opponent.PowerText;
+        if (key == _opponentKey)
+        {
+            return;
+        }
+
+        _opponentKey = key;
+        _opponent = opponent;
+        RelayoutIfShown();
+    }
+
+    /// <summary>
+    /// Redraws when shown; asked during a redraw (a row's guard switching it off from inside it), once that redraw is over:
+    /// never a redraw within a redraw.
+    /// </summary>
+    private void RelayoutIfShown()
+    {
+        if (_inRelayout)
+        {
+            _relayoutAgain = true;
+        }
+        else if (IsVisible)
         {
             Relayout();
         }
@@ -228,6 +336,8 @@ internal sealed class CompsPanel
         IsVisible = false;
         _view.Back(); // out of the game: the next one starts on the list
         _loggedDetail = null;
+        _fitted = false; // the next game starts in the box Move panels gave
+        _resizeLog = ResizeLog.None;
         _panel.Visibility = Visibility.Collapsed;
         _popup.Hide();
         _popup.NewGame();
@@ -237,11 +347,42 @@ internal sealed class CompsPanel
     {
         _canvas.SizeChanged -= OnCanvasSizeChanged;
         _mover.MoveModeChanged -= OnMoveModeChanged;
+        _mover.LayoutReset -= OnLayoutReset;
         _popup.Detach();
         _canvas.Children.Remove(_panel);
     }
 
-    private void OnMoveModeChanged() => _run(_popup.Hide);
+    /// <summary>
+    /// Move mode shows the box Move panels edits: a panel sized by + / − goes back to it, and stays there once move mode is
+    /// off, until + or − is pressed again.
+    /// </summary>
+    private void OnMoveModeChanged() => _run(() =>
+    {
+        _popup.Hide();
+        _fitted = false;
+        RelayoutIfShown();
+    });
+
+    private void OnLayoutReset() => _fitted = false; // PanelMover redraws the panel right after
+
+    /// <summary>
+    /// − or + in the inset: one target less or more (settings.json), and, outside move mode, the panel sized to its content
+    /// from now on in this game: the N lines of the new number (PanelGrowth). One log line once it is resized.
+    /// </summary>
+    private void OnCountClicked(int step)
+    {
+        var before = _count();
+        var fit = !_mover.MoveMode;
+        _fitted |= fit;
+        _resizeLog = fit ? ResizeLog.AfterTargets : ResizeLog.None;
+        _changeCount(step); // the simulation redraws right away (Show, which logs the resize), the plugin at its next update
+        if (_resizeLog == ResizeLog.AfterTargets && _count() == before)
+        {
+            _resizeLog = ResizeLog.Now; // already 1 or 4: no new targets will come, the panel is sized at once
+        }
+
+        RelayoutIfShown();
+    }
 
     /// <summary>What the popup draws for a guide of the list, and where the panel and the other panels are; null when it left the list.</summary>
     private GuidePopupContent? PopupContent(string guideId)
@@ -481,7 +622,7 @@ internal sealed class CompsPanel
 
     /// <summary>
     /// "Compositions" — or, in a guide's detail, the "← All comp guides" button in its place, as HDT puts it at the top —
-    /// then the source, Meta ↗ and − n targets +.
+    /// then the source, Meta ↗ and "n targets" (− and + are in the inset).
     /// </summary>
     private FrameworkElement TitleBar(double scale, bool detail = false) => TitleBar(scale, detail, out _);
 
@@ -507,21 +648,18 @@ internal sealed class CompsPanel
             right.Children.Add(meta);
         }
 
-        // A tick silences the automatic guesses, which − n + counts: with a guide ticked, the targets are the ticked guides and
-        // the guides in progress (CompTargets.Choose), − and + have nothing to change, so they are dim and the title counts
-        // what was chosen.
+        // How many targets: − and + set it, in the inset under the frame. A tick silences the automatic guesses, which the
+        // number counts: with a guide ticked, the targets are the ticked guides and the guides in progress (CompTargets.Choose),
+        // − and + have nothing to change (dim), and the title counts what was chosen.
         var chosen = _targets.Count(t => t.Ticked);
         var n = chosen > 0 ? chosen : _count();
-        right.Children.Add(PanelButton("−", scale, () => _changeCount(-1), enabled: chosen == 0));
         var count = Text(chosen > 0
                 ? $"{n.ToString(CultureInfo.InvariantCulture)} chosen"
                 : $"{n.ToString(CultureInfo.InvariantCulture)} target{(n == 1 ? string.Empty : "s")}",
             PanelTypography.Small, scale, MutedBrush);
         count.TextWrapping = TextWrapping.NoWrap;
         count.VerticalAlignment = VerticalAlignment.Center;
-        count.Margin = new Thickness(5 * scale, 0, 5 * scale, 0);
         right.Children.Add(count);
-        right.Children.Add(PanelButton("+", scale, () => _changeCount(+1), enabled: chosen == 0));
         bar.Children.Add(right);
 
         shown = new TextBlock { FontSize = PanelTypography.Small * scale, Foreground = MutedBrush, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6 * scale, 0, 0, 0) };
@@ -545,11 +683,81 @@ internal sealed class CompsPanel
     }
 
     /// <summary>
-    /// The title, then either the list or one guide's detail, built and measured in place between the panel's top and
-    /// the room it has: the box the player gave it, otherwise down to the gold (it may have been moved).
+    /// The power inset: the player's row and the opponent's (BoardPowerView), each drawn under its own guard, between − on the
+    /// left and + on the right, dim and without effect while a guide is ticked (CompTargets.CountAdjustable). Returns which
+    /// rows were drawn (a row switched off by its guard is not).
+    /// </summary>
+    private (bool Own, bool Opponent) BuildInset(double scale)
+    {
+        var rows = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        bool AddRow(Action<Action> run, WarbandComparison? comparison, string tags)
+        {
+            var drawn = false;
+            if (comparison != null)
+            {
+                run(() =>
+                {
+                    var row = BoardPowerView.Build(comparison, scale, tags);
+                    row.Margin = new Thickness(0, rows.Children.Count > 0 ? PanelFit.InsetRowGap * scale : 0, 0, 0);
+                    rows.Children.Add(row);
+                    drawn = true;
+                });
+            }
+
+            return drawn;
+        }
+
+        var own = AddRow(_powerRun, _power, BoardPowerView.Own);
+        var opponent = AddRow(_opponentRun, _opponent, BoardPowerView.Opponent);
+
+        var adjustable = CompTargets.CountAdjustable(_targets);
+        var minus = PanelButton("−", scale, () => OnCountClicked(-1), enabled: adjustable);
+        var plus = PanelButton("+", scale, () => OnCountClicked(+1), enabled: adjustable);
+        minus.Tag = MinusTag;
+        plus.Tag = PlusTag;
+        minus.Margin = new Thickness(0, 0, 6 * scale, 0);
+        plus.Margin = new Thickness(6 * scale, 0, 0, 0);
+        var dock = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(minus, Dock.Left);
+        DockPanel.SetDock(plus, Dock.Right);
+        dock.Children.Add(minus);
+        dock.Children.Add(plus);
+        dock.Children.Add(rows);
+        _inset.Padding = new Thickness(4 * scale, PanelFit.InsetPadding * scale, 4 * scale, PanelFit.InsetPadding * scale);
+        _inset.Margin = new Thickness(0, PanelFit.InsetGap * scale, 0, 0);
+        _inset.Child = dock;
+        return (own, opponent);
+    }
+
+    /// <summary>Tags of the inset's − and + (the simulation's self-test finds them by them).</summary>
+    public const string MinusTag = "count-minus";
+    public const string PlusTag = "count-plus";
+
+    /// <summary>The power inset under the frame (the simulation's self-test reads it).</summary>
+    public Border Inset => _inset;
+
+    /// <summary>The frame with the title and the list or a detail, above the inset (the simulation's self-test reads it).</summary>
+    public Border Frame => _frame;
+
+    /// <summary>True while the panel is sized to its content (a panel never resized, or + / − pressed in this game).</summary>
+    public bool FitsContent => !_mover.MoveMode && (!_mover.IsResized(PanelId) || _fitted);
+
+    /// <summary>The span the panel was given by the last redraw sized to its content; null otherwise.</summary>
+    public PanelSpan? Span => _span;
+
+    /// <summary>
+    /// The frame with the title and either the list or one guide's detail, then the inset, built and measured in place. Its
+    /// height: sized to its content (<see cref="FitsContent"/>: N guide lines, or the whole detail) between the zones of the
+    /// game and the gold (PanelGrowth); otherwise the box the player gave it, or the default one down to the gold.
     /// </summary>
     private void Relayout()
     {
+        if (_inRelayout)
+        {
+            _relayoutAgain = true;
+            return;
+        }
+
         if (!IsVisible || Suspended || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
         {
             _staleWhileSuspended |= Suspended;
@@ -558,49 +766,132 @@ internal sealed class CompsPanel
             return;
         }
 
+        _inRelayout = true;
+        try
+        {
+            var passes = 0;
+            do
+            {
+                _relayoutAgain = false;
+                LayoutOnce();
+            }
+            while (_relayoutAgain && ++passes < 3);
+        }
+        finally
+        {
+            _inRelayout = false;
+        }
+    }
+
+    private void LayoutOnce()
+    {
         var width = _canvas.ActualWidth;
         var height = _canvas.ActualHeight;
         var scale = TavernLayout.Scale(height);
         var rect = TavernLayout.TargetPanel(width, height);
         var placed = _mover.Place(_panel, PanelId, rect, interactive: true,
-            new PanelResize(PanelFit.TargetMinWidth * scale, PanelFit.TargetMinHeight * scale, () => _run(Relayout)));
+            new PanelResize(PanelFit.TargetMinWidth * scale, PanelFit.TargetMinHeight * scale, () => _run(Relayout)), frame: _frame);
         var resized = _mover.IsResized(PanelId);
+        var boxLeft = Canvas.GetLeft(_panel);
+        var boxTop = Canvas.GetTop(_panel);
         _panel.Width = placed.Width;
-        _panel.MinHeight = resized ? Math.Min(rect.Height, placed.Height) : rect.Height;
-        var top = Canvas.GetTop(_panel);
-        var room = resized ? placed.Height : Math.Max(rect.Height, PanelFit.BottomLimit * height - top);
+        _panel.Visibility = Visibility.Visible;
+
+        // The inset first: the frame has what it leaves.
+        var (ownDrawn, opponentDrawn) = BuildInset(scale);
+        _inset.Measure(new Size(placed.Width, double.PositiveInfinity));
+        var insetBlock = _inset.DesiredSize.Height; // its gap above it included
+
         // The frame at its thickest, 3 px in move mode (PanelMover), which a switch of mode does not redraw: computed with
         // the 2 px of the normal frame, the content was 2 px wider than the room in move mode and cut on the right (found by
         // the simulation's self-test). Six ovals still fit: the last one's 4 px gap on the right is what gives way.
+        // Upright, the frame as drawn now: a switch of move mode redraws the panel (OnMoveModeChanged), and in the room between
+        // the boards and the gold, three targets in two tiers need the 2 px the thicker frame would take.
         var inner = Math.Max(0, placed.Width - 2 * (PanelFit.Padding * scale + Math.Max(PanelFit.Border, 3)));
-        var frame = 2 * (VerticalPadding * scale + Math.Max(PanelFit.Border, 3));
+        var chrome = 2 * (VerticalPadding * scale + (_mover.MoveMode ? 3 : PanelFit.Border));
         var lines = new StackPanel { Margin = new Thickness(PanelFit.Padding * scale, VerticalPadding * scale, PanelFit.Padding * scale, VerticalPadding * scale), Width = inner };
-        _panel.Child = lines;
-        _panel.Visibility = Visibility.Visible;
+        _frame.Child = lines;
+
+        var fit = FitsContent;
+        var boxHeight = resized ? placed.Height : rect.Height;
+        var fixedRoom = resized ? placed.Height : Math.Max(rect.Height, PanelFit.BottomLimit * height - boxTop);
+        _span = null;
+
+        // The room the frame's content gets once it says what it would like (N lines, or the whole detail): sized to it, the
+        // panel is placed by PanelGrowth from the box Move panels gives, never from where the last redraw put it.
+        double RoomFor(double content)
+        {
+            if (!fit)
+            {
+                return fixedRoom - insetBlock - chrome;
+            }
+
+            var box = new LayoutRect(boxLeft + placed.Width / 2, boxTop + boxHeight / 2, placed.Width, boxHeight);
+            var span = PanelGrowth.Place(box, content + chrome + insetBlock, PanelFit.TargetMinHeight * scale, height,
+                PanelGrowth.Obstacles(width, height, _mover.VisiblePanels(except: _panel)));
+            _span = span;
+            Canvas.SetTop(_panel, span.Top);
+            return span.Height - insetBlock - chrome;
+        }
 
         var guide = _view.DetailId is { } id ? _board.All.Select(p => p.Guide).FirstOrDefault(g => g.Id == id) : null;
         double needed;
         _shownLines = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
+        _fitRows = CompTargets.FitRows(_targets, _count());
+        _listFit = null;
         if (guide != null && DetailEnabled)
         {
-            needed = LayoutDetail(lines, guide, scale, height, inner, room - frame) + frame;
+            needed = LayoutDetail(lines, guide, scale, height, inner, RoomFor) + chrome;
         }
         else
         {
             _view.Back(); // the guide left HDT's list, or the detail was switched off
             _loggedDetail = null;
-            needed = LayoutList(lines, scale, height, inner, room - frame) + frame;
+            needed = LayoutList(lines, scale, height, inner, RoomFor, fit ? _fitRows : null) + chrome;
         }
 
-        // Never less than what is shown: a list always shows one line, even in a box too small for it.
-        _panel.MaxHeight = Math.Max(room, needed);
+        // Never less than what is shown: a list always shows one line, even in a box too small for it. Sized to its content,
+        // the frame is what it shows: less than its span when a line did not fit (a target left out takes no other guide's
+        // place), and a panel that kept its bottom keeps it then too. Otherwise never smaller than the default box.
+        var frameRoom = (_span is { } given ? given.Height : fixedRoom) - insetBlock;
+        _frame.MinHeight = fit ? 0 : Math.Max(0, (resized ? Math.Min(rect.Height, placed.Height) : rect.Height) - insetBlock);
+        _frame.MaxHeight = Math.Max(frameRoom, needed);
+
+        var frameHeight = Math.Max(_frame.MinHeight, Math.Min(_frame.MaxHeight, needed));
+        if (_span is { } span && frameHeight + insetBlock < span.Height)
+        {
+            var top0 = span.Anchor == PanelAnchor.Bottom ? span.Bottom - (frameHeight + insetBlock) : span.Top;
+            Canvas.SetTop(_panel, top0);
+            _span = new PanelSpan(top0, frameHeight + insetBlock, span.Anchor);
+        }
+
+        var top = Canvas.GetTop(_panel);
+        var insetHeight = insetBlock - PanelFit.InsetGap * scale;
+        var inset = new LayoutRect(boxLeft + placed.Width / 2, top + frameHeight + PanelFit.InsetGap * scale + insetHeight / 2, placed.Width, insetHeight);
+        var insetLine = PowerInset.Line(inset, ownDrawn ? _power : null, opponentDrawn ? _opponent : null);
+        if (insetLine != _loggedInset)
+        {
+            _loggedInset = insetLine;
+            _log(insetLine);
+        }
+
+        if (_resizeLog == ResizeLog.Now)
+        {
+            _resizeLog = ResizeLog.None;
+            var panel = new LayoutRect(boxLeft + placed.Width / 2, top + (frameHeight + insetBlock) / 2, placed.Width, frameHeight + insetBlock);
+            _log(PanelGrowth.ResizeLine(_count(), panel, _span?.Anchor ?? PanelAnchor.Top, _listFit?.RowsShown ?? 0, _fitRows, _listFit?.RowsTotal ?? 0));
+        }
 
         // Last, the panel being complete: the popup of a hovered line follows the redraw (no line in a detail: it hides).
         _popup.Listed(_shownLines);
     }
 
-    /// <summary>The list, as much of it as fits in <paramref name="room"/>; returns the height used.</summary>
-    private double LayoutList(StackPanel lines, double scale, double height, double inner, double room)
+    /// <summary>
+    /// The list, as much of it as fits in the room <paramref name="roomFor"/> gives once it knows what the list would like:
+    /// <paramref name="fitRows"/> guide lines (the panel sized to them), or as many as fit in a fixed box (null). Returns
+    /// the height used.
+    /// </summary>
+    private double LayoutList(StackPanel lines, double scale, double height, double inner, Func<double, double> roomFor, int? fitRows)
     {
         var chrome = new List<FrameworkElement> { TitleBar(scale, detail: false, out var shownCount) };
         shownCount.Text = "99 of 99 shown"; // the widest it will be, while measuring
@@ -619,30 +910,31 @@ internal sealed class CompsPanel
             chrome.Add(note);
         }
 
-        var pieces = new List<(FrameworkElement Element, Action? FillOvals, CompGuideItemKind Kind, int Group, bool Target, string? GuideId)>();
+        var pieces = new List<(FrameworkElement Element, Action? FillOvals, CompGuideItemKind Kind, int Group, int Rank, string? GuideId)>();
         var tiers = CompTargets.Tiers(_board, _targets);
         for (var g = 0; g < tiers.Count; g++)
         {
-            pieces.Add((TierHeader(tiers[g], scale), null, CompGuideItemKind.TierHeader, g, false, null));
+            pieces.Add((TierHeader(tiers[g], scale), null, CompGuideItemKind.TierHeader, g, 0, null));
             foreach (var progress in tiers[g].Rows)
             {
                 var (element, fill) = Row(progress, scale, height);
-                pieces.Add((element, fill, CompGuideItemKind.Row, g, CompTargets.Find(_targets, progress.Guide) != null, progress.Guide.Id));
+                pieces.Add((element, fill, CompGuideItemKind.Row, g, CompTargets.Find(_targets, progress.Guide)?.Rank ?? 0, progress.Guide.Id));
             }
         }
 
-        // The board's power: chrome, as the warband line was, so that guide lines give way before it does.
-        var footer = _footer != null ? BoardPowerView.Build(_footer, scale) : null;
-
         // Measured in place, so that the canvas's inherited font applies: the heights are the ones drawn.
-        foreach (var element in chrome.Concat(pieces.Select(p => p.Element)).Concat(footer != null ? new FrameworkElement[] { footer } : Array.Empty<FrameworkElement>()))
+        foreach (var element in chrome.Concat(pieces.Select(p => p.Element)))
         {
             lines.Children.Add(element);
         }
 
         lines.Measure(new Size(inner, double.PositiveInfinity));
-        var used = chrome.Sum(e => e.DesiredSize.Height) + (footer?.DesiredSize.Height ?? 0);
-        var items = pieces.Select(p => new CompGuideFitItem(p.Kind, p.Group, p.Element.DesiredSize.Height, p.Target)).ToList();
+        var used = chrome.Sum(e => e.DesiredSize.Height);
+        // A target is highlighted with its rank: when the targets do not all fit, the best stay (CompGuideLayout.Fit).
+        var items = pieces.Select(p => new CompGuideFitItem(p.Kind, p.Group, p.Element.DesiredSize.Height, p.Rank > 0, p.Rank)).ToList();
+
+        // Sized for N lines: the chrome and exactly the pieces Fit shows for N lines (CompGuideLayout.HeightFor).
+        var room = roomFor(fitRows is { } rows ? used + CompGuideLayout.HeightFor(items, rows) : double.PositiveInfinity);
         if (note != null && !CompGuideLayout.KeepsOptionalLine(items, room - used + note.DesiredSize.Height, note.DesiredSize.Height))
         {
             chrome.Remove(note); // the note gives way to a target's line, never the reverse
@@ -650,6 +942,7 @@ internal sealed class CompsPanel
         }
 
         var fit = CompGuideLayout.Fit(items, room - used, moreLineHeight: 0, atLeastOne: true);
+        _listFit = fit;
 
         lines.Children.Clear();
         foreach (var element in chrome)
@@ -672,20 +965,17 @@ internal sealed class CompsPanel
         shownCount.Text = fit.ShowsMoreLine
             ? $"{fit.RowsShown.ToString(CultureInfo.InvariantCulture)} of {fit.RowsTotal.ToString(CultureInfo.InvariantCulture)} shown"
             : string.Empty;
-        if (footer != null)
-        {
-            lines.Children.Add(footer);
-        }
 
         return used + shownHeight;
     }
 
     /// <summary>
     /// One guide's detail, in place of the list: "← All comp guides" in the title bar, its tick box, name and badges, its
-    /// line of Firestone context when it has one, then its sections in HDT's order, as many as fit, a section that does not
-    /// fit left out whole (CompGuideLayout.Sections). Returns the height used.
+    /// line of Firestone context when it has one, then its sections in HDT's order, as many as fit in the room
+    /// <paramref name="roomFor"/> gives for the whole detail, a section that does not fit left out whole
+    /// (CompGuideLayout.Sections). Returns the height used.
     /// </summary>
-    private double LayoutDetail(StackPanel lines, CompGuide guide, double scale, double height, double inner, double room)
+    private double LayoutDetail(StackPanel lines, CompGuide guide, double scale, double height, double inner, Func<double, double> roomFor)
     {
         var target = CompTargets.Find(_targets, guide);
         var chrome = new List<FrameworkElement> { TitleBar(scale, detail: true) };
@@ -734,7 +1024,9 @@ internal sealed class CompsPanel
 
         lines.Measure(new Size(inner, double.PositiveInfinity));
         var used = chrome.Sum(e => e.DesiredSize.Height);
-        var fit = CompGuideLayout.Sections(sections.Select(s => s.DesiredSize.Height).ToList(), room - used, more.DesiredSize.Height);
+        var heights = sections.Select(s => s.DesiredSize.Height).ToList();
+        var room = roomFor(used + heights.Sum()); // sized to its content, the panel takes what the whole detail asks for
+        var fit = CompGuideLayout.Sections(heights, room - used, more.DesiredSize.Height);
 
         lines.Children.Clear();
         foreach (var element in chrome)

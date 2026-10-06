@@ -63,7 +63,7 @@ internal sealed class PanelMover
 
     private readonly Canvas _canvas;
     private readonly string _path;
-    private readonly Dictionary<Border, (string Id, Brush Brush, Thickness Thickness, bool Interactive)> _panels = new();
+    private readonly Dictionary<Border, (string Id, Border Frame, Brush Brush, Thickness Thickness, bool Interactive)> _panels = new();
     private readonly Dictionary<Border, Resizer> _resizers = new();
     private readonly PanelLayout _layout;
     private Border? _dragged;
@@ -99,6 +99,12 @@ internal sealed class PanelMover
     public event Action? MoveModeChanged;
 
     /// <summary>
+    /// Raised by "Reset panel positions" once the layout is back to its defaults, before the panels redraw: what a panel
+    /// keeps of its own on top of its box (the "Compositions" panel sized by + / −) goes back to the default too.
+    /// </summary>
+    public event Action? LayoutReset;
+
+    /// <summary>
     /// Where the visible panels it places are on the canvas, but <paramref name="except"/>: what a popup of that panel
     /// must not cover (the Skip combat button).
     /// </summary>
@@ -125,13 +131,16 @@ internal sealed class PanelMover
     /// declared clickable to HDT only in move mode, so the game keeps its clicks around those children.
     /// A panel given a <paramref name="resize"/> can also be resized in move mode (pass it at every call: the
     /// minimum follows the window's scale). Returns the rectangle the panel has: its default one, or the one the
-    /// player gave it, raised to the minimum and kept inside the overlay.
+    /// player gave it, raised to the minimum and kept inside the overlay. A panel made of several boxes (the "Compositions"
+    /// panel and the power inset under it) names in <paramref name="frame"/> the one that wears the move-mode frame; by
+    /// default the panel itself.
     /// </summary>
-    public LayoutRect Place(Border panel, string panelId, LayoutRect defaultRect, bool interactive = false, PanelResize? resize = null)
+    public LayoutRect Place(Border panel, string panelId, LayoutRect defaultRect, bool interactive = false, PanelResize? resize = null, Border? frame = null)
     {
         if (!_panels.ContainsKey(panel))
         {
-            _panels[panel] = (panelId, panel.BorderBrush, panel.BorderThickness, interactive);
+            var framed = frame ?? panel;
+            _panels[panel] = (panelId, framed, framed.BorderBrush, framed.BorderThickness, interactive);
             panel.MouseLeftButtonDown += OnDown;
             panel.MouseMove += OnMove;
             panel.MouseLeftButtonUp += OnUp;
@@ -200,6 +209,7 @@ internal sealed class PanelMover
         }
 
         Save();
+        LayoutReset?.Invoke();
         foreach (var resizer in _resizers.Values)
         {
             resizer.Resize.Relayout(); // back to the default room at once, not at the next update
@@ -208,12 +218,12 @@ internal sealed class PanelMover
 
     private void Apply(Border panel)
     {
-        var (_, brush, thickness, interactive) = _panels[panel];
+        var (_, frame, brush, thickness, interactive) = _panels[panel];
         OverlayExtensions.SetIsOverlayHitTestVisible(panel, MoveMode);
         panel.IsHitTestVisible = MoveMode || interactive;
         panel.Cursor = MoveMode ? Cursors.SizeAll : null;
-        panel.BorderBrush = MoveMode ? MoveBorder : brush;
-        panel.BorderThickness = MoveMode ? new Thickness(3) : thickness;
+        frame.BorderBrush = MoveMode ? MoveBorder : brush;
+        frame.BorderThickness = MoveMode ? new Thickness(3) : thickness;
         if (_resizers.TryGetValue(panel, out var resizer))
         {
             OverlayExtensions.SetIsOverlayHitTestVisible(resizer.Handle, MoveMode);
@@ -316,11 +326,25 @@ internal sealed class PanelMover
         // the handle was grabbed, plus the handle's own side.
         var pointer = e.GetPosition(_canvas);
         var side = resizer.Handle.Width;
-        _layout.Resize(resizer.Id, resizer.Default, pointer.X - _handleGrab.X + side, pointer.Y - _handleGrab.Y + side,
-            resizer.Resize.Minimum, _canvas.ActualWidth, _canvas.ActualHeight);
+        ResizeTo(panel, pointer.X - _handleGrab.X + side, pointer.Y - _handleGrab.Y + side);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// The panel's bottom right corner pulled to (<paramref name="cornerX"/>, <paramref name="cornerY"/>), as the handle
+    /// pulls it (PanelLayout.Resize: the top left stays, the minimum and the overlay's edge hold), and the panel redrawn in
+    /// its new box at once. The simulation's self-test calls it where a hand would drag.
+    /// </summary>
+    internal void ResizeTo(Border panel, double cornerX, double cornerY)
+    {
+        if (!_resizers.TryGetValue(panel, out var resizer))
+        {
+            return;
+        }
+
+        _layout.Resize(resizer.Id, resizer.Default, cornerX, cornerY, resizer.Resize.Minimum, _canvas.ActualWidth, _canvas.ActualHeight);
         resizer.Resize.Relayout(); // the panel shows what fits in the new box, right now: "2 of 8 shown" follows the hand
         UpdateResizer(panel);
-        e.Handled = true;
     }
 
     private void OnHandleUp(object sender, MouseButtonEventArgs e)
@@ -389,11 +413,22 @@ internal sealed class PanelMover
         var panel = _dragged;
         _dragged = null;
         panel.ReleaseMouseCapture();
-        _layout.Store(_panels[panel].Id, Canvas.GetLeft(panel), Canvas.GetTop(panel), _canvas.ActualWidth, _canvas.ActualHeight);
+        Drop(panel, Canvas.GetLeft(panel), Canvas.GetTop(panel));
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// The panel dropped at (<paramref name="left"/>, <paramref name="top"/>): its place remembered (a size it was given
+    /// stays) and saved, its frame and handle following. The simulation's self-test calls it where a hand would drop.
+    /// </summary>
+    internal void Drop(Border panel, double left, double top)
+    {
+        Canvas.SetLeft(panel, left);
+        Canvas.SetTop(panel, top);
+        _layout.Store(_panels[panel].Id, left, top, _canvas.ActualWidth, _canvas.ActualHeight);
         Save();
         UpdateResizer(panel);
-        Log.Info($"Bronzebeard HUD: panel moved {_panels[panel].Id} to ({Canvas.GetLeft(panel):0},{Canvas.GetTop(panel):0})");
-        e.Handled = true;
+        Log.Info($"Bronzebeard HUD: panel moved {_panels[panel].Id} to ({left:0},{top:0})");
     }
 
     private void Save()

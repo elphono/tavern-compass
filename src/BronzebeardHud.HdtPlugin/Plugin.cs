@@ -40,6 +40,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _choiceGuard;
     private readonly FeatureGuard _selectionGuard;
     private readonly FeatureGuard _warbandGuard;
+    private readonly FeatureGuard _opponentPowerGuard;
     private readonly FeatureGuard _heroCompsGuard;
     private readonly FeatureGuard _compCountGuard;
     private readonly FeatureGuard _pinsGuard;
@@ -120,7 +121,10 @@ public sealed class Plugin : IPlugin
         _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
         // Replaces "trinket-choice": trinkets are now one kind of choice among discovers and Dark Gifts.
         _choiceGuard = new FeatureGuard("discover-advice", (n, e) => Disable(n, e, () => _choices?.Hide()));
-        _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _compsPanel?.SetFooter(null)));
+        // The two rows of the power inset under the panel, one guard each: a row that throws (computing it or drawing it)
+        // leaves the inset alone, the other row and the panel keep running.
+        _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _compsPanel?.SetPower(null)));
+        _opponentPowerGuard = new FeatureGuard("opponent-power", (n, e) => Disable(n, e, () => _compsPanel?.SetOpponentPower(null)));
         // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
         _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
@@ -621,7 +625,8 @@ public sealed class Plugin : IPlugin
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
         _compsPanel = new CompsPanel(Core.OverlayCanvas, _mover, ToggleGuide, () => _settings.SuggestedCompositions, ChangeSuggested, OpenMetaSnapshot,
-            PivotsFor, DetailShown, guide => TargetContext.For(guide, _bridge, _heroEffects), action => _compsGuard.Run(action));
+            PivotsFor, DetailShown, guide => TargetContext.For(guide, _bridge, _heroEffects), action => _compsGuard.Run(action),
+            action => _warbandGuard.Run(action), action => _opponentPowerGuard.Run(action), line => Log.Info(line));
         _markers = new TavernMarkers(Core.OverlayCanvas, TogglePin);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory);
@@ -642,6 +647,7 @@ public sealed class Plugin : IPlugin
         _warbandLine = null;
         _warbandRound = -1;
         _warbandLoggedRound = -1;
+        _opponentPowerLine = string.Empty;
         _guidesState = null;
         _guidesList = null;
         _guides = null;
@@ -704,6 +710,7 @@ public sealed class Plugin : IPlugin
         _opponentMmrGuard.Run(() => UpdateOpponentMmr(game));
         _choiceGuard.Run(() => UpdateChoice(game));
         _warbandGuard.Run(() => UpdateWarband(game));
+        _opponentPowerGuard.Run(() => UpdateOpponentPower(game));
         _skipCombatGuard.Run(() => UpdateSkipCombat(game));
     }
 
@@ -1005,10 +1012,10 @@ public sealed class Plugin : IPlugin
     }
 
     /// <summary>
-    /// Under the list of the panel, in the shop and in combat: the board's power, its attack plus health against the
-    /// average of the same hero at the same turn (Firestone warbandStats), drawn as a gauge and a coloured badge
-    /// (BoardPowerView, WarbandCurve.Compare's level), and one line per round in HDT's log, with the level
-    /// ("… · +18% power=even", "power=none (too early)").
+    /// The first row of the power inset under the panel, in the shop and in combat: the board's power, its attack plus health
+    /// against the average of the same hero at the same turn (Firestone warbandStats), drawn as four lamps, the lit one
+    /// glowing, and a coloured badge (BoardPowerView, WarbandCurve.Compare's level), and one line per round in HDT's log, with
+    /// the level ("… · +18% power=even", "power=none (too early)").
     /// </summary>
     private void UpdateWarband(GameV2 game)
     {
@@ -1022,7 +1029,7 @@ public sealed class Plugin : IPlugin
         if (hero == null)
         {
             _warbandLine = null;
-            _compsPanel.SetFooter(null);
+            _compsPanel.SetPower(null);
             return;
         }
 
@@ -1044,7 +1051,42 @@ public sealed class Plugin : IPlugin
         var comparison = WarbandCurve.Compare(round, WarbandCurve.BoardStats(HdtEntityAdapter.BoardMinionStats(game)), hero, _stats.Sources());
         _warbandRound = round;
         _warbandLine = comparison.Line + " " + comparison.PowerText;
-        _compsPanel.SetFooter(comparison);
+        _compsPanel.SetPower(comparison);
+    }
+
+    private string _opponentPowerLine = string.Empty;
+
+    /// <summary>
+    /// The second row of the power inset: the opponent's board against THEIR hero's average (OpponentPower) — in combat the
+    /// board being fought, as HDT snapshotted it when the combat began; in the shop the next opponent's last board HDT saw,
+    /// against their hero's average at the turn it was seen; grey with the reason without one. One line in HDT's log each
+    /// time it changes, with the measure it rests on (OpponentPower.LogLine).
+    /// </summary>
+    private void UpdateOpponentPower(GameV2 game)
+    {
+        if (_compsPanel == null || _stats == null)
+        {
+            return;
+        }
+
+        var phase = HdtEntityAdapter.Phase(game);
+        if (phase is not (OverlayPhase.Shop or OverlayPhase.Combat))
+        {
+            _opponentPowerLine = string.Empty;
+            _compsPanel.SetOpponentPower(null);
+            return;
+        }
+
+        var facts = HdtEntityAdapter.OpponentFacts(game, phase);
+        var comparison = OpponentPower.Compare(facts, _stats.Sources(), HdtEntityAdapter.HeroName);
+        var line = OpponentPower.LogLine(facts, comparison);
+        if (line != _opponentPowerLine)
+        {
+            _opponentPowerLine = line;
+            Log.Info(line);
+        }
+
+        _compsPanel.SetOpponentPower(comparison);
     }
 
     /// <summary>

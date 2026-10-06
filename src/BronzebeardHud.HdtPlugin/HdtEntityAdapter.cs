@@ -174,6 +174,62 @@ internal static class HdtEntityAdapter
     }
 
     /// <summary>
+    /// What the opponent's gauge reads (OpponentPower): the turn, the player's own hero (only logged), the PLAYER_ID of the
+    /// player fought in this combat — the hero in play that game.Opponent controls, as HDT's BattlegroundsBoardState finds it
+    /// —, the player's NEXT_OPPONENT_PLAYER_ID, each player's hero as the leaderboard shows it, and HDT's last known board of
+    /// those two (GameV2.GetBattlegroundsBoardStateFor, snapshotted when a combat begins: TagChangeActions
+    /// .OnBattlegroundsCombatSetupChange). Decompiled from HDT 1.58.9 (BattlegroundsBoardState.SnapshotCurrentBoard, GetSnapshot).
+    /// HDT mutating its entities meanwhile throws InvalidOperationException: the feature guard skips that update.
+    /// </summary>
+    public static OpponentFacts OpponentFacts(GameV2 game, OverlayPhase phase)
+    {
+        var entities = game.Entities.Values.ToList();
+        var combatId = 0;
+        if (phase == OverlayPhase.Combat)
+        {
+            var foe = entities.FirstOrDefault(e => e.IsHero && e.IsInZone(Zone.PLAY) && e.IsControlledBy(game.Opponent.Id));
+            combatId = foe?.GetTag(GameTag.PLAYER_ID) ?? 0;
+        }
+
+        var nextId = game.PlayerEntity?.GetTag(GameTag.NEXT_OPPONENT_PLAYER_ID) ?? 0;
+        var heroes = new Dictionary<int, string>();
+        foreach (var hero in entities.Where(e => e.IsHero && !string.IsNullOrEmpty(e.CardId) && e.HasTag(GameTag.PLAYER_LEADERBOARD_PLACE)))
+        {
+            var id = hero.GetTag(GameTag.PLAYER_ID);
+            if (id > 0 && !heroes.ContainsKey(id))
+            {
+                heroes[id] = BaseHeroId(hero);
+            }
+        }
+
+        var boards = new Dictionary<int, BoardSeen>();
+        foreach (var id in new[] { combatId, nextId }.Where(id => id > 0).Distinct())
+        {
+            var hero = entities.FirstOrDefault(e => e.IsHero && e.GetTag(GameTag.PLAYER_ID) == id);
+            var snapshot = hero == null ? null : game.GetBattlegroundsBoardStateFor(hero.Id);
+            var seenHero = snapshot?.Entities?.FirstOrDefault(e => e.IsHero && !string.IsNullOrEmpty(e.CardId));
+            if (snapshot != null && seenHero != null)
+            {
+                boards[id] = new BoardSeen(BaseHeroId(seenHero), snapshot.Turn,
+                    snapshot.Entities.Where(e => e.IsMinion).Select(e => (e.GetTag(GameTag.ATK), e.GetTag(GameTag.HEALTH))).ToList());
+            }
+        }
+
+        return new OpponentFacts(phase, game.GetTurnNumber(), PlayerHeroId(game), combatId, nextId, boards, heroes);
+    }
+
+    /// <summary>A hero's base id, skins mapped to their parent (HeroIdNormalizer), as the stats are keyed.</summary>
+    private static string BaseHeroId(HdtEntity hero)
+    {
+        var snapshot = ToSnapshot(hero);
+        return HeroIdNormalizer.Normalize(snapshot.CardId!, snapshot.ParentCardId);
+    }
+
+    /// <summary>A hero's English name from HearthDb ("no curve for Rakanishu"); its id when HearthDb does not know it.</summary>
+    public static string HeroName(string heroCardId) =>
+        HearthDb.Cards.All.TryGetValue(heroCardId, out var card) && !string.IsNullOrEmpty(card.Name) ? card.Name : heroCardId;
+
+    /// <summary>
     /// Lobby players (name and hero), as HDT already read them (GameMetaData.BattlegroundsLobbyInfo),
     /// the local player excluded. Empty until HDT has the lobby.
     /// </summary>
