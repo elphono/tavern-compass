@@ -798,11 +798,11 @@ internal sealed class CompsPanel
         _inset.Measure(new Size(placed.Width, double.PositiveInfinity));
         var insetBlock = _inset.DesiredSize.Height; // its gap above it included
 
-        // The frame at its thickest, 3 px in move mode (PanelMover), which a switch of mode does not redraw: computed with
-        // the 2 px of the normal frame, the content was 2 px wider than the room in move mode and cut on the right (found by
-        // the simulation's self-test). Six ovals still fit: the last one's 4 px gap on the right is what gives way.
-        // Upright, the frame as drawn now: a switch of move mode redraws the panel (OnMoveModeChanged), and in the room between
-        // the boards and the gold, three targets in two tiers need the 2 px the thicker frame would take.
+        // Across, the frame at its thickest, 3 px in move mode (PanelMover): computed with the 2 px of the normal frame, the
+        // content was 2 px wider than the room in move mode and cut on the right (found by the simulation's self-test). Six
+        // ovals still fit: the last one's 4 px gap on the right is what gives way. Upright, the frame as drawn now: a switch
+        // of move mode redraws the panel (OnMoveModeChanged), and in the room between the boards and the gold, three targets
+        // in two tiers need the 2 px the thicker frame would take.
         var inner = Math.Max(0, placed.Width - 2 * (PanelFit.Padding * scale + Math.Max(PanelFit.Border, 3)));
         var chrome = 2 * (VerticalPadding * scale + (_mover.MoveMode ? 3 : PanelFit.Border));
         var lines = new StackPanel { Margin = new Thickness(PanelFit.Padding * scale, VerticalPadding * scale, PanelFit.Padding * scale, VerticalPadding * scale), Width = inner };

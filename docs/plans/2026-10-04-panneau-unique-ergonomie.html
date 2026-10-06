@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Panneau unique Compositions</title>
-<meta name="description" content="Note de conception du 2026-10-04 : les sept demandes d'Ali sur les panneaux de compositions, la seconde passe du soir (survol, stats Firestone, choix), puis le 2026-10-06 (tribus du lobby, cases, puissance du board), ce qui reste à décider et à voir en jeu.">
+<meta name="description" content="Note de conception du 2026-10-04 : les sept demandes d'Ali sur les panneaux de compositions, la seconde passe du soir (survol, stats Firestone, choix), puis le 2026-10-06 (tribus du lobby, cases, puissance du board ; le soir, encart de puissance, + / − qui redimensionnent, jauge de l'adversaire), ce qui reste à décider et à voir en jeu.">
 <style>
   :root {
     --bg: #f7f7f4; --surface: #ffffff; --text: #1d1f24; --muted: #555b67; --border: #d6d9df; --soft: #eef0f3;
@@ -119,6 +119,16 @@
 <main>
   <h1>Panneau unique « Compositions »</h1>
   <p class="meta">Note de conception pour Ali, 2026-10-04. État : vu dans la simulation, pas encore sous HDT. Chaque section donne d'abord la décision ; le raisonnement est dessiné dessous, et les preuves sont repliées.</p>
+
+  <div class="pass2" style="border-left-color: var(--o-panel)">
+    <b>2026-10-06, soir : encart de puissance, + / − qui redimensionnent, jauge de l'adversaire.</b>
+    <ol>
+      <li><a href="#encart-avant-apres">§ 12.1 — Avant / après</a> : la jauge sort du cadre, − et + l'encadrent, les feux s'allument avec un halo.</li>
+      <li><a href="#encart-taille">§ 12.2 — + / −</a> : le panneau prend la hauteur des N meilleures compos, sans couvrir le jeu.</li>
+      <li><a href="#encart-adversaire">§ 12.4 — L'adversaire</a> : son plateau contre la courbe de son héros, en combat et en taverne.</li>
+      <li><a href="#encart-decisions">§ 12.5 — Décisions à confirmer</a> : plateau + main, case cochée, taille oubliée à la partie suivante.</li>
+    </ol>
+  </div>
 
   <div class="pass2" style="border-left-color: var(--ok)">
     <b>2026-10-06 : tribus du lobby, cases à cocher, puissance du board.</b>
@@ -1127,6 +1137,196 @@ Build succeeded.
       </tbody>
     </table>
     <p>Avant que chaque groupe de contrôles de la simulation soit gardé, trois de ces mutations la faisaient planter sans rapport : ce n'était pas une détection.</p>
+  </details>
+
+  <h2 id="encart">12. Encart de puissance, + / −, jauge de l'adversaire <span class="tag2">6 oct. soir</span></h2>
+  <p class="lead">La jauge sort du cadre pour un petit encart dessous, encadré de − et + ; ses feux s'allument avec un halo de leur couleur. Un appui sur + ou − donne au panneau la hauteur des N meilleures compos. Une seconde rangée, même composant, mesure le plateau de l'adversaire contre la moyenne de son héros. Vu dans la simulation, pas encore sous HDT.</p>
+  <div class="tiles">
+    <div class="tile"><b>1 → 4</b><span>lignes, une par appui sur + ou − ; le panneau prend juste leur hauteur</span></div>
+    <div class="tile"><b>2 rangées</b><span>votre plateau, puis celui de l'adversaire, chacune contre la courbe de son propre héros</span></div>
+    <div class="tile"><b>339 / 342 px</b><span>trois cibles sur deux tiers et l'encart, à la place par défaut en 1080p : la place entre les plateaux et l'or</span></div>
+  </div>
+
+  <h3 id="encart-avant-apres">12.1 Avant / après</h3>
+  <figure class="crop w1100">
+    <a href="img/2026-10-06-encart-puissance/avant-apres.png"><img src="img/2026-10-06-encart-puissance/avant-apres.png" width="1036" height="380" loading="lazy" alt="À gauche, avant : la jauge est une ligne en bas du cadre, − et + dans la barre de titre. À droite, après : le cadre ne garde que la liste, l'encart sous lui porte − à gauche, + à droite, et deux rangées de feux, la vôtre et celle de l'adversaire"></a>
+    <figcaption><b>Simulation, données inventées.</b> À gauche, avant (capture en mode déplacement, d'où le cadre cyan) : la jauge dans le pied du cadre, − et + dans le titre. À droite, après, comme en partie : l'encart sous le cadre, − et + l'encadrent, deux rangées de quatre feux (rouge, jaune, vert, or), le feu du palier allumé avec son halo ; le titre garde « 3 targets ».</figcaption>
+  </figure>
+
+  <h3 id="encart-taille">12.2 + / − : la hauteur des N meilleures compos</h3>
+  <div class="mech">
+    <figure>
+      <svg viewBox="0 0 340 330" role="img" aria-labelledby="t-grow">
+        <title id="t-grow">Trois cas de placement : avec de la place sous lui le panneau garde son haut et grandit vers le bas ; sans place sous lui il monte jusqu'aux plateaux, son bas sur la ligne de l'or ; posé en bas de l'écran il garde son bas et grandit vers le haut</title>
+        <defs>
+          <marker id="gw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--o-panel)"/></marker>
+        </defs>
+        <rect x="0" y="22" width="340" height="40" style="fill:var(--bad);opacity:.18"/>
+        <text x="170" y="47" font-size="15" text-anchor="middle" style="fill:var(--bad)">plateaux : jamais couverts</text>
+        <path d="M0 250 L340 250" style="stroke:var(--core);stroke-width:2;stroke-dasharray:6 4"/>
+        <text x="4" y="270" font-size="14" style="fill:var(--core)">ligne de l'or</text>
+        <path d="M0 316 L340 316" style="stroke:var(--text);stroke-width:2"/>
+        <text x="4" y="308" font-size="14" class="sub">bas de l'écran</text>
+
+        <rect x="8" y="74" width="96" height="70" rx="6" style="fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <rect x="8" y="74" width="96" height="120" rx="6" style="fill:var(--o-panel);opacity:.22;stroke:var(--o-panel);stroke-width:2"/>
+        <path d="M56 160 L56 188" class="wire" style="stroke:var(--o-panel)" marker-end="url(#gw)"/>
+        <text x="56" y="214" font-size="15" text-anchor="middle">garde</text>
+        <text x="56" y="232" font-size="15" text-anchor="middle">son haut</text>
+
+        <rect x="122" y="74" width="96" height="70" rx="6" style="fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <rect x="122" y="62" width="96" height="188" rx="6" style="fill:var(--o-panel);opacity:.22;stroke:var(--o-panel);stroke-width:2"/>
+        <path d="M170 150 L170 70" class="wire" style="stroke:var(--o-panel)" marker-end="url(#gw)"/>
+        <text x="170" y="182" font-size="15" text-anchor="middle">plus de place</text>
+        <text x="170" y="200" font-size="15" text-anchor="middle">dessous : monte</text>
+
+        <rect x="236" y="262" width="96" height="54" rx="6" style="fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <rect x="236" y="168" width="96" height="148" rx="6" style="fill:var(--o-panel);opacity:.22;stroke:var(--o-panel);stroke-width:2"/>
+        <path d="M284 300 L284 176" class="wire" style="stroke:var(--o-panel)" marker-end="url(#gw)"/>
+        <text x="284" y="112" font-size="15" text-anchor="middle">posé en bas :</text>
+        <text x="284" y="130" font-size="15" text-anchor="middle">garde son bas</text>
+      </svg>
+      <figcaption>En pointillé, la boîte que donne Move panels ; en bleu, le panneau dimensionné sur N lignes. Il part toujours de la boîte du layout, jamais de sa place au redessin d'avant : la même N tombe toujours au même endroit.</figcaption>
+    </figure>
+    <div>
+      <table class="cards">
+        <thead><tr><th>Le panneau…</th><th>Sa hauteur</th></tr></thead>
+        <tbody>
+          <tr><td data-label="Le panneau…">jamais redimensionné par sa poignée</td><td data-label="Sa hauteur"><b>toujours N lignes</b>, la barre de titre et l'encart : sa taille par défaut, c'est « N compos »</td></tr>
+          <tr><td data-label="Le panneau…">redimensionné par sa poignée</td><td data-label="Sa hauteur">sa boîte (la taille choisie dans Move panels), <b>jusqu'à un appui sur + ou −</b> ; puis N lignes jusqu'à la partie suivante</td></tr>
+          <tr><td data-label="Le panneau…">en mode déplacement</td><td data-label="Sa hauteur">la boîte que la poignée édite</td></tr>
+          <tr><td data-label="Le panneau…">après « Reset panel positions »</td><td data-label="Sa hauteur">place par défaut, N lignes</td></tr>
+          <tr><td data-label="Le panneau…">une case cochée</td><td data-label="Sa hauteur">− et + grisés ; N lignes, et au moins toutes les cibles (cochées et en cours) — pour qu'une autre compo reste là, à cocher</td></tr>
+        </tbody>
+      </table>
+      <p>Quand N lignes ne tiennent pas entre les plateaux et l'or, le panneau montre ce qui tient, <b>les meilleures cibles par rang</b> : jamais une cible moins probable, ni un guide sans couleur, à la place d'une cible laissée dehors. Un appui sur + ne fait plus disparaître une meilleure compo (vu dans la simulation, corrigé).</p>
+    </div>
+  </div>
+  <figure class="crop w1100">
+    <a href="img/2026-10-06-encart-puissance/n1-a-n4.png"><img src="img/2026-10-06-encart-puissance/n1-a-n4.png" width="1032" height="772" loading="lazy" alt="Quatre fois le panneau à sa place par défaut : une, deux, trois lignes, puis encore trois avec 4 targets au titre, la quatrième ne tenant pas"></a>
+    <figcaption><b>Simulation, 1920 × 1080.</b> En haut N = 1 et 2, en bas N = 3 et 4 : 177, 247, 339 et 339 px. À N = 3, les trois cibles sur deux tiers prennent toute la place entre les plateaux et l'or (à 3 px près) ; à N = 4, la quatrième (son tier en plus) ne tient pas : « 3 of 8 shown », les cibles 1, 2 et 3.</figcaption>
+  </figure>
+  <div class="duo">
+    <figure>
+      <a href="img/2026-10-06-encart-puissance/bas-ecran.png"><img src="img/2026-10-06-encart-puissance/bas-ecran.png" width="1036" height="440" loading="lazy" alt="Le panneau posé en bas de l'écran : à une ligne, il touche le bas ; à quatre, il a grandi vers le haut, toujours collé au bas"></a>
+      <figcaption>Posé en bas de l'écran (<code>--layout</code>) : il garde son bas et grandit vers le haut, jamais sur les plateaux.</figcaption>
+    </figure>
+    <figure>
+      <a href="img/2026-10-06-encart-puissance/cases.png"><img src="img/2026-10-06-encart-puissance/cases.png" width="1036" height="440" loading="lazy" alt="À gauche, sans case : deux cibles visibles, la troisième dans un troisième tier ne tient pas. À droite, Pirate Discover cochée : trois lignes, dont un guide non ciblé à cocher, − et + grisés, 1 chosen"></a>
+      <figcaption>À gauche, trois cibles sur trois tiers : deux tiennent (limite connue). À droite, une case cochée : trois lignes, dont un guide qu'on peut encore cocher ; − et + grisés.</figcaption>
+    </figure>
+  </div>
+  <figure class="crop w580">
+    <a href="img/2026-10-06-encart-puissance/mode-deplacement.png"><img src="img/2026-10-06-encart-puissance/mode-deplacement.png" width="510" height="380" loading="lazy" alt="En mode déplacement : le cadre en cyan, le cadre pointillé autour du cadre et de l'encart, la poignée au coin bas-droit, sur le +"></a>
+    <figcaption>En mode déplacement, on voit la boîte que la poignée édite : cadre et encart bougent ensemble, le pointillé les entoure tous deux. La poignée couvre le + : sans gêne, en mode déplacement les clics vont au déplacement. Dans cette boîte par défaut, l'encart prend la place de l'ancien pied : deux cibles sur trois.</figcaption>
+  </figure>
+
+  <h3 id="encart-feux">12.3 Les feux : un seul allumé, avec son halo</h3>
+  <figure class="crop w825">
+    <a href="img/2026-10-06-encart-puissance/feux-joueur.png"><img src="img/2026-10-06-encart-puissance/feux-joueur.png" width="741" height="486" loading="lazy" alt="Six encarts empilés : rangée du joueur rouge moins 33 %, jaune plus 18 %, vert plus 58 %, or plus 117 %, puis deux gris sans couleur ; la rangée de l'adversaire reste jaune"></a>
+    <figcaption><b>Rangée du joueur</b>, de haut en bas : ▼ −33 %, ≈ +18 %, ▲ +58 %, ★ +117 % (halo or), puis deux cas gris : pas de courbe, tours 1-2. Le palier se lit aussi par le signe et la place du feu, jamais par la couleur seule.</figcaption>
+  </figure>
+
+  <h3 id="encart-adversaire">12.4 La compo de l'adversaire</h3>
+  <div class="mech">
+    <figure>
+      <svg viewBox="0 0 340 300" role="img" aria-labelledby="t-opp">
+        <title id="t-opp">En combat, le plateau affronté, figé par HDT au début du combat, contre la moyenne de son héros à ce tour ; en taverne, le dernier plateau vu du prochain adversaire, contre la moyenne de son héros au tour où il a été vu</title>
+        <defs>
+          <marker id="ow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+        </defs>
+        <rect class="box" x="2" y="4" width="160" height="80" rx="8"/>
+        <text x="82" y="30" font-size="16" font-weight="700" text-anchor="middle">En combat</text>
+        <text x="82" y="52" font-size="15" class="sub" text-anchor="middle">le plateau affronté,</text>
+        <text x="82" y="72" font-size="15" class="sub" text-anchor="middle">figé au début</text>
+        <rect class="box" x="178" y="4" width="160" height="80" rx="8"/>
+        <text x="258" y="30" font-size="16" font-weight="700" text-anchor="middle">En taverne</text>
+        <text x="258" y="52" font-size="15" class="sub" text-anchor="middle">le prochain adversaire,</text>
+        <text x="258" y="72" font-size="15" class="sub" text-anchor="middle">dernier plateau vu</text>
+        <path class="wire" d="M82 84 L140 120" marker-end="url(#ow)"/>
+        <path class="wire" d="M258 84 L200 120" marker-end="url(#ow)"/>
+        <rect x="2" y="124" width="336" height="76" rx="8" style="fill:var(--surface);stroke:var(--o-panel);stroke-width:2.5"/>
+        <text x="170" y="152" font-size="16" font-weight="700" text-anchor="middle">courbe de SON héros</text>
+        <text x="170" y="176" font-size="15" class="sub" text-anchor="middle">au tour où le plateau a été vu</text>
+        <path class="wire" d="M100 200 L100 228" marker-end="url(#ow)"/>
+        <path class="wire" d="M262 200 L262 228" marker-end="url(#ow)"/>
+        <rect x="2" y="232" width="170" height="64" rx="8" style="fill:var(--ok-soft);stroke:var(--ok);stroke-width:2"/>
+        <text x="87" y="258" font-size="15" font-weight="700" text-anchor="middle">un feu, un %</text>
+        <text x="87" y="280" font-size="15" class="sub" text-anchor="middle">mêmes paliers</text>
+        <rect x="184" y="232" width="154" height="64" rx="8" style="fill:var(--surface);stroke:var(--muted);stroke-width:2;stroke-dasharray:6 4"/>
+        <text x="261" y="258" font-size="15" font-weight="700" text-anchor="middle">gris, la raison</text>
+        <text x="261" y="280" font-size="15" class="sub" text-anchor="middle">jamais votre courbe</text>
+      </svg>
+      <figcaption>Le plateau de l'adversaire n'est comparé qu'à la courbe de son héros. Un plateau d'il y a cinq tours contre la moyenne d'aujourd'hui lirait toujours « behind » : la taverne le compare donc au tour où il a été vu, et le dit.</figcaption>
+    </figure>
+    <div>
+      <table class="cards">
+        <thead><tr><th>Quand</th><th>Ce que dit la rangée</th></tr></thead>
+        <tbody>
+          <tr><td data-label="Quand">combat</td><td data-label="Ce que dit la rangée"><code>Opp. 160 · their hero avg 143 at turn 8</code>, badge « ≈ +12% »</td></tr>
+          <tr><td data-label="Quand">taverne, adversaire déjà affronté</td><td data-label="Ce que dit la rangée"><code>Next opp. 70 at turn 5 · their hero avg 50</code></td></tr>
+          <tr><td data-label="Quand">taverne, jamais affronté</td><td data-label="Ce que dit la rangée"><code>Next opp. Rakanishu – not fought yet</code>, gris</td></tr>
+          <tr><td data-label="Quand">prochain adversaire inconnu</td><td data-label="Ce que dit la rangée"><code>Next opp. – not known yet</code>, gris</td></tr>
+          <tr><td data-label="Quand">son héros sans courbe</td><td data-label="Ce que dit la rangée"><code>Opp. 160 · no curve for Rakanishu</code>, gris</td></tr>
+          <tr><td data-label="Quand">plateau du combat pas encore lu</td><td data-label="Ce que dit la rangée"><code>Opp. – board not read yet</code>, gris</td></tr>
+        </tbody>
+      </table>
+      <p>Ce qu'HDT expose, vérifié dans son code (HDT 1.58.9, décompilé) : au début de chaque combat il fige le plateau de l'adversaire (son héros et ses sbires, avec le tour) et le garde comme « dernier plateau connu » ; le plugin le lit par une méthode publique, et le prochain adversaire par une balise de l'entité du joueur. Il ne redessine pas ce plateau (HDT le montre déjà au survol du classement) : il n'ajoute que la jauge.</p>
+    </div>
+  </div>
+  <figure class="crop w825">
+    <a href="img/2026-10-06-encart-puissance/feux-adversaire.png"><img src="img/2026-10-06-encart-puissance/feux-adversaire.png" width="741" height="568" loading="lazy" alt="Sept encarts empilés : la rangée de l'adversaire rouge, jaune, vert, or, gris sans courbe, vert pour le prochain adversaire vu au tour 5, gris jamais affronté"></a>
+    <figcaption><b>Rangée de l'adversaire</b> (sa courbe inventée : 143 au tour 8, 50 au tour 5) : ▼ −37 %, ≈ +12 %, ▲ +47 %, ★ +110 %, pas de courbe, le prochain adversaire vu au tour 5, jamais affronté. Sur votre courbe (120), 160 se lirait +33 % : la ligne dit « their hero avg ».</figcaption>
+  </figure>
+
+  <h3 id="encart-decisions">12.5 Décisions prises à votre place (réversibles)</h3>
+  <table class="cards">
+    <thead><tr><th>Sujet</th><th>Décision</th><th>Pourquoi</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Sujet">« avec notre board seulement »</td><td data-label="Décision"><b>plateau + main gardés</b> : le classement ne change pas</td><td data-label="Pourquoi">la main, c'est ce que vous poserez au tour suivant, et c'était votre première demande (« board et main ») ; <b>à confirmer</b></td></tr>
+      <tr><td data-label="Sujet">taille donnée par + / −</td><td data-label="Décision">oubliée à la partie suivante pour un panneau redimensionné ; un panneau jamais redimensionné suit toujours N</td><td data-label="Pourquoi">« Move panels détermine la taille par défaut » ; la garder d'une partie à l'autre demanderait un champ de plus dans <code>layout.json</code> : <b>à confirmer</b></td></tr>
+      <tr><td data-label="Sujet">une case cochée</td><td data-label="Décision">N lignes, au moins toutes les cibles ; − et + grisés</td><td data-label="Pourquoi">dimensionné sur la seule case, le panneau cacherait les autres compos, et − / + grisés ne permettraient plus de les montrer pour en cocher une autre : <b>à confirmer</b></td></tr>
+      <tr><td data-label="Sujet">adversaire en taverne</td><td data-label="Décision">son dernier plateau vu, contre sa moyenne au tour où il a été vu</td><td data-label="Pourquoi">« le prochain adversaire est-il devant ? » ; comparé à la moyenne d'aujourd'hui, il lirait toujours « behind »</td></tr>
+      <tr><td data-label="Sujet">deux rangées, un encart</td><td data-label="Décision">votre plateau au-dessus, l'adversaire dessous</td><td data-label="Pourquoi">lisible d'un coup d'œil ; côte à côte, les chiffres n'auraient pas tenu dans la largeur du panneau</td></tr>
+      <tr><td data-label="Sujet">hauteur gardée dans <code>layout.json</code></td><td data-label="Décision">compte l'encart</td><td data-label="Pourquoi">un seul panneau à déplacer ; une boîte choisie avant laisse ≈ 42 px de conception de moins à la liste</td></tr>
+    </tbody>
+  </table>
+
+  <h3>12.6 Pas vu, à vérifier en partie</h3>
+  <ul>
+    <li><b>Rien n'a tourné sous HDT</b> : les feux et leur halo sur le vrai jeu, les clics de − et + au-dessus du jeu, le panneau qui suit N en partie. La simulation ne reproduit ni la couche d'HDT (clics transparents, survol sondé) ni sa lecture du plateau adverse : elle lui donne des faits inventés.</li>
+    <li><b>Le plateau adverse réel</b> : que le plateau figé par HDT soit bien celui du combat quand le plugin le lit, que le prochain adversaire soit le bon, les noms des héros. La ligne <code>opponent power …</code> du journal d'HDT le dira dès la première partie (plateau, héros, tour vu, moyenne).</li>
+    <li>En partie : l'encart (feux, halo, − et +) ; un appui sur + ou − et la ligne <code>targets n=… panel resized to …</code> ; la rangée « Opp. » en combat, « Next opp. » en taverne.</li>
+  </ul>
+  <details>
+    <summary>Preuves : tests, simulation, mutations</summary>
+    <table class="cards">
+      <thead><tr><th>Preuve</th><th>Chiffre</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Preuve"><code>dotnet test</code> (Stats + LogParser + GameState + App)</td><td data-label="Chiffre">602 + 23 + 52 + 7 = 684 verts (640 avant) ; chaque test nouveau vu rouge avant le code</td></tr>
+        <tr><td data-label="Preuve">Simulation <code>--selftest</code></td><td data-label="Chiffre">78 contrôles, ALL PASSED (61 avant)</td></tr>
+        <tr><td data-label="Preuve">Build Release du plugin contre HDT 1.58.9</td><td data-label="Chiffre">0 avertissement, 0 erreur</td></tr>
+        <tr><td data-label="Preuve">Mutations sur une copie du dépôt, suite entière et simulation, <code>bin/obj</code> purgés</td><td data-label="Chiffre">25 sur 25 détectées, copie verte avant et après</td></tr>
+      </tbody>
+    </table>
+    <table class="cards">
+      <thead><tr><th>Mutation</th><th>Ce qui tombe</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Mutation">hauteur de N lignes : une ligne de trop ; barres de tier oubliées</td><td data-label="Ce qui tombe">7 et 8 tests ; 2 et 4 contrôles</td></tr>
+        <tr><td data-label="Mutation">cibles prises dans l'ordre de la liste, pas par rang</td><td data-label="Ce qui tombe">1 test ; 1 contrôle (N = 1 à 4)</td></tr>
+        <tr><td data-label="Mutation">une cible laissée dehors remplacée par un guide non ciblé</td><td data-label="Ce qui tombe">1 test</td></tr>
+        <tr><td data-label="Mutation">ancrage : jamais le bas ; le bas dès la ligne de l'or</td><td data-label="Ce qui tombe">1 test et 1 contrôle chacune</td></tr>
+        <tr><td data-label="Mutation">bornes : monte à travers les plateaux ; descend sur une zone ; pas de bornage à l'écran</td><td data-label="Ce qui tombe">3, 2 et 1 tests ; 2 contrôles pour la première</td></tr>
+        <tr><td data-label="Mutation">halo : shiny pâle ; le gris brille ; « even » allume le vert</td><td data-label="Ce qui tombe">1 test chacune ; 2 contrôles pour la dernière</td></tr>
+        <tr><td data-label="Mutation">rendu : tout feu allumé brille en jaune</td><td data-label="Ce qui tombe">7 contrôles</td></tr>
+        <tr><td data-label="Mutation">− / + actifs avec une case ; − jamais grisé au rendu</td><td data-label="Ce qui tombe">3 tests et 1 contrôle ; 3 contrôles</td></tr>
+        <tr><td data-label="Mutation">case cochée : dimensionné sur les seules cibles</td><td data-label="Ce qui tombe">2 tests</td></tr>
+        <tr><td data-label="Mutation">adversaire : votre courbe (combat, taverne), repli sur votre courbe, moyenne du tour courant, plateau d'un tour antérieur</td><td data-label="Ce qui tombe">4, 1, 1, 1 et 1 tests ; 6, 1, 1, 1 et 0 contrôles</td></tr>
+        <tr><td data-label="Mutation">un appui ne dimensionne pas ; la partie suivante garde la taille ; boîte périmée</td><td data-label="Ce qui tombe">1 contrôle chacune</td></tr>
+        <tr><td data-label="Mutation">les deux rangées sous un même garde-fou</td><td data-label="Ce qui tombe">1 contrôle</td></tr>
+      </tbody>
+    </table>
+    <p>Non éprouvé : la lecture d'HDT elle-même (le héros contrôlé par <code>game.Opponent</code>, <code>NEXT_OPPONENT_PLAYER_ID</code>), qui ne s'exécute qu'avec HDT. Le détail, nom par nom, est dans <code>docs/journal/2026-10-06-encart-puissance-resize.md</code>.</p>
   </details>
 </main>
 </body>

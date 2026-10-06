@@ -41,6 +41,13 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 
 Ce qui reste ouvert :
 
+- **Vérifier en jeu l'encart de puissance et le resize par + / −** (2026-10-06, `docs/journal/2026-10-06-encart-puissance-resize.md`,
+  note HTML § 12) : l'encart sous le cadre (feux, halo, − à gauche, + à droite), le panneau qui suit N à chaque appui
+  (ligne `targets n=… panel resized to …`), son bas gardé en bas d'écran, la boîte de la poignée gardée jusqu'à un appui ; la
+  rangée de l'adversaire (ligne `opponent power …` : plateau, héros, tour vu, moyenne), en combat le plateau affronté, en
+  taverne le dernier plateau vu du prochain adversaire. **Trois arbitrages à confirmer par Ali** : « avec notre board
+  seulement » gardé plateau + main ; une case cochée garde N lignes (au moins toutes les cibles) ; la taille donnée par
+  + / − oubliée à la partie suivante. Vus seulement dans la simulation (`--count`, `--opp-power`, `--play`).
 - **Vérifier en jeu le filtre des tribus du lobby, la règle des cases et l'indicateur de puissance** (2026-10-06,
   `docs/journal/2026-10-06-tribus-cases-puissance.md`, note HTML § 11) : la ligne `lobby tribes=[…] read at …` (quand HDT a
   les tribus : jamais mesuré, seulement déduit), `lobby tribes=[…] (…): k/n guides playable; left out: …` ; plus aucune
@@ -138,15 +145,19 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   l'overlay : `{"schema": 1, "panels": {"target-compositions": {"left": 0.76, "top": 0.07}}}`. Un fichier illisible
   donne la disposition par défaut (message dans le journal d'HDT) ; « Reset panel positions » la rétablit.
   Une entrée d'un panneau qui n'existe plus (`combats`, `lineups`, `comp-guides`) est ignorée sans message.
-  Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas.
+  Les marqueurs attachés à une carte, un héros ou une tuile du classement ne bougent pas. Le panneau « Compositions » et
+  son encart de puissance (dessous) sont un seul panneau pour `PanelMover` (même clé, même entrée de `layout.json`) : ils
+  bougent, se redimensionnent et se cachent ensemble ; en mode déplacement, le cadre principal porte la bordure cyan
+  (`PanelMover.Place(…, frame:)`) et le cadre pointillé entoure les deux.
 - Redimensionner (même mode : poignée ◢ au coin bas-droit du panneau « Compositions », cadre
   pointillé cyan autour de la place donnée ; **pas de poignée sur Skip combat**, un bouton n'a rien à montrer en plus
   ou en moins). On donne de la **place** au contenu, jamais un zoom (Ali, 2026-10-04) : le panneau montre plus ou
   moins de guides (« 2 of 15 shown ») ou de sections du détail, au même corps de texte, donc le plancher de
   12 px tient. La taille est gardée à côté de la position, `"width"` et `"height"` en fractions de l'overlay,
   facultatifs ensemble : `{"left": 0.76, "top": 0.07, "width": 0.22, "height": 0.5}` ; un fichier sans taille se lit
-  comme avant, et « Reset panel positions » rend aussi la taille. Minimum (`PanelFit.TargetMin*`) : la largeur par
-  défaut (case, nom, six ovales) et le titre + 1 ligne. Une boîte plus petite que ce que le panneau montre toujours
+  comme avant, et « Reset panel positions » rend aussi la taille. La hauteur gardée compte l'encart de puissance
+  (2026-10-06) : une boîte choisie avant laisse ≈ 42 px de conception de moins à la liste. Minimum (`PanelFit.TargetMin*`) :
+  la largeur par défaut (case, nom, six ovales), le titre + 1 ligne et l'encart. Une boîte plus petite que ce que le panneau montre toujours
   (une ligne de guide, sous la barre de son tier) grandit pour le tenir. Hors mode déplacement la boîte épouse son
   contenu jusqu'à la taille choisie. La poignée et le cadre sont des éléments du canvas gérés par `PanelMover`, pas
   des enfants du panneau, qui remplace tout son contenu à chaque redessin. La poignée **ne garde aucun rectangle** :
@@ -158,6 +169,24 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   `Tolerance` : une boîte exactement de la hauteur de n lignes, divisée par une échelle qui n'est pas une fraction
   binaire, rendait n − 1 lignes) est retiré depuis la fusion : le panneau unique mesure ses pièces en place, en pixels
   de l'overlay, et `CompGuideLayout` décide ce qui tient (`Fit` et `Sections`, avec la même tolérance).
+- **Hauteur réglée par + / −** (Ali, 2026-10-06 : « avec move panel on détermine la taille et l'emplacement par défaut ; un
+  appui sur les + ou − resize la fenêtre pour afficher les N meilleurs compos »). Hors mode déplacement, un panneau
+  **jamais redimensionné par sa poignée** est toujours dimensionné sur son contenu : N lignes (`CompTargets.FitRows` :
+  − n + ; avec une case cochée, au moins toutes les cibles), la barre de titre et l'encart ; « Reset panel positions »
+  le remet dans ce cas. Un panneau **redimensionné par sa poignée** garde sa boîte (sa taille par défaut) jusqu'à un appui
+  sur + ou − dans la partie, puis est dimensionné sur son contenu jusqu'à la partie suivante (`CompsPanel.Hide`) ou un
+  changement de mode déplacement ; en mode déplacement on voit toujours la boîte que la poignée édite. Le détail d'un
+  guide, dimensionné, prend la hauteur de toutes ses sections. Placement (`PanelGrowth.Place`, testé) : le panneau garde
+  le haut de sa boîte et grandit vers le bas jusqu'à la ligne de l'or (`PanelFit.BottomLimit`) ; une boîte posée **sous**
+  cette ligne (en bas de l'écran) garde son bas et grandit vers le haut ; sans place en dessous il monte jusqu'à la
+  première zone du jeu ou le premier panneau au-dessus de lui (plateaux, classement, héros : `GuidePopupLayout.GameZones` ;
+  Skip combat), jamais hors de l'écran ; si même là les N lignes ne tiennent pas, il montre ce qui tient (« k of n
+  shown »), les **meilleures cibles par rang** (`CompGuideLayout.Fit` : jamais un guide qui n'est pas une cible à la place
+  d'une cible laissée dehors), et se resserre sur ce qu'il montre. Le placement part toujours de la boîte du layout, jamais
+  de la place du dernier redessin (pas de dérive). Mesuré dans la simulation en 1080p à la place par défaut : N = 1 →
+  177 px, 2 → 247, 3 (deux tiers) → 339 (≈ 3 px de marge entre les plateaux et l'or), 4 → 3 lignes sur 4 ; trois cibles
+  dans trois tiers → 2 lignes. Journal : `targets n=4 panel resized to (1181,682 488x339) anchor=bottom lines=3/4 shown,
+  of 8` par appui.
 - Encart des héros proposés (sélection du héros, fixe) : sous le bouton de reroll du jeu (« Réinitialiser »,
   0,632 → 0,718 H), de 0,725 à 0,805 H, 0,17 H de large, dans la colonne du héros (grille d'HDT, un héros tous
   les 340/1080 H). Un encart qui approcherait à moins de 0,01 H du bouton OK (0,751 → 0,825 H) se décale de
@@ -177,10 +206,11 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   mesure et forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. **Seuls les guides que le lobby peut jouer
   sont listés** (`LobbyGuides`, ci-dessous ; la liste gratuite de HDT n'est pas filtrée) ; tant que HDT n'a pas les tribus,
   une ligne grise « Lobby tribes unknown: every guide listed ». Titre : « Compositions », « k of n shown »
-  quand des guides manquent, la source (« HDT free » / « Tier 7 »), « Meta ↗ », « − n targets + » (1 à 4, 3 par défaut,
+  quand des guides manquent, la source (« HDT free » / « Tier 7 »), « Meta ↗ », « n targets » (1 à 4, 3 par défaut,
   gardé dans `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}` ; dès qu'une
-  compo est cochée le titre dit « k chosen » et − / + sont grisés, sans effet) ; une ligne dorée tant que HDT n'a pas de
-  guides.
+  compo est cochée il dit « k chosen ») ; une ligne dorée tant que HDT n'a pas de guides. **− et + sont dans l'encart de
+  puissance**, sous le cadre (− à gauche, + à droite, depuis le 2026-10-06) : ils changent n et redimensionnent le panneau
+  (ci-dessus) ; grisés et sans effet dès qu'une compo est cochée (`CompTargets.CountAdjustable`).
 - **Cibles** (`CompTargetTracker`, `CompTargets.Choose`) : **une case cochée désigne la compo visée sans effacer ce qu'on
   construit** (Ali, 2026-10-04 : « une compo checkboxée est une compo vers laquelle on veut se diriger » ; 2026-10-06 :
   « quand je click sur une checkbox ça enlève d'autres compos […] celles que j'étais en train de jouer »). S'il y a des
@@ -200,11 +230,22 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   par `HdtEntityAdapter.LobbyTribeNames` (mémoire du jeu lue par HDT), redemandées une fois par seconde au plus tant
   qu'inconnues, puis gardées pour la partie ; **inconnues : rien n'est écarté**, et le panneau le dit. Une case cochée sur
   un guide que le lobby, une fois connu, ne joue pas est décochée (une ligne de journal).
-- **Puissance du board** (`BoardPowerView`, `BoardPowerLevels`, 2026-10-06, sous la liste, à la place de l'ancienne ligne
-  « Board … · +18% ») : une jauge de quatre segments (rouge, jaune, vert, or ; le palier allumé), un badge de la couleur
-  du palier avec son signe et le pourcentage (« ▼ −33% », « ≈ +18% », « ▲ +58% », « ★ +117% », doré lumineux), puis
-  « Board 190 · hero avg 120 at turn 8 ». Paliers en tours de croissance de la courbe (×1,8 par tour, mesuré) : < −25 %
-  rouge, jusqu'à +34 % jaune, jusqu'à +80 % vert, au-delà shiny. Sans couleur (segments gris, « – », raison écrite) : pas
+- **Puissance du board** (`BoardPowerView`, `BoardPowerLevels`, 2026-10-06) : **dans un encart sous le cadre** (Ali, le
+  soir : « on sort l'indicateur de force de compo pour en faire un petit encart en dessous du cadre principal […] un effet
+  lumineux sur le composant feu rouge ; on l'encadre des + et − »), aussi large que le panneau, entre − et + : deux
+  rangées, chacune quatre feux dans un boîtier sombre (rouge, jaune, vert, or ; le feu du palier allumé avec un halo de
+  sa couleur, `BoardPowerLevels.Halo`, or profond pour shiny ; les autres éteints), un badge de la couleur du palier avec
+  son signe et le pourcentage (« ▼ −33% », « ≈ +18% », « ▲ +58% », « ★ +117% », doré lumineux), puis les chiffres.
+  **Rangée du joueur** : « Board 190 · hero avg 120 at turn 8 ». **Rangée de l'adversaire** (`OpponentPower`, même code de
+  rendu) : son plateau contre la moyenne de **son** héros (jamais la courbe du joueur) — en combat le plateau affronté, tel
+  qu'HDT le fige au début du combat (`GameV2.GetBattlegroundsBoardStateFor`, héros en jeu contrôlé par `game.Opponent`) :
+  « Opp. 160 · their hero avg 143 at turn 8 » ; en taverne le dernier plateau vu du prochain adversaire
+  (`NEXT_OPPONENT_PLAYER_ID`), contre la moyenne de son héros au tour où il a été vu : « Next opp. 70 at turn 5 · their
+  hero avg 50 » ; sans donnée, gris et la raison (« Next opp. – not known yet », « Next opp. Rakanishu – not fought yet »,
+  « Opp. – board not read yet », « no curve for Rakanishu »). Chaque rangée a son garde-fou (`warband-curve`,
+  `opponent-power`) : une rangée qui lève est retirée seule. L'encart est caché avec le panneau pendant un choix.
+  Paliers en tours de croissance de la courbe (×1,8 par tour, mesuré) : < −25 %
+  rouge, jusqu'à +34 % jaune, jusqu'à +80 % vert, au-delà shiny. Sans couleur (feux gris, aucun halo, « – », raison écrite) : pas
   de courbe, pas de moyenne au tour, moyenne < 12 (« too early »), courbe qui retombe à ce tour (« curve falls after turn
   16 »), héros sous 100 parties (« few games (78) »). Global seulement : Firestone n'a pas de courbe par compo.
   Liste dans l'ordre de HDT par tier (S → D, barres aux dégradés de HDT), les cibles en tête de leur tier ; une ligne =
@@ -266,7 +307,11 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   lobby) ; `warband round=… hero=… Board … · +18% power=even` (`power=none (too early)`) ; `tavern highlights=[carte:core|enabler|addon:guide, carte:boards
   3/5:guide, …] targets=[…]` quand ils changent (`TavernHighlights.Summary`) ; `choice kind=…` par choix (raison et
   évidence de chaque étiquette) ; `choice open: markers and panel hidden` / `choice closed: restored` à chaque transition ;
-  `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]`.
+  `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]` ; `targets n=4 panel resized to (x,y w×h)
+  anchor=top|bottom lines=k/N shown, of m` à chaque appui sur + ou − (hors mode déplacement) ; `power inset at (x,y w×h): you
+  ▲ +58% (ahead) · opp ≈ +12% (even)` quand ce que montre l'encart change (`– (none: too early)` sans donnée, `off` pour une
+  rangée coupée) ; `opponent power scope=combat|next|none id=… hero=… (yours …) turn=… seen=… board=… (k minions) · Opp. …
+  power=…` quand la jauge de l'adversaire change.
 - Les compositions de Firestone (`CompService`, `TavernAdvisor`, `CompositionRows`, `CompDetail`, `CompTransitions`,
   `MinionLineups`) restent chargées et dans le code ; elles ne sont plus affichées en liste (hors ligne « comp ≈ » de
   l'encart des héros), mais orientent les aides par le pont ci-dessous. Une erreur d'un fichier de `manual\` est dite une
@@ -291,9 +336,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   les vrais panneaux (`PanelMover`, « Compositions » et son popup de survol, cadres sur les cartes de Bob, Skip combat, étiquettes des choix) dans une fenêtre Windows ordinaire, sans
   HDT ni partie, avec des données synthétiques (dont deux compos Firestone inventées pour le pont, un contre-exemple
   « no match », un lobby de cinq tribus par scénario — `--scenario 3` sans morts-vivants, `4` lobby inconnu, `5` cases —
-  et une courbe de héros inventée pour la jauge, `--power behind|even|ahead|shiny|none|early`) ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
+  et une courbe de héros inventée pour la jauge, `--power behind|even|ahead|shiny|none|early`, une autre pour le héros
+  adverse, `--opp-power behind|even|ahead|shiny|none|next|unseen` ; `--count n` clique − / + jusqu'à n, `--play` coupe le
+  mode déplacement) ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
   la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. Elle ne simule
-  pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) : un défaut qui y vivrait ne s'y voit pas.
+  pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) ni la lecture d'HDT (plateau adverse,
+  `NEXT_OPPONENT_PLAYER_ID` : faits synthétiques) : un défaut qui y vivrait ne s'y voit pas.
 - Le dépôt est **privé** (il était public jusqu'au 2026-09-26) : on garde malgré tout la règle
   qu'aucune donnée réelle de Firestone ni de HSReplay n'y entre ; les tests utilisent des données
   synthétiques.
@@ -437,7 +485,7 @@ Fixtures can be chained to build up a full timeline.
 | Dossier | Contenu |
 |---|---|
 | `docs/plans/` | 2026-03-08 : conception et plan du portage Rust → C# ; 2026-09-26 : étude de stack, spec et plan du plugin HDT |
-| `docs/plans/2026-10-04-panneau-unique-ergonomie.html` | note de conception HTML pour Ali (images dans `img/2026-10-04-panneau-unique/` et `img/2026-10-06-tribus-cases-puissance/`) : les 7 demandes du panneau unique → décisions, avant / après, flux des cibles, ce qui n'a pas été vu, ce qui reste à décider ; § 11 : tribus du lobby, cases à cocher, puissance du board (2026-10-06) |
+| `docs/plans/2026-10-04-panneau-unique-ergonomie.html` | note de conception HTML pour Ali (images dans `img/2026-10-04-panneau-unique/`, `img/2026-10-06-tribus-cases-puissance/` et `img/2026-10-06-encart-puissance/`) : les 7 demandes du panneau unique → décisions, avant / après, flux des cibles, ce qui n'a pas été vu, ce qui reste à décider ; § 11 : tribus du lobby, cases à cocher, puissance du board (2026-10-06) ; § 12 : encart de puissance, + / − qui redimensionnent, jauge de l'adversaire (2026-10-06, soir) |
 | `docs/reference/` | format de `Power.log`, recherche HDT / Tier7 |
 | `docs/journal/` | ce qui s'est décidé, séance par séance |
 | `docs/archive/` | le dépôt Rust complet, en bundle git |

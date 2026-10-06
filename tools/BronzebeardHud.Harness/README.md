@@ -11,7 +11,10 @@ redimensionner et les regarder **sans lancer une partie** ni HDT.
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --tick 1   # la même, la compo n° 1 cochée : elle passe en tête, les compos en cours restent
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --scenario 3   # lobby sans morts-vivants ni dragons : leurs guides ni listés ni ciblés
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --scenario 5 --tick 3   # cases : la compo pariée cochée, la compo en cours gardée (« in progress »)
-./tools/BronzebeardHud.Harness/launch.sh --screenshot --power shiny   # la jauge de puissance : behind, even, ahead, shiny, none, early
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --power shiny   # la rangée du joueur dans l'encart : behind, even, ahead, shiny, none, early
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --opp-power next   # la rangée de l'adversaire : behind, even, ahead, shiny, none, next, unseen
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --count 4   # − / + cliqués jusqu'à 4 compos, mode déplacement off : le panneau dimensionné sur elles
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --play     # mode déplacement off, comme en partie (le panneau sur N lignes)
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover   # la même, un choix ouvert : discover, dark-gift ou trinket
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover --close-choice   # le choix ouvert puis refermé : la scène rétablie
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --hover 1 --no-skip   # la ligne de la 1re cible survolée : son popup, comme en taverne
@@ -34,9 +37,21 @@ chacune, sur les ids de `Pool`, un héros inventé) : `pirate_fs` → Pirate Dis
 trois cartes avec `mech_fs` mais seulement 3 de ses 7 cartes clés : « no match », le contre-exemple. La ligne `bridge:` est au journal.
 
 Arguments en plus : `--size 1600x900`, `--layout <fichier>`, `--wait <ms>` (attente des noms et images avant la capture),
-`--scenario 0…5` (plateau tenu et tribus du lobby, `HarnessData.Scenarios` ; 2 par défaut), `--power <scène>` (la jauge de
-puissance sous la liste, `HarnessData.Power` ; even par défaut), `--detail <rang ou nom>`
+`--scenario 0…5` (plateau tenu et tribus du lobby, `HarnessData.Scenarios` ; 2 par défaut), `--power <scène>` (la rangée
+du joueur dans l'encart de puissance, `HarnessData.Power` ; even par défaut), `--opp-power <scène>` (la rangée de
+l'adversaire, `HarnessData.OpponentFacts` ; even par défaut), `--count <1…4>` (− et + cliqués comme la souris jusqu'à ce
+nombre, mode déplacement off ; une case cochée les grise et fait échouer la capture), `--play` (mode déplacement off),
+`--detail <rang ou nom>`
 (ouvre le détail avant la capture ; un rang qui n'existe pas fait échouer la capture plutôt que de capturer la liste).
+Un panneau en bas de l'écran : `--layout 'C:\temp\BronzebeardHarness-ci\layout-bottom.json'` avec
+`{"schema": 1, "panels": {"target-compositions": {"left": 0.6151, "top": 0.9}}}` (ramené dans l'écran : il touche le bas).
+
+| `--opp-power` | Ce que lit la rangée de l'adversaire (héros adverse inventé : 143 au tour 8, 50 au tour 5 ; le joueur : 120 au tour 8) |
+|---|---|
+| behind, even, ahead, shiny | en combat, tour 8 : plateaux de 90, 160, 210, 300 contre 143 |
+| none | en combat, un héros sans courbe : « no curve for … » |
+| next | en taverne, tour 9 : le dernier plateau vu du prochain adversaire, 70 au tour 5, contre 50 (au tour 9, 250 : il lirait « behind ») |
+| unseen | en taverne : un prochain adversaire jamais affronté, « not fought yet » |
 Un nom de guide avec des espaces ne passe pas par `launch.sh` (PowerShell le coupe) : donner le rang de la cible.
 
 | Scénario | Plateau, main | Lobby | Cibles (3 voulues) |
@@ -67,7 +82,10 @@ mêmes appels de `BronzebeardHud.Stats` : cibles et couleurs sont celles que le 
 la fenêtre d'overlay transparente aux clics au-dessus du jeu et le survol sondé à 60 Hz (le `--selftest` lève lui-même
 `MouseEnter` et `MouseLeave` ; le double `MouseEnter` de la sonde et de WPF, et le `MouseLeave` que WPF lève quand la
 fenêtre repasse en clic-transparent, n'y sont qu'imités) ; la vraie rangée de Bob (ses sept cartes sont des boîtes grises
-placées où `TavernLayout.CardSlots` met les cartes du jeu). L'infobulle unique de HDT n'est vue qu'à travers sa copie,
+placées où `TavernLayout.CardSlots` met les cartes du jeu) ; la lecture du plateau adverse par
+`HdtEntityAdapter.OpponentFacts` (héros contrôlé par `game.Opponent`, `NEXT_OPPONENT_PLAYER_ID`, plateau figé par HDT au
+début du combat) : la simulation lui donne des faits inventés (`HarnessData.OpponentFacts`), seul le calcul et le rendu qui
+suivent sont réels. L'infobulle unique de HDT n'est vue qu'à travers sa copie,
 `HdtTooltip`, écrite d'après le code décompilé. Ce que l'hôte reproduit : la logique des panneaux, leurs événements WPF,
 leur mise en page et leur remplissage.
 
@@ -81,7 +99,8 @@ leur mise en page et leur remplissage.
   Firestone de Mech Magnet (pointillés « + M. Magnet 3/5 », par le pont).
 - Six scénarios (liste déroulante, tableau ci-dessus : chacun est une partie, cases et couleurs oubliées en changeant) ;
   le bouton « Detail of target 1 / list » ouvre et ferme le détail.
-- La jauge de puissance sous la liste (liste déroulante « power … ») : les quatre paliers et deux cas sans donnée.
+- L'encart de puissance sous le cadre, entre − et + (listes déroulantes « power … » et « opp … ») : les quatre paliers et
+  les cas sans donnée, pour le joueur et pour l'adversaire.
 - Un choix (liste déroulante) : ses options au-dessus de la rangée de Bob, comme dans le jeu, sous les étiquettes du
   plugin. Tant qu'il est ouvert, les cadres, étiquettes et ◇ des cartes de Bob et le panneau « Compositions » (et son popup)
   sont retirés de l'écran, puis remis tels quels à sa fermeture (`ChoiceCover`, comme le plugin).
@@ -99,9 +118,17 @@ progress », le pari parti, les cadres de Bob qui suivent, « 1 chosen » puis �
 décocher rend les mêmes cibles dans les mêmes couleurs ; **les tribus du lobby** (scénarios 3 et 4) : aucune cible, ligne
 ni cadre d'un guide d'une tribu absente (calculé sur les données de la simulation, pas pris à `LobbyGuides`), la ligne de
 journal qui les nomme ; lobby inconnu : rien d'écarté et la ligne « Lobby tribes unknown » ; une case cochée lobby
-inconnu puis écartée une fois le lobby connu : décochée, une ligne `unticked`, plus cible ; **la jauge de puissance**,
-pour chaque scène : badge, signe et pourcentage, couleur, segment allumé à sa place, chiffres écrits, rien de coupé ;
-sans donnée, tout gris et « – » ; les cadres sur les cartes de Bob, pleins
+inconnu puis écartée une fois le lobby connu : décochée, une ligne `unticked`, plus cible ; **l'encart de puissance** :
+hors du cadre, dessous, aussi large que le panneau, − à gauche et + à droite centrés, la rangée du joueur au-dessus de celle
+de l'adversaire, aucun texte sous 12 px ni coupé ; **chaque rangée**, pour chaque scène : badge, signe et pourcentage,
+couleur, le seul feu allumé à sa place et le seul halo, de la couleur du palier (or pour shiny), les autres éteints,
+chiffres écrits ; sans donnée, tout gris, aucun halo, « – » ; pour l'adversaire, une ligne `opponent power` par
+changement, qui nomme son héros et le vôtre, le tour vu, le plateau et la moyenne ; **+ / −** (mode déplacement off,
+cliqués comme la souris) : N de 1 à 4 et retour, trois fois, N lignes dont les meilleures cibles par rang (ou, faute de
+place, le bas sur l'or), aucune zone du jeu couverte, le même rectangle pour le même N, une ligne `targets n=` par appui
+dont les chiffres sont ceux dessinés (+ à 4 compris) ; contre le bas de l'écran le bas gardé, grandissant vers le haut ;
+une boîte donnée par la poignée gardée jusqu'à un appui, retrouvée à la partie suivante, « Reset » qui rend la place par
+défaut ; **une rangée en panne** (dessin qui lève) retirée seule, la rangée du joueur, − et + restant ; les cadres sur les cartes de Bob, pleins
 et pointillés, tels que `TavernHighlights` les demande ; un clic sur le nom d'une cible ouvre son détail, « ← All comp
 guides » rend la liste ; les sections du détail dans l'ordre de HDT et « k of n sections » quand il en manque ; **aucun
 texte du panneau sous 12 px × échelle, aucun texte coupé** (liste et détail : l'encre de chaque texte, pas sa boîte, doit
@@ -118,7 +145,7 @@ le mode déplacement le cachent ; **le pont** : une ligne `bridge:` qui nomme ch
 dans la couleur de T, un rôle suivi de « · k/n boards », « pivot → G (X) » sur fond neutre, lus sur ce qui est dessiné ; sur une carte
 de Bob, un cadre pointillé « + T 3/5 » dans la couleur de T et la ligne `tavern highlights=[…:boards 3/5:…]` ; la ligne de contexte
 sous l'en-tête du détail et du popup d'un guide ponté (texte attendu calculé à la main, 12 px, gris), absente pour le non ponté ;
-**un choix ouvert** (Dark Gift puis découverte) retire cadres, étiquettes, ◇, panneau et popup, aucun popup au survol pendant ce
+**un choix ouvert** (Dark Gift puis découverte) retire cadres, étiquettes, ◇, panneau, encart et popup, aucun popup au survol pendant ce
 temps, une ligne `choice open` et une seule ; refermé, les mêmes cibles, les mêmes marqueurs (places, couleurs, textes), le panneau
 à sa place avec **les mêmes éléments** (pas reconstruit), une ligne `choice closed`, et le survol remarche ; aucune ligne Warning/Error, **lue après que le dispatcher a livré les lignes** (avant le
 2026-10-04 elle lisait 0 ligne : elles arrivent par `Dispatcher.BeginInvoke`) ; le fichier de disposition est celui de la
@@ -137,3 +164,8 @@ Ceux du 2026-10-06 aussi : simulation aveugle au lobby (4 contrôles tombent), f
 (3), paris non tus (3), jauge toujours au 2ᵉ segment (5), « in progress » jamais écrit (1), ligne « lobby inconnu » jamais
 cédée (1). C'est en les lançant qu'on a vu trois de ces mutations faire planter la simulation sans écrire de rapport : chaque
 groupe de contrôles est depuis gardé, une exception y devient un échec nommé.
+Ceux de l'encart et de + / − (2026-10-06, soir), avec la suite xUnit, sur une copie : 25 mutations, 25 détectées. Celles que
+seule la simulation voit : tout feu allumé en jaune (7 contrôles), − jamais grisé (3), un appui qui ne dimensionne pas une
+boîte de la poignée, la partie suivante qui garde la taille de + / −, une boîte périmée prise au dernier redessin, les deux
+rangées sous un seul garde-fou (1 chacune). Le contrôle « panneau remis tel quel après un choix » lit désormais le contenu du
+cadre (`CompsPanel.Content`) : l'enfant du panneau (cadre + encart) ne change jamais, et le comparer ne prouvait plus rien.
