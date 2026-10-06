@@ -133,3 +133,7 @@ reconstruit au retour, journal à chaque mise à jour, pont non passé aux aides
 neutre, ligne de contexte absente, à 13 px ou absente du seul popup, seuil du pont relâché (le contre-exemple ponte). Une
 mutation survit, et c'est voulu : retirer « suspendu » de ce qui bloque le popup ne le fait pas revenir pendant un choix,
 `PopupContent` refuse aussi un panneau suspendu, et un panneau replié a une largeur nulle (trois gardes, la propriété tient).
+Ceux du 2026-10-06 aussi : simulation aveugle au lobby (4 contrôles tombent), filtre des tribus retiré (5), cochées seules
+(3), paris non tus (3), jauge toujours au 2ᵉ segment (5), « in progress » jamais écrit (1), ligne « lobby inconnu » jamais
+cédée (1). C'est en les lançant qu'on a vu trois de ces mutations faire planter la simulation sans écrire de rapport : chaque
+groupe de contrôles est depuis gardé, une exception y devient un échec nommé.

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Panneau unique Compositions</title>
-<meta name="description" content="Note de conception du 2026-10-04 : les sept demandes d'Ali sur les panneaux de compositions, puis la seconde passe du soir (survol, stats Firestone, choix), ce qui reste à décider et à voir en jeu.">
+<meta name="description" content="Note de conception du 2026-10-04 : les sept demandes d'Ali sur les panneaux de compositions, la seconde passe du soir (survol, stats Firestone, choix), puis le 2026-10-06 (tribus du lobby, cases, puissance du board), ce qui reste à décider et à voir en jeu.">
 <style>
   :root {
     --bg: #f7f7f4; --surface: #ffffff; --text: #1d1f24; --muted: #555b67; --border: #d6d9df; --soft: #eef0f3;
@@ -120,6 +120,15 @@
   <h1>Panneau unique « Compositions »</h1>
   <p class="meta">Note de conception pour Ali, 2026-10-04. État : vu dans la simulation, pas encore sous HDT. Chaque section donne d'abord la décision ; le raisonnement est dessiné dessous, et les preuves sont repliées.</p>
 
+  <div class="pass2" style="border-left-color: var(--ok)">
+    <b>2026-10-06 : tribus du lobby, cases à cocher, puissance du board.</b>
+    <ol>
+      <li><a href="#tribus">§ 11.1 — Tribus du lobby</a> : plus aucune compo d'une tribu absente, ni listée, ni ciblée, ni encadrée.</li>
+      <li><a href="#cases">§ 11.2 — Cases à cocher</a> : cocher la compo visée garde celles qu'on construit ; seuls les paris se taisent.</li>
+      <li><a href="#puissance">§ 11.3 — Puissance du board</a> : une jauge rouge / jaune / verte / dorée sous la liste.</li>
+    </ol>
+  </div>
+
   <div class="pass2">
     <b>Seconde passe (soir) : survol, stats Firestone branchées, choix nettoyés.</b>
     <ol>
@@ -166,7 +175,7 @@
       <tr>
         <td class="n">4</td>
         <td data-label="Demande d'Ali">Les deux panneaux disent la même chose ; l'ergonomie de HDT est meilleure. Plusieurs compos à la fois, chacune sa couleur.</td>
-        <td data-label="Décision">Fusion : la liste de HDT par tier. Cibles = les guides cochés seuls s’ils existent, sinon les N plus probables (1 à 4) ; une couleur par cible, stable pendant la partie. La ligne « Board vs hero avg » est gardée telle quelle.</td>
+        <td data-label="Décision">Fusion : la liste de HDT par tier. Cibles = les guides cochés seuls s’ils existent, sinon les N plus probables (1 à 4) ; une couleur par cible, stable pendant la partie. La ligne « Board vs hero avg » est gardée telle quelle. <b>Revu le 2026-10-06</b> : les cochées gardent les compos en cours (§ 11.2), la ligne devient une jauge (§ 11.3).</td>
         <td data-label="Où le voir">Après, liste ; zoom de la liste (dernière ligne)</td>
         <td data-label="Écarté">La liste Firestone et sa place moyenne (« avg ») par compo : le tier de HDT la remplace. Lecture à confirmer : § 9 (g).</td>
       </tr>
@@ -321,7 +330,7 @@
       </defs>
       <rect class="box" x="10" y="80" width="160" height="70" rx="8"/>
       <text x="90" y="110" font-size="16" font-weight="700" text-anchor="middle">Guides de HDT</text>
-      <text x="90" y="132" font-size="15" class="sub" text-anchor="middle">liste par tier</text>
+      <text x="90" y="132" font-size="15" class="sub" text-anchor="middle">du lobby (§ 11.1)</text>
       <rect class="box" x="10" y="230" width="160" height="70" rx="8"/>
       <text x="90" y="260" font-size="16" font-weight="700" text-anchor="middle">Plateau + main</text>
       <text x="90" y="282" font-size="15" class="sub" text-anchor="middle">cartes tenues</text>
@@ -334,7 +343,7 @@
 
       <rect class="box" x="450" y="130" width="190" height="130" rx="8"/>
       <text x="545" y="156" font-size="15" class="mono" text-anchor="middle">CompTargetTracker</text>
-      <text x="545" y="180" font-size="15" class="sub" text-anchor="middle">cochées (≤ 4) seules,</text>
+      <text x="545" y="180" font-size="15" class="sub" text-anchor="middle">cochées, puis en cours ;</text>
       <text x="545" y="200" font-size="15" class="sub" text-anchor="middle">sinon les plus probables,</text>
       <text x="545" y="220" font-size="15" class="sub" text-anchor="middle">jusqu'à n (1 à 4)</text>
       <text x="545" y="244" font-size="15" text-anchor="middle" font-weight="600">couleur stable</text>
@@ -372,7 +381,7 @@
       </defs>
       <rect class="box" x="2" y="4" width="160" height="76" rx="8"/>
       <text x="82" y="36" font-size="16.5" font-weight="700" text-anchor="middle">Guides de HDT</text>
-      <text x="82" y="60" font-size="15" class="sub" text-anchor="middle">par tier</text>
+      <text x="82" y="60" font-size="15" class="sub" text-anchor="middle">du lobby</text>
       <rect class="box" x="178" y="4" width="160" height="76" rx="8"/>
       <text x="258" y="36" font-size="16.5" font-weight="700" text-anchor="middle">Plateau + main</text>
       <text x="258" y="60" font-size="15" class="sub" text-anchor="middle">cartes tenues</text>
@@ -386,7 +395,7 @@
 
       <rect class="box" x="2" y="234" width="336" height="108" rx="8"/>
       <text x="170" y="262" font-size="16" class="mono" text-anchor="middle">CompTargetTracker</text>
-      <text x="170" y="288" font-size="15" class="sub" text-anchor="middle">cochées (≤ 4) seules, sinon</text>
+      <text x="170" y="288" font-size="15" class="sub" text-anchor="middle">cochées, puis en cours ; sinon</text>
       <text x="170" y="310" font-size="15" class="sub" text-anchor="middle">les plus probables, n (1 à 4)</text>
       <text x="170" y="332" font-size="15" text-anchor="middle" font-weight="600">couleur stable</text>
 
@@ -408,7 +417,7 @@
       <text x="190" y="596" font-size="16.5" font-weight="700" text-anchor="middle" style="fill:var(--o-choice)">Aides de choix</text>
       <text x="190" y="624" font-size="15" class="mono sub" text-anchor="middle">ChoiceAdvisor</text>
     </svg>
-    <figcaption>Les trois sorties lisent les mêmes cibles, avec les mêmes couleurs : elles ne peuvent pas se contredire. Une case cochée restreint les cibles à celles qu’on a cochées.</figcaption>
+    <figcaption>Les trois sorties lisent les mêmes cibles, avec les mêmes couleurs : elles ne peuvent pas se contredire. Depuis le 2026-10-06, seuls les guides que le lobby peut jouer entrent (§ 11.1), et une case cochée fait taire les paris sans retirer les compos en cours (§ 11.2).</figcaption>
   </figure>
 
   <h2 id="survol">5. Survol d'une ligne <span class="tag2">soir</span></h2>
@@ -915,6 +924,209 @@ Passed!  - Failed:     0, Passed:     7, Skipped:     0, Total:     7 - Bronzebe
 Build succeeded.
     0 Warning(s)
     0 Error(s)</pre>
+  </details>
+
+  <h2 id="tribus-cases-puissance">11. Tribus du lobby, cases, puissance du board <span class="tag2">6 oct.</span></h2>
+  <p class="lead">Trois retours d'Ali en partie. Les compos d'une tribu absente du lobby ne sont plus conseillées ; cocher la compo qu'on vise ne retire plus celles qu'on construit ; la ligne « Board vs hero avg » devient une jauge rouge / jaune / verte / dorée. Vu dans la simulation, pas encore sous HDT.</p>
+  <div class="tiles">
+    <div class="tile"><b>15 / 69</b><span>rondes d'Ali, le 6 octobre, avec une cible d'une tribu absente du lobby</span></div>
+    <div class="tile"><b>2 cartes clés</b><span>tenues : la compo est « en cours » et reste une cible quand on en coche une autre</span></div>
+    <div class="tile"><b>−25&nbsp;% · +34&nbsp;% · +80&nbsp;%</b><span>paliers de la jauge : un demi-tour et un tour de croissance de la courbe (×1,8 par tour)</span></div>
+  </div>
+
+  <h3 id="tribus">11.1 Tribus du lobby : rien d'une tribu absente</h3>
+  <div class="mech">
+    <figure>
+      <svg viewBox="0 0 340 418" role="img" aria-labelledby="t-lobby">
+        <title id="t-lobby">Les guides de HDT et les tribus du lobby passent par LobbyGuides : les jouables vont au panneau, aux cibles, aux cadres, aux choix et aux pivots ; les écartés vont au journal</title>
+        <defs>
+          <marker id="lw-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+          <marker id="lw-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--ok)"/></marker>
+          <marker id="lw-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--bad)"/></marker>
+        </defs>
+        <rect class="box" x="2" y="4" width="160" height="66" rx="8"/>
+        <text x="82" y="32" font-size="16" font-weight="700" text-anchor="middle">Guides de HDT</text>
+        <text x="82" y="54" font-size="15" class="sub" text-anchor="middle">27, non filtrés</text>
+        <rect class="box" x="178" y="4" width="160" height="66" rx="8"/>
+        <text x="258" y="32" font-size="16" font-weight="700" text-anchor="middle">Tribus du lobby</text>
+        <text x="258" y="54" font-size="15" class="sub" text-anchor="middle">lues par HDT</text>
+        <path class="wire" d="M82 70 L140 104" marker-end="url(#lw-n)"/>
+        <path class="wire" d="M258 70 L200 104" marker-end="url(#lw-n)"/>
+
+        <rect class="box" x="2" y="108" width="336" height="118" rx="8"/>
+        <text x="170" y="134" font-size="16" class="mono" text-anchor="middle">LobbyGuides</text>
+        <text x="16" y="160" font-size="15">tribu principale absente → écarté</text>
+        <text x="16" y="184" font-size="15">½ des cartes clés introuvables → écarté</text>
+        <text x="16" y="208" font-size="15" class="sub">lobby inconnu → rien d'écarté</text>
+
+        <path d="M100 226 L100 256" style="stroke:var(--ok);stroke-width:2.5;fill:none" marker-end="url(#lw-ok)"/>
+        <path d="M276 226 L276 256" style="stroke:var(--bad);stroke-width:2.5;fill:none" marker-end="url(#lw-bad)"/>
+        <rect x="2" y="260" width="200" height="66" rx="8" style="fill:var(--ok-soft);stroke:var(--ok);stroke-width:2"/>
+        <text x="102" y="288" font-size="16" font-weight="700" text-anchor="middle">Jouables</text>
+        <text x="102" y="310" font-size="15" class="sub" text-anchor="middle">12 à 16 par lobby</text>
+        <rect x="214" y="260" width="124" height="66" rx="8" style="fill:var(--surface);stroke:var(--bad);stroke-width:2"/>
+        <text x="276" y="288" font-size="16" font-weight="700" text-anchor="middle">Écartés</text>
+        <text x="276" y="310" font-size="15" class="mono sub" text-anchor="middle">(no BEAST)</text>
+
+        <path d="M100 326 L100 350" style="stroke:var(--ok);stroke-width:2.5;fill:none" marker-end="url(#lw-ok)"/>
+        <rect x="2" y="354" width="336" height="60" rx="8" style="fill:var(--surface);stroke:var(--o-panel);stroke-width:2.5"/>
+        <text x="170" y="380" font-size="15" text-anchor="middle">liste · cibles · cadres de Bob</text>
+        <text x="170" y="402" font-size="15" text-anchor="middle">aides de choix · pivots</text>
+      </svg>
+      <figcaption>Une seule liste filtrée nourrit toutes les sorties : un guide écarté ne peut réapparaître ni en cadre, ni en étiquette de choix, ni en pivot. Les écartés sont nommés dans le journal d'HDT, avec la raison.</figcaption>
+    </figure>
+    <div>
+      <table class="cards">
+        <thead><tr><th>Cas</th><th>Décision</th></tr></thead>
+        <tbody>
+          <tr><td data-label="Cas">Tribu principale absente, cartes clés neutres</td><td data-label="Décision"><b>Écarté.</b> C'est le bug : une carte neutre tenue (Titus Rivendare, acheté à 17:18:28) faisait entrer un guide Bêtes et un guide Aberrations dans les cibles d'un lobby sans l'une ni l'autre.</td></tr>
+          <tr><td data-label="Cas">Guide sans tribu (Menagerie)</td><td data-label="Décision">Gardé, sauf si la moitié de ses cartes clés ne peuvent pas apparaître.</td></tr>
+          <tr><td data-label="Cas">Une carte clé sur quatre introuvable</td><td data-label="Décision">Gardé.</td></tr>
+          <tr><td data-label="Cas">Carte à deux tribus</td><td data-label="Décision">Trouvable si l'une est là.</td></tr>
+          <tr><td data-label="Cas">Amalgame, carte sans tribu, carte dorée</td><td data-label="Décision">Toujours trouvables ; la dorée est lue comme sa carte de base.</td></tr>
+          <tr><td data-label="Cas">Tribus pas encore connues</td><td data-label="Décision">Rien d'écarté, et le panneau le dit en une ligne grise, qui cède sa place à une cible si la place manque.</td></tr>
+          <tr><td data-label="Cas">Case cochée sur un guide écarté ensuite</td><td data-label="Décision">Décochée, une ligne <code>unticked … : no BEAST</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p><b>Liste du panneau : les écartés ne sont plus listés.</b> 27 guides ne tenaient pas à la place par défaut ; les six lobbies du jour en gardent 12 à 16. Une ligne grisée se lit quand même, une ligne absente non, et la liste Tier 7 de HDT fait déjà ainsi. Écartés : griser en place (le bruit reste), reléguer en bas (la place manque déjà).</p>
+  <figure class="crop w1100">
+    <a href="img/2026-10-06-tribus-cases-puissance/lobby.png"><img src="img/2026-10-06-tribus-cases-puissance/lobby.png" width="1542" height="386" loading="lazy" alt="Trois panneaux de la simulation : lobby inconnu, 15 guides, Undead Attack cible ; lobby inconnu avec une seule cible, la ligne grise Lobby tribes unknown ; lobby sans morts-vivants, 8 guides, plus aucune compo mort-vivant"></a>
+    <figcaption><b>Simulation, données inventées.</b> À gauche, le lobby inconnu : rien n'est écarté (« 3 of 15 shown »), comme avant le correctif. Au milieu, la ligne grise quand elle ne coûte la place d'aucune cible. À droite, un lobby sans morts-vivants ni dragons : 8 guides, la carte neutre tenue ne fait plus cibler les compos mort-vivant.</figcaption>
+  </figure>
+  <details>
+    <summary>La mesure : six lobbies, la cause dans le code, quand HDT connaît les tribus</summary>
+    <p>Les tribus du lobby ne sont écrites nulle part dans <code>Power.log</code> ; elles se déduisent des sbires que Bob propose. Six parties le 6 octobre : 15 des 69 rondes journalisées avaient une cible d'une tribu absente (5 parties sur 6), et 7 lignes de cadres en taverne. Le chemin des cibles (<code>UpdateComps</code> → <code>CompGuideMatch.Rank</code> → <code>CompTargets.Choose</code>) classait la liste entière de HDT sans jamais lire le lobby ; seul le dernier repli des aides de choix le lisait, et sur la seule tribu principale.</p>
+    <p>Quand HDT a-t-il les tribus ? Il les lit dans la mémoire du jeu et les garde pour la partie (décompilé). Dans le journal du jour, l'encart des héros, qui filtre sur ces tribus, n'a nommé que des compos du lobby dans les six parties (24 sur 24), dès sa première ligne, moins de 2 s après la création de la partie : elles sont très probablement connues avant la taverne. Jamais mesuré directement ; la nouvelle ligne <code>lobby tribes=[…] read at …</code> le dira.</p>
+  </details>
+
+  <h3 id="cases">11.2 Cases à cocher : viser sans perdre ce qu'on construit</h3>
+  <div class="mech">
+    <figure>
+      <svg viewBox="0 0 340 360" role="img" aria-labelledby="t-tick">
+        <title id="t-tick">Trois cibles, A à trois cartes clés, B à deux, C à une. On coche A. Avant : A seule. Maintenant : A, puis B en cours ; C, un pari, se tait</title>
+        <text x="2" y="22" font-size="15" class="sub">Cibles avant le clic</text>
+        <rect x="2" y="32" width="104" height="36" rx="6" style="fill:#FF2BD6"/><text x="54" y="56" font-size="15" font-weight="700" text-anchor="middle" style="fill:#000">A ★3/5</text>
+        <rect x="118" y="32" width="104" height="36" rx="6" style="fill:#B8FF1F"/><text x="170" y="56" font-size="15" font-weight="700" text-anchor="middle" style="fill:#000">B ★2/4</text>
+        <rect x="234" y="32" width="104" height="36" rx="6" style="fill:#2EA8FF"/><text x="286" y="56" font-size="15" font-weight="700" text-anchor="middle" style="fill:#000">C ★1/5</text>
+        <text x="170" y="100" font-size="16" font-weight="700" text-anchor="middle">on coche A ✓</text>
+
+        <text x="2" y="138" font-size="15" class="sub">Règle du 4 octobre</text>
+        <rect x="2" y="148" width="104" height="36" rx="6" style="fill:#FF2BD6"/><text x="54" y="172" font-size="15" font-weight="700" text-anchor="middle" style="fill:#000">A ✓</text>
+        <rect x="118" y="148" width="104" height="36" rx="6" style="fill:none;stroke:var(--bad);stroke-width:2;stroke-dasharray:6 4"/><text x="170" y="172" font-size="15" text-anchor="middle" style="fill:var(--bad)">B parti</text>
+        <rect x="234" y="148" width="104" height="36" rx="6" style="fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:6 4"/><text x="286" y="172" font-size="15" text-anchor="middle" class="sub">C parti</text>
+
+        <text x="2" y="222" font-size="15" font-weight="700">Maintenant</text>
+        <rect x="2" y="232" width="104" height="36" rx="6" style="fill:#FF2BD6"/><text x="54" y="256" font-size="15" font-weight="700" text-anchor="middle" style="fill:#000">A ✓</text>
+        <rect x="118" y="232" width="104" height="36" rx="6" style="fill:#B8FF1F"/><text x="170" y="256" font-size="15" font-weight="700" text-anchor="middle" style="fill:#000">B</text>
+        <text x="170" y="290" font-size="15" text-anchor="middle" style="fill:var(--ok)">en cours</text>
+        <rect x="234" y="232" width="104" height="36" rx="6" style="fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:6 4"/><text x="286" y="256" font-size="15" text-anchor="middle" class="sub">C</text>
+        <text x="286" y="290" font-size="15" text-anchor="middle" class="sub">pari : se tait</text>
+        <text x="2" y="332" font-size="15" class="sub">− n + gris : n compte les paris,</text>
+        <text x="2" y="352" font-size="15" class="sub">que la case fait taire.</text>
+      </svg>
+      <figcaption>Une case dit « je vais là » ; elle ne retire plus ce qu'on construit. « En cours » = deux cartes clés tenues (deux anneaux verts sur la ligne). Les couleurs de A et B ne changent pas.</figcaption>
+    </figure>
+    <div>
+      <table class="cards">
+        <thead><tr><th>Clic d'Ali</th><th>Ce qui s'est passé</th><th>Maintenant</th></tr></thead>
+        <tbody>
+          <tr><td data-label="Clic d'Ali">6 oct. 17:14 : coche sa 1ʳᵉ cible (★3/5)</td><td data-label="Ce qui s'est passé">la 2ᵉ (★1/5) disparaît ; décoché 2 s après</td><td data-label="Maintenant">elle part aussi : une carte clé n'est qu'un pari</td></tr>
+          <tr><td data-label="Clic d'Ali">5 oct. 13:02 : coche une compo ★2</td><td data-label="Ce qui s'est passé">les deux autres (★2 chacune) disparaissent</td><td data-label="Maintenant"><b>elles restent</b>, « in progress »</td></tr>
+          <tr><td data-label="Clic d'Ali">5 oct. 22:00 : coche sa 1ʳᵉ cible (★2/5)</td><td data-label="Ce qui s'est passé">trois compos à ★1 disparaissent</td><td data-label="Maintenant">elles partent : des paris</td></tr>
+          <tr><td data-label="Clic d'Ali">4 oct. 20:12 : coche / décoche 4 fois en 7 s</td><td data-label="Ce qui s'est passé">la case paraît incompréhensible</td><td data-label="Maintenant">« in progress » dit pourquoi une ligne reste colorée</td></tr>
+        </tbody>
+      </table>
+      <p>Sans case, rien ne change, sauf un détail de stabilité : à score égal, une cible du tour d'avant garde sa place ; il faut un score plus haut pour la remplacer.</p>
+      <p>Écartés : revenir à « cochées puis probables jusqu'à n » (la case ne restreindrait plus rien, ce qu'Ali avait demandé le 4 octobre) ; tout garder au moment du clic (rien ne changerait à l'écran, la case paraîtrait sans effet) ; un seuil sur le score (enablers et add-ons sont communs à plusieurs guides).</p>
+    </div>
+  </div>
+  <figure class="crop w1100">
+    <a href="img/2026-10-06-tribus-cases-puissance/cases.png"><img src="img/2026-10-06-tribus-cases-puissance/cases.png" width="1032" height="386" loading="lazy" alt="Deux panneaux de la simulation : avant le clic, Elemental Cycle cible 1 ; après avoir coché Pirate Discover, celle-ci passe en 1, Elemental Cycle reste cible 2 avec in progress sous son nom"></a>
+    <figcaption><b>Simulation, données inventées.</b> Pirate Discover cochée passe en tête ; Elemental Cycle (deux cartes clés tenues) reste cible, dans sa couleur, « in progress » sous son nom ; le pari (Beast Deathrattle, cible 2 avant le clic, hors de vue ici) se tait. − et + sont grisés, le titre dit « 1 chosen ».</figcaption>
+  </figure>
+
+  <h3 id="puissance">11.3 Puissance du board : une jauge</h3>
+  <div class="mech">
+    <figure>
+      <svg viewBox="0 0 340 250" role="img" aria-labelledby="t-gauge">
+        <title id="t-gauge">Échelle des paliers, board divisé par la moyenne du héros au même tour, en échelle logarithmique : rouge sous −25 %, jaune jusqu'à +34 %, vert jusqu'à +80 %, shiny au-delà</title>
+        <text x="170" y="16" font-size="15" class="sub" text-anchor="middle">board ÷ moyenne du héros au même tour</text>
+        <path d="M152 46 L152 40 L237 40 L237 46" style="stroke:var(--muted);fill:none;stroke-width:1.5"/>
+        <text x="194" y="35" font-size="14.6" class="sub" text-anchor="middle">1 tour</text>
+        <path d="M110 58 L110 52 L195 52 L195 58" style="stroke:var(--muted);fill:none;stroke-width:1.5"/>
+        <text x="64" y="57" font-size="14.6" class="sub" text-anchor="middle">± ½ tour</text>
+        <rect x="20" y="64" width="90" height="34" style="fill:#FF6B6B"/>
+        <rect x="110" y="64" width="85" height="34" style="fill:#FFD43B"/>
+        <rect x="195" y="64" width="42" height="34" style="fill:#3DDC84"/>
+        <rect x="237" y="64" width="83" height="34" style="fill:#FFF4C2;stroke:#FFB300;stroke-width:2"/>
+        <text x="65" y="87" font-size="16" font-weight="700" text-anchor="middle" style="fill:#000">▼</text>
+        <text x="152" y="87" font-size="16" font-weight="700" text-anchor="middle" style="fill:#000">≈</text>
+        <text x="216" y="87" font-size="16" font-weight="700" text-anchor="middle" style="fill:#000">▲</text>
+        <text x="278" y="87" font-size="16" font-weight="700" text-anchor="middle" style="fill:#000">★</text>
+        <path d="M110 98 L110 108 M152 98 L152 108 M195 98 L195 108 M237 98 L237 108" style="stroke:var(--text);stroke-width:1.5"/>
+        <text x="110" y="126" font-size="14.6" text-anchor="middle">−25 %</text>
+        <text x="152" y="146" font-size="14.6" text-anchor="middle">moyenne</text>
+        <text x="195" y="126" font-size="14.6" text-anchor="middle">+34 %</text>
+        <text x="237" y="146" font-size="14.6" text-anchor="middle">+80 %</text>
+        <text x="20" y="182" font-size="15" class="sub">un tour de croissance : ×1,8 (médiane</text>
+        <text x="20" y="202" font-size="15" class="sub">des courbes de Firestone, tours 4 à 11)</text>
+        <text x="20" y="232" font-size="15" class="sub">sans couleur : tours 1-2, courbe qui retombe</text>
+      </svg>
+      <figcaption>Les seuils sont en tours de croissance de la courbe : moins d'un demi-tour de la moyenne, c'est jaune ; un tour d'avance, c'est déjà le board moyen du tour suivant : shiny.</figcaption>
+    </figure>
+    <div>
+      <table class="cards">
+        <thead><tr><th>Sans couleur quand</th><th>Pourquoi</th></tr></thead>
+        <tbody>
+          <tr><td data-label="Sans couleur quand">moyenne &lt; 12 (tours 1 et 2)</td><td data-label="Pourquoi">un seul sbire fait toute la différence</td></tr>
+          <tr><td data-label="Sans couleur quand">la courbe retombe à ce tour</td><td data-label="Pourquoi">peu de parties atteignent les tours tardifs ; les courbes retombent aux tours 15 à 18, et les lignes d'Ali y lisaient +248 % à +4885 %</td></tr>
+          <tr><td data-label="Sans couleur quand">héros sous 100 parties</td><td data-label="Pourquoi">un jugement : Firestone ne donne pas d'effectif par tour (78 au plus bas, mesuré)</td></tr>
+          <tr><td data-label="Sans couleur quand">pas de courbe, pas de moyenne pour le tour</td><td data-label="Pourquoi">rien à comparer</td></tr>
+        </tbody>
+      </table>
+      <p>Sur les 464 rondes journalisées d'Ali : rouge 128, jaune 166, vert 34, shiny 49, sans couleur 87. <b>Par compo : non fait</b> — Firestone ne publie pas de courbe de stats par tour pour une compo, seulement sa place et ses plateaux finaux.</p>
+    </div>
+  </div>
+  <figure class="crop w1100">
+    <a href="img/2026-10-06-tribus-cases-puissance/puissance.png"><img src="img/2026-10-06-tribus-cases-puissance/puissance.png" width="1844" height="294" loading="lazy" alt="La jauge sous la liste dans six cas : rouge moins 33 %, jaune plus 18 %, vert plus 58 %, shiny plus 117 % avec une lueur dorée, puis deux cas gris sans couleur"></a>
+    <figcaption><b>Simulation, courbe inventée (120 au tour 8).</b> Le palier ne repose jamais sur la couleur seule : son signe (▼ ≈ ▲ ★) et la place du segment allumé le disent aussi ; le pourcentage reste écrit ; sans donnée, tout est gris et la raison est écrite.</figcaption>
+  </figure>
+
+  <h3>11.4 Pas vu, à vérifier en partie</h3>
+  <ul>
+    <li>Rien n'a tourné sous HDT : lecture des tribus, rendu, clics. La règle « moitié des cartes clés » n'a pas été éprouvée sur les vrais guides (leurs listes ne sont pas sur le disque).</li>
+    <li>En partie : la ligne <code>lobby tribes=[…] read at …</code> (quand HDT a les tribus) et <code>… guides playable; left out: …</code> ; plus aucune compo d'une tribu absente (liste, cadres, choix) ; cocher la compo visée garde celles à deux cartes clés ; la jauge sous la liste, grise aux tours 1-2.</li>
+    <li>À trancher par Ali : le seuil « deux cartes clés » (le clic de 17:14 laisserait encore partir une compo à une carte clé) ; masquer plutôt que griser les guides écartés.</li>
+  </ul>
+  <details>
+    <summary>Preuves : tests, simulation, mutations</summary>
+    <table class="cards">
+      <thead><tr><th>Preuve</th><th>Chiffre</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Preuve"><code>dotnet test</code> (Stats + LogParser + GameState + App)</td><td data-label="Chiffre">558 + 23 + 52 + 7 = 640 verts (610 avant)</td></tr>
+        <tr><td data-label="Preuve">Simulation <code>--selftest</code></td><td data-label="Chiffre">61 contrôles, ALL PASSED (49 avant)</td></tr>
+        <tr><td data-label="Preuve">Mutations dirigées, sur une copie du dépôt, suite entière et simulation</td><td data-label="Chiffre">14 sur 14 détectées, chaque restauration revérifiée verte</td></tr>
+      </tbody>
+    </table>
+    <table class="cards">
+      <thead><tr><th>Mutation</th><th>Ce qui tombe</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Mutation">le filtre ne filtre rien</td><td data-label="Ce qui tombe">8 tests ; 5 contrôles de la simulation</td></tr>
+        <tr><td data-label="Mutation">la ronde classe toute la liste</td><td data-label="Ce qui tombe">2 tests ; 3 contrôles</td></tr>
+        <tr><td data-label="Mutation">tribu principale ignorée</td><td data-label="Ce qui tombe">6 tests</td></tr>
+        <tr><td data-label="Mutation">les cochées seules (règle du 4 octobre)</td><td data-label="Ce qui tombe">10 tests ; 3 contrôles</td></tr>
+        <tr><td data-label="Mutation">la case ne fait plus taire les paris</td><td data-label="Ce qui tombe">22 tests ; 3 contrôles</td></tr>
+        <tr><td data-label="Mutation">une carte clé suffit à être « en cours »</td><td data-label="Ce qui tombe">23 tests</td></tr>
+        <tr><td data-label="Mutation">plus de préférence à la cible en place</td><td data-label="Ce qui tombe">2 tests</td></tr>
+        <tr><td data-label="Mutation">shiny à ×2 ; vert dès +20 % ; courbe qui retombe ignorée</td><td data-label="Ce qui tombe">2, 3 et 1 tests</td></tr>
+        <tr><td data-label="Mutation">simulation aveugle au lobby</td><td data-label="Ce qui tombe">4 contrôles</td></tr>
+        <tr><td data-label="Mutation">jauge : toujours le 2ᵉ segment ; « in progress » jamais écrit</td><td data-label="Ce qui tombe">5 et 1 contrôles</td></tr>
+        <tr><td data-label="Mutation">ligne « lobby inconnu » toujours gardée</td><td data-label="Ce qui tombe">1 test ; 1 contrôle</td></tr>
+      </tbody>
+    </table>
+    <p>Avant que chaque groupe de contrôles de la simulation soit gardé, trois de ces mutations la faisaient planter sans rapport : ce n'était pas une détection.</p>
   </details>
 </main>
 </body>

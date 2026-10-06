@@ -41,6 +41,11 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 
 Ce qui reste ouvert :
 
+- **Vérifier en jeu le filtre des tribus du lobby, la règle des cases et l'indicateur de puissance** (2026-10-06,
+  `docs/journal/2026-10-06-tribus-cases-puissance.md`, note HTML § 11) : la ligne `lobby tribes=[…] read at …` (quand HDT a
+  les tribus : jamais mesuré, seulement déduit), `lobby tribes=[…] (…): k/n guides playable; left out: …` ; plus aucune
+  compo d'une tribu absente (liste, cadres, choix) ; une case cochée garde les compos en cours (« in progress ») ; la
+  jauge rouge / jaune / verte / dorée sous la liste. Vus seulement dans la simulation (`--scenario 3|4|5`, `--power …`).
 - **Vérifier en jeu le panneau unique « Compositions »** (2026-10-04, `docs/journal/2026-10-04-panneau-unique.md`) :
   liste des guides de HDT et couleurs des cibles, détail au clic, cadres sur les cartes de Bob, étiquettes des choix,
   tribus du lobby (bêtes), popup du guide au survol d'une ligne (et l'aperçu de carte au premier survol d'un ovale). Vu
@@ -169,17 +174,39 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   lus par son API publique (`API.Core.OverlayWindow.BattlegroundsCompsGuidesVM` : `CurrentState`, `Comps` gratuite ou
   `CompsByTier` Tier 7, objets `HSReplay.Responses.BattlegroundsCompGuide`) ; HDT la charge à chaque début de partie, le
   plugin ne fait aucune requête ; le `.csproj` référence `HSReplay.dll` (fourni par HDT, jamais copié) pour ce seul type ;
-  mesure et forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. Titre : « Compositions », « k of n shown »
+  mesure et forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. **Seuls les guides que le lobby peut jouer
+  sont listés** (`LobbyGuides`, ci-dessous ; la liste gratuite de HDT n'est pas filtrée) ; tant que HDT n'a pas les tribus,
+  une ligne grise « Lobby tribes unknown: every guide listed ». Titre : « Compositions », « k of n shown »
   quand des guides manquent, la source (« HDT free » / « Tier 7 »), « Meta ↗ », « − n targets + » (1 à 4, 3 par défaut,
   gardé dans `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}` ; dès qu'une
   compo est cochée le titre dit « k chosen » et − / + sont grisés, sans effet) ; une ligne dorée tant que HDT n'a pas de
   guides.
-- **Cibles** (`CompTargetTracker`) : **une case cochée restreint** (Ali, 2026-10-04 : « une compo checkboxée est une compo
-  vers laquelle on veut se diriger »). S'il y a des guides cochés (quatre au plus, ordre de coche), ce sont les seules
-  cibles : eux seuls portent des cadres en taverne et servent aux aides de choix, même si une autre compo est bien plus
-  probable. Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
-  `CompGuideMatch`), jusqu'à n (− n +, qui ne sert alors qu'à cela). Tout décocher rend les cibles automatiques. Une cible garde sa
+- **Cibles** (`CompTargetTracker`, `CompTargets.Choose`) : **une case cochée désigne la compo visée sans effacer ce qu'on
+  construit** (Ali, 2026-10-04 : « une compo checkboxée est une compo vers laquelle on veut se diriger » ; 2026-10-06 :
+  « quand je click sur une checkbox ça enlève d'autres compos […] celles que j'étais en train de jouer »). S'il y a des
+  guides cochés (quatre au plus, ordre de coche) : eux d'abord (`TargetKind.Chosen`), puis les guides **en cours**
+  (`InProgress` : deux cartes clés tenues, plateau + main, ou toutes celles d'un guide qui en a moins ; « in progress » sous
+  leur nom), dans la limite de quatre cibles ; les paris (une seule carte clé) se taisent, et − n + (qui compte les paris)
+  est grisé. Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
+  `CompGuideMatch`), jusqu'à n (− n +) ; à score égal, une cible du tour d'avant garde sa place (il faut un score plus
+  haut pour la remplacer). Tout décocher rend les cibles automatiques. Une cible garde sa
   couleur tant qu'elle le reste (magenta, lime, bleu ciel, blanc), cases et couleurs sont oubliées à la partie suivante.
+  Le tout passe par `CompTargets.Round`, qui ne prend que `LobbyGuides` : aucun guide d'une tribu absente n'est classé.
+- **Tribus du lobby** (`LobbyGuides`, 2026-10-06 : 15 rondes sur 69 d'Ali avaient une cible d'une tribu absente, à cause
+  d'une carte clé neutre tenue). Un guide est écarté si sa tribu principale n'est pas dans la partie (même si ses cartes
+  clés sont neutres), ou si au moins la moitié de ses cartes clés ne peuvent pas y apparaître (tribus de HearthDb,
+  `HdtEntityAdapter.CardTribes` : une carte à deux tribus apparaît si l'une est là, un amalgame toujours, une carte inconnue
+  n'est jamais retenue contre un guide). Écarté : ni listé, ni cible, ni cadre, ni étiquette de choix, ni pivot. Tribus lues
+  par `HdtEntityAdapter.LobbyTribeNames` (mémoire du jeu lue par HDT), redemandées une fois par seconde au plus tant
+  qu'inconnues, puis gardées pour la partie ; **inconnues : rien n'est écarté**, et le panneau le dit. Une case cochée sur
+  un guide que le lobby, une fois connu, ne joue pas est décochée (une ligne de journal).
+- **Puissance du board** (`BoardPowerView`, `BoardPowerLevels`, 2026-10-06, sous la liste, à la place de l'ancienne ligne
+  « Board … · +18% ») : une jauge de quatre segments (rouge, jaune, vert, or ; le palier allumé), un badge de la couleur
+  du palier avec son signe et le pourcentage (« ▼ −33% », « ≈ +18% », « ▲ +58% », « ★ +117% », doré lumineux), puis
+  « Board 190 · hero avg 120 at turn 8 ». Paliers en tours de croissance de la courbe (×1,8 par tour, mesuré) : < −25 %
+  rouge, jusqu'à +34 % jaune, jusqu'à +80 % vert, au-delà shiny. Sans couleur (segments gris, « – », raison écrite) : pas
+  de courbe, pas de moyenne au tour, moyenne < 12 (« too early »), courbe qui retombe à ce tour (« curve falls after turn
+  16 »), héros sous 100 parties (« few games (78) »). Global seulement : Firestone n'a pas de courbe par compo.
   Liste dans l'ordre de HDT par tier (S → D, barres aux dégradés de HDT), les cibles en tête de leur tier ; une ligne =
   case, nom (deux lignes au besoin, jamais coupé ; couleur et gras d'une cible, blanc si quelque chose est tenu, gris
   sinon), les **cartes clés** seules en ovales (anneau vert + ✓ si tenues, tier en badge ; au-delà de six : cinq et
@@ -230,9 +257,13 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   défaut en 1080p, couvrait le bas de la 3e option (302 × 43 px en découverte, 359 × 162 px en Dark Gift). Décision du
   pilote, réversible, **à confirmer en jeu par Ali** ; garde-fou `choice-cover` (s'il tombe, tout est rétabli).
 - **Journal** : `comp guides loaded from HDT (…)` à chaque nouvelle liste, `… comp guides: none from HDT (state …)` tant
-  que HDT n'a rien ; `bridge: Guide → compo (k/N keys, m cards, n games); Autre → no match (k/n guides bridged, against m
+  que HDT n'a rien ; `lobby tribes=[…] read at hero selection` (ou `shop turn n`) quand les tribus sont connues, `lobby
+  tribes unknown at shop turn n: …` une fois si la taverne s'ouvre sans elles ; `lobby tribes=[…] (shop turn n): k/n guides
+  playable; left out: Guide (no BEAST), Autre (key cards X, Y: no QUILBOAR)` (ou `lobby tribes unknown (…)`) à chaque
+  nouvelle liste ou nouveau lobby ; `unticked Guide/20: no BEAST` ; `bridge: Guide → compo (k/N keys, m cards, n games); Autre → no match (k/n guides bridged, against m
   compositions; Firestone ok)` à chaque recalcul du pont ; `comps round=… source=… comps=… board=… hand=… targets=[1. Nom
-  #couleur ★k/N; …]` à la fin de chaque tour de taverne ; `tavern highlights=[carte:core|enabler|addon:guide, carte:boards
+  #couleur ★k/N ticked; 2. Nom #couleur ★k/N in progress; …]` à la fin de chaque tour de taverne (`comps` = guides du
+  lobby) ; `warband round=… hero=… Board … · +18% power=even` (`power=none (too early)`) ; `tavern highlights=[carte:core|enabler|addon:guide, carte:boards
   3/5:guide, …] targets=[…]` quand ils changent (`TavernHighlights.Summary`) ; `choice kind=…` par choix (raison et
   évidence de chaque étiquette) ; `choice open: markers and panel hidden` / `choice closed: restored` à chaque transition ;
   `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]`.
@@ -258,8 +289,9 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 - Sous WSL, on vérifie les tests et le build. Le chargement par HDT et les événements réels ne se vérifient que
   sous Windows, avec HDT installé. **Exception : la simulation** `tools/BronzebeardHud.Harness/` (README) fait tourner
   les vrais panneaux (`PanelMover`, « Compositions » et son popup de survol, cadres sur les cartes de Bob, Skip combat, étiquettes des choix) dans une fenêtre Windows ordinaire, sans
-  HDT ni partie, avec des données synthétiques (dont deux compos Firestone inventées pour le pont, et un contre-exemple
-  « no match ») ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
+  HDT ni partie, avec des données synthétiques (dont deux compos Firestone inventées pour le pont, un contre-exemple
+  « no match », un lobby de cinq tribus par scénario — `--scenario 3` sans morts-vivants, `4` lobby inconnu, `5` cases —
+  et une courbe de héros inventée pour la jauge, `--power behind|even|ahead|shiny|none|early`) ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
   la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. Elle ne simule
   pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) : un défaut qui y vivrait ne s'y voit pas.
 - Le dépôt est **privé** (il était public jusqu'au 2026-09-26) : on garde malgré tout la règle
@@ -405,7 +437,7 @@ Fixtures can be chained to build up a full timeline.
 | Dossier | Contenu |
 |---|---|
 | `docs/plans/` | 2026-03-08 : conception et plan du portage Rust → C# ; 2026-09-26 : étude de stack, spec et plan du plugin HDT |
-| `docs/plans/2026-10-04-panneau-unique-ergonomie.html` | note de conception HTML pour Ali (images dans `img/2026-10-04-panneau-unique/`) : les 7 demandes du panneau unique → décisions, avant / après, flux des cibles, ce qui n'a pas été vu, ce qui reste à décider |
+| `docs/plans/2026-10-04-panneau-unique-ergonomie.html` | note de conception HTML pour Ali (images dans `img/2026-10-04-panneau-unique/` et `img/2026-10-06-tribus-cases-puissance/`) : les 7 demandes du panneau unique → décisions, avant / après, flux des cibles, ce qui n'a pas été vu, ce qui reste à décider ; § 11 : tribus du lobby, cases à cocher, puissance du board (2026-10-06) |
 | `docs/reference/` | format de `Power.log`, recherche HDT / Tier7 |
 | `docs/journal/` | ce qui s'est décidé, séance par séance |
 | `docs/archive/` | le dépôt Rust complet, en bundle git |
