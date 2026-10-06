@@ -553,10 +553,10 @@ public sealed class Plugin : IPlugin
     internal static string StatsDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BronzebeardHud", "stats");
 
-    public string Name => "Bronzebeard HUD";
+    public string Name => "Tavern Compass";
 
     public string Description =>
-        "Battlegrounds hero-pick stats (Firestone public aggregates, hand-typed HSReplay data) and HDT's comp guides as targets, on top of HDT's overlay.";
+        "Battlegrounds comp targets from HDT's comp guides, frames on Bob's cards, help with choices, a board-power gauge, and hero-pick stats (Firestone public aggregates), on top of HDT's overlay.";
 
     public string ButtonText => "Move panels (on/off)";
     public string Author => "elphono";
@@ -566,7 +566,7 @@ public sealed class Plugin : IPlugin
 
     private MenuItem BuildMenu()
     {
-        var menu = new MenuItem { Header = "Bronzebeard HUD" };
+        var menu = new MenuItem { Header = "Tavern Compass" };
         _moveItem = new MenuItem { Header = "Move panels", IsCheckable = true };
         _moveItem.Click += (_, _) => ToggleMoveMode();
         var reset = new MenuItem { Header = "Reset panel positions" };

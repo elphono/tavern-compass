@@ -392,7 +392,7 @@ internal sealed class HarnessWindow : Window
             }
         }
 
-        Title = "Bronzebeard HUD — simulation (not HDT)";
+        Title = "Tavern Compass — simulation (not HDT)";
         Width = 1750;
         Height = 960;
         Content = BuildContent(options);
