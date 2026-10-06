@@ -14,12 +14,13 @@ public enum CompGuideItemKind
 /// <summary>One piece of the comp guides panel, in display order, with its measured height (overlay pixels).</summary>
 public readonly struct CompGuideFitItem
 {
-    public CompGuideFitItem(CompGuideItemKind kind, int group, double height, bool highlighted = false)
+    public CompGuideFitItem(CompGuideItemKind kind, int group, double height, bool highlighted = false, int rank = 0)
     {
         Kind = kind;
         Group = group;
         Height = height;
         Highlighted = highlighted;
+        Rank = rank;
     }
 
     public CompGuideItemKind Kind { get; }
@@ -29,6 +30,9 @@ public readonly struct CompGuideFitItem
 
     public double Height { get; }
     public bool Highlighted { get; }
+
+    /// <summary>A highlighted line's rank (a target's: 1 the most probable); highlighted lines are taken in rank order. 0: none.</summary>
+    public int Rank { get; }
 }
 
 /// <summary>Which pieces of the panel are shown (indexes in display order), and whether a "k of n shown" line goes under them.</summary>
@@ -70,10 +74,11 @@ public sealed class SectionFit
 public static class CompGuideLayout
 {
     /// <summary>
-    /// Which pieces fit in <paramref name="room"/> (overlay pixels). The highlighted guides first, in display order, so
-    /// that the most probable ones never give way to the others; then the other guides in display order, until one
-    /// does not fit. A tier's header shows when at least one of its guides does. When some guides are left out, a line
-    /// <paramref name="moreLineHeight"/> tall is kept for "k of n shown". The result keeps the display order.
+    /// Which pieces fit in <paramref name="room"/> (overlay pixels). The highlighted guides first, by rank (then in display
+    /// order), so that the most probable ones never give way to the others; then, if every highlighted guide fitted, the other
+    /// guides in display order, until one does not fit. A tier's header shows when at least one of its guides does. When some
+    /// guides are left out, a line <paramref name="moreLineHeight"/> tall is kept for "k of n shown". The result keeps the
+    /// display order.
     /// </summary>
     /// <param name="atLeastOne">
     /// When no row fits at all, the first highlighted row (else the first row) is shown anyway, with its tier's header:
@@ -102,6 +107,64 @@ public static class CompGuideLayout
         }
 
         return new CompGuideFit(some, shown, rows);
+    }
+
+    /// <summary>
+    /// The height of the pieces <see cref="Fit"/> shows for <paramref name="rows"/> guide lines: the highlighted lines first, in
+    /// display order, then the others in display order, up to <paramref name="rows"/> lines, each tier's header once, with the
+    /// first of its lines taken. A room of exactly this height makes Fit show those very lines (the panel sized for N lines,
+    /// Ali, 2026-10-06: "+ or − resizes the window to show the N best compositions"). 0 for no line; every piece when
+    /// <paramref name="rows"/> is more than there are lines.
+    /// </summary>
+    public static double HeightFor(IReadOnlyList<CompGuideFitItem> items, int rows)
+    {
+        var headers = Headers(items);
+        var counted = new HashSet<int>();
+        var used = 0.0;
+        var taken = 0;
+
+        // The order Try takes them in, and its very sums (a line with its header added first), so that Fit, given this
+        // room, finds the same total to the last bit.
+        var order = HighlightedByRank(items)
+            .Concat(Enumerable.Range(0, items.Count).Where(i => items[i].Kind == CompGuideItemKind.Row && !items[i].Highlighted));
+        foreach (var i in order)
+        {
+            if (taken >= rows)
+            {
+                break;
+            }
+
+            var header = headers.TryGetValue(items[i].Group, out var h) && counted.Add(h) ? h : -1;
+            used += items[i].Height + (header >= 0 ? items[header].Height : 0);
+            taken++;
+        }
+
+        return used;
+    }
+
+    /// <summary>
+    /// The highlighted lines, by rank (a target's: the best first), then in the list's order: when they do not all fit, the
+    /// best stay, whatever their tier (a + that left out the third target for the fourth would make a better one disappear).
+    /// </summary>
+    private static IEnumerable<int> HighlightedByRank(IReadOnlyList<CompGuideFitItem> items) =>
+        Enumerable.Range(0, items.Count)
+            .Where(i => items[i].Kind == CompGuideItemKind.Row && items[i].Highlighted)
+            .OrderBy(i => items[i].Rank)
+            .ThenBy(i => i);
+
+    /// <summary>Each tier's header, by group: the first header piece of the group.</summary>
+    private static Dictionary<int, int> Headers(IReadOnlyList<CompGuideFitItem> items)
+    {
+        var headers = new Dictionary<int, int>();
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i].Kind == CompGuideItemKind.TierHeader && !headers.ContainsKey(items[i].Group))
+            {
+                headers[items[i].Group] = i;
+            }
+        }
+
+        return headers;
     }
 
     /// <summary>
@@ -151,15 +214,7 @@ public static class CompGuideLayout
 
     private static IReadOnlyList<int> Try(IReadOnlyList<CompGuideFitItem> items, double room)
     {
-        var headers = new Dictionary<int, int>();
-        for (var i = 0; i < items.Count; i++)
-        {
-            if (items[i].Kind == CompGuideItemKind.TierHeader && !headers.ContainsKey(items[i].Group))
-            {
-                headers[items[i].Group] = i;
-            }
-        }
-
+        var headers = Headers(items);
         var accepted = new HashSet<int>();
         var used = 0.0;
         bool Take(int i)
@@ -182,15 +237,15 @@ public static class CompGuideLayout
             return true;
         }
 
-        for (var i = 0; i < items.Count; i++)
+        var targetLeftOut = false;
+        foreach (var i in HighlightedByRank(items))
         {
-            if (items[i].Kind == CompGuideItemKind.Row && items[i].Highlighted)
-            {
-                Take(i);
-            }
+            targetLeftOut |= !Take(i);
         }
 
-        for (var i = 0; i < items.Count; i++)
+        // A highlighted guide left out is never replaced by one that is not (it may have needed its tier's bar, which a guide
+        // of a tier already shown does not).
+        for (var i = 0; i < items.Count && !targetLeftOut; i++)
         {
             if (items[i].Kind == CompGuideItemKind.Row && !items[i].Highlighted && !Take(i))
             {

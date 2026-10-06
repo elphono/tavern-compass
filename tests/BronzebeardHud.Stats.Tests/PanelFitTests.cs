@@ -61,17 +61,33 @@ public class PanelFitTests
     /// <summary>
     /// The list height that sizes the default box (TavernLayout.TargetPanel) and the resize minimum, written out in literal
     /// numbers on purpose, the oval's aspect aside (TavernLayout.OvalAspect, which may change on its own): 52 = 2 × 2 border
-    /// + 2 × 8 padding + 32 title bar; a footer 20, a status line 16; a line one 54-wide oval tall, 6 apart.
+    /// + 2 × 8 padding + 32 title bar; a status line 16; a line one 54-wide oval tall, 6 apart. No footer since 2026-10-06:
+    /// the board's power left the frame for the inset under it (<see cref="PanelFit.PowerInset"/>).
     /// </summary>
     [Fact]
     public void ListHeight_WrittenOutInLiteralNumbers()
     {
         var oval = 54 * TavernLayout.OvalAspect;
 
-        Assert.Equal(52 + oval, PanelFit.ListHeight(1, footer: false, status: false), precision: 9);
-        Assert.Equal(52 + 20 + 3 * oval + 2 * 6, PanelFit.ListHeight(3, footer: true, status: false), precision: 9);
-        Assert.Equal(52 + 16 + 2 * oval + 6, PanelFit.ListHeight(2, footer: false, status: true), precision: 9);
-        Assert.Equal(52 + 20, PanelFit.ListHeight(0, footer: true, status: false), precision: 9); // no line, no gap
+        Assert.Equal(52 + oval, PanelFit.ListHeight(1), precision: 9);
+        Assert.Equal(52 + 3 * oval + 2 * 6, PanelFit.ListHeight(3), precision: 9);
+        Assert.Equal(52 + 16 + 2 * oval + 6, PanelFit.ListHeight(2, status: true), precision: 9);
+        Assert.Equal(52, PanelFit.ListHeight(0), precision: 9); // no line, no gap
+    }
+
+    /// <summary>
+    /// The power inset under the frame, in design pixels: 2 apart from the frame, then a 1 px border, 2 of padding, two rows
+    /// 16 tall (the badge, the 12 px figures) 2 apart, 2 of padding and the border again: 42. Not more: at the default place
+    /// in 1080p, three targets in two tiers and the inset need all the room between the boards and the gold (measured in the
+    /// simulation on 2026-10-06: 344 px for 342 with a 3 px gap and 3 of padding, the third target left out).
+    /// </summary>
+    [Fact]
+    public void PowerInset_WrittenOutInLiteralNumbers_AndCountedInTheDefaultBoxAndTheMinimum()
+    {
+        Assert.Equal(2 + 1 + 2 + 16 + 2 + 16 + 2 + 1, PanelFit.PowerInset);
+        Assert.Equal(PanelFit.ListHeight(1) + PanelFit.PowerInset, PanelFit.TargetMinHeight, precision: 9);
+        Assert.Equal((PanelFit.ListHeight(3) + PanelFit.PowerInset) * TavernLayout.Scale(1080), TavernLayout.TargetPanel(1920, 1080).Height, precision: 9);
+        Assert.Equal((PanelFit.ListHeight(3) + PanelFit.PowerInset) * TavernLayout.Scale(1440), TavernLayout.TargetPanel(2560, 1440).Height, precision: 9);
     }
 
     [Fact]
@@ -87,10 +103,10 @@ public class PanelFitTests
     }
 
     [Fact]
-    public void TargetMinimum_HoldsTheTitleAndOneLine_AndNothingMore()
+    public void TargetMinimum_HoldsTheTitleOneLineAndTheInset_AndNothingMore()
     {
-        Assert.Equal(PanelFit.ListHeight(1, footer: false, status: false), PanelFit.TargetMinHeight, precision: 9);
-        Assert.True(PanelFit.TargetMinHeight < PanelFit.ListHeight(2, false, false), "the minimum box has room for a second line");
+        Assert.Equal(PanelFit.ListHeight(1) + PanelFit.PowerInset, PanelFit.TargetMinHeight, precision: 9);
+        Assert.True(PanelFit.TargetMinHeight < PanelFit.ListHeight(2) + PanelFit.PowerInset, "the minimum box has room for a second line");
         Assert.Equal(PanelFit.PanelWidth, PanelFit.TargetMinWidth); // narrower than its six ovals it cannot go
     }
 }

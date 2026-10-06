@@ -96,9 +96,22 @@ public static class PanelFit
     /// </summary>
     public const double RowGap = 6;
 
-    /// <summary>The warband line under the list, and the loading status line.</summary>
-    public const double FooterLine = 20;
+    /// <summary>The loading status line.</summary>
     public const double StatusLine = 16;
+
+    /// <summary>
+    /// The power inset under the frame (PowerInset; it left the frame on 2026-10-06), in design pixels: 2 apart from the
+    /// frame, a 1 px border, 2 of padding, two rows 16 tall (the player's board, the opponent's) 2 apart, 2 of padding and the
+    /// border. What the panel draws is measured in place; this sizes the default box and the minimum. Not more: at the
+    /// default place in 1080p, three targets in two tiers and the inset take all the room between the boards and the gold.
+    /// </summary>
+    public const double PowerInset = InsetGap + 2 * InsetBorder + 2 * InsetPadding + 2 * InsetRow + InsetRowGap;
+
+    public const double InsetGap = 2;
+    public const double InsetBorder = 1;
+    public const double InsetPadding = 2;
+    public const double InsetRow = 16;
+    public const double InsetRowGap = 2;
 
     /// <summary>
     /// Panel width: the tick box, the name and six ovals, 488 design pixels. Not wider: at its default place
@@ -110,18 +123,18 @@ public static class PanelFit
     /// <summary>Lowest point a panel may reach, × H: above the player's gold, at the bottom right of the board.</summary>
     public const double BottomLimit = 0.945;
 
-    private static double Chrome(bool footer, bool status) =>
-        2 * Border + 2 * Padding + TitleBar + (footer ? FooterLine : 0) + (status ? StatusLine : 0);
+    private static double Chrome(bool status) =>
+        2 * Border + 2 * Padding + TitleBar + (status ? StatusLine : 0);
 
     /// <summary>
     /// Smallest box of the target panel when resized (design pixels): the title and one guide line, as wide as
-    /// its six ovals need. A footer or a status line under that one line does not widen it: the panel then grows
-    /// to hold what it shows, as it always showed at least one line.
+    /// its six ovals need, and the power inset under them. A status line under that one line does not widen it: the panel
+    /// then grows to hold what it shows, as it always showed at least one line.
     /// </summary>
     public const double TargetMinWidth = PanelWidth;
-    public static double TargetMinHeight => ListHeight(1, footer: false, status: false);
+    public static double TargetMinHeight => ListHeight(1) + PowerInset;
 
-    /// <summary>Height of a list of <paramref name="rows"/> lines, in design pixels, chrome included.</summary>
-    public static double ListHeight(int rows, bool footer, bool status) =>
-        Chrome(footer, status) + rows * RowHeight + Math.Max(0, rows - 1) * RowGap;
+    /// <summary>Height of a list of <paramref name="rows"/> lines in its frame, in design pixels, chrome included (not the inset).</summary>
+    public static double ListHeight(int rows, bool status = false) =>
+        Chrome(status) + rows * RowHeight + Math.Max(0, rows - 1) * RowGap;
 }

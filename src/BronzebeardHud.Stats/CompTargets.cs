@@ -207,6 +207,25 @@ public static class CompTargets
             .ToList();
     }
 
+    /// <summary>
+    /// Whether − and + may change the number of targets: not while a guide is ticked. A tick silences the guesses, which the
+    /// number counts (<see cref="Choose"/>): with a guide ticked the targets are the ticked guides and the guides in progress,
+    /// and − n + has nothing to change (drawn dim, a click does nothing).
+    /// </summary>
+    public static bool CountAdjustable(IReadOnlyList<CompTarget> targets) => !targets.Any(t => t.Ticked);
+
+    /// <summary>
+    /// How many guide lines the panel is sized for when it fits its content (PanelGrowth): the number wanted (− n +, 1 to 4);
+    /// with a guide ticked, that number still, or every target when there are more (the ticked guides and the guides in
+    /// progress, four at most). Sized on the ticked guides alone, the panel would hide every other guide, and − and + being
+    /// dim, the player could not show them again to tick another one.
+    /// </summary>
+    public static int FitRows(IReadOnlyList<CompTarget> targets, int count)
+    {
+        var wanted = Math.Max(HudSettings.MinSuggested, Math.Min(HudSettings.MaxSuggested, count));
+        return CountAdjustable(targets) ? wanted : Math.Max(wanted, Math.Min(CompTargetTracker.MaxTicked, targets.Count));
+    }
+
     /// <summary>The target for a guide, or null when it is not one.</summary>
     public static CompTarget? Find(IReadOnlyList<CompTarget> targets, CompGuide guide) =>
         targets.FirstOrDefault(t => t.Guide.Id == guide.Id);

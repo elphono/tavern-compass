@@ -80,6 +80,20 @@ public static class BoardPowerLevels
 
     /// <summary>The four coloured levels, in gauge order.</summary>
     public static readonly IReadOnlyList<BoardPower> Gauge = new[] { BoardPower.Behind, BoardPower.Even, BoardPower.Ahead, BoardPower.Shiny };
+
+    /// <summary>The lamp of the gauge that is lit for a level (0 red to 3 gold, <see cref="Gauge"/>); -1 for none: no lamp lit.</summary>
+    public static int LitLamp(BoardPower power) => Gauge.ToList().IndexOf(power);
+
+    /// <summary>
+    /// The glow around the lit lamp, "#RRGGBB" (the traffic-light effect, Ali, 2026-10-06): the level's own colour, a deep gold
+    /// for shiny (its pale gold lamp would glow too faintly); null without a level: nothing lit, nothing glows.
+    /// </summary>
+    public static string? Halo(BoardPower power) => power switch
+    {
+        BoardPower.None => null,
+        BoardPower.Shiny => "#FFC400",
+        _ => Colour(power),
+    };
 }
 
 /// <summary>The player's board against the average board of the same hero at the same turn.</summary>
@@ -123,6 +137,24 @@ public sealed class WarbandComparison
     public string PowerText => "power=" + BoardPowerLevels.Name(Power) + (Note != null ? $" ({Note})" : string.Empty);
 }
 
+/// <summary>How a comparison of <see cref="WarbandCurve"/> names its board, its hero and the average.</summary>
+internal sealed class WarbandWords
+{
+    /// <param name="board">"Board 142", "Opp. 160", "Next opp. 70 at turn 5".</param>
+    /// <param name="hero">Who has no curve: "this hero", "Rakanishu".</param>
+    /// <param name="average">The average, {0} its value, {1} the turn: "hero avg {0} at turn {1}", "their hero avg {0}".</param>
+    public WarbandWords(string board, string hero, string average)
+    {
+        Board = board;
+        Hero = hero;
+        Average = average;
+    }
+
+    public string Board { get; }
+    public string Hero { get; }
+    public string Average { get; }
+}
+
 /// <summary>
 /// Firestone's warbandStats give, per hero and turn, the average sum of attack and health of the player's
 /// minions at that turn's combat. Set against the player's own board, they tell whether to push stats or
@@ -135,13 +167,20 @@ public static class WarbandCurve
     public static int BoardStats(IEnumerable<(int Attack, int Health)> minions) => minions.Sum(m => Math.Max(0, m.Attack) + Math.Max(0, m.Health));
 
     /// <param name="sources">Stats files, most trusted first; the first one with a curve for the hero is used.</param>
-    public static WarbandComparison Compare(int turn, int boardStats, string heroCardId, IReadOnlyList<HeroStatsFile> sources)
+    public static WarbandComparison Compare(int turn, int boardStats, string heroCardId, IReadOnlyList<HeroStatsFile> sources) =>
+        Compare(turn, boardStats, heroCardId, sources, new WarbandWords($"Board {boardStats}", "this hero", "hero avg {0} at turn {1}"));
+
+    /// <summary>
+    /// The same comparison, worded for another board (the opponent's: <see cref="OpponentPower"/>): <paramref name="words"/>
+    /// says how the board, the hero and the average are named. Levels and notes are the same rules.
+    /// </summary>
+    internal static WarbandComparison Compare(int turn, int boardStats, string heroCardId, IReadOnlyList<HeroStatsFile> sources, WarbandWords words)
     {
         var hero = sources.Select(s => s.Find(heroCardId)).FirstOrDefault(h => h is { WarbandCurve.Count: > 0 });
-        var board = $"Board {boardStats}";
+        var board = words.Board;
         if (hero == null)
         {
-            return new WarbandComparison(turn, boardStats, null, $"{board} · no curve for this hero");
+            return new WarbandComparison(turn, boardStats, null, $"{board} · no curve for {words.Hero}");
         }
 
         var curve = hero.WarbandCurve;
@@ -152,7 +191,7 @@ public static class WarbandCurve
         }
 
         var inv = CultureInfo.InvariantCulture;
-        var details = $"{board} · hero avg {point.AverageStats.ToString("0", inv)} at turn {turn}";
+        var details = $"{board} · {string.Format(inv, words.Average, point.AverageStats.ToString("0", inv), turn)}";
         if (point.AverageStats <= 0)
         {
             return new WarbandComparison(turn, boardStats, point.AverageStats, details, note: "too early");

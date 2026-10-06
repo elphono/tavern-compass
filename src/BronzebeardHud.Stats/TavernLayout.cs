@@ -212,15 +212,16 @@ public static class TavernLayout
     /// The target composition panel's default place: the lower right part of Hearthstone's 4:3 frame,
     /// below the player's board row (OverlayWindow.Update.cs:537-538 + MouseOverDetection.cs:38), right of
     /// the hero and hero power (which sit within W/2 ± 0.2 × H), above the gold at the bottom. Sized for
-    /// three composition lines with the warband line under them (PanelFit); the list may grow below that, down
-    /// to PanelFit.BottomLimit. It can be moved (PanelLayout).
+    /// three composition lines and the power inset under the frame (PanelFit.PowerInset, 2026-10-06); the panel sizes
+    /// itself to its content from there (PanelGrowth), between the boards and PanelFit.BottomLimit. It can be moved and
+    /// resized (PanelLayout).
     /// </summary>
     public static LayoutRect TargetPanel(double width, double height)
     {
         var s = Scale(height);
         var frameRight = width / 2 + height * 2 / 3;
         var panelWidth = PanelFit.PanelWidth * s;
-        var panelHeight = PanelFit.ListHeight(3, footer: true, status: false) * s;
+        var panelHeight = (PanelFit.ListHeight(3) + PanelFit.PowerInset) * s;
         var right = frameRight - 0.01 * height;
         var top = PlayerRowBottom(height) + 0.012 * height;
         return new LayoutRect(right - panelWidth / 2, top + panelHeight / 2, panelWidth, panelHeight);
