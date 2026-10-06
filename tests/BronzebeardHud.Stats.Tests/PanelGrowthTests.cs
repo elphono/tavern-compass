@@ -131,9 +131,12 @@ public class PanelGrowthTests
     public void AMinimumLargerThanTheRoom_IsKept_InsideTheScreen()
     {
         var span = PanelGrowth.Place(Default, 50, minimum: 500, H, Zones);
+        var above = PanelGrowth.Place(Box(1181, 40, 488, 200), 50, minimum: 500, H, Zones); // 320.76 above the boards: less than 500
 
         Assert.Equal(500, span.Height, precision: 6);
         Assert.True(span.Top >= 0 && span.Bottom <= H, $"{span.Top}..{span.Bottom}");
+        Assert.Equal(500, above.Height, precision: 6);
+        Assert.Equal(0, above.Top, precision: 6); // over the boards then, but never above the screen
     }
 
     /// <summary>
