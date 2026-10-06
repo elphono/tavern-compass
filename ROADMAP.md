@@ -1,6 +1,6 @@
 # Roadmap
 
-State of the project on 2026-10-06. Detailed history, decision by decision, is in [`docs/journal/`](docs/journal/)
+State of the project on 2026-10-07. Detailed history, decision by decision, is in [`docs/journal/`](docs/journal/)
 (in French); the specification and the plan the plugin follows are in [`docs/plans/`](docs/plans/).
 
 | Horizon | What |

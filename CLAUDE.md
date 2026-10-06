@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Vue d'ensemble
 
-**Tavern Compass** (nom de code `BronzebeardHud`, nom affiché « Bronzebeard HUD » jusqu'au 2026-10-06) est un plugin
+**Tavern Compass** (nom de code `BronzebeardHud`, nom affiché « Bronzebeard HUD » jusqu'au 2026-10-07) est un plugin
 Hearthstone Deck Tracker (HDT) pour Battlegrounds : les compos à viser, des cadres sur les cartes de Bob, des aides pour
 les choix et une jauge de puissance du board. Dépôt public `github.com/elphono/tavern-compass` (ex-`bg_ultimate_hud`),
 licence MIT (le dossier local s'appelle encore `bg_ultimate_hud`). **Langue** : `README.md` et `ROADMAP.md` en anglais (le public), toute l'autre documentation en français,
@@ -78,7 +78,7 @@ Ce qui reste ouvert :
 | Stats HSReplay | usage local accepté, mais le site renvoie un challenge Cloudflare : **on ne contourne pas** une protection anti-bot ; import semi-manuel depuis le navigateur (spec § 6) |
 | Simulateur npm `simulate-bgs-battle` | usage personnel, autorisé ; inutile tant que Bob's Buddy (HDT) fait le travail |
 | MMR des adversaires | gardé tel quel. Le leaderboard EU s'arrête à 8 000 ; Ali est à ≈ 6 840 (région EU mesurée) ; plage par défaut 8 000 – 8 050 |
-| Visibilité | dépôt GitHub **public** (privé du 2026-09-26 au 2026-10-06). Le 2026-10-06 (Ali) : licence MIT, nom « Tavern Compass », historique purgé de ses données personnelles (BattleTags, pseudo d'adversaire, numéros de compte, bundle Rust), nom affiché dans HDT changé sans toucher aux noms internes |
+| Visibilité | dépôt GitHub **public** (privé du 2026-09-26 au 2026-10-06). Le 2026-10-07 (Ali) : licence MIT, nom « Tavern Compass », historique purgé de ses données personnelles (BattleTags, pseudo d'adversaire, numéros de compte, bundle Rust), nom affiché dans HDT changé sans toucher aux noms internes |
 
 ## Façon de travailler sur ce projet
 
@@ -93,7 +93,7 @@ Ce qui reste ouvert :
   `.editorconfig`), `dotnet test -warnaserror` et les builds Release du plugin et de la simulation en `-warnaserror` : le
   code n'a aucun avertissement, un nouveau fait échouer la construction. `RepositoryHygieneTests` refuse tout BattleTag,
   pseudo de joueur ou numéro de compte réel dans un fichier du dépôt (les données de test sont inventées).
-- **Historique réécrit le 2026-10-06** (purge des données personnelles, voir « Décisions ») : les hashes de commit cités
+- **Historique réécrit le 2026-10-07** (purge des données personnelles, voir « Décisions ») : les hashes de commit cités
   dans les documents ont été recalculés ; un clone fait avant cette date est à refaire (`git clone`, ou `git fetch` puis
   `git reset --hard origin/main` si l'arbre est propre). L'ancienne app autonome reste atteignable par le tag
   `archive/standalone-app`.

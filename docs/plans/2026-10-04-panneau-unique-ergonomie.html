@@ -253,7 +253,7 @@
         <summary>La mesure</summary>
         <p>Journal d'HDT d'Ali, 2026-10-04 14:13:22, tour 11 : la première compo mise en valeur était à « ★3/5 +3 ». Cela fait 3 cartes clés tenues sur 5, plus 3 enablers ou add-ons tenus, donc 6 noms après « ✓ », puis 2 cartes clés après « need » : 8 noms sur une ligne.</p>
         <pre>hdt_log.txt:450  14:13:22|Info|Plugin.LogCompGuidesRound &gt;&gt; Bronzebeard HUD: comp guides round=11 source=hdt-free comps=23 board=7 hand=10 highlighted=[1. … ★3/5 +3; 2. … ★2/4 +2; 3. … ★1/3 +1]</pre>
-        <p>HDT ne mélange jamais ces listes ; la liste « tout ce qui est tenu » (<code>CompGuideProgress.Held</code>) est retirée (commit b1c9ee3).</p>
+        <p>HDT ne mélange jamais ces listes ; la liste « tout ce qui est tenu » (<code>CompGuideProgress.Held</code>) est retirée (commit 5e64d5e).</p>
       </details>
     </figure>
 
@@ -288,7 +288,7 @@
       <details>
         <summary>La mesure</summary>
         <p>25 portraits mesurés (art.hearthstonejson.com, 256x) : 24 ont 22 à 36 colonnes blanches de chaque côté. L'ancien ovale (40 × 48, le carré entier en « UniformToFill ») n'en rognait que 21,3 par côté. La découpe de HDT (<code>BattlegroundsMinion.xaml</code>, RadiusX = 87) en rogne 41 ; sa hauteur suit le rapport 1,2 (208,8 lignes).</p>
-        <p>Effet sur la capture de la simulation (35 ovales) : pixels blancs neutres (R, G, B &gt; 245) au bord intérieur des anneaux, <b>1325 avant, 0 après</b>. Trois mutations contre toute la suite (ancienne découpe, rapport 240/174, découpe 174 × 240) : trois détectées. Commit 48406c5.</p>
+        <p>Effet sur la capture de la simulation (35 ovales) : pixels blancs neutres (R, G, B &gt; 245) au bord intérieur des anneaux, <b>1325 avant, 0 après</b>. Trois mutations contre toute la suite (ancienne découpe, rapport 240/174, découpe 174 × 240) : trois détectées. Commit 0236275.</p>
       </details>
     </figure>
   </div>
@@ -558,7 +558,7 @@
         <tr><td data-label="Ce que fait HDT"><code>SetTooltip</code> : un seul emplacement pour tout l'overlay (<code>Children.Count &gt; 0 → return</code>), fermé au MouseLeave, sans taille maximale</td><td data-label="Conséquence">une infobulle de ligne occuperait l'emplacement : les ovales de cette ligne ne montreraient plus leur carte</td></tr>
         <tr><td data-label="Ce que fait HDT">sonde ≈ 60 Hz purement géométrique : tout élément <code>IsOverlayHoverVisible</code> dont le rectangle contient le curseur reçoit MouseEnter</td><td data-label="Conséquence">une ligne et l'ovale qu'elle contient sont « entrés » ensemble ; passer de l'une à l'autre ne lève rien sur la ligne</td></tr>
         <tr><td data-label="Ce que fait HDT">au-dessus d'un élément cliquable, WPF lève en plus ses propres MouseEnter / MouseLeave</td><td data-label="Conséquence">gestionnaires appelés deux fois ; un MouseLeave peut arriver curseur encore sur la ligne</td></tr>
-        <tr><td data-label="Ce que fait HDT"><code>SetTooltip</code> place l'infobulle d'après sa taille mesurée, juste après l'avoir ajoutée</td><td data-label="Conséquence">une <code>Image</code> sans source mesure 0 × 0 : l'aperçu tombait sur le panneau au premier survol ; corrigé (c8155b4), <code>FullCard</code> rend une boîte de la taille de la carte</td></tr>
+        <tr><td data-label="Ce que fait HDT"><code>SetTooltip</code> place l'infobulle d'après sa taille mesurée, juste après l'avoir ajoutée</td><td data-label="Conséquence">une <code>Image</code> sans source mesure 0 × 0 : l'aperçu tombait sur le panneau au premier survol ; corrigé (35d47e4), <code>FullCard</code> rend une boîte de la taille de la carte</td></tr>
       </tbody>
     </table>
     <p>Mesuré sur les captures (1920 × 1080) : panneau en (1181, 691), 488 × 319, bord droit à 1669 ; popup de Pirate Discover de 1452 à 1852, soit 183 px plus à droite. Un guide à six sections (Mech Magnet) : popup en (1452, 135), 400 × 547. En 4:3 (1440 × 1080), la colonne à droite des plateaux n'a que 217 px : le popup passe au-dessus des plateaux, 301 px de haut, sections réduites (calculé par <code>GuidePopupLayout</code>, pas regardé).</p>
@@ -749,7 +749,7 @@
 <main style="padding-top:0">
   <details>
     <summary>La preuve : la ligne <code>bridge:</code> et les contrôles du self-test</summary>
-    <p>Self-test relancé à 1ef888b pour cette note. Le contre-exemple Mech Divine Shield partage 3 cartes avec <code>mech_fs</code>, mais seulement 3 de ses 7 cartes clés : moins de la moitié, donc « no match ».</p>
+    <p>Self-test relancé à 1bf79ed pour cette note. Le contre-exemple Mech Divine Shield partage 3 cartes avec <code>mech_fs</code>, mais seulement 3 de ses 7 cartes clés : moins de la moitié, donc « no match ».</p>
     <pre>PASS  bridge: one log line naming every guide; Pirate Discover and Mech Magnet bridged, the counter-example Mech Divine Shield "no match": 1 line(s); counter-example: Mech Divine Shield shares 3 cards with mech_fs, 3 of its 7 core cards; Bronzebeard HUD: bridge: Undead Butcher → no match; Pirate Discover → pirate_fs (4/4 keys, 6 cards, 1800 games); Mech Magnet → mech_fs (2/2 keys, 3 cards, 1200 games); Beast Pack → no match; […] Mech Divine Shield → no match; Murloc Tidecaller → no match; Beast Deathrattle → no match (2/15 guides bridged, against 2 compositions; Firestone synthetic)
 PASS  Bob's card on the top boards of a bridged target: dotted frame and "+ T k/n" in T's colour, in the log: BG36_331 (Bob's #7) on 3/5 boards of mech_fs: frame dotted #FFB8FF1F, label "+ M. Magnet 3/5" #FFB8FF1F, Mech Magnet is #FFB8FF1F; log: "BG36_331:boards 3/5:Mech Magnet/17"
 PASS  choice discover: the bridge's labels: "+ T k/n boards" in T's colour, a role "· k/n boards", "pivot → G (X)" neutral: top boards: #1 "+ Mech Magnet 3/5 boards" on #FFB8FF1F, Mech Magnet is #B8FF1F | suffix: #0 "+ Pirate Discover · 3/5 boards" on #FFFF2BD6 | pivot: #2 "pivot → Beast Pack (A)" on #E63A3A44</pre>
@@ -776,7 +776,7 @@ PASS  choice discover: the bridge's labels: "+ T k/n boards" in T's colour, a ro
   <div class="duo">
     <figure>
       <a href="img/2026-10-04-panneau-unique/avant-choix-marqueurs.png"><img src="img/2026-10-04-panneau-unique/avant-choix-marqueurs.png" width="1920" height="1080" loading="lazy" alt="Avant : une découverte à trois options ; les cadres et étiquettes de la rangée de Bob passent par-dessus les cartes proposées, et le panneau couvre le bas de la troisième"></a>
-      <figcaption><b>Avant</b> (20:19, avant 176fb05) : découverte, trois cibles. Les cadres et étiquettes de Bob (« core MDS 2/7 », « + P. Discover », « pinned », « enabler MDS »…) passent par-dessus les options ; le panneau couvre le bas de la 3ᵉ.</figcaption>
+      <figcaption><b>Avant</b> (20:19, avant 86d88e3) : découverte, trois cibles. Les cadres et étiquettes de Bob (« core MDS 2/7 », « + P. Discover », « pinned », « enabler MDS »…) passent par-dessus les options ; le panneau couvre le bas de la 3ᵉ.</figcaption>
     </figure>
     <figure>
       <a href="img/2026-10-04-panneau-unique/avant-choix-darkgift.png"><img src="img/2026-10-04-panneau-unique/avant-choix-darkgift.png" width="1920" height="1080" loading="lazy" alt="Avant : un Dark Gift ; ses grandes cartes couvrent la rangée de Bob, dont les boutons d'épinglage tombent dans les cartes, et le panneau couvre le bas de la troisième"></a>
@@ -784,7 +784,7 @@ PASS  choice discover: the bridge's labels: "+ T k/n boards" in T's colour, a ro
     </figure>
     <figure>
       <a href="img/2026-10-04-panneau-unique/apres-choix-discover.png"><img src="img/2026-10-04-panneau-unique/apres-choix-discover.png" width="1920" height="1080" loading="lazy" alt="Après : la même découverte, sans marqueurs ni panneau ; seules les trois étiquettes du choix restent au-dessus des options"></a>
-      <figcaption><b>Après</b> (1ef888b) : la même découverte. Marqueurs, ◇ et panneau retirés ; restent les étiquettes du choix, qui portent le pont (§ 6).</figcaption>
+      <figcaption><b>Après</b> (1bf79ed) : la même découverte. Marqueurs, ◇ et panneau retirés ; restent les étiquettes du choix, qui portent le pont (§ 6).</figcaption>
     </figure>
     <figure>
       <a href="img/2026-10-04-panneau-unique/apres-choix-ferme.png"><img src="img/2026-10-04-panneau-unique/apres-choix-ferme.png" width="1920" height="1080" loading="lazy" alt="Après : le choix refermé, la rangée de Bob retrouve ses cadres et le panneau sa place"></a>
@@ -793,7 +793,7 @@ PASS  choice discover: the bridge's labels: "+ T k/n boards" in T's colour, a ro
   </div>
   <figure style="max-width:960px">
     <a href="img/2026-10-04-panneau-unique/apres-choix-trinket.png"><img src="img/2026-10-04-panneau-unique/apres-choix-trinket.png" width="1920" height="1080" loading="lazy" alt="Après : un choix de quatre trinkets ; seules leurs étiquettes de statistiques restent, sans marqueurs ni panneau"></a>
-    <figcaption><b>Après, trinket</b> (capture refaite à 1ef888b) : les quatre étiquettes de trinket, inchangées (« avg 3.71 → ≈3.41 ≈ Pirate Discover »…), et rien d'autre du plugin.</figcaption>
+    <figcaption><b>Après, trinket</b> (capture refaite à 1bf79ed) : les quatre étiquettes de trinket, inchangées (« avg 3.71 → ≈3.41 ≈ Pirate Discover »…), et rien d'autre du plugin.</figcaption>
   </figure>
 </div>
 
@@ -883,30 +883,30 @@ PASS  choice discover: the bridge's labels: "+ T k/n boards" in T's colour, a ro
     <table class="cards">
       <thead><tr><th>Preuve</th><th>Chiffre</th><th>D'où</th></tr></thead>
       <tbody>
-        <tr><td data-label="Preuve">Tests de la solution à 1ef888b (Stats + GameState + LogParser + App)</td><td data-label="Chiffre">528 + 52 + 23 + 7, 0 échec</td><td data-label="D'où"><code>dotnet test</code>, relancé pour cette note</td></tr>
-        <tr><td data-label="Preuve">Mutations du pont (<code>GuideBridge</code>, aides de choix, cadres de taverne)</td><td data-label="Chiffre">22 sur 22 tuées</td><td data-label="D'où">seconde campagne, contre toute la suite ; la première avait laissé 2 survivantes, deux vrais trous bouchés par deux tests (c418331)</td></tr>
-        <tr><td data-label="Preuve">Mutations du popup côté Stats (place, logique du survol)</td><td data-label="Chiffre">15 sur 15 tuées</td><td data-label="D'où">14 dans la campagne de c1c1996 ; la 15ᵉ (popup plus large que la fenêtre) tuée par le test ajouté avant ce commit, relancée pour cette note</td></tr>
-        <tr><td data-label="Preuve">Mutations du popup côté simulation (self-test)</td><td data-label="Chiffre">6 détectées + 1 témoin</td><td data-label="D'où">le témoin : sans vider le dispatcher, l'ancien contrôle du journal passait malgré un avertissement injecté (6463f72)</td></tr>
-        <tr><td data-label="Preuve">Mutations du masquage pendant un choix et du pont dans la simulation</td><td data-label="Chiffre">toutes tuées sauf une</td><td data-label="D'où">la survivante est une défense en profondeur, trois gardes contre le popup pendant un choix (message de 3ad9954, pas relancé ici)</td></tr>
-        <tr><td data-label="Preuve">Self-test de la simulation (<code>--selftest</code>)</td><td data-label="Chiffre">50 PASS, 0 FAIL</td><td data-label="D'où">relancé à 1ef888b pour cette note</td></tr>
-        <tr><td data-label="Preuve">Build Release du plugin contre HDT 1.58.6 installé</td><td data-label="Chiffre">0 avertissement, 0 erreur</td><td data-label="D'où">relancé à 1ef888b</td></tr>
-        <tr><td data-label="Preuve">Commits du travail</td><td data-label="Chiffre">c613a9c → 1ef888b, 13 commits</td><td data-label="D'où"><code>git log</code></td></tr>
+        <tr><td data-label="Preuve">Tests de la solution à 1bf79ed (Stats + GameState + LogParser + App)</td><td data-label="Chiffre">528 + 52 + 23 + 7, 0 échec</td><td data-label="D'où"><code>dotnet test</code>, relancé pour cette note</td></tr>
+        <tr><td data-label="Preuve">Mutations du pont (<code>GuideBridge</code>, aides de choix, cadres de taverne)</td><td data-label="Chiffre">22 sur 22 tuées</td><td data-label="D'où">seconde campagne, contre toute la suite ; la première avait laissé 2 survivantes, deux vrais trous bouchés par deux tests (bb9a718)</td></tr>
+        <tr><td data-label="Preuve">Mutations du popup côté Stats (place, logique du survol)</td><td data-label="Chiffre">15 sur 15 tuées</td><td data-label="D'où">14 dans la campagne de c5cc08f ; la 15ᵉ (popup plus large que la fenêtre) tuée par le test ajouté avant ce commit, relancée pour cette note</td></tr>
+        <tr><td data-label="Preuve">Mutations du popup côté simulation (self-test)</td><td data-label="Chiffre">6 détectées + 1 témoin</td><td data-label="D'où">le témoin : sans vider le dispatcher, l'ancien contrôle du journal passait malgré un avertissement injecté (c179e23)</td></tr>
+        <tr><td data-label="Preuve">Mutations du masquage pendant un choix et du pont dans la simulation</td><td data-label="Chiffre">toutes tuées sauf une</td><td data-label="D'où">la survivante est une défense en profondeur, trois gardes contre le popup pendant un choix (message de 3ee571b, pas relancé ici)</td></tr>
+        <tr><td data-label="Preuve">Self-test de la simulation (<code>--selftest</code>)</td><td data-label="Chiffre">50 PASS, 0 FAIL</td><td data-label="D'où">relancé à 1bf79ed pour cette note</td></tr>
+        <tr><td data-label="Preuve">Build Release du plugin contre HDT 1.58.6 installé</td><td data-label="Chiffre">0 avertissement, 0 erreur</td><td data-label="D'où">relancé à 1bf79ed</td></tr>
+        <tr><td data-label="Preuve">Commits du travail</td><td data-label="Chiffre">26c701f → 1bf79ed, 13 commits</td><td data-label="D'où"><code>git log</code></td></tr>
       </tbody>
     </table>
-    <pre>$ dotnet test        (à 1ef888b)
+    <pre>$ dotnet test        (à 1bf79ed)
 Passed!  - Failed:     0, Passed:   528, Skipped:     0, Total:   528 - BronzebeardHud.Stats.Tests.dll (net8.0)
 Passed!  - Failed:     0, Passed:    23, Skipped:     0, Total:    23 - BronzebeardHud.LogParser.Tests.dll (net8.0)
 Passed!  - Failed:     0, Passed:    52, Skipped:     0, Total:    52 - BronzebeardHud.GameState.Tests.dll (net8.0)
 Passed!  - Failed:     0, Passed:     7, Skipped:     0, Total:     7 - BronzebeardHud.App.Tests.dll (net8.0)</pre>
-    <pre>$ ./tools/BronzebeardHud.Harness/launch.sh --selftest        (à 1ef888b)
+    <pre>$ ./tools/BronzebeardHud.Harness/launch.sh --selftest        (à 1bf79ed)
 PASS  two movable panels are drawn: 2 visible panels: (1181,691 488x319) | (1540,573 136x45)
 [… 48 autres PASS, 0 FAIL …]
 PASS  the layout file is the harness's own: C:\temp\BronzebeardHarness-ci\layout.json
 ALL PASSED</pre>
-    <pre>$ # la 15ᵉ mutation du popup, sur une copie de 1ef888b : « || popupWidth &gt; width - 2 * margin) » → « ) »
+    <pre>$ # la 15ᵉ mutation du popup, sur une copie de 1bf79ed : « || popupWidth &gt; width - 2 * margin) » → « ) »
   Failed BronzebeardHud.Stats.Tests.GuidePopupLayoutTests.AWindowNarrowerThanThePopup_GivesNothing_ThoughANarrowerOneFits
 Failed!  - Failed:     1, Passed:   527, Skipped:     0, Total:   528 - BronzebeardHud.Stats.Tests.dll (net8.0)</pre>
-    <pre>$ dotnet build src/BronzebeardHud.HdtPlugin -c Release --no-incremental -p:HdtInstallDir=…/HearthstoneDeckTracker/app-1.58.6/        (à 1ef888b)
+    <pre>$ dotnet build src/BronzebeardHud.HdtPlugin -c Release --no-incremental -p:HdtInstallDir=…/HearthstoneDeckTracker/app-1.58.6/        (à 1bf79ed)
 Build succeeded.
     0 Warning(s)
     0 Error(s)</pre>
@@ -915,17 +915,17 @@ Build succeeded.
     <table class="cards">
       <thead><tr><th>Preuve</th><th>Chiffre</th><th>D'où</th></tr></thead>
       <tbody>
-        <tr><td data-label="Preuve">Tests de la solution au commit 9e0c7b6 (Stats + GameState + LogParser + App)</td><td data-label="Chiffre">489 + 52 + 23 + 7, 0 échec</td><td data-label="D'où"><code>dotnet test</code>, relancé le 2026-10-04</td></tr>
-        <tr><td data-label="Preuve">Les mêmes, après le retrait du code de mise en page devenu inutile (27ed59e)</td><td data-label="Chiffre">467 + 52 + 23 + 7, 0 échec</td><td data-label="D'où">22 cas retirés, qui ne visaient que ce code</td></tr>
-        <tr><td data-label="Preuve">Mutations côté bibliothèque Stats</td><td data-label="Chiffre">18 + 12 détectées</td><td data-label="D'où">12 : commit 9132714 ; 18 : session de fusion, pas consigné dans un commit</td></tr>
-        <tr><td data-label="Preuve">Mutations de la découpe des portraits</td><td data-label="Chiffre">3 sur 3 détectées</td><td data-label="D'où">commit 48406c5</td></tr>
-        <tr><td data-label="Preuve">Pixels blancs neutres au bord intérieur des anneaux (35 ovales)</td><td data-label="Chiffre">1325 → 0</td><td data-label="D'où">commit 48406c5</td></tr>
+        <tr><td data-label="Preuve">Tests de la solution au commit a5b3761 (Stats + GameState + LogParser + App)</td><td data-label="Chiffre">489 + 52 + 23 + 7, 0 échec</td><td data-label="D'où"><code>dotnet test</code>, relancé le 2026-10-04</td></tr>
+        <tr><td data-label="Preuve">Les mêmes, après le retrait du code de mise en page devenu inutile (c74e025)</td><td data-label="Chiffre">467 + 52 + 23 + 7, 0 échec</td><td data-label="D'où">22 cas retirés, qui ne visaient que ce code</td></tr>
+        <tr><td data-label="Preuve">Mutations côté bibliothèque Stats</td><td data-label="Chiffre">18 + 12 détectées</td><td data-label="D'où">12 : commit e17e046 ; 18 : session de fusion, pas consigné dans un commit</td></tr>
+        <tr><td data-label="Preuve">Mutations de la découpe des portraits</td><td data-label="Chiffre">3 sur 3 détectées</td><td data-label="D'où">commit 0236275</td></tr>
+        <tr><td data-label="Preuve">Pixels blancs neutres au bord intérieur des anneaux (35 ovales)</td><td data-label="Chiffre">1325 → 0</td><td data-label="D'où">commit 0236275</td></tr>
         <tr><td data-label="Preuve">Auto-test de la simulation (<code>--selftest</code>)</td><td data-label="Chiffre">14 PASS</td><td data-label="D'où">session de fusion, pas consigné dans un commit</td></tr>
-        <tr><td data-label="Preuve">Build Release du plugin contre HDT 1.58.6 installé</td><td data-label="Chiffre">0 avertissement, 0 erreur</td><td data-label="D'où">relancé le 2026-10-04, après 27ed59e</td></tr>
-        <tr><td data-label="Preuve">Commits du travail</td><td data-label="Chiffre">3770d09 → 9e0c7b6, puis 27ed59e</td><td data-label="D'où"><code>git log</code></td></tr>
+        <tr><td data-label="Preuve">Build Release du plugin contre HDT 1.58.6 installé</td><td data-label="Chiffre">0 avertissement, 0 erreur</td><td data-label="D'où">relancé le 2026-10-04, après c74e025</td></tr>
+        <tr><td data-label="Preuve">Commits du travail</td><td data-label="Chiffre">5ad9840 → a5b3761, puis c74e025</td><td data-label="D'où"><code>git log</code></td></tr>
       </tbody>
     </table>
-    <pre>$ dotnet test        (au commit 9e0c7b6)
+    <pre>$ dotnet test        (au commit a5b3761)
 Passed!  - Failed:     0, Passed:   489, Skipped:     0, Total:   489 - BronzebeardHud.Stats.Tests.dll (net8.0)
 Passed!  - Failed:     0, Passed:    23, Skipped:     0, Total:    23 - BronzebeardHud.LogParser.Tests.dll (net8.0)
 Passed!  - Failed:     0, Passed:    52, Skipped:     0, Total:    52 - BronzebeardHud.GameState.Tests.dll (net8.0)

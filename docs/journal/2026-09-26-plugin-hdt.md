@@ -30,11 +30,11 @@ flowchart LR
 
 | Symptôme vu par Ali | Cause mesurée | Correctif |
 |---|---|---|
-| panneau des héros en un seul bloc centré | constantes au jugé | positions tirées du code d'HDT (`02ebc3d`) |
-| compos visées vides | cache écrit par la version précédente (`schema` 1, sans `referenceBoard`), jugé frais 7 jours | numéro de schéma + retéléchargement (`a51568b`) ; `comps=0` dit désormais pourquoi |
+| panneau des héros en un seul bloc centré | constantes au jugé | positions tirées du code d'HDT (`9b0f81e`) |
+| compos visées vides | cache écrit par la version précédente (`schema` 1, sans `referenceBoard`), jugé frais 7 jours | numéro de schéma + retéléchargement (`3a41849`) ; `comps=0` dit désormais pourquoi |
 | texte des marqueurs coupé | largeur fixe | texte court, largeur calée sur la carte |
-| panneau Combats illisible | 8 courbes sans légende, ni axes ni chiffres, placé au centre | classement par PV, repères chiffrés, bord de l'écran (`62ac336`) |
-| carte au survol sous le panneau | ordre d'empilement | calque le plus haut (`fe2ac0b`) |
+| panneau Combats illisible | 8 courbes sans légende, ni axes ni chiffres, placé au centre | classement par PV, repères chiffrés, bord de l'écran (`6c05f38`) |
+| carte au survol sous le panneau | ordre d'empilement | calque le plus haut (`8ccd624`) |
 
 La leçon qui vaut pour la suite : **la ligne `Bronzebeard HUD: …` du journal d'HDT tranche en une
 lecture** ce que plusieurs hypothèses plausibles laissaient ouvert (le cache vide n'était pas un

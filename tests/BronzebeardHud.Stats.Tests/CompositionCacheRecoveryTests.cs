@@ -10,7 +10,7 @@ namespace BronzebeardHud.Stats.Tests;
 public sealed class CompositionCacheRecoveryTests : IDisposable
 {
     // The exact shape of Ali's cache at the time of the report (written at 19:58 CEST by the plugin of
-    // 3572dc0, before compositions carried the order of the final board; tavern line logged at 20:31:15
+    // 30e4180, before compositions carried the order of the final board; tavern line logged at 20:31:15
     // CEST): same keys, schema 1, 24 compositions, no referenceBoard, same dates. Names, card ids and
     // numbers are replaced, since the repository is public and takes no real Firestone data (CLAUDE.md).
     private static readonly string AliCache1958 = Path.Combine(AppContext.BaseDirectory, "Fixtures", "comp-cache-schema1-shape-2026-09-26-1958.json");
