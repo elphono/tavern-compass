@@ -80,3 +80,7 @@ and no game. Handy to see a change, or to reproduce a layout problem. See [its R
 Tavern Compass is a fan project. It is not affiliated with or endorsed by Blizzard Entertainment, HearthSim
 (Hearthstone Deck Tracker), HSReplay.net or Firestone. Hearthstone and Battlegrounds are trademarks of Blizzard
 Entertainment, Inc.
+
+## License
+
+[MIT](LICENSE). The statistics it shows belong to their sources (see *Data and privacy*), not to this license.
