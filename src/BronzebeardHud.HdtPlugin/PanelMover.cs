@@ -99,12 +99,6 @@ internal sealed class PanelMover
     public event Action? MoveModeChanged;
 
     /// <summary>
-    /// Raised by "Reset panel positions" once the layout is back to its defaults, before the panels redraw: what a panel
-    /// keeps of its own on top of its box (the "Compositions" panel sized by + / −) goes back to the default too.
-    /// </summary>
-    public event Action? LayoutReset;
-
-    /// <summary>
     /// Where the visible panels it places are on the canvas, but <paramref name="except"/>: what a popup of that panel
     /// must not cover (the Skip combat button).
     /// </summary>
@@ -209,7 +203,6 @@ internal sealed class PanelMover
         }
 
         Save();
-        LayoutReset?.Invoke();
         foreach (var resizer in _resizers.Values)
         {
             resizer.Resize.Relayout(); // back to the default room at once, not at the next update

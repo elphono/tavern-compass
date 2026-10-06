@@ -104,7 +104,7 @@ internal sealed class CompsPanel
     private string? _loggedInset;
 
     // + or − was pressed in this game (outside move mode): a panel resized by its handle is sized to its content from then on,
-    // until the next game, a switch of move mode or "Reset panel positions". A panel never resized always is.
+    // until the next game or a switch of move mode. A panel never resized always is — "Reset panel positions" makes it one.
     private bool _fitted;
 
     // A press on + or − asks for one log line once the panel is resized: at the next redraw that comes with the targets the
@@ -191,7 +191,6 @@ internal sealed class CompsPanel
         _canvas.SizeChanged += OnCanvasSizeChanged;
         _popup = new GuidePopup(canvas, PopupContent, () => _mover.MoveMode || _view.ShowsDetail || !IsVisible || Suspended, cursorOver ?? GuidePopup.IsCursorOver, run);
         _mover.MoveModeChanged += OnMoveModeChanged;
-        _mover.LayoutReset += OnLayoutReset;
     }
 
     /// <summary>The inset's background: the panel's, a shade lighter at the top, so that it reads as a piece of its own.</summary>
@@ -347,7 +346,6 @@ internal sealed class CompsPanel
     {
         _canvas.SizeChanged -= OnCanvasSizeChanged;
         _mover.MoveModeChanged -= OnMoveModeChanged;
-        _mover.LayoutReset -= OnLayoutReset;
         _popup.Detach();
         _canvas.Children.Remove(_panel);
     }
@@ -362,8 +360,6 @@ internal sealed class CompsPanel
         _fitted = false;
         RelayoutIfShown();
     });
-
-    private void OnLayoutReset() => _fitted = false; // PanelMover redraws the panel right after
 
     /// <summary>
     /// − or + in the inset: one target less or more (settings.json), and, outside move mode, the panel sized to its content
