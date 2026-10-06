@@ -70,6 +70,25 @@ public sealed class CompTarget
     public bool Ticked => Kind == TargetKind.Chosen;
 }
 
+/// <summary>What one round of the compositions gives (<see cref="CompTargets.Round"/>).</summary>
+public sealed class CompRound
+{
+    public CompRound(CompGuideBoard board, IReadOnlyList<CompTarget> targets, IReadOnlyList<string> unticked)
+    {
+        Board = board;
+        Targets = targets;
+        Unticked = unticked;
+    }
+
+    /// <summary>The lobby's guides ranked against the cards held: what the panel lists.</summary>
+    public CompGuideBoard Board { get; }
+
+    public IReadOnlyList<CompTarget> Targets { get; }
+
+    /// <summary>One log line per tick dropped this round because the lobby cannot play its guide; empty most of the time.</summary>
+    public IReadOnlyList<string> Unticked { get; }
+}
+
 /// <summary>Which guides are targets, before any colour: the pure part of <see cref="CompTargetTracker.Next"/>.</summary>
 public static class CompTargets
 {
@@ -136,6 +155,27 @@ public static class CompTargets
         return chosen;
     }
 
+    /// <summary>
+    /// One round, as the plugin runs it whenever the cards, the guides, the lobby, the ticks or the count change: the ticks
+    /// on guides the lobby cannot play are dropped (one log line each), the lobby's guides are ranked against the cards held
+    /// (<see cref="CompGuideMatch.Rank"/>), and the tracker chooses and colours the targets. Taking <see cref="LobbyGuides"/>,
+    /// never a bare list, is what keeps a guide the lobby cannot play out of the targets, the frames and the panel.
+    /// </summary>
+    public static CompRound Round(LobbyGuides guides, PlayerCards cards, CompTargetTracker tracker, int count)
+    {
+        var unticked = new List<string>();
+        foreach (var id in tracker.Ticked.ToList())
+        {
+            if (guides.Reason(id) is { } reason)
+            {
+                tracker.Untick(id);
+                unticked.Add($"Bronzebeard HUD: unticked {id}: {reason}");
+            }
+        }
+
+        var board = CompGuideMatch.Rank(guides.Playable, cards, count);
+        return new CompRound(board, tracker.Next(board, count), unticked);
+    }
 
     /// <summary>
     /// The panel's tiers with the targets first in their tier (by <see cref="CompTarget.Rank"/>), then the other guides in
@@ -254,6 +294,9 @@ public sealed class CompTargetTracker
         _ticked.Add(guideId);
         return true;
     }
+
+    /// <summary>Unticks a guide if it is ticked (a guide the lobby cannot play: <see cref="CompTargets.Round"/>).</summary>
+    public void Untick(string guideId) => _ticked.Remove(guideId);
 
     /// <summary>
     /// The line for HDT's log after <see cref="Toggle"/>: "Bronzebeard HUD: ticked guides=[A/11,B/20]", or, refused,

@@ -106,6 +106,22 @@ public class CompsPanelLogicTests
         Assert.Equal(new[] { 3, 5 }, CompGuideLayout.Fit(items, 20 + 60 + 16, 16, atLeastOne: true).Shown);
     }
 
+    [Fact]
+    public void AnOptionalLine_IsDrawnOnlyWhenItCostsNoTargetItsLine()
+    {
+        CompGuideFitItem Header(int group) => new(CompGuideItemKind.TierHeader, group, 20);
+        CompGuideFitItem Row(int group, bool target = false) => new(CompGuideItemKind.Row, group, 60, target);
+        // Three targets in three tiers (as the simulation's "lobby not known yet"): 3 × (20 + 60) = 240 for the targets.
+        var items = new[] { Header(0), Row(0, target: true), Row(0), Header(1), Row(1, target: true), Header(2), Row(2, target: true) };
+
+        Assert.False(CompGuideLayout.KeepsOptionalLine(items, room: 250, lineHeight: 20)); // 250 − 20 = 230: the third target would go
+        Assert.True(CompGuideLayout.KeepsOptionalLine(items, room: 260, lineHeight: 20));  // 240 left: the three still fit
+        Assert.True(CompGuideLayout.KeepsOptionalLine(items, room: 310, lineHeight: 20));  // it may push out a line that is no target (300 > 290)
+        Assert.Equal(4, CompGuideLayout.Fit(items, 310, 0, atLeastOne: true).RowsShown);   // (which, without it, fits)
+        Assert.Equal(3, CompGuideLayout.Fit(items, 290, 0, atLeastOne: true).RowsShown);
+        Assert.True(CompGuideLayout.KeepsOptionalLine(new[] { Header(0), Row(0) }, room: 70, lineHeight: 20)); // no target to lose
+    }
+
     [Theory]
     [InlineData(0, 0, 0)]
     [InlineData(2, 2, 0)]

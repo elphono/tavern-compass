@@ -105,6 +105,17 @@ public static class CompGuideLayout
     }
 
     /// <summary>
+    /// Whether an optional line <paramref name="lineHeight"/> tall (the note "Lobby tribes unknown: every guide listed") is
+    /// drawn above the list: only when it costs no target its line. Seen in the simulation on 2026-10-06: at the default
+    /// size, the note pushed the third target out of the list; a target is what the player acts on, the note only explains.
+    /// </summary>
+    public static bool KeepsOptionalLine(IReadOnlyList<CompGuideFitItem> items, double room, double lineHeight, double moreLineHeight = 0)
+    {
+        int Targets(CompGuideFit fit) => fit.Shown.Count(i => items[i].Kind == CompGuideItemKind.Row && items[i].Highlighted);
+        return Targets(Fit(items, room - lineHeight, moreLineHeight, atLeastOne: true)) >= Targets(Fit(items, room, moreLineHeight, atLeastOne: true));
+    }
+
+    /// <summary>
     /// Which sections of a guide's detail fit in <paramref name="room"/> (overlay pixels), each measured in place: all of
     /// them when they fit; otherwise, with a line <paramref name="moreLineHeight"/> tall kept for "k of n sections", each
     /// section in order when it fits in what is left, a section that does not being left out whole (never cut). The first
