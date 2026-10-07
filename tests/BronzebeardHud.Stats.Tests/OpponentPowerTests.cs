@@ -120,6 +120,32 @@ public class OpponentPowerTests
     }
 
     [Fact]
+    public void ABoardReadFromHdt_MinionsOnly_FeedsTheGauge_AgainstTheLeaderboardsHero_AndTheLogSaysHowItWasAsked()
+    {
+        // Player 5's tile is Theirs (entity 40); in play, a ghost without curve carries the same PLAYER_ID (entity 12). HDT's
+        // snapshot of player 5 holds three minions (160) and no hero; player 6's tile (entity 41) has none.
+        var heroes = new[] { new HeroEntity(12, 5, Uncharted, false), new HeroEntity(40, 5, Theirs, true), new HeroEntity(41, 6, Theirs, true) };
+        SnapshotRead? Hdt(int entityId) =>
+            heroes.FirstOrDefault(h => h.EntityId == entityId)?.PlayerId == 5 ? new SnapshotRead(8, 3, Minions(160)) : null;
+        var five = OpponentBoards.Read(5, heroes, Hdt);
+        var six = OpponentBoards.Read(6, heroes, Hdt);
+        var fight = new OpponentFacts(OverlayPhase.Combat, 8, Mine, 5, 6, new Dictionary<int, BoardSeen> { [5] = five.Board! },
+            OpponentBoards.Leaderboard(heroes), new Dictionary<int, string> { [5] = five.Probe, [6] = six.Probe });
+        var shop = new OpponentFacts(OverlayPhase.Shop, 9, Mine, 0, 6, new Dictionary<int, BoardSeen>(),
+            OpponentBoards.Leaderboard(heroes), new Dictionary<int, string> { [6] = six.Probe });
+
+        var power = OpponentPower.Compare(fight, Sources, Name);
+
+        Assert.Equal((BoardPower.Behind, "Opp. 160 · their hero avg 220 at turn 8"), (power.Power, power.Details));
+        Assert.Equal("Bronzebeard HUD: opponent power scope=combat id=5 hero=TB_THEM (yours TB_ME) turn=8 seen=8 board=160 (3 minions) "
+                     + "read=[heroes 12,40 asked 40 → turn 8, 3 entities, 3 minions] · Opp. 160 · their hero avg 220 at turn 8 · −27% power=behind",
+            OpponentPower.LogLine(fight, power));
+        Assert.Equal("Bronzebeard HUD: opponent power scope=next id=6 hero=TB_THEM (yours TB_ME) turn=9 seen=none "
+                     + "read=[heroes 41 asked 41 → no snapshot] · Next opp. Rakanishu – not fought yet power=none",
+            OpponentPower.LogLine(shop, OpponentPower.Compare(shop, Sources, Name)));
+    }
+
+    [Fact]
     public void LogLine_SaysTheMeasureItRestsOn()
     {
         var fight = Facts(OverlayPhase.Combat, 8, combat: 5, boards: new Dictionary<int, BoardSeen> { [5] = new(Theirs, 8, Minions(160)) });

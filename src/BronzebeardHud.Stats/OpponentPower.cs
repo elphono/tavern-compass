@@ -6,9 +6,9 @@ using System.Linq;
 namespace BronzebeardHud.Stats;
 
 /// <summary>
-/// One opponent's board as HDT keeps it: the hero it fought with (base hero id, skins mapped), the turn, and the attack and
-/// health of its minions, snapshotted by HDT when a combat begins (GameV2.GetBattlegroundsBoardStateFor, the "last known
-/// board" HDT shows when a tile of the leaderboard is hovered).
+/// One opponent's board as HDT keeps it: their hero (the leaderboard's, base hero id, skins mapped: HDT's snapshot holds no
+/// hero, <see cref="OpponentBoards"/>), the turn, and the attack and health of its minions, snapshotted by HDT when a combat
+/// begins (GameV2.GetBattlegroundsBoardStateFor, the "last known board" HDT shows when a tile of the leaderboard is hovered).
 /// </summary>
 public sealed class BoardSeen
 {
@@ -35,8 +35,9 @@ public sealed class OpponentFacts
     /// <param name="nextOpponentId">The player's NEXT_OPPONENT_PLAYER_ID; 0 when the game has not said it yet.</param>
     /// <param name="lastBoards">HDT's last known board of each opponent, by PLAYER_ID.</param>
     /// <param name="heroes">Each player's hero as the leaderboard shows it (base id), by PLAYER_ID: the name of an opponent never fought.</param>
+    /// <param name="reads">How each board was asked of HDT (<see cref="BoardRead.Probe"/>), by PLAYER_ID: said in the log line.</param>
     public OpponentFacts(OverlayPhase phase, int turn, string? playerHeroCardId, int combatOpponentId, int nextOpponentId,
-        IReadOnlyDictionary<int, BoardSeen> lastBoards, IReadOnlyDictionary<int, string> heroes)
+        IReadOnlyDictionary<int, BoardSeen> lastBoards, IReadOnlyDictionary<int, string> heroes, IReadOnlyDictionary<int, string>? reads = null)
     {
         Phase = phase;
         Turn = turn;
@@ -45,6 +46,7 @@ public sealed class OpponentFacts
         NextOpponentId = nextOpponentId;
         LastBoards = lastBoards;
         Heroes = heroes;
+        Reads = reads ?? new Dictionary<int, string>();
     }
 
     public OverlayPhase Phase { get; }
@@ -54,6 +56,113 @@ public sealed class OpponentFacts
     public int NextOpponentId { get; }
     public IReadOnlyDictionary<int, BoardSeen> LastBoards { get; }
     public IReadOnlyDictionary<int, string> Heroes { get; }
+    public IReadOnlyDictionary<int, string> Reads { get; }
+}
+
+/// <summary>
+/// A hero entity of HDT's game and the PLAYER_ID it carries. Several carry the same one: the leaderboard's tile, the hero in
+/// play during a combat (Kel'Thuzad against a ghost, which carries the dead player's PLAYER_ID), a skin.
+/// </summary>
+public sealed class HeroEntity
+{
+    /// <param name="heroCardId">Base hero id, skins mapped to their parent (HeroIdNormalizer).</param>
+    /// <param name="onLeaderboard">Carries PLAYER_LEADERBOARD_PLACE: the leaderboard's tile, the player's own hero.</param>
+    public HeroEntity(int entityId, int playerId, string heroCardId, bool onLeaderboard)
+    {
+        EntityId = entityId;
+        PlayerId = playerId;
+        HeroCardId = heroCardId;
+        OnLeaderboard = onLeaderboard;
+    }
+
+    public int EntityId { get; }
+    public int PlayerId { get; }
+    public string HeroCardId { get; }
+    public bool OnLeaderboard { get; }
+}
+
+/// <summary>
+/// HDT's snapshot of a board (Hearthstone_Deck_Tracker.Hearthstone.BoardSnapshot) as the plugin reads it: the turn it was
+/// taken, how many entities it holds, and the attack and health of those that are minions. HDT 1.58.9 keeps the minions
+/// only, never the hero (BattlegroundsBoardState.SnapshotCurrentBoard: <c>x.IsMinion &amp;&amp; x.IsInZone(Zone.PLAY) &amp;&amp;
+/// x.IsControlledBy(_game.Opponent.Id)</c>).
+/// </summary>
+public sealed class SnapshotRead
+{
+    public SnapshotRead(int turn, int entities, IReadOnlyList<(int Attack, int Health)> minions)
+    {
+        Turn = turn;
+        Entities = entities;
+        Minions = minions;
+    }
+
+    public int Turn { get; }
+    public int Entities { get; }
+    public IReadOnlyList<(int Attack, int Health)> Minions { get; }
+}
+
+/// <summary>One opponent's board as read from HDT, and how it was read, for the log.</summary>
+public sealed class BoardRead
+{
+    public BoardRead(BoardSeen? board, string probe)
+    {
+        Board = board;
+        Probe = probe;
+    }
+
+    /// <summary>The board, against the player's own hero; null when HDT has none (never fought) or no hero carries the PLAYER_ID.</summary>
+    public BoardSeen? Board { get; }
+
+    /// <summary>"heroes 40,90 asked 40 → turn 8, 7 entities, 7 minions", "heroes 40 asked 40 → no snapshot", "no hero entity".</summary>
+    public string Probe { get; }
+}
+
+/// <summary>
+/// How an opponent's last board is asked of HDT (GameV2.GetBattlegroundsBoardStateFor), decompiled from HDT 1.58.9. When a
+/// combat begins (TagChangeActions.OnBattlegroundsCombatSetupChange), BattlegroundsBoardState.SnapshotCurrentBoard files the
+/// opponent's MINIONS under the PLAYER_ID of the hero in play that game.Opponent controls; GetSnapshot(entityId) finds them
+/// again by the PLAYER_ID of the entity it is given. So any hero carrying that PLAYER_ID answers alike, and the hero is never
+/// in the snapshot: it is taken from the entities instead (until 2026-10-07 the plugin looked for it in the snapshot, found
+/// none, and never read a board).
+/// </summary>
+public static class OpponentBoards
+{
+    /// <summary>
+    /// The hero of a PLAYER_ID: the leaderboard's (the player's own hero, the entity HDT's leaderboard hover hands
+    /// GetBattlegroundsBoardStateFor), else the first by entity id; null when no hero carries it.
+    /// </summary>
+    public static HeroEntity? Pick(IReadOnlyList<HeroEntity> heroes, int playerId) =>
+        heroes.Where(h => h.PlayerId == playerId).OrderByDescending(h => h.OnLeaderboard).ThenBy(h => h.EntityId).FirstOrDefault();
+
+    /// <summary>Each player's hero as the leaderboard shows it, by PLAYER_ID: the leaderboard's tiles only, the first by entity id.</summary>
+    public static IReadOnlyDictionary<int, string> Leaderboard(IReadOnlyList<HeroEntity> heroes) =>
+        heroes.Where(h => h.OnLeaderboard && h.PlayerId > 0).OrderBy(h => h.EntityId)
+            .GroupBy(h => h.PlayerId).ToDictionary(g => g.Key, g => g.First().HeroCardId);
+
+    /// <summary>
+    /// The last board of the player <paramref name="playerId"/>: <paramref name="snapshotFor"/> (GetBattlegroundsBoardStateFor,
+    /// by entity id) asked for the hero <see cref="Pick"/> names, measured against that hero.
+    /// </summary>
+    public static BoardRead Read(int playerId, IReadOnlyList<HeroEntity> heroes, Func<int, SnapshotRead?> snapshotFor)
+    {
+        var hero = Pick(heroes, playerId);
+        if (hero == null)
+        {
+            return new BoardRead(null, "no hero entity");
+        }
+
+        var inv = CultureInfo.InvariantCulture;
+        var ids = string.Join(",", heroes.Where(h => h.PlayerId == playerId).Select(h => h.EntityId).OrderBy(id => id).Select(id => id.ToString(inv)));
+        var asked = $"heroes {ids} asked {hero.EntityId.ToString(inv)}";
+        var snapshot = snapshotFor(hero.EntityId);
+        if (snapshot == null)
+        {
+            return new BoardRead(null, $"{asked} → no snapshot");
+        }
+
+        return new BoardRead(new BoardSeen(hero.HeroCardId, snapshot.Turn, snapshot.Minions),
+            $"{asked} → turn {snapshot.Turn.ToString(inv)}, {snapshot.Entities.ToString(inv)} entities, {snapshot.Minions.Count.ToString(inv)} minions");
+    }
 }
 
 /// <summary>
@@ -119,8 +228,9 @@ public static class OpponentPower
 
     /// <summary>
     /// The line written in HDT's log each time the gauge changes, with what it rests on (the board, its hero, the turn it was
-    /// seen, the average): "Bronzebeard HUD: opponent power scope=combat id=5 hero=TB_X (yours TB_Y) turn=8 seen=8 board=160
-    /// (3 minions) · Opp. 160 · their hero avg 220 at turn 8 · −27% power=behind".
+    /// seen, how it was asked of HDT, the average): "Bronzebeard HUD: opponent power scope=combat id=5 hero=TB_X (yours TB_Y)
+    /// turn=8 seen=8 board=160 (3 minions) read=[heroes 40,90 asked 40 → turn 8, 3 entities, 3 minions] · Opp. 160 · their
+    /// hero avg 220 at turn 8 · −27% power=behind".
     /// </summary>
     public static string LogLine(OpponentFacts facts, WarbandComparison comparison)
     {
@@ -136,7 +246,8 @@ public static class OpponentPower
         var measure = seen != null
             ? $"seen={seen.Turn.ToString(inv)} board={seen.Stats.ToString(inv)} ({seen.Minions.Count.ToString(inv)} minions)"
             : "seen=none";
+        var read = id > 0 && facts.Reads.TryGetValue(id, out var probe) ? $" read=[{probe}]" : string.Empty;
         return $"Bronzebeard HUD: opponent power scope={scope} id={id.ToString(inv)} hero={hero} (yours {facts.PlayerHeroCardId ?? "none"}) "
-               + $"turn={facts.Turn.ToString(inv)} {measure} · {comparison.Line} {comparison.PowerText}";
+               + $"turn={facts.Turn.ToString(inv)} {measure}{read} · {comparison.Line} {comparison.PowerText}";
     }
 }
