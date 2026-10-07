@@ -18,10 +18,12 @@ Deux correctifs demandés par Ali après une partie réelle. Faits sous WSL (tes
 - **Décision** : le héros de référence vient des entités, celui du classement (`OpponentBoards.Pick` : contre un fantôme,
   le héros en jeu est Kel'Thuzad avec le `PLAYER_ID` du mort) ; la ligne de journal dit en plus `read=[heroes … asked … →
   turn t, n entities, m minions | no snapshot]`.
-- **Vu en passant, non corrigé** : à la fin de chaque combat, plus aucun héros en jeu contrôlé par l'adversaire n'est
-  trouvé alors que la phase est encore « combat » (28 lignes `scope=combat id=0`, 2 à 3 s avant la ligne `scope=next`
-  suivante) : la rangée passera « Opp. – not known yet » pendant ce temps. Garder l'adversaire du combat jusqu'à la
-  taverne est un arbitrage laissé à Ali.
+- **Fin de combat** : plus aucun héros en jeu contrôlé par l'adversaire n'est trouvé alors que la phase est encore
+  « combat » (28 lignes `scope=combat id=0` sur 28 combats, chacune après une ligne du même combat avec un id, au même
+  tour, et 2 à 5 s avant la ligne `scope=next` : 4 × 2 s, 17 × 3 s, 6 × 4 s, 1 × 5 s) ; la rangée passait « Opp. – not
+  known yet ». **Arbitrage d'Ali** : garder l'adversaire du combat et sa jauge jusqu'au retour en taverne
+  (`CombatOpponentKeeper` : les faits du même combat gardés tels quels, oubliés en taverne, à un autre tour ou quand un
+  autre adversaire est trouvé ; journal `id=3 (kept)`, une seule ligne tant que rien ne change).
 
 ## 2. Compos cochées : plus aucun cadre pour les autres compos en taverne
 

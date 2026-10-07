@@ -38,7 +38,9 @@ Ce qui reste ouvert :
 - **Vérifier en jeu les deux correctifs du 2026-10-07** (`docs/journal/2026-10-07-jauge-adverse-cadres-coches.md`) : la
   rangée de l'adversaire — sur une partie entière, aucune ligne `opponent power …` n'avait de plateau (`seen=none` partout) ; la prochaine doit
   porter `seen=<tour>` en combat et, en taverne, contre un adversaire déjà affronté ; sinon, `read=[…]` dit à lui seul
-  pourquoi (aucun héros, pas de plateau chez HDT, plateau vide ou d'un autre tour). Et, une case cochée, plus aucun cadre
+  pourquoi (aucun héros, pas de plateau chez HDT, plateau vide ou d'un autre tour) ; en fin de combat, la ligne
+  `scope=combat id=… (kept)` au lieu de `id=0 … not known yet` (arbitrage d'Ali rendu : l'adversaire du combat est gardé
+  jusqu'à la taverne). Et, une case cochée, plus aucun cadre
   sur les cartes de Bob hors des guides cochés (ligne `tavern highlights=[…] … frames from ticked=[…]`) ; vu seulement dans
   la simulation (`--selftest`, `--scenario 5 --tick 3`).
 - **Vérifier en jeu l'encart de puissance et le resize par + / −** (2026-10-06, `docs/journal/2026-10-06-encart-puissance-resize.md`,
@@ -251,7 +253,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   sbires, jamais le héros** (`BattlegroundsBoardState.SnapshotCurrentBoard`, décompilé) : le héros de référence est pris
   dans les entités, celui du classement (`OpponentBoards` : `Pick`, `Read`, `Leaderboard` ; contre un fantôme, le héros en
   jeu est Kel'Thuzad avec le `PLAYER_ID` du mort). Jusqu'au 2026-10-07 le plugin cherchait le héros dans le plateau et
-  n'en a lu aucun (`docs/journal/2026-10-07-jauge-adverse-cadres-coches.md`) ; **pas encore vu en jeu**. En taverne le dernier plateau vu du prochain adversaire
+  n'en a lu aucun (`docs/journal/2026-10-07-jauge-adverse-cadres-coches.md`) ; **pas encore vu en jeu**. En fin de
+  combat, HDT n'a plus de héros adverse en jeu pendant 2 à 5 s (mesuré, 28 combats sur 28) : la rangée garde l'adversaire
+  du combat et sa jauge tels quels jusqu'à la taverne (Ali, 2026-10-07 ; `CombatOpponentKeeper`, oublié en taverne, à un
+  autre tour, ou remplacé par un autre adversaire trouvé ; journal `id=3 (kept)`). En taverne le dernier plateau vu du prochain adversaire
   (`NEXT_OPPONENT_PLAYER_ID`), contre la moyenne de son héros au tour où il a été vu : « Next opp. 70 at turn 5 · their
   hero avg 50 » ; sans donnée, gris et la raison (« Next opp. – not known yet », « Next opp. Rakanishu – not fought yet »,
   « Opp. – board not read yet », « no curve for Rakanishu »). Chaque rangée a son garde-fou (`warband-curve`,
@@ -327,7 +332,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]` ; `targets n=4 panel resized to (x,y w×h)
   anchor=top|bottom lines=k/N shown, of m` à chaque appui sur + ou − (hors mode déplacement) ; `power inset at (x,y w×h): you
   ▲ +58% (ahead) · opp ≈ +12% (even)` quand ce que montre l'encart change (`– (none: too early)` sans donnée, `off` pour une
-  rangée coupée) ; `opponent power scope=combat|next|none id=… hero=… (yours …) turn=… seen=… board=… (k minions)
+  rangée coupée) ; `opponent power scope=combat|next|none id=…[ (kept)] hero=… (yours …) turn=… seen=… board=… (k minions)
   read=[heroes 12,40 asked 40 → turn 8, 7 entities, 7 minions] · Opp. … power=…` quand la jauge de l'adversaire change
   (`read` : les entités héros de ce `PLAYER_ID`, celle demandée à HDT, puis `no snapshot` ou ce que contient le plateau ;
   `no hero entity` si aucun héros ne le porte).

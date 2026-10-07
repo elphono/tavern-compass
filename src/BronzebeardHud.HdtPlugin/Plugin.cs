@@ -1057,12 +1057,14 @@ public sealed class Plugin : IPlugin
     }
 
     private string _opponentPowerLine = string.Empty;
+    private readonly CombatOpponentKeeper _combatOpponent = new();
 
     /// <summary>
     /// The second row of the power inset: the opponent's board against THEIR hero's average (OpponentPower) — in combat the
-    /// board being fought, as HDT snapshotted it when the combat began; in the shop the next opponent's last board HDT saw,
-    /// against their hero's average at the turn it was seen; grey with the reason without one. One line in HDT's log each
-    /// time it changes, with the measure it rests on (OpponentPower.LogLine).
+    /// board being fought, as HDT snapshotted it when the combat began, kept to the end of the combat once HDT no longer
+    /// has their hero in play (CombatOpponentKeeper); in the shop the next opponent's last board HDT saw, against their hero's
+    /// average at the turn it was seen; grey with the reason without one. One line in HDT's log each time it changes, with
+    /// the measure it rests on (OpponentPower.LogLine).
     /// </summary>
     private void UpdateOpponentPower(GameV2 game)
     {
@@ -1075,11 +1077,12 @@ public sealed class Plugin : IPlugin
         if (phase is not (OverlayPhase.Shop or OverlayPhase.Combat))
         {
             _opponentPowerLine = string.Empty;
+            _combatOpponent.Forget();
             _compsPanel.SetOpponentPower(null);
             return;
         }
 
-        var facts = HdtEntityAdapter.OpponentFacts(game, phase);
+        var facts = _combatOpponent.Observe(HdtEntityAdapter.OpponentFacts(game, phase));
         var comparison = OpponentPower.Compare(facts, _stats.Sources(), HdtEntityAdapter.HeroName);
         var line = OpponentPower.LogLine(facts, comparison);
         if (line != _opponentPowerLine)
