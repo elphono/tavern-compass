@@ -35,10 +35,12 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 
 Ce qui reste ouvert :
 
-- **Vérifier en jeu la rangée de l'adversaire corrigée** (2026-10-07, `docs/journal/2026-10-07-jauge-adverse-cadres-coches.md`) :
-  sur une partie entière, aucune ligne `opponent power …` n'avait de plateau (`seen=none` partout) ; la prochaine doit
+- **Vérifier en jeu les deux correctifs du 2026-10-07** (`docs/journal/2026-10-07-jauge-adverse-cadres-coches.md`) : la
+  rangée de l'adversaire — sur une partie entière, aucune ligne `opponent power …` n'avait de plateau (`seen=none` partout) ; la prochaine doit
   porter `seen=<tour>` en combat et, en taverne, contre un adversaire déjà affronté ; sinon, `read=[…]` dit à lui seul
-  pourquoi (aucun héros, pas de plateau chez HDT, plateau vide ou d'un autre tour).
+  pourquoi (aucun héros, pas de plateau chez HDT, plateau vide ou d'un autre tour). Et, une case cochée, plus aucun cadre
+  sur les cartes de Bob hors des guides cochés (ligne `tavern highlights=[…] … frames from ticked=[…]`) ; vu seulement dans
+  la simulation (`--selftest`, `--scenario 5 --tick 3`).
 - **Vérifier en jeu l'encart de puissance et le resize par + / −** (2026-10-06, `docs/journal/2026-10-06-encart-puissance-resize.md`,
   note HTML § 12) : l'encart sous le cadre (feux, halo, − à gauche, + à droite), le panneau qui suit N à chaque appui
   (ligne `targets n=… panel resized to …`), son bas gardé en bas d'écran, la boîte de la poignée gardée jusqu'à un appui ; la
@@ -223,7 +225,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   guides cochés (quatre au plus, ordre de coche) : eux d'abord (`TargetKind.Chosen`), puis les guides **en cours**
   (`InProgress` : deux cartes clés tenues, plateau + main, ou toutes celles d'un guide qui en a moins ; « in progress » sous
   leur nom), dans la limite de quatre cibles ; les paris (une seule carte clé) se taisent, et − n + (qui compte les paris)
-  est grisé. Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
+  est grisé. Sur les cartes de Bob, seuls les guides cochés encadrent alors (2026-10-07, « Taverne » ci-dessous). Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
   `CompGuideMatch`), jusqu'à n (− n +) ; à score égal, une cible du tour d'avant garde sa place (il faut un score plus
   haut pour la remplacer). Tout décocher rend les cibles automatiques. Une cible garde sa
   couleur tant qu'elle le reste (magenta, lime, bleu ciel, blanc), cases et couleurs sont oubliées à la partie suivante.
@@ -294,7 +296,11 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   add-on → pointillés, dans la couleur de la cible (carte clé d'abord, puis l'ordre des cibles), étiquette « core Nom
   k/N », « enabler Nom » ou « + Nom » ; avec le pont, une carte qu'aucun guide de cible ne nomme mais qui est sur ≥ 2
   plateaux finaux de la compo Firestone d'une cible → pointillés « + Nom 3/5 », après tous les rôles ; le ◇ au-dessus
-  de chaque sbire l'épingle (cadre blanc). **Choix** (découverte, Dark Gift, trinket : `ChoiceAdvisor`, avec le pont) :
+  de chaque sbire l'épingle (cadre blanc). **Dès qu'un guide est coché, seuls les guides cochés encadrent** (Ali,
+  2026-10-07 : « quand on sélectionne des compos vers lesquelles on veut tendre, on ne devrait plus surligner aucun autre
+  sbire dans le shop » ; `TavernHighlights.Framing`) : une cible « in progress » reste listée dans le panneau mais n'encadre
+  plus rien, ni par ses rôles ni par les plateaux de sa compo pontée, et n'est plus nommée sous l'étiquette d'une cochée ;
+  sans case cochée, rien ne change. Les étiquettes des choix et les ◇ n'en dépendent pas. **Choix** (découverte, Dark Gift, trinket : `ChoiceAdvisor`, avec le pont) :
   carte d'une cible → étiquette dans sa couleur (« ★ core Nom 2/3→3/3 », « + Nom », suivies de « · 4/5 boards » quand la
   compo pontée de la cible a des plateaux finaux) ; sinon une carte qu'aucune liste de la cible ne nomme mais sur ≥ 2
   plateaux de sa compo pontée (« + Nom 3/5 boards », dans sa couleur) ; sinon une carte clé d'un guide vers lequel une
@@ -315,7 +321,8 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   compositions; Firestone ok)` à chaque recalcul du pont ; `comps round=… source=… comps=… board=… hand=… targets=[1. Nom
   #couleur ★k/N ticked; 2. Nom #couleur ★k/N in progress; …]` à la fin de chaque tour de taverne (`comps` = guides du
   lobby) ; `warband round=… hero=… Board … · +18% power=even` (`power=none (too early)`) ; `tavern highlights=[carte:core|enabler|addon:guide, carte:boards
-  3/5:guide, …] targets=[…]` quand ils changent (`TavernHighlights.Summary`) ; `choice kind=…` par choix (raison et
+  3/5:guide, …] targets=[…]` quand ils changent (`TavernHighlights.Summary`, `LogLine`), suivi de `frames from
+  ticked=[…]` quand une case cochée réduit les cadres aux guides cochés ; `choice kind=…` par choix (raison et
   évidence de chaque étiquette) ; `choice open: markers and panel hidden` / `choice closed: restored` à chaque transition ;
   `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]` ; `targets n=4 panel resized to (x,y w×h)
   anchor=top|bottom lines=k/N shown, of m` à chaque appui sur + ou − (hors mode déplacement) ; `power inset at (x,y w×h): you

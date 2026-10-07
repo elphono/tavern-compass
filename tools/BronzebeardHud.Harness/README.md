@@ -61,7 +61,7 @@ Un nom de guide avec des espaces ne passe pas par `launch.sh` (PowerShell le cou
 | 2 A strong board, one in hand | Pirate Discover, Mech Magnet, Mech Divine Shield | idem | 3 |
 | 3 A neutral key card of absent tribes | la carte neutre `Pool[0]`, carte clé de 3 guides morts-vivants et dragons, + 2 mécas | sans morts-vivants ni dragons | 2 (les mécas) |
 | 4 The lobby not known yet | la carte neutre et une carte clé méca | inconnu | 3 (rien n'est écarté ; la ligne « Lobby tribes unknown » cède sa place à une cible à la taille par défaut, se montre avec une seule cible) |
-| 5 Ticks: in progress and guesses | Elemental Cycle ★2/4, une carte clé de quatre autres guides | 5 tribus | 3 ; cocher Pirate Discover garde Elemental Cycle (« in progress ») et fait taire les paris |
+| 5 Ticks: in progress and guesses | Elemental Cycle ★2/4, une carte clé de quatre autres guides | 5 tribus | 3 ; cocher Pirate Discover garde Elemental Cycle (« in progress ») et fait taire les paris ; seul Pirate Discover encadre alors les cartes de Bob |
 
 Les tribus des cartes de la simulation sont synthétiques (`HarnessData.CardTribes` : celle du premier guide qui la liste,
 `Pool[0]` neutre) ; la courbe de puissance est inventée (×1,8 par tour, 120 au tour 8).

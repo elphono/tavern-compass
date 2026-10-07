@@ -158,7 +158,8 @@ internal static class SelfTest
     /// playing") A tick names where the player wants to go, and keeps what he is building. In the scenario "Ticks: in progress
     /// and guesses" the automatic targets are Elemental Cycle (two key cards held: in progress), Beast Deathrattle and Pirate
     /// Discover (one each: guesses). Ticking Pirate Discover makes it the first target, keeps Elemental Cycle in its colour
-    /// with "in progress" under its name, and silences Beast Deathrattle; Bob's frames follow; a second tick adds a chosen
+    /// with "in progress" under its name, and silences Beast Deathrattle; Bob's frames are then Pirate Discover's alone
+    /// (2026-10-07: a guide in progress frames nothing once a guide is ticked); a second tick adds a chosen
     /// guide; − and + are dim and do nothing; unticking everything gives back the automatic targets in the colours they had.
     /// The boxes are clicked as the mouse would (their Click event), found in the line of the guide named, never by place.
     /// </summary>
@@ -179,9 +180,14 @@ internal static class SelfTest
         var auto = window.Targets.ToList();
         var colourOf = auto.ToDictionary(t => t.Guide.Name, t => t.Colour);
         var autoNames = new[] { "Elemental Cycle", "Beast Deathrattle", "Pirate Discover" };
-        check("ticks scene: the automatic targets are a guide in progress and two guesses",
-            auto.Select(t => t.Guide.Name).SequenceEqual(autoNames) && auto.All(t => t.Kind == TargetKind.Probable), Kinds(auto));
+        var autoFrames = window.Highlights.Where(h => h.Kind != HighlightKind.None).Select(h => h.Target?.Guide.Name).Distinct().ToList();
+        check("ticks scene: the automatic targets are a guide in progress and two guesses, Bob's cards framed for both of the first and the last",
+            auto.Select(t => t.Guide.Name).SequenceEqual(autoNames) && auto.All(t => t.Kind == TargetKind.Probable)
+            && autoFrames.Contains("Elemental Cycle") && autoFrames.Contains("Pirate Discover"),
+            $"{Kinds(auto)}; frames for [{string.Join(", ", autoFrames)}]");
 
+        // (Ali, 2026-10-07) With a guide ticked, Bob's frames come from the ticked guides alone: Elemental Cycle, in progress,
+        // stays in the panel but frames nothing.
         var clicked = ClickBoxOf(window, "Pirate Discover");
         window.UpdateLayout();
         var one = window.Targets.ToList();
@@ -189,10 +195,10 @@ internal static class SelfTest
         var caption = window.Comps.ShownLines.TryGetValue(window.GuideOf("Elemental Cycle")!.Id, out var inProgressLine)
                       && Texts(inProgressLine).Any(t => t.IsVisible && Content(t) == "in progress");
         var captions = Texts(comps).Count(t => t.IsVisible && Content(t) == "in progress");
-        check("ticking a guide: it comes first, the guide in progress stays in its colour and says so, the guess leaves; Bob's frames follow",
+        check("ticking a guide: it comes first, the guide in progress stays in its colour and says so, the guess leaves; Bob's frames are the ticked guide's alone",
             clicked && one.Select(t => (t.Guide.Name, t.Kind)).SequenceEqual(new[] { ("Pirate Discover", TargetKind.Chosen), ("Elemental Cycle", TargetKind.InProgress) })
             && one.All(t => colourOf.TryGetValue(t.Guide.Name, out var c) && c == t.Colour) && caption && captions == 1
-            && frames.Count >= 2 && frames.All(n => n is "Pirate Discover" or "Elemental Cycle") && FindText(comps, "1 chosen") != null,
+            && frames.SequenceEqual(new[] { "Pirate Discover" }) && FindText(comps, "1 chosen") != null,
             $"{Kinds(one)}; \"in progress\" under Elemental Cycle: {caption} ({captions} drawn); frames for [{string.Join(", ", frames)}]; "
             + $"title: {(FindText(comps, "1 chosen") != null ? "1 chosen" : "not 1 chosen")}");
 

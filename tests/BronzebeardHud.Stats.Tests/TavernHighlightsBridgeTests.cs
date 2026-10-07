@@ -60,6 +60,27 @@ public class TavernHighlightsBridgeTests
     }
 
     [Fact]
+    public void ATickedTarget_TheTopBoardsOfAGuideInProgress_FrameNothing()
+    {
+        // Pirate Discover ticked; Undead Butcher, two key cards held (U1, U3), in progress. RTOP stands on 2/5 of Undead
+        // Butcher's boards and U2 is its core card: with the tick, neither is framed. PA and P1 are Pirate Discover's.
+        var targets = GuideTestData.Targets(All, new PlayerCards(Held, Array.Empty<OwnedCard>()), 2, Pirates);
+        Assert.Equal(new[] { ("Pirate Discover", TargetKind.Chosen), ("Undead Butcher", TargetKind.InProgress) }, targets.Select(t => (t.Guide.Name, t.Kind)));
+        var bob = new[] { "RTOP", "U2", "PA", "P1" };
+
+        var highlights = TavernHighlights.For(bob, targets, Bridge());
+
+        Assert.Equal(new (HighlightKind, string?, string?, string)[]
+        {
+            (HighlightKind.None, null, null, ""),
+            (HighlightKind.None, null, null, ""),
+            (HighlightKind.Enabler, "Pirate Discover", P0, "+"),
+            (HighlightKind.Commit, "Pirate Discover", P0, "core"),
+        }, Summary(highlights));
+        Assert.Equal("PA:addon:Pirate Discover/23,P1:core:Pirate Discover/23", TavernHighlights.Summary(bob, highlights));
+    }
+
+    [Fact]
     public void LogSummary_KeepsThePluginsFormat_AndNamesTheBoards()
     {
         Assert.Equal("U2:core:Undead Butcher/11,PA:addon:Pirate Discover/23,P1:core:Pirate Discover/23",

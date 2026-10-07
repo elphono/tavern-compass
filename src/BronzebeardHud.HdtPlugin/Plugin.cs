@@ -259,8 +259,9 @@ public sealed class Plugin : IPlugin
     /// <summary>
     /// In the shop: Bob's cards that serve the targets (TavernHighlights: core card → solid frame, enabler or add-on →
     /// dotted frame, in the target's colour; with the bridge, a card on at least two top boards of a target's Firestone
-    /// comp → dotted "+ T 3/5"), the pins, and a pin button above each minion. Redrawn when Bob's row, the targets, the
-    /// pins or the bridge change; one log line whenever the highlights change (TavernHighlights.Summary).
+    /// comp → dotted "+ T 3/5"; with a guide ticked, the ticked guides alone), the pins, and a pin button above each minion.
+    /// Redrawn when Bob's row, the targets, the pins or the bridge change; one log line whenever the highlights change
+    /// (TavernHighlights.LogLine).
     /// </summary>
     private void UpdateTavern(GameV2 game)
     {
@@ -288,13 +289,14 @@ public sealed class Plugin : IPlugin
         _tavernKey = key;
         var bob = row.Select(s => s.CardId).ToList();
         var targets = _tracker.Targets;
+        // With a guide ticked, the ticked guides alone frame Bob's cards (TavernHighlights.Framing).
         var highlights = TavernHighlights.For(bob, targets, _bridge);
         // The top-board frames too ("card:boards 3/5:guide"): written by role alone, they were invisible in the log.
         var line = TavernHighlights.Summary(bob, highlights);
         if (line != _loggedHighlights)
         {
             _loggedHighlights = line;
-            Log.Info($"Bronzebeard HUD: tavern highlights=[{line}] targets={CompTargets.Summary(targets)}");
+            Log.Info(TavernHighlights.LogLine(line, targets));
         }
 
         _markers.Show(bob, highlights, _gamePins.Merge(_comps?.Pins ?? TavernPins.Empty), row.Select(s => s.IsMinion).ToList());

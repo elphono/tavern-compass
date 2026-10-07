@@ -65,29 +65,33 @@ public sealed class TavernHighlight
 /// target; otherwise an enabler or add-on of a target is an enabler (dotted frame). Among targets of the same kind, the
 /// first in target order wins, and gives its colour. Last, with a bridge (<see cref="GuideBridge"/>), a card that no
 /// target's guide lists but that stands on at least <see cref="CardEvidence.MinimumBoards"/> of the final boards of a
-/// target's bridged comp is dotted too, "+ Undead Butcher 3/5" (the first such target in target order).
+/// target's bridged comp is dotted too, "+ Undead Butcher 3/5" (the first such target in target order). With a guide ticked,
+/// the ticked guides alone frame (<see cref="Framing"/>).
 /// </summary>
 public static class TavernHighlights
 {
     /// <param name="bobCards">Bob's row, left to right (the tavern spell included: it matches nothing).</param>
-    /// <param name="targets">The targets, in their order (<see cref="CompTargetTracker.Next"/>).</param>
+    /// <param name="targets">The targets, in their order (<see cref="CompTargetTracker.Next"/>); narrowed by <see cref="Framing"/>.</param>
     /// <param name="bridge">Guide id → its Firestone comp (<see cref="GuideBridge.For"/>); null: the guides alone, as before the bridge.</param>
     public static IReadOnlyList<TavernHighlight> For(IReadOnlyList<string> bobCards, IReadOnlyList<CompTarget> targets,
-        IReadOnlyDictionary<string, GuideEvidence>? bridge = null) =>
-        bobCards.Select(card =>
+        IReadOnlyDictionary<string, GuideEvidence>? bridge = null)
+    {
+        var framing = Framing(targets);
+        return bobCards.Select(card =>
         {
-            var effects = GuideCardEffects.On(card, targets);
+            var effects = GuideCardEffects.On(card, framing);
             if (effects.Count > 0)
             {
                 var first = effects[0];
                 return new TavernHighlight(first.IsCore ? HighlightKind.Commit : HighlightKind.Enabler, first, effects.Skip(1).ToList());
             }
 
-            var top = BoardEvidence.For(card, targets, bridge).FirstOrDefault(b => b.Card.IsTop);
+            var top = BoardEvidence.For(card, framing, bridge).FirstOrDefault(b => b.Card.IsTop);
             return top != null
                 ? new TavernHighlight(HighlightKind.Enabler, null, Array.Empty<GuideCardEffect>(), top)
                 : TavernHighlight.None;
         }).ToList();
+    }
 
     /// <summary>
     /// The marker lines under one of Bob's cards, at most <paramref name="maxLines"/>: "◆ pinned" first when pinned, then
@@ -121,6 +125,28 @@ public static class TavernHighlights
         }
 
         return lines.Take(maxLines).ToList();
+    }
+
+    /// <summary>
+    /// The targets whose cards Bob's row frames. With a guide ticked, the ticked guides alone (Ali, 2026-10-07: "quand on
+    /// sélectionne des compos vers lesquelles on veut tendre, on ne devrait plus surligner aucun autre sbire dans le shop"):
+    /// a guide in progress stays a target, listed in the panel, but neither its cards nor its bridged comp's top boards are
+    /// framed, nor named under a ticked guide's label. Nothing ticked: every target, as before. The choice labels
+    /// (<see cref="ChoiceAdvisor"/>) keep every target.
+    /// </summary>
+    public static IReadOnlyList<CompTarget> Framing(IReadOnlyList<CompTarget> targets) =>
+        targets.Any(t => t.Ticked) ? targets.Where(t => t.Ticked).ToList() : targets;
+
+    /// <summary>
+    /// The line written in HDT's log when the highlights change: "Bronzebeard HUD: tavern highlights=[<paramref name="summary"/>]
+    /// targets=[…]", then, when a guide is ticked, the targets that frame (<see cref="Framing"/>): "frames from ticked=[…]".
+    /// </summary>
+    /// <param name="summary">The highlights, <see cref="Summary"/>.</param>
+    public static string LogLine(string summary, IReadOnlyList<CompTarget> targets)
+    {
+        var framing = Framing(targets);
+        var from = framing.Count < targets.Count ? $" frames from ticked={CompTargets.Summary(framing)}" : string.Empty;
+        return $"Bronzebeard HUD: tavern highlights=[{summary}] targets={CompTargets.Summary(targets)}{from}";
     }
 
     /// <summary>

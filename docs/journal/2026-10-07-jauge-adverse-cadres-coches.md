@@ -18,3 +18,17 @@ Deux correctifs demandés par Ali après une partie réelle. Faits sous WSL (tes
 - **Décision** : le héros de référence vient des entités, celui du classement (`OpponentBoards.Pick` : contre un fantôme,
   le héros en jeu est Kel'Thuzad avec le `PLAYER_ID` du mort) ; la ligne de journal dit en plus `read=[heroes … asked … →
   turn t, n entities, m minions | no snapshot]`.
+- **Vu en passant, non corrigé** : à la fin de chaque combat, plus aucun héros en jeu contrôlé par l'adversaire n'est
+  trouvé alors que la phase est encore « combat » (28 lignes `scope=combat id=0`, 2 à 3 s avant la ligne `scope=next`
+  suivante) : la rangée passera « Opp. – not known yet » pendant ce temps. Garder l'adversaire du combat jusqu'à la
+  taverne est un arbitrage laissé à Ali.
+
+## 2. Compos cochées : plus aucun cadre pour les autres compos en taverne
+
+- **Constat** (Ali) : « quand on sélectionne des compos vers lesquelles on veut tendre, on ne devrait plus surligner aucun
+  autre sbire dans le shop ». Une cible « in progress » gardée à côté d'une cochée encadrait encore ses cartes.
+- **Cause** : `TavernHighlights.For` encadrait pour toutes les cibles, cochées ou non (décision du 2026-10-06, faite pour
+  la liste du panneau).
+- **Décision** : dès qu'un guide est coché, seuls les guides cochés encadrent (`TavernHighlights.Framing`) : rôles,
+  plateaux de la compo pontée et noms sous l'étiquette. La liste du panneau, les étiquettes des choix et les ◇ ne changent
+  pas ; sans case cochée, rien ne change. Le journal dit `frames from ticked=[…]`.

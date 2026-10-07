@@ -452,7 +452,7 @@ internal sealed class HarnessWindow : Window
         if (line != _loggedHighlights)
         {
             _loggedHighlights = line;
-            Log.Info($"Bronzebeard HUD: tavern highlights=[{line}] targets={CompTargets.Summary(targets)}");
+            Log.Info(TavernHighlights.LogLine(line, targets));
         }
 
         Markers.Show(HarnessData.Shop, Highlights, HarnessData.Pins, HarnessData.Shop.Select(_ => true).ToList());

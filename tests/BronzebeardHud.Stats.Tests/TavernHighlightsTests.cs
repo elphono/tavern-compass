@@ -74,23 +74,87 @@ public class TavernHighlightsTests
         Assert.All(TavernHighlights.For(new[] { "KEY_U1" }, Array.Empty<CompTarget>()), h => Assert.Same(TavernHighlight.None, h));
     }
 
-    [Fact]
-    public void ATickedTarget_ComesFirst_AGuideInProgressKeepsItsFrames_AGuessGetsNone()
-    {
-        // Pirates ticked: it comes first. Undead Butcher, both of its key cards held, is being built: its cards keep their
-        // frames. Mech Magnet, one key card held, was only a guess: the tick silences it, its cards get no frame.
-        var targets = Targets(All, Board("KEY_U1", "KEY_U2", "KEY_M1"), 3, Pirates);
-        Assert.Equal(new[] { TargetKind.Chosen, TargetKind.InProgress }, targets.Select(t => t.Kind));
+    // Bob's row for the ticks: a core card and an add-on of Pirates, a core card, an enabler and an add-on of Undead, a core
+    // card of Mechs. Distinct cards for each guide, so that whose frame each one gets shows.
+    private static readonly string[] TickRow = { "KEY_P1", "ADD_P", "KEY_U1", "EN_U", "ADD_U", "KEY_M1" };
 
-        var highlights = TavernHighlights.For(new[] { "KEY_P1", "ADD_M", "KEY_U1", "KEY_M1" }, targets);
+    // Held: both key cards of Undead (in progress), one of Mechs (a guess), an add-on of Pirates (a guess).
+    private static readonly PlayerCards TickBoard = Board("KEY_U1", "KEY_U2", "KEY_M1", "ADD_P");
+
+    [Fact]
+    public void ATickedTarget_FramesAlone_AGuideInProgressFramesNothing_AGuessNeither()
+    {
+        // (Ali, 2026-10-07: "quand on sélectionne des compos vers lesquelles on veut tendre, on ne devrait plus surligner aucun
+        // autre sbire dans le shop".) Pirates ticked: it comes first and frames its cards. Undead Butcher, both of its key cards
+        // held, is being built: it stays a target (the panel lists it, "in progress"), but none of its cards is framed. Mech
+        // Magnet, one key card held, was only a guess: no target, no frame.
+        var targets = Targets(All, TickBoard, 3, Pirates);
+        Assert.Equal(new[] { ("Pirate Gold", TargetKind.Chosen), ("Undead Butcher", TargetKind.InProgress) }, targets.Select(t => (t.Guide.Name, t.Kind)));
+
+        var highlights = TavernHighlights.For(TickRow, targets);
 
         Assert.Equal(new (HighlightKind, string?, string?, string)[]
         {
             (HighlightKind.Commit, "Pirate Gold", P0, "core"),
             (HighlightKind.Enabler, "Pirate Gold", P0, "+"),
-            (HighlightKind.Commit, "Undead Butcher", P1, "core"),
+            (HighlightKind.None, null, null, ""),
+            (HighlightKind.None, null, null, ""),
+            (HighlightKind.None, null, null, ""),
             (HighlightKind.None, null, null, ""),
         }, Summary(highlights));
+        Assert.Equal("KEY_P1:core:Pirate Gold/0,ADD_P:addon:Pirate Gold/0", TavernHighlights.Summary(TickRow, highlights));
+    }
+
+    [Fact]
+    public void NothingTicked_EveryTargetFramesItsCards_AsBefore()
+    {
+        // The same row, the same board, nothing ticked: Undead Butcher, Mech Magnet and Pirate Gold are the probable targets,
+        // and each frames its cards in its colour.
+        var targets = Targets(All, TickBoard, 3);
+        Assert.Equal(new[] { ("Undead Butcher", TargetKind.Probable), ("Mech Magnet", TargetKind.Probable), ("Pirate Gold", TargetKind.Probable) },
+            targets.Select(t => (t.Guide.Name, t.Kind)));
+
+        var highlights = TavernHighlights.For(TickRow, targets);
+
+        Assert.Equal(new (HighlightKind, string?, string?, string)[]
+        {
+            (HighlightKind.Commit, "Pirate Gold", P2, "core"),
+            (HighlightKind.Enabler, "Pirate Gold", P2, "+"),
+            (HighlightKind.Commit, "Undead Butcher", P0, "core"),
+            (HighlightKind.Enabler, "Undead Butcher", P0, "enabler"),
+            (HighlightKind.Enabler, "Undead Butcher", P0, "+"),
+            (HighlightKind.Commit, "Mech Magnet", P1, "core"),
+        }, Summary(highlights));
+        Assert.Same(targets, TavernHighlights.Framing(targets));
+    }
+
+    [Fact]
+    public void ATickedTarget_TheOthersUnderItsLabel_AreTickedOnesOnly()
+    {
+        // ADD_M is an add-on of Mechs and of Pirates. Mechs, two key cards held (KEY_M1, SHARED), is in progress; Pirates is
+        // ticked: ADD_M is Pirates' "+", and Mechs is not listed under it.
+        var targets = Targets(All, Board("KEY_M1", "SHARED"), 3, Pirates);
+        Assert.Equal(new[] { ("Pirate Gold", TargetKind.Chosen), ("Mech Magnet", TargetKind.InProgress) }, targets.Select(t => (t.Guide.Name, t.Kind)));
+
+        var highlight = TavernHighlights.For(new[] { "ADD_M" }, targets).Single();
+
+        Assert.Equal((HighlightKind.Enabler, "Pirate Gold", P0, "+"), (highlight.Kind, highlight.Target!.Guide.Name, highlight.Colour, highlight.Tag));
+        Assert.Empty(highlight.Others);
+        Assert.Equal(new[] { "+ Pirate Gold" }, TavernHighlights.MarkerLines(highlight, pinned: false, maxChars: 20));
+    }
+
+    [Fact]
+    public void TheLogLine_SaysWhichTargetsFrame_WhenAGuideIsTicked()
+    {
+        var ticked = Targets(All, TickBoard, 3, Pirates);
+        var auto = Targets(All, TickBoard, 3);
+
+        Assert.Equal($"Bronzebeard HUD: tavern highlights=[KEY_P1:core:Pirate Gold/0,ADD_P:addon:Pirate Gold/0] targets=[Pirate Gold {P0}; Undead Butcher {P1}] "
+                     + $"frames from ticked=[Pirate Gold {P0}]",
+            TavernHighlights.LogLine(TavernHighlights.Summary(TickRow, TavernHighlights.For(TickRow, ticked)), ticked));
+        Assert.Equal($"Bronzebeard HUD: tavern highlights=[KEY_P1:core:Pirate Gold/0,ADD_P:addon:Pirate Gold/0,KEY_U1:core:Undead Butcher/0,"
+                     + $"EN_U:enabler:Undead Butcher/0,ADD_U:addon:Undead Butcher/0,KEY_M1:core:Mech Magnet/0] targets=[Undead Butcher {P0}; Mech Magnet {P1}; Pirate Gold {P2}]",
+            TavernHighlights.LogLine(TavernHighlights.Summary(TickRow, TavernHighlights.For(TickRow, auto)), auto));
     }
 
     [Fact]
