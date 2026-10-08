@@ -49,6 +49,7 @@ and, when there is one, the line of HDT's log that tells.
 - **Simulation of HDT's overlay layer** (clicks through the transparent overlay, hover probed at 60 Hz) and a scenario
   mode with an injected mouse. Today the simulation cannot show a defect that lives in that layer.
 - **HSReplay manual import** is implemented but has never been used: the folder is empty and only Firestone's comps run.
+- **Statistics from several sources**: one local format that keeps where each figure comes from (source, patch, MMR bracket, sample size), consolidation that shows "contested" rather than silently picking a source, Firestone's card stats first, nomi.gg's patch analysis only once its author agrees. Design note (in French): [docs/plans/2026-10-08-stats-multi-sources.html](docs/plans/2026-10-08-stats-multi-sources.html).
 
 ## Not planned
 

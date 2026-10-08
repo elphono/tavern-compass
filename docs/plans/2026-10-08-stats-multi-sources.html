@@ -1,0 +1,1107 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stats multi-sources</title>
+<meta name="description" content="Note de conception du 2026-10-08 : intégrer les stats de nomi.gg, de Firestone (card-stats compris), de HDT et de HSReplay dans un format commun qui garde leur provenance, les consolider sans choisir en silence, les mettre à jour source par source, et ce qu'elles permettent de nouveau à l'écran. Ce que fait Nomi's Kitchen, ce qu'on en reprend. Aucune implémentation.">
+<style>
+  :root {
+    --bg: #f7f7f4; --surface: #ffffff; --text: #1d1f24; --muted: #555b67; --border: #d6d9df; --soft: #eef0f3;
+    --ok: #15803d; --ok-soft: #d7f5df;
+    --new: #1d5fd6; --new-soft: #dbe7fb;
+    --ask: #b45309; --ask-soft: #fde9c8;
+    --bad: #c81e1e; --bad-soft: #fde0e0;
+    --fs: #1d5fd6; --nomi: #7c3aed; --nomi-soft: #ece4fd; --art: #9aa3b2;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
+      --ok: #4ade80; --ok-soft: #133a22;
+      --new: #6ea8ff; --new-soft: #17284a;
+      --ask: #f5b83d; --ask-soft: #4a3712;
+      --bad: #ff6b6b; --bad-soft: #4a1c1c;
+      --fs: #6ea8ff; --nomi: #b79bff; --nomi-soft: #2e2450; --art: #5d6577;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
+    --ok: #4ade80; --ok-soft: #133a22;
+    --new: #6ea8ff; --new-soft: #17284a;
+    --ask: #f5b83d; --ask-soft: #4a3712;
+    --bad: #ff6b6b; --bad-soft: #4a1c1c;
+    --fs: #6ea8ff; --nomi: #b79bff; --nomi-soft: #2e2450; --art: #5d6577;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow-wrap: break-word;
+  }
+  main { max-width: 920px; margin: 0 auto; padding: 24px 16px 64px; }
+  .wide { max-width: 1240px; margin: 0 auto; padding: 0 16px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 8px 0 4px; }
+  h2 { font-size: 22px; line-height: 1.25; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  h3 { font-size: 18px; margin: 28px 0 8px; }
+  p { margin: 8px 0; }
+  a { color: var(--new); }
+  .meta { color: var(--muted); font-size: 15px; margin: 0 0 12px; }
+  code { font: max(14px, 0.92em) ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+  .lead { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--text); border-radius: 8px; padding: 14px 16px; font-size: 18px; }
+  .ask-box { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--nomi); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+  .ask-box p { margin: 6px 0; }
+  .warn { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--ask); border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0 0; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .tile b { display: block; font-size: 26px; line-height: 1.1; }
+  .tile span { color: var(--muted); font-size: 15px; }
+  .formula { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 10px 0; font-size: 17px; overflow-wrap: anywhere; }
+  .formula b { font-weight: 700; }
+  sub { font-size: max(14px, 0.75em); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--surface); border: 1px solid var(--border); margin: 12px 0; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--soft); font-weight: 600; }
+  td.n { font-weight: 700; white-space: nowrap; }
+  .st { display: inline-block; font-size: 14px; font-weight: 700; border-radius: 4px; padding: 0 6px; border: 1.5px solid; white-space: nowrap; }
+  .st.ok { color: var(--ok); border-color: var(--ok); }
+  .st.new { color: var(--new); border-color: var(--new); }
+  .st.ask { color: var(--ask); border-color: var(--ask); }
+  .st.bad { color: var(--bad); border-color: var(--bad); }
+  .st.no { color: var(--muted); border-color: var(--muted); }
+  @media (max-width: 720px) {
+    table.cards, table.cards tbody, table.cards tr, table.cards td { display: block; width: 100%; }
+    table.cards thead { display: none; }
+    table.cards { border: 0; background: transparent; }
+    table.cards tr { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin: 0 0 12px; padding: 4px 0; }
+    table.cards td { border: 0; padding: 4px 12px; }
+    table.cards td::before { content: attr(data-label); display: block; font-size: 14px; color: var(--muted); font-weight: 600; }
+    table.cards td.n::before { display: inline; content: ""; }
+  }
+
+  figure { margin: 20px 0; }
+  figcaption { color: var(--muted); font-size: 15px; margin-top: 6px; }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  svg .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  svg .sub, svg .sub text { fill: var(--muted); }
+  svg .b { font-weight: 700; }
+  svg .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+  svg .wire { stroke: var(--muted); stroke-width: 2; fill: none; }
+  svg .c-ok { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 2; }
+  svg .c-new { fill: var(--new-soft); stroke: var(--new); stroke-width: 2.5; stroke-dasharray: 7 4; }
+  svg .c-ask { fill: var(--ask-soft); stroke: var(--ask); stroke-width: 2; stroke-dasharray: 7 4; }
+  svg .c-bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 2; }
+  svg .c-man { fill: var(--soft); stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 3; }
+  svg .c-no { fill: none; stroke: var(--border); stroke-width: 1.2; }
+  svg .d-ok { fill: var(--ok); } svg .d-new { fill: var(--new); } svg .d-ask { fill: var(--ask); }
+  svg .d-bad { fill: var(--bad); } svg .d-man { fill: none; stroke: var(--muted); stroke-width: 2; } svg .d-no { fill: var(--border); }
+  svg .t-ok, svg .t-ok text { fill: var(--ok); } svg .t-new, svg .t-new text { fill: var(--new); }
+  svg .t-ask, svg .t-ask text { fill: var(--ask); } svg .t-bad, svg .t-bad text { fill: var(--bad); }
+  /* In-game sketches: the game is dark whatever the page theme. */
+  svg .g-bg { fill: #1b2130; }
+  svg .g-panel { fill: #11151f; stroke: #3a4560; stroke-width: 1.5; }
+  svg .g-card { fill: #4a5570; }
+  svg .g-card2 { fill: #34405a; }
+  svg .g-t, svg .g-t text { fill: #f2f2f2; }
+  svg .g-m, svg .g-m text { fill: #b8bfcc; }
+  svg .g-mag, svg .g-mag text { fill: #ff4fdc; }
+  svg .g-up, svg .g-up text { fill: #4ade80; }
+  svg .g-amb, svg .g-amb text { fill: #f5b83d; }
+  svg .pin circle { stroke: #ffffff; stroke-width: 2.5; }
+  svg .pin text { fill: #ffffff; font-weight: 700; }
+  .p-blue { fill: #2563eb; } .p-amb { fill: #b45309; } .p-green { fill: #15803d; } .p-grey { fill: #5b6474; }
+
+  .w-wide { display: none; max-width: 900px; margin: 0 auto; }
+  .wide > figure { max-width: 900px; margin: 20px auto; }
+  main:has(+ .wide) { padding-bottom: 8px; }
+  .w-tall { max-width: 420px; margin: 0 auto; }
+  @media (min-width: 940px) { .w-wide { display: block; } .w-tall { display: none; } }
+  .mech { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
+  @media (min-width: 860px) { .mech { grid-template-columns: 1fr 1fr; } }
+  .mech svg, .solo svg { max-width: 440px; }
+  .solo svg { margin: 0 auto; }
+  .crops { display: grid; grid-template-columns: 1fr; gap: 24px; }
+  @media (min-width: 860px) { .crops { grid-template-columns: 1fr 1fr 1fr; } }
+  .crops svg { max-width: 420px; margin: 0 auto; }
+  .screen svg { max-width: 720px; margin: 0 auto; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 15px; color: var(--muted); margin-top: 6px; }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+  .pinl { display: inline-block; width: 22px; height: 22px; line-height: 22px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 14px; text-align: center; margin-right: 6px; }
+  .pinl.blue { background: #2563eb; } .pinl.amb { background: #b45309; } .pinl.green { background: #15803d; } .pinl.grey { background: #5b6474; }
+
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; margin: 12px 0; }
+  details > summary { cursor: pointer; font-weight: 600; }
+  details[open] > summary { margin-bottom: 8px; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 10px 12px; border-radius: 6px; margin: 8px 0; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  blockquote { margin: 12px 0; padding: 10px 16px; border-left: 4px solid var(--muted); background: var(--surface); border-radius: 0 8px 8px 0; font-style: italic; }
+
+  /* Depth selector: the statement alone, then the reasoning, then the proof. */
+  .lv-input { position: absolute; opacity: 0; pointer-events: none; }
+  .levels { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0; margin: 4px 0 8px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .levels > span { color: var(--muted); font-size: 15px; margin-right: 4px; }
+  .levels label { cursor: pointer; font-size: 15px; font-weight: 600; padding: 5px 12px; border: 1.5px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); }
+  #lv1:checked ~ main label[for="lv1"], #lv2:checked ~ main label[for="lv2"], #lv3:checked ~ main label[for="lv3"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+  #lv1:focus-visible ~ main label[for="lv1"], #lv2:focus-visible ~ main label[for="lv2"], #lv3:focus-visible ~ main label[for="lv3"] { outline: 2px solid var(--new); outline-offset: 2px; }
+  #lv1:checked ~ * .why, #lv1:checked ~ .why, #lv1:checked ~ * .proof, #lv1:checked ~ .proof,
+  #lv2:checked ~ * .proof, #lv2:checked ~ .proof { display: none !important; }
+  .proof { background: var(--surface); border: 1px dashed var(--muted); border-radius: 8px; padding: 10px 14px; margin: 14px 0; }
+  .proof > b:first-child { display: block; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<input type="radio" name="lv" id="lv1" class="lv-input" aria-label="L'essentiel">
+<input type="radio" name="lv" id="lv2" class="lv-input" aria-label="Le raisonnement" checked>
+<input type="radio" name="lv" id="lv3" class="lv-input" aria-label="Les preuves">
+
+<main>
+  <h1>Stats multi-sources : consolider pour mieux conseiller</h1>
+  <p class="meta">Note de conception pour Ali, 2026-10-08. Aucune ligne de code n'est touchée : c'est de la réflexion, à trancher. Chaque source a été mesurée une fois, ce jour-là ; les chiffres cités sont des ordres de grandeur d'un jour, pas des données.</p>
+  <div class="levels" role="group" aria-label="Profondeur de lecture">
+    <span>Lire :</span>
+    <label for="lv1">L'essentiel</label>
+    <label for="lv2">Le raisonnement</label>
+    <label for="lv3">Les preuves</label>
+  </div>
+
+  <blockquote>« Sur nomi.gg/patch/analysis/ on a les stats du dernier patch. Je veux qu'on réfléchisse à comment on peut intégrer ces stats dans notre DB pour donner de meilleurs conseils. À la fois plus pertinents sur ceux qu'on fait déjà, et plus variés (nouveaux composants IHM ? à brainstorm). Il faut aussi pouvoir intégrer automatiquement les MAJ de ce site (et les autres, Firestone/HDT etc.) dans notre DB de stats. Comment on choisit quelles stats sont les plus pertinentes si elles sont en contradiction ? Peut-être qu'il faut faire un pré-traitement des stats en interne pour les consolider ? » — puis : « Renseigne-toi aussi sur le plugin Nomi's Kitchen sur ce site. Qu'est-ce qu'il fait qu'on peut reprendre à notre compte. »</blockquote>
+
+  <h2 id="phrase">1. En une phrase</h2>
+  <p class="lead">Deux sources se contredisent rarement sur la vérité : elles mesurent des joueurs, des périodes et des définitions différents. On ramène donc chaque chiffre à un format commun qui garde sa <b>provenance</b> (source, patch, tranche de MMR, période, nombre de parties), on ne combine que ce qui est comparable, et l'interface dit « contesté » au lieu de choisir en silence. Le premier chantier n'est pas nomi.gg : c'est card-stats de Firestone, déjà autorisé, plus riche, et jamais téléchargé.</p>
+  <div class="tiles">
+    <div class="tile"><b>806 cartes</b><span>placement par carte <em>et par tour</em> chez Firestone : autorisé, jamais chargé</span></div>
+    <div class="tile"><b>277 joueurs</b><span>derrière les 5 076 parties de nomi.gg ; 30 au-dessus de 10 000 MMR</span></div>
+    <div class="tile"><b>0 patch</b><span>aucun numéro de patch dans nos formats locaux : seulement une période et une date</span></div>
+    <div class="tile"><b>1 garde-fou</b><span>pour tous les chargements : la panne d'une source nouvelle couperait Firestone</span></div>
+  </div>
+
+  <h2 id="sources">2. Les sources : ce qu'elles donnent, ce qu'on a le droit d'en faire</h2>
+  <p class="lead">Firestone est la seule source à la fois riche et autorisée. nomi.gg apporte ce qu'aucune autre n'a, l'effet d'un patch sur ses six premiers jours, mais sur un petit échantillon et sans aucune condition écrite : on demande avant de collecter quoi que ce soit.</p>
+</main>
+
+<div class="wide why">
+  <figure>
+    <svg class="w-wide" viewBox="0 0 880 470" role="img" aria-labelledby="t-mx">
+      <title id="t-mx">Matrice des sources (Firestone, nomi.gg, HDT, HSReplay) contre six genres de statistiques, avec l'effectif et l'état de chaque case</title>
+      <g font-size="16" class="b" text-anchor="middle">
+        <text x="261" y="32">Firestone</text><text x="437" y="32">nomi.gg</text><text x="613" y="32">HDT</text><text x="789" y="32">HSReplay</text>
+      </g>
+      <g font-size="14" class="sub" text-anchor="middle">
+        <text x="261" y="52">accord de l'auteur</text><text x="437" y="52">aucune licence écrite</text><text x="613" y="52">API, sans requête</text><text x="789" y="52">challenge Cloudflare</text>
+      </g>
+      <g font-size="15" class="b">
+        <text x="12" y="96">Héros</text><text x="12" y="162">Carte × tour</text><text x="12" y="228">Compo</text>
+        <text x="12" y="294">Trinket</text><text x="12" y="360">Courbe de tier</text><text x="12" y="426">Avant / après</text>
+      </g>
+      <g font-size="14" class="sub">
+        <text x="12" y="116">place, top 4, 1re</text><text x="12" y="182">placement par tour</text><text x="12" y="248">archétype, plateaux</text>
+        <text x="12" y="314">place au choix</text><text x="12" y="380">montée de taverne</text><text x="12" y="446">effet d'un patch</text>
+      </g>
+      <!-- row 1: heroes -->
+      <rect class="c-ok" x="178" y="70" width="166" height="60" rx="6"/>
+      <rect class="c-ask" x="354" y="70" width="166" height="60" rx="6"/>
+      <rect class="c-bad" x="530" y="70" width="166" height="60" rx="6"/>
+      <rect class="c-man" x="706" y="70" width="166" height="60" rx="6"/>
+      <!-- row 2: card x turn -->
+      <rect class="c-new" x="178" y="136" width="166" height="60" rx="6"/>
+      <rect class="c-ask" x="354" y="136" width="166" height="60" rx="6"/>
+      <rect class="c-no" x="530" y="136" width="166" height="60" rx="6"/>
+      <rect class="c-no" x="706" y="136" width="166" height="60" rx="6"/>
+      <!-- row 3: comps -->
+      <rect class="c-ok" x="178" y="202" width="166" height="60" rx="6"/>
+      <rect class="c-ask" x="354" y="202" width="166" height="60" rx="6"/>
+      <rect class="c-ok" x="530" y="202" width="166" height="60" rx="6"/>
+      <rect class="c-man" x="706" y="202" width="166" height="60" rx="6"/>
+      <!-- row 4: trinkets -->
+      <rect class="c-ok" x="178" y="268" width="166" height="60" rx="6"/>
+      <rect class="c-ask" x="354" y="268" width="166" height="60" rx="6"/>
+      <rect class="c-bad" x="530" y="268" width="166" height="60" rx="6"/>
+      <rect class="c-no" x="706" y="268" width="166" height="60" rx="6"/>
+      <!-- row 5: tier curve -->
+      <rect class="c-no" x="178" y="334" width="166" height="60" rx="6"/>
+      <rect class="c-ask" x="354" y="334" width="166" height="60" rx="6"/>
+      <rect class="c-no" x="530" y="334" width="166" height="60" rx="6"/>
+      <rect class="c-no" x="706" y="334" width="166" height="60" rx="6"/>
+      <!-- row 6: patch before / after -->
+      <rect class="c-no" x="178" y="400" width="166" height="60" rx="6"/>
+      <rect class="c-ask" x="354" y="400" width="166" height="60" rx="6"/>
+      <rect class="c-no" x="530" y="400" width="166" height="60" rx="6"/>
+      <rect class="c-no" x="706" y="400" width="166" height="60" rx="6"/>
+      <g font-size="15" text-anchor="middle" style="font-weight:600">
+        <text x="261" y="96">116 héros</text><text x="437" y="96">59 héros</text><text x="613" y="96">Tier 7, payant</text><text x="789" y="96">import manuel</text>
+        <text x="261" y="162">806 cartes</text><text x="437" y="162">32 cartes</text><text x="613" y="172" class="sub">—</text><text x="789" y="172" class="sub">—</text>
+        <text x="261" y="228">25 archétypes</text><text x="437" y="228">10 plateaux</text><text x="613" y="228">≈ 23 guides</text><text x="789" y="228">*.comps.txt</text>
+        <text x="261" y="294">238 trinkets</text><text x="437" y="294">6 + 6 par sorte</text><text x="613" y="294">Tier 7, payant</text><text x="789" y="304" class="sub">—</text>
+        <text x="261" y="360" class="sub">pas trouvée</text><text x="437" y="360">8 courbes</text><text x="613" y="370" class="sub">—</text><text x="789" y="370" class="sub">—</text>
+        <text x="261" y="426" class="sub">non</text><text x="437" y="426">11 tribus</text><text x="613" y="436" class="sub">—</text><text x="789" y="436" class="sub">—</text>
+      </g>
+      <g font-size="14" text-anchor="middle" class="sub">
+        <text x="261" y="116">5 tranches de MMR</text><text x="437" y="116">5 076 parties en tout</text><text x="613" y="116">pas d'accès gratuit</text><text x="789" y="116">jamais utilisé</text>
+        <text x="261" y="182">par tour, 474 101 pts</text><text x="437" y="182">sans tour · « lift »</text>
+        <text x="261" y="248">plateaux finaux</text><text x="437" y="248">gagnants, cartes clés</text><text x="613" y="248">gratuits, tier S → D</text><text x="789" y="248">jamais utilisé</text>
+        <text x="261" y="314">place par tranche</text><text x="437" y="314">gagnants / perdants</text><text x="613" y="314">pas d'accès gratuit</text>
+        <text x="261" y="380">plateau par tour : oui</text><text x="437" y="380">médianes, tier 5</text>
+        <text x="261" y="446">last-patch, 7 j, 3 j</text><text x="437" y="446">avant / après, buffs</text>
+      </g>
+    </svg>
+
+    <svg class="w-tall" viewBox="0 0 340 640" role="img" aria-labelledby="t-mx2">
+      <title id="t-mx2">La même matrice, source par source</title>
+      <rect class="box" x="2" y="4" width="336" height="184" rx="8"/>
+      <text x="14" y="28" font-size="16" class="b">Firestone</text><text x="326" y="28" font-size="14" class="sub" text-anchor="end">accord de l'auteur</text>
+      <g font-size="14">
+        <circle class="d-ok" cx="20" cy="51" r="6"/><text x="34" y="56">Héros : 116, 5 tranches de MMR</text>
+        <circle class="d-new" cx="20" cy="75" r="6"/><text x="34" y="80">Carte × tour : 806 cartes, 474 101 pts</text>
+        <circle class="d-ok" cx="20" cy="99" r="6"/><text x="34" y="104">Compo : 25 archétypes, plateaux finaux</text>
+        <circle class="d-ok" cx="20" cy="123" r="6"/><text x="34" y="128">Trinket : 238, place par tranche</text>
+        <circle class="d-no" cx="20" cy="147" r="6"/><text x="34" y="152">Courbe de tier : pas trouvée</text>
+        <circle class="d-no" cx="20" cy="171" r="6"/><text x="34" y="176">Patch avant / après : non</text>
+      </g>
+      <rect class="box" x="2" y="200" width="336" height="184" rx="8"/>
+      <text x="14" y="224" font-size="16" class="b">nomi.gg</text><text x="326" y="224" font-size="14" class="sub" text-anchor="end">aucune licence : à demander</text>
+      <g font-size="14">
+        <circle class="d-ask" cx="20" cy="247" r="6"/><text x="34" y="252">Héros : 59, 5 076 parties en tout</text>
+        <circle class="d-ask" cx="20" cy="271" r="6"/><text x="34" y="276">Carte : 32, sans tour, « lift »</text>
+        <circle class="d-ask" cx="20" cy="295" r="6"/><text x="34" y="300">Compo : 10 plateaux gagnants</text>
+        <circle class="d-ask" cx="20" cy="319" r="6"/><text x="34" y="324">Trinket : 6 gagnants + 6 perdants</text>
+        <circle class="d-ask" cx="20" cy="343" r="6"/><text x="34" y="348">Courbe de tier : 8 courbes, médianes</text>
+        <circle class="d-ask" cx="20" cy="367" r="6"/><text x="34" y="372">Patch avant / après : 11 tribus</text>
+      </g>
+      <rect class="box" x="2" y="396" width="336" height="112" rx="8"/>
+      <text x="14" y="420" font-size="16" class="b">HDT</text><text x="326" y="420" font-size="14" class="sub" text-anchor="end">API publique, sans requête</text>
+      <g font-size="14">
+        <circle class="d-ok" cx="20" cy="443" r="6"/><text x="34" y="448">Compo : ≈ 23 guides gratuits</text>
+        <circle class="d-bad" cx="20" cy="467" r="6"/><text x="34" y="472">Héros, trinkets : Tier 7, payant</text>
+        <circle class="d-no" cx="20" cy="491" r="6"/><text x="34" y="496">Le reste : rien</text>
+      </g>
+      <rect class="box" x="2" y="520" width="336" height="112" rx="8"/>
+      <text x="14" y="544" font-size="16" class="b">HSReplay</text><text x="326" y="544" font-size="14" class="sub" text-anchor="end">challenge Cloudflare</text>
+      <g font-size="14">
+        <circle class="d-man" cx="20" cy="567" r="5.5"/><text x="34" y="572">Héros, compos : import manuel</text>
+        <circle class="d-man" cx="20" cy="591" r="5.5"/><text x="34" y="596">… implémenté, jamais utilisé</text>
+        <circle class="d-bad" cx="20" cy="615" r="6"/><text x="34" y="620">Site : aucune requête, rien contourné</text>
+      </g>
+    </svg>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--ok-soft);border:2px solid var(--ok)"></i>consommé aujourd'hui</span>
+      <span><i class="sw" style="background:var(--new-soft);border:2px dashed var(--new)"></i>autorisé, jamais téléchargé</span>
+      <span><i class="sw" style="background:var(--ask-soft);border:2px dashed var(--ask)"></i>à demander avant toute collecte</span>
+      <span><i class="sw" style="background:var(--bad-soft);border:2px solid var(--bad)"></i>payant, ou protégé : on ne contourne pas</span>
+      <span><i class="sw" style="background:var(--soft);border:1.5px dashed var(--muted)"></i>import manuel, jamais utilisé</span>
+      <span><i class="sw" style="border:1px solid var(--border)"></i>absent, ou pas trouvé</span>
+    </div>
+    <figcaption>Une case = ce que la source donne pour ce genre de statistique, avec son effectif. Les chiffres sont ceux du 2026-10-08. « Points » chez Firestone : des cartes jouées, pas des parties.</figcaption>
+  </figure>
+</div>
+
+<main style="padding-top:0">
+  <table class="cards why">
+    <thead><tr><th>Source</th><th>Ce qui est permis</th><th>Sur quoi on s'appuie</th><th>Ce qu'on en fait</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Source"><b>Firestone</b> <span class="st ok">oui</span></td><td data-label="Permis">Toutes ses données publiques, pour tous nos usages ; cache local, rafraîchissement modeste.</td><td data-label="Fondement">Accord de l'auteur, étendu le 2026-09-27 à toutes ses données publiques, card-stats nommément (<code>CLAUDE.md</code>, « Décisions »).</td><td data-label="On en fait">Ajouter card-stats ; toujours aucune donnée réelle dans le dépôt.</td></tr>
+      <tr><td data-label="Source"><b>nomi.gg</b> <span class="st ask">à demander</span></td><td data-label="Permis">Rien d'écrit. Le <code>robots.txt</code> autorise tout (<code>Allow: /</code>) et porte un signal Cloudflare <code>search=yes, ai-train=no, use=reference</code> ; il nomme et interdit des robots d'entraînement de modèles.</td><td data-label="Fondement">Aucune condition d'utilisation, aucune mention légale, aucune page d'API (toutes en 404). Seul contact : les issues GitHub du plugin. « Unofficial fan project, free for everyone » n'est pas une licence de données.</td><td data-label="On en fait">Demander (brouillon au § 10). D'ici là : import manuel du JSON, comme HSReplay.</td></tr>
+      <tr><td data-label="Source"><b>HSReplay</b> <span class="st bad">manuel</span></td><td data-label="Permis">Usage local accepté.</td><td data-label="Fondement">Le site renvoie un challenge Cloudflare (<code>403</code>, <code>cf-mitigated: challenge</code>) : décision du 2026-09-26, on ne contourne pas.</td><td data-label="On en fait">L'import manuel existe et n'a jamais servi : inchangé.</td></tr>
+      <tr><td data-label="Source"><b>HDT</b> <span class="st ok">oui</span></td><td data-label="Permis">Ce que son API publique expose : les guides de compos gratuits.</td><td data-label="Fondement">Le plugin lit <code>BattlegroundsCompsGuidesVM</code>, sans requête.</td><td data-label="On en fait">Inchangé. Stats de héros, de compos classées et de trinkets : Tier 7, payant.</td></tr>
+      <tr><td data-label="Source"><b>Code de Nomi's Kitchen</b> <span class="st bad">non</span></td><td data-label="Permis">Rien : licence « MIT NON-AI » (MIT, plus une interdiction d'usage pour l'entraînement, le data mining et les jeux de données, avec menace de poursuites).</td><td data-label="Fondement">Licence des dépôts <code>RainWritesCode/NomisKitchenHDT</code> et <code>NomisKitchenFirestone</code>.</td><td data-label="On en fait">Des idées seulement (§ 3), aucune ligne reprise.</td></tr>
+    </tbody>
+  </table>
+  <p class="why">La licence du plugin ne couvre pas les données du site, mais elle dit l'état d'esprit de son auteur : une collecte automatique sans accord serait mal reçue, à raison. Demander coûte une issue ; ne pas demander pourrait coûter la source.</p>
+
+  <div class="warn">
+    <b>Une contradiction à trancher dans nos propres documents.</b> <code>ROADMAP.md</code> (« Next ») dit que card-stats est « a new download that the maintainer still has to approve » ; <code>CLAUDE.md</code> dit l'accord étendu le 2026-09-27 à toutes les données publiques, card-stats nommément. <b>Recommandation</b> : <code>CLAUDE.md</code> fait foi, card-stats se télécharge « modestement » comme les autres fichiers, et la ligne de la roadmap se corrige. C'est à Ali de le confirmer (§ 14, décision 1) ; cette note ne touche pas à la ligne existante.
+  </div>
+
+  <div class="proof">
+    <b>Preuve — les sources telles que mesurées le 2026-10-08</b>
+    <p><b>nomi.gg</b>. <code>/patch/analysis/</code> est une page de 2 084 octets (« Loading the analysis… », <code>&lt;body data-patch="36.6.3"&gt;</code>) qui charge <code>https://nomi.gg/patch/analysis/36.6.3.json</code> : 35 030 octets, <code>ETag "dlz4g0p2k773r12"</code>, <code>last-modified: Thu, 08 Oct 2026 03:03:35 GMT</code>. Le numéro du patch courant vient de <code>/patch/data/latest.json</code>. Pages <code>/terms/</code>, <code>/privacy/</code>, <code>/about/</code>, <code>/api/</code>, <code>/legal/</code>, <code>/tos/</code> : 404. Les données viennent des utilisateurs du plugin (Power.log envoyé à <code>https://api.nomi.gg/v1/reports</code>), pas d'une republication de HSReplay ou Firestone.</p>
+    <pre>patch, build (253216), generated, window {preEnd, postStart}, buffed[], nerfed[]
+overview {games 5076, players 277, preGames 1321, highGames 1507, highPlayers 30, avgPlace, winRate, top4Rate}
+tribes {pre, post}            11 tribus : lobby, share, games, avg, top4, win
+heroes[59]                    {id "TB_BaconShop_HERO_37", name, games 51, avg 2.86, top4, win, pick}
+boards[10]                    plateaux gagnants : tribe, wins, hero, board[7] {card, atk, hp, golden}, core[] {id, share}
+cards {best[12], common[12], under[8]}   {id "BG36_620", name, tier, atk, hp, races, games, avg, top4, win, lift}
+curve {all|high: medians {first, top4, bottom4}, curves[8] {curve "3-4-6-7", games, avg, top4, win}, tier5[] {turn, …}}
+deities {pre|post}, tidbits[13] (comparaisons A/B par tribu)
+trinkets {lesser|greater: winners[6], losers[6], minPicks 40}</pre>
+    <p>Fenêtre : 2026-10-02 → 2026-10-08, 5 076 parties solo de 277 joueurs ; « 10 000+ MMR » = 30 joueurs ; pas de région ; <b>aucune stat par tour ni par tier de taverne</b> ; deux fenêtres seulement, avant et après le patch.</p>
+    <p><b>Firestone</b> (<code>static.zerotoheroes.com/api/bgs/</code>). Consommés : <code>hero-stats/mmr-{100,50,25,10,1}/last-patch/overview-from-hourly.gz.json</code> (116 héros : <code>averagePosition</code>, <code>placementDistribution</code>, <code>warbandStats</code> par tour, <code>tribeStats</code>), <code>comp-stats/last-patch/…</code> (25 archétypes, 4,8 Mo en gzip, 55 Mo décompressé), <code>trinket-stats/last-patch/…</code> (238 trinkets, <code>pickRate</code>, <code>averagePlacement</code>, <code>averagePlacementAtMmr[5]</code>), <code>hero-stats/last-patch/mmr-percentiles.gz.json</code> (<code>[{100:0},{50:6091},{25:6656},{10:7235},{1:9852}]</code>). <b>Jamais consommé</b> : <code>card-stats/mmr-100/last-patch/overview-from-hourly.gz.json</code>, 199 Ko en gzip, 1,46 Mo décompressé, 806 cartes, <code>{cardId, totalPlayed, averagePlacement, averagePlacementOther, turnStats[24] {turn, totalPlayed, averagePlacement, totalOther, averagePlacementOther}}</code>, <code>dataPoints</code> 474 101 ; variantes <code>mmr-50</code>, <code>mmr-1</code>, <code>past-seven</code>, <code>past-three</code>, <code>all-time</code>. Tous les <code>Last-Modified</code> du 2026-10-08 entre 00:11 et 03:55 UTC, <code>cache-control: max-age=28800</code>, <code>lastUpdateDate</code> 2026-10-08T00:10Z. Les chemins « battlegrounds-strategies », « perfect-games » et « card-rules » n'ont pas été trouvés (403 sur toutes les tentatives).</p>
+    <p><b>HDT</b> : comp guides par <code>BattlegroundsCompsGuidesVM</code>, déjà lus. <b>bgknowhow.com</b> : arrêté depuis juillet 2025, figé au patch 31.6.2. Aucune autre source vérifiée.</p>
+  </div>
+
+  <h2 id="nomi-kitchen">3. Nomi's Kitchen : ce qu'il fait, ce qu'on reprend</h2>
+  <p class="lead">Le plugin HDT de Nomi n'affiche aucune stat de héros, de sbire, de compo ni de trinket : il collecte des parties pour le site. Les stats en jeu vivent dans une application Android distincte. On en reprend une idée simple, <b>l'effectif à côté de chaque moyenne</b>, et on en corrige le défaut : un chiffre tiré de 3 parties y est montré aussi gros qu'un chiffre tiré de 33.</p>
+
+  <div class="mech why">
+    <figure>
+      <svg viewBox="0 0 340 344" role="img" aria-labelledby="t-app">
+        <title id="t-app">Au choix du héros, l'app de Nomi montre la place moyenne et le nombre de parties au-dessus de chaque portrait ; rappelées vers 4,5, ces quatre moyennes ne se distinguent presque plus</title>
+        <text x="10" y="20" font-size="15" class="b">Au choix du héros, l'app de Nomi</text>
+        <g>
+          <rect class="box" x="9" y="32" width="76" height="60" rx="6"/><rect class="box" x="92" y="32" width="76" height="60" rx="6"/>
+          <rect class="box" x="175" y="32" width="76" height="60" rx="6"/><rect class="box" x="258" y="32" width="76" height="60" rx="6"/>
+        </g>
+        <g text-anchor="middle">
+          <g font-size="22" class="b"><text x="47" y="62">4.33</text><text x="130" y="62">4</text><text x="213" y="62">4.24</text><text x="296" y="62">4.29</text></g>
+          <g font-size="14" class="sub"><text x="47" y="83">3 games</text><text x="130" y="83">6 games</text><text x="213" y="83">33 games</text><text x="296" y="83">28 games</text></g>
+        </g>
+        <g style="fill:var(--art)">
+          <path d="M21 150 V124 A26 26 0 0 1 73 124 V150 Z"/><path d="M104 150 V124 A26 26 0 0 1 156 124 V150 Z"/>
+          <path d="M187 150 V124 A26 26 0 0 1 239 124 V150 Z"/><path d="M270 150 V124 A26 26 0 0 1 322 124 V150 Z"/>
+        </g>
+        <text x="10" y="176" font-size="14" class="sub">3 parties s'affichent comme 33.</text>
+        <line x1="10" y1="190" x2="330" y2="190" style="stroke:var(--border);stroke-width:1.5"/>
+        <text x="10" y="212" font-size="15" class="b">Rappelées vers la moyenne, 4,5</text>
+        <line x1="308.3" y1="222" x2="308.3" y2="316" style="stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <g font-size="14" class="sub"><text x="10" y="236">n = 3</text><text x="10" y="260">n = 6</text><text x="10" y="284">n = 33</text><text x="10" y="308">n = 28</text></g>
+        <g style="stroke:var(--muted);stroke-width:1.5">
+          <line x1="240" y1="231" x2="294" y2="231"/><line x1="97" y1="255" x2="268" y2="255"/>
+          <line x1="201" y1="279" x2="242" y2="279"/><line x1="222" y1="303" x2="259" y2="303"/>
+        </g>
+        <g style="fill:var(--surface);stroke:var(--text);stroke-width:2">
+          <circle cx="234.7" cy="231" r="5"/><circle cx="91.7" cy="255" r="5"/><circle cx="195.7" cy="279" r="5"/><circle cx="217.3" cy="303" r="5"/>
+        </g>
+        <g style="fill:var(--new)">
+          <circle cx="299.7" cy="231" r="5.5"/><circle cx="273.7" cy="255" r="5.5"/><circle cx="247.7" cy="279" r="5.5"/><circle cx="265" cy="303" r="5.5"/>
+        </g>
+        <line x1="70" y1="318" x2="330" y2="318" style="stroke:var(--muted);stroke-width:1.5"/>
+        <g font-size="14" class="sub" text-anchor="middle"><text x="91.7" y="336">4,0</text><text x="178.3" y="336">4,2</text><text x="265" y="336">4,4</text><text x="308.3" y="336" class="b" style="fill:var(--text)">4,5</text></g>
+      </svg>
+      <div class="legend">
+        <span><i class="sw" style="border:2px solid var(--text);border-radius:50%"></i>moyenne brute</span>
+        <span><i class="sw" style="background:var(--new);border-radius:50%"></i>rappelée vers 4,5</span>
+      </div>
+      <figcaption>Redessiné d'après une capture de l'app (pas son image). Une fois rappelées vers la moyenne comme le fait déjà <code>HeroCompAffinity</code>, les quatre se tiennent en 0,12 place : avec 3 à 33 parties, qu'elles soient celles du joueur ou du site, ces chiffres ne départagent presque rien.</figcaption>
+    </figure>
+    <div>
+      <table class="cards">
+        <thead><tr><th>Fonction</th><th>Où</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr><td data-label="Fonction">Place moyenne et nombre de parties au-dessus de chaque héros</td><td data-label="Où">app Android</td><td data-label="Verdict"><span class="st ok">reprendre</span> l'effectif : notre encart l'a (<code>DataPoints</code>) et ne l'affiche pas. Sans grossir un chiffre mince.</td></tr>
+          <tr><td data-label="Fonction">Tribus du lobby écrites sous « Choose a Hero »</td><td data-label="Où">app Android</td><td data-label="Verdict"><span class="st no">pas en double</span> le plugin les lit déjà pour filtrer ; HDT les montre peut-être déjà (à vérifier). Sinon une ligne grise suffit.</td></tr>
+          <tr><td data-label="Fonction">Onglet Heroes : rang, place moyenne, trois pourcentages, sans effectif visible</td><td data-label="Où">app Android</td><td data-label="Verdict"><span class="st no">hors jeu</span> un classement se lit hors partie ; « Meta ↗ » ouvre déjà une page.</td></tr>
+          <tr><td data-label="Fonction">Plateaux adverses, chances de combat</td><td data-label="Où">app Android</td><td data-label="Verdict"><span class="st no">pas en double</span> Bob's Buddy et le classement de HDT le font.</td></tr>
+          <tr><td data-label="Fonction">Overlay APM (actions par minute : courant, pic, moyenne)</td><td data-label="Où">plugin HDT</td><td data-label="Verdict"><span class="st bad">écarter</span> il ne conseille aucune décision et ajoute un widget au-dessus du jeu. S'il intéresse un jour, c'est une ligne du journal d'HDT.</td></tr>
+          <tr><td data-label="Fonction">Partage des parties vers nomi.gg, activé par défaut</td><td data-label="Où">plugin HDT</td><td data-label="Verdict"><span class="st bad">écarter</span> notre plugin n'envoie rien, et le dépôt vient d'être purgé de toute donnée personnelle.</td></tr>
+          <tr><td data-label="Fonction">Correctif « minion dance », nombres complets au lieu de « 1.2K »</td><td data-label="Où">plugin HDT</td><td data-label="Verdict"><span class="st no">hors sujet</span> ils corrigent l'affichage du jeu ; nous n'y touchons pas.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="proof">
+    <b>Preuve — ce que montrent les deux captures de l'app (regardées, non copiées)</b>
+    <p><b>Choix du héros</b> (écran 4:3) : quatre portraits, et au-dessus de chacun une boîte « 4.33 AVG PLACE 3 games », « 4 · 6 games », « 4.24 · 33 games », « 4.29 · 28 games », toutes du même corps ; sous le titre « Choose a Hero », les tribus du lobby (« Mechs, Murlocs, Pirates, Quilboar, Undead »). La boîte du deuxième héros mord sur le bandeau du titre du jeu. <b>Onglet Heroes</b> : rang, portrait, place moyenne (2.50, 2.65, 2.67…) et trois pourcentages dont les en-têtes sont hors de la capture ; des valeurs comme « 100 % » en top 4 trahissent de petits échantillons, mais aucun effectif n'est visible.</p>
+    <p>Rappel (k = 30 parties à 4,5) : (3 × 4,33 + 30 × 4,5) / 33 = 4,48 ; (6 × 4 + 135) / 36 = 4,42 ; (33 × 4,24 + 135) / 63 = 4,36 ; (28 × 4,29 + 135) / 58 = 4,40. Écart brut 0,33, écart rappelé 0,12.</p>
+    <p>Plugin HDT v1.0.9 et mod BepInEx pour Firestone v1.1.2. Notre encart des héros affiche aujourd'hui le tier, la place moyenne, le taux de choix, la source et la tranche, puis « top 4 · 1st » (<code>HeroPickPanel.cs:149-164</code>) ; <code>HeroFigures.DataPoints</code> existe et n'est pas affiché.</p>
+  </div>
+
+  <h2 id="contradictions">4. Pourquoi deux sources « se contredisent »</h2>
+  <p class="lead">Avant d'arbitrer entre deux chiffres, vérifier qu'ils mesurent la même chose. Trois écarts expliquent presque tous les désaccords : <b>qui</b> joue (la population), <b>quand</b> (la période), et <b>ce qu'on compte</b> (la définition). Le pré-traitement consiste d'abord à rendre ces trois écarts visibles, pas à les moyenner.</p>
+  <div class="mech why">
+    <figure>
+      <svg viewBox="0 0 340 590" role="img" aria-labelledby="t-gaps">
+        <title id="t-gaps">Trois écarts entre nomi.gg et Firestone : population (277 joueurs contre des tranches de MMR), fenêtre (six jours après le patch contre last-patch), définition (win, place moyenne, carte jouée, lift)</title>
+        <rect class="box" x="2" y="4" width="336" height="206" rx="8"/>
+        <text x="14" y="28" font-size="16" class="b">1. Population</text>
+        <text x="14" y="52" font-size="14">nomi.gg : 277 joueurs, 5 076 parties</text>
+        <text x="14" y="72" font-size="14">Firestone : 474 101 points (cartes)</text>
+        <text x="14" y="104" font-size="14" class="sub">tranches de Firestone (seuil de MMR)</text>
+        <g font-size="14" text-anchor="middle"><text x="31.8" y="130">50 %</text><text x="105.3" y="130">25 %</text><text x="180.6" y="130">10 %</text><text x="300" y="130">1 %</text></g>
+        <line x1="20" y1="150" x2="280" y2="150" style="stroke:var(--muted);stroke-width:2"/>
+        <g style="stroke:var(--muted);stroke-width:2"><line x1="282" y1="158" x2="288" y2="142"/><line x1="288" y1="158" x2="294" y2="142"/></g>
+        <rect x="306" y="142" width="22" height="16" style="fill:var(--nomi-soft);stroke:var(--nomi);stroke-width:1.5"/>
+        <line x1="296" y1="150" x2="328" y2="150" style="stroke:var(--muted);stroke-width:2"/>
+        <g style="stroke:var(--text);stroke-width:2"><line x1="31.8" y1="140" x2="31.8" y2="160"/><line x1="105.3" y1="140" x2="105.3" y2="160"/><line x1="180.6" y1="140" x2="180.6" y2="160"/><line x1="300" y1="140" x2="300" y2="160"/></g>
+        <path d="M129.2 152 l-7 14 h14 z" style="fill:var(--new)"/>
+        <text x="129.2" y="184" font-size="14" text-anchor="middle" class="b" style="fill:var(--new)">Ali ≈ 6 840</text>
+        <text x="330" y="184" font-size="14" text-anchor="end" style="fill:var(--nomi)">nomi ≥ 10 000 : 30</text>
+        <text x="14" y="202" font-size="14" class="sub">seuils : 6 091 · 6 656 · 7 235 · 9 852</text>
+
+        <rect class="box" x="2" y="220" width="336" height="168" rx="8"/>
+        <text x="14" y="244" font-size="16" class="b">2. Fenêtre</text>
+        <text x="150" y="266" font-size="14" text-anchor="middle">patch 36.6.3</text>
+        <line x1="150" y1="272" x2="150" y2="330" style="stroke:var(--text);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <text x="14" y="291" font-size="14" class="b">nomi</text>
+        <rect x="92" y="278" width="54" height="18" rx="3" style="fill:var(--nomi-soft);stroke:var(--nomi);stroke-width:1.5"/>
+        <rect x="154" y="278" width="166" height="18" rx="3" style="fill:var(--nomi)"/>
+        <text x="237" y="292" font-size="14" text-anchor="middle" style="fill:var(--bg)">6 jours après</text>
+        <text x="14" y="319" font-size="14" class="b">Firestone</text>
+        <rect x="104" y="306" width="46" height="18" rx="3" style="fill:none;stroke:var(--fs);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <text x="127" y="320" font-size="14" text-anchor="middle" style="fill:var(--fs)">?</text>
+        <rect x="154" y="306" width="166" height="18" rx="3" style="fill:var(--fs)"/>
+        <text x="237" y="320" font-size="14" text-anchor="middle" style="fill:var(--bg)">last-patch</text>
+        <g font-size="14" class="sub"><text x="150" y="346" text-anchor="middle">2 oct.</text><text x="320" y="346" text-anchor="end">8 oct.</text></g>
+        <text x="14" y="374" font-size="14">« last-patch » : même début ?</text>
+
+        <rect class="box" x="2" y="398" width="336" height="188" rx="8"/>
+        <text x="14" y="422" font-size="16" class="b">3. Définition</text>
+        <g font-size="14" class="sub"><text x="14" y="446">terme</text><text x="114" y="446">nomi.gg</text><text x="202" y="446">Firestone</text></g>
+        <line x1="14" y1="454" x2="326" y2="454" style="stroke:var(--border);stroke-width:1"/>
+        <g font-size="14">
+          <text x="14" y="476" class="b">victoire</text><text x="114" y="476">win = 1re</text><text x="202" y="476">1re, recalculée</text>
+          <text x="14" y="500" class="b">place moy.</text><text x="114" y="500">avg</text><text x="202" y="500" class="mono">averagePosition</text>
+          <text x="14" y="524" class="b">carte jouée</text><text x="114" y="524">games ?</text><text x="202" y="524" class="mono">totalPlayed ?</text>
+          <text x="14" y="548" class="b">lift</text><text x="114" y="548">non publié</text><text x="202" y="548" class="sub">aucun</text>
+        </g>
+        <text x="14" y="574" font-size="14" class="sub">? = définition à vérifier avant de fusionner</text>
+      </svg>
+      <figcaption>La tranche « haute » de nomi.gg (30 joueurs au-dessus de 10 000) n'est pas celle d'Ali (≈ 6 840, entre le top 25 % et le top 10 % de Firestone). Ses autres chiffres mêlent toutes les tranches.</figcaption>
+    </figure>
+    <div>
+      <p><b>Population.</b> 5 076 parties de 277 joueurs ne valent pas 5 076 parties de 5 076 joueurs : un bon joueur pèse sur tous les héros qu'il prend. Et la seule tranche que nomi.gg distingue est bien au-dessus d'Ali ; pour lui, la tranche alignée est le top 25 % de Firestone.</p>
+      <p><b>Fenêtre.</b> nomi.gg compare avant et après le patch ; Firestone donne « last-patch ». Si les deux ne commencent pas au même build, un écart juste après un patch est d'abord un écart de période.</p>
+      <p><b>Définition.</b> Le « win » de nomi.gg est la 1re place ; notre encart la recalcule déjà depuis la distribution de Firestone (« 1st 10% »). Le « lift » de nomi.gg n'est défini nulle part, et « jouée » chez Firestone n'est pas établi (achetée ? posée ?).</p>
+      <p class="ask-box"><b>Règle.</b> Une stat dont on ne connaît ni l'effectif ni la période ne se consolide pas : elle s'affiche à part, avec sa source, ou pas du tout.</p>
+    </div>
+  </div>
+
+  <h2 id="chaine">5. La chaîne cible</h2>
+  <p class="lead">Chaque source passe par un adaptateur qui la traduit dans un format commun ; une fonction pure consolide ; les aides ne voient plus que la vue consolidée et sa provenance. Les deux points par lesquels passent déjà tous les consommateurs, <code>StatsService.Sources()</code> et <code>CompService.Compositions()</code>, sont les endroits où brancher cette vue.</p>
+</main>
+
+<div class="wide why">
+  <figure>
+    <svg class="w-wide" viewBox="0 0 880 400" role="img" aria-labelledby="t-chain">
+      <title id="t-chain">Sources, adaptateurs, chiffre avec sa provenance, consolidation, aides et surfaces</title>
+      <defs>
+        <marker id="ch-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+      </defs>
+      <g font-size="15" class="b">
+        <text x="10" y="26">Sources</text><text x="182" y="26">Adaptateurs</text><text x="314" y="26">Provenance</text>
+        <text x="476" y="26">Consolidation</text><text x="608" y="26">Aides → surfaces</text>
+      </g>
+      <rect class="box" x="10" y="40" width="150" height="196" rx="8"/>
+      <text x="22" y="62" font-size="15" class="b">Firestone</text>
+      <rect class="c-ok" x="20" y="72" width="130" height="32" rx="5"/><text x="85" y="93" font-size="14" text-anchor="middle">héros</text>
+      <rect class="c-ok" x="20" y="112" width="130" height="32" rx="5"/><text x="85" y="133" font-size="14" text-anchor="middle">compos</text>
+      <rect class="c-ok" x="20" y="152" width="130" height="32" rx="5"/><text x="85" y="173" font-size="14" text-anchor="middle">trinkets</text>
+      <rect class="c-new" x="20" y="192" width="130" height="32" rx="5"/><text x="85" y="213" font-size="14" text-anchor="middle" class="b t-new">cartes × tours</text>
+      <rect class="c-ask" x="10" y="248" width="150" height="40" rx="6"/><text x="85" y="273" font-size="14" text-anchor="middle" class="b t-ask">nomi.gg (accord)</text>
+      <rect class="c-ok" x="10" y="298" width="150" height="40" rx="6"/><text x="85" y="323" font-size="14" text-anchor="middle">HDT · guides</text>
+      <rect class="c-man" x="10" y="348" width="150" height="40" rx="6"/><text x="85" y="373" font-size="14" text-anchor="middle" class="mono">stats\manual\</text>
+      <g class="wire" marker-end="url(#ch-a)">
+        <path d="M150 88 L180 150"/><path d="M150 128 L180 170"/><path d="M150 168 L180 190"/><path d="M150 208 L180 210"/>
+        <path d="M160 268 L180 240"/><path d="M160 318 L180 270"/><path d="M160 368 L180 300"/>
+      </g>
+      <rect class="c-new" x="182" y="40" width="110" height="348" rx="8"/>
+      <g font-size="14" text-anchor="middle">
+        <text x="237" y="78">un</text><text x="237" y="98">adaptateur</text><text x="237" y="118">par source</text><text x="237" y="138">et par genre</text>
+        <text x="237" y="186" class="b">registre</text>
+        <text x="237" y="234">garde-fou</text><text x="237" y="254">par source</text>
+        <text x="237" y="302">cache, ETag</text><text x="237" y="322">par fichier</text>
+      </g>
+      <path class="wire" d="M292 200 L312 200" marker-end="url(#ch-a)"/>
+      <rect class="c-new" x="314" y="60" width="120" height="280" rx="8"/>
+      <g font-size="14" text-anchor="middle">
+        <text x="374" y="86" class="b">un chiffre</text><text x="374" y="106" class="b">+ provenance</text>
+        <text x="374" y="140">source</text><text x="374" y="164">patch, build</text><text x="374" y="188">tranche MMR</text>
+        <text x="374" y="212">fenêtre</text><text x="374" y="236">effectif</text><text x="374" y="260">définition</text>
+        <text x="374" y="284" class="mono">generatedAt</text><text x="374" y="308" class="mono">fetchedAt</text>
+      </g>
+      <path class="wire" d="M434 200 L454 200" marker-end="url(#ch-a)"/>
+      <rect class="c-new" x="456" y="60" width="130" height="280" rx="8"/>
+      <g font-size="14" text-anchor="middle">
+        <text x="521" y="86" class="b">fonction pure</text>
+        <text x="521" y="124">1 aligner</text><text x="521" y="144" class="sub">patch, tranche</text>
+        <text x="521" y="176">2 rappeler</text><text x="521" y="196" class="sub">k = 30 parties</text>
+        <text x="521" y="228">3 pondérer</text><text x="521" y="248" class="sub">par l'effectif</text>
+        <text x="521" y="280">4 juger</text><text x="521" y="300" class="sub">recouvrement</text>
+      </g>
+      <g class="wire" marker-end="url(#ch-a)">
+        <path d="M586 200 L606 84"/><path d="M586 200 L606 140"/><path d="M586 200 L606 196"/><path d="M586 200 L606 252"/><path d="M586 200 L606 308"/>
+      </g>
+      <g font-size="14">
+        <rect class="box" x="608" y="60" width="262" height="48" rx="6"/><text x="620" y="80" class="b">héros proposés</text><text x="620" y="99" class="sub">encart sous le reroll</text>
+        <rect class="box" x="608" y="116" width="262" height="48" rx="6"/><text x="620" y="136" class="b">choix</text><text x="620" y="155" class="sub">étiquette au-dessus de l'option</text>
+        <rect class="box" x="608" y="172" width="262" height="48" rx="6"/><text x="620" y="192" class="b">taverne</text><text x="620" y="211" class="sub">cartes de Bob : cadre, étiquette</text>
+        <rect class="box" x="608" y="228" width="262" height="48" rx="6"/><text x="620" y="248" class="b">jauge</text><text x="620" y="267" class="sub">encart de puissance</text>
+        <rect class="c-new" x="608" y="284" width="262" height="48" rx="6"/><text x="620" y="304" class="b t-new">nouvelles aides (§ 11)</text><text x="620" y="323" class="sub">badges, lignes grises, popup</text>
+      </g>
+      <text x="456" y="368" font-size="14" class="sub">Tous les consommateurs passent déjà par deux goulots :</text>
+      <text x="456" y="390" font-size="14" class="mono">StatsService.Sources(), CompService.Compositions()</text>
+    </svg>
+
+    <svg class="w-tall" viewBox="0 0 340 740" role="img" aria-labelledby="t-chain2">
+      <title id="t-chain2">La même chaîne, de haut en bas</title>
+      <defs>
+        <marker id="ct-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+      </defs>
+      <rect class="box" x="2" y="4" width="336" height="180" rx="8"/>
+      <text x="14" y="28" font-size="16" class="b">Sources</text>
+      <g font-size="14" text-anchor="middle">
+        <rect class="c-ok" x="10" y="40" width="156" height="30" rx="5"/><text x="88" y="60">Firestone · héros</text>
+        <rect class="c-ok" x="174" y="40" width="156" height="30" rx="5"/><text x="252" y="60">Firestone · compos</text>
+        <rect class="c-ok" x="10" y="76" width="156" height="30" rx="5"/><text x="88" y="96">Firestone · trinkets</text>
+        <rect class="c-new" x="174" y="76" width="156" height="30" rx="5"/><text x="252" y="96" class="b t-new">Firestone · cartes</text>
+        <rect class="c-ask" x="10" y="112" width="156" height="30" rx="5"/><text x="88" y="132" class="b t-ask">nomi.gg (accord)</text>
+        <rect class="c-ok" x="174" y="112" width="156" height="30" rx="5"/><text x="252" y="132">HDT · guides</text>
+        <rect class="c-man" x="10" y="148" width="156" height="30" rx="5"/><text x="88" y="168" class="mono">stats\manual\</text>
+      </g>
+      <path class="wire" d="M170 186 L170 202" marker-end="url(#ct-a)"/>
+      <rect class="c-new" x="2" y="206" width="336" height="76" rx="8"/>
+      <text x="170" y="230" font-size="16" class="b" text-anchor="middle">Adaptateurs</text>
+      <g font-size="14" text-anchor="middle"><text x="170" y="252">un par source et par genre, registre,</text><text x="170" y="272">garde-fou et cache par source</text></g>
+      <path class="wire" d="M170 284 L170 300" marker-end="url(#ct-a)"/>
+      <rect class="c-new" x="2" y="304" width="336" height="76" rx="8"/>
+      <text x="170" y="328" font-size="16" class="b" text-anchor="middle">Un chiffre + sa provenance</text>
+      <g font-size="14" text-anchor="middle"><text x="170" y="350">source, patch, tranche, fenêtre,</text><text x="170" y="370">effectif, définition, dates</text></g>
+      <path class="wire" d="M170 382 L170 398" marker-end="url(#ct-a)"/>
+      <rect class="c-new" x="2" y="402" width="336" height="76" rx="8"/>
+      <text x="170" y="426" font-size="16" class="b" text-anchor="middle">Consolidation (fonction pure)</text>
+      <g font-size="14" text-anchor="middle"><text x="170" y="448">1 aligner · 2 rappeler</text><text x="170" y="468">3 pondérer · 4 juger</text></g>
+      <path class="wire" d="M170 480 L170 496" marker-end="url(#ct-a)"/>
+      <rect class="box" x="2" y="500" width="336" height="160" rx="8"/>
+      <text x="14" y="524" font-size="16" class="b">Aides → surfaces</text>
+      <g font-size="14">
+        <text x="14" y="550">héros proposés → encart sous le reroll</text>
+        <text x="14" y="574">choix → étiquette d'option</text>
+        <text x="14" y="598">taverne → cartes de Bob</text>
+        <text x="14" y="622">jauge → encart de puissance</text>
+        <text x="14" y="646" class="b t-new">nouvelles aides → § 11</text>
+      </g>
+      <text x="14" y="684" font-size="14" class="sub">Goulots par où tout passe déjà :</text>
+      <text x="14" y="706" font-size="14" class="mono">StatsService.Sources()</text>
+      <text x="14" y="728" font-size="14" class="mono">CompService.Compositions()</text>
+    </svg>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--ok-soft);border:2px solid var(--ok)"></i>existe</span>
+      <span><i class="sw" style="background:var(--new-soft);border:2px dashed var(--new)"></i>à créer</span>
+      <span><i class="sw" style="background:var(--ask-soft);border:2px dashed var(--ask)"></i>après accord</span>
+      <span><i class="sw" style="background:var(--soft);border:1.5px dashed var(--muted)"></i>manuel</span>
+    </div>
+    <figcaption>Aujourd'hui, chaque source a son importeur, et les aides lisent les fichiers bruts l'un après l'autre. Demain, les aides ne changent pas de signature : on change ce que les deux goulots renvoient.</figcaption>
+  </figure>
+</div>
+
+<main style="padding-top:0">
+  <table class="cards why">
+    <thead><tr><th>Ce qui manque aujourd'hui</th><th>Conséquence</th><th>Où</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Manque">Une interface commune de source</td><td data-label="Conséquence">Un importeur ad hoc par source ; une 5e source = un 5e importeur.</td><td data-label="Où"><code>FirestoneHeroStatsImporter</code>, <code>FirestoneCompImporter</code>, <code>TrinketStats</code>, <code>HsReplayCompText</code></td></tr>
+      <tr><td data-label="Manque">La provenance</td><td data-label="Conséquence"><code>source</code> limité à deux valeurs et refusé sinon ; perdue au niveau d'une compo ; absente des trinkets.</td><td data-label="Où"><code>HeroStatsFile</code>, <code>CompositionFile</code>, <code>TrinketStatsFile</code></td></tr>
+      <tr><td data-label="Manque">Le patch</td><td data-label="Conséquence">Aucun numéro de patch ni de build nulle part : une donnée périmée ne se reconnaît pas.</td><td data-label="Où">tous les formats locaux</td></tr>
+      <tr><td data-label="Manque">La consolidation</td><td data-label="Conséquence">Héros juxtaposés, « la plus fiable d'abord » ; jauge : la première courbe gagne ; compos concaténées sans dédoublonnage.</td><td data-label="Où"><code>HeroPickAdvisor</code>, <code>WarbandCurve</code>, <code>CompService</code></td></tr>
+      <tr><td data-label="Manque">Un garde-fou par source</td><td data-label="Conséquence">Un seul <code>data-refresh</code> pour tout : nomi.gg en panne couperait Firestone.</td><td data-label="Où"><code>Plugin.cs</code></td></tr>
+      <tr><td data-label="Manque">Une 3e source à l'écran</td><td data-label="Conséquence">Étiquette binaire « HSR » / « FS » (une 3e source s'afficherait « FS ») ; deux sources au plus ; à deux, la ligne « comp ≈ » ne tient plus.</td><td data-label="Où"><code>HeroPickPanel</code>, <code>HeroPickLayout</code></td></tr>
+    </tbody>
+  </table>
+  <div class="proof">
+    <b>Preuve — l'inventaire du code, fichier:ligne</b>
+    <table class="cards">
+      <thead><tr><th>Constat</th><th>Où</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Constat">Un importeur par source, aucune interface commune</td><td data-label="Où"><code>FirestoneHeroStatsImporter.cs:18-94</code>, <code>FirestoneCompImporter.cs:45-146</code>, <code>TrinketStats.cs:153-202</code>, <code>HsReplayCompText.cs:33-132</code></td></tr>
+        <tr><td data-label="Constat">Ce qui s'en rapproche : <code>IConditionalFetcher</code> et le patron privé <code>GetAsync&lt;T&gt;</code> (url, chemin, load, import, serialize)</td><td data-label="Où"><code>StatsCache.cs:48-52</code>, <code>StatsCache.cs:243-314</code></td></tr>
+        <tr><td data-label="Constat"><code>source</code> ∈ {<code>firestone</code>, <code>hsreplay-manual</code>}, refusé sinon</td><td data-label="Où"><code>HeroStatsFile.cs:8-17</code>, <code>HeroStatsLoader.cs:100</code>, <code>CompositionFile.cs:187</code></td></tr>
+        <tr><td data-label="Constat">Provenance perdue au niveau de <code>Composition</code> ; <code>TrinketStatsFile</code> sans <code>Source</code> ; <code>CompService.Version</code> compte des changements, pas une version de données</td><td data-label="Où"><code>CompositionFile.cs:62-115</code></td></tr>
+        <tr><td data-label="Constat">Héros juxtaposés par source ; jauge : la première source qui a une courbe ; compos concaténées ; unicité des ids seulement dans un fichier ; affinité : le premier id gagne</td><td data-label="Où"><code>HeroPickAdvisor.cs:86,94-110</code>, <code>WarbandCurve.cs:179</code>, <code>CompService.cs:69-70</code>, <code>CompositionFile.cs:207-211</code>, <code>HeroCompAffinity.cs:83</code></td></tr>
+        <tr><td data-label="Constat">Précédent de combinaison : rappel vers la moyenne, 30 parties fictives, 10 minimum</td><td data-label="Où"><code>HeroCompAffinity.cs:36-70</code></td></tr>
+        <tr><td data-label="Constat">Goulots : <code>StatsService.Sources()</code> (lu en <code>Plugin.cs:1053,1086,1243</code>), <code>CompService.Compositions()</code> (lu en <code>Plugin.cs:909,927,1249</code>)</td><td data-label="Où"><code>StatsService.cs:100-101</code>, <code>CompService.cs:69-70</code></td></tr>
+        <tr><td data-label="Constat">Un seul garde-fou pour tous les chargements</td><td data-label="Où"><code>Plugin.cs:111,707</code></td></tr>
+        <tr><td data-label="Constat">« HSR » / « FS » ; deux sources au plus ; la ligne « comp ≈ »</td><td data-label="Où"><code>HeroPickPanel.cs:203</code>, <code>:149</code>, <code>HeroPickLayout.cs:139-169</code></td></tr>
+        <tr><td data-label="Constat">Chaque propriétaire crée son <code>HttpStatsFetcher</code> et son <code>StatsCache</code></td><td data-label="Où"><code>StatsService.cs:20,30</code>, <code>CompService.cs:21,34</code>, <code>ChoiceAdvicePanel.cs:29,38</code></td></tr>
+        <tr><td data-label="Constat">Clés de redessin</td><td data-label="Où"><code>_tavernKey</code>, <code>_choiceKey</code> (<code>Plugin.cs:283,1145</code>)</td></tr>
+        <tr><td data-label="Constat">« last-patch » en dur ; aucun réglage de tranche ni de période pour le joueur</td><td data-label="Où"><code>StatsService.cs:18</code>, <code>HudSettings.cs:10</code></td></tr>
+      </tbody>
+    </table>
+    <p>Lignes vérifiées par lecture avant d'écrire cette note, entre autres : <code>StatsService.cs:18</code> <code>private const string TimePeriod = "last-patch";</code> ; <code>HeroPickPanel.cs:203</code> <code>source == StatsSources.HsReplayManual ? "HSR" : "FS"</code> ; <code>Plugin.cs:111</code> <code>new FeatureGuard("data-refresh", …)</code>.</p>
+  </div>
+
+  <h2 id="consolidation">6. Pré-traitement : normaliser, étiqueter, puis combiner</h2>
+  <p class="lead">Trois temps, dans cet ordre : <b>aligner</b> (même patch, tranche du joueur), <b>rappeler</b> les petits échantillons vers la moyenne, <b>pondérer</b> par l'effectif. Puis <b>juger</b> : si les intervalles des sources ne se recouvrent pas, le conseil est « contesté », et l'interface montre les deux chiffres au lieu d'en choisir un.</p>
+
+  <h3 class="why">6.1 Ce que porte chaque chiffre</h3>
+  <table class="cards why">
+    <thead><tr><th>Champ</th><th>Exemple Firestone</th><th>Exemple nomi.gg</th><th>Pourquoi</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Champ"><code>source</code></td><td data-label="Firestone"><code>firestone</code></td><td data-label="nomi.gg"><code>nomi.gg</code></td><td data-label="Pourquoi">Liste ouverte : une valeur inconnue s'affiche sous son nom, elle n'est pas refusée.</td></tr>
+      <tr><td data-label="Champ"><code>kind</code>, sujet, mesure</td><td data-label="Firestone">héros, <code>TB_BaconShop_HERO_37</code>, place moyenne</td><td data-label="nomi.gg">idem</td><td data-label="Pourquoi">On ne combine que même sujet et même mesure.</td></tr>
+      <tr><td data-label="Champ">valeur, effectif, unité de l'effectif</td><td data-label="Firestone">3,40 ; 4 000 ; parties</td><td data-label="nomi.gg">2,86 ; 51 ; parties</td><td data-label="Pourquoi">L'effectif fait le poids ; « points » (cartes jouées) ≠ « parties ».</td></tr>
+      <tr><td data-label="Champ">tranche de MMR</td><td data-label="Firestone">top 25 % (≥ 6 656)</td><td data-label="nomi.gg">toutes</td><td data-label="Pourquoi">Alignement sur le joueur.</td></tr>
+      <tr><td data-label="Champ">fenêtre</td><td data-label="Firestone"><code>last-patch</code></td><td data-label="nomi.gg">2026-10-02 → 2026-10-08</td><td data-label="Pourquoi">Une stat sans fenêtre ne se consolide pas.</td></tr>
+      <tr><td data-label="Champ"><code>patch</code>, <code>build</code></td><td data-label="Firestone">à établir</td><td data-label="nomi.gg">36.6.3, 253216</td><td data-label="Pourquoi">Une donnée d'un patch antérieur est déclassée, pas mélangée.</td></tr>
+      <tr><td data-label="Champ"><code>generatedAt</code>, <code>fetchedAt</code>, URL, ETag</td><td data-label="Firestone">2026-10-08T00:10Z …</td><td data-label="nomi.gg"><code>generated</code>, ETag</td><td data-label="Pourquoi">Fraîcheur affichable, et le « pourquoi » d'un chiffre.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="why">6.2 La règle de combinaison</h3>
+  <div class="mech why">
+    <div>
+      <span class="formula"><b>x̂</b> = ( Σ d<sub>s</sub>·n<sub>s</sub>·x<sub>s</sub> + k·μ<sub>0</sub> ) / ( Σ d<sub>s</sub>·n<sub>s</sub> + k )</span>
+      <p><b>x<sub>s</sub></b>, <b>n<sub>s</sub></b> : la valeur et l'effectif de la source s. <b>d<sub>s</sub></b> ∈ ]0 ; 1] : la décote d'alignement (1 si même patch et tranche du joueur ; 0,5, à régler, si la tranche ne correspond pas ; une source d'un patch antérieur n'entre pas du tout). <b>k = 30</b> parties fictives à <b>μ<sub>0</sub> = 4,5</b> pour un héros : c'est le rappel de <code>HeroCompAffinity</code>, avec le même raisonnement (2,3² / 0,4² ≈ 30).</p>
+      <span class="formula"><b>contesté</b> ⇔ [ x<sub>a</sub> ± 2σ/√n<sub>a</sub> ] ∩ [ x<sub>b</sub> ± 2σ/√n<sub>b</sub> ] = ∅, avec σ ≈ 2,3</span>
+      <p>Deux sources sous 10 parties ne jugent rien : elles s'affichent à part. Le critère de recouvrement est prudent et se lit à l'écran (« 2.9 ↔ 3.8 ») ; un test de différence serait plus fin, au prix de cette lisibilité.</p>
+      <p><b>Ce que ça veut dire pour nomi.gg, franchement</b> : sur un héros, ses 51 parties pèsent moins de 1 % face aux milliers de Firestone. Sa valeur n'est pas là. Elle est dans ce que Firestone n'a pas sous cette forme : l'effet d'un patch sur six jours, les tribus avant et après, la courbe de montée de tier, les trinkets gagnants et perdants.</p>
+    </div>
+    <figure>
+      <svg viewBox="0 0 340 330" role="img" aria-labelledby="t-w">
+        <title id="t-w">Jaraxxus : Firestone pèse 98,6 % de la moyenne ; l'intervalle de nomi.gg, large, recouvre le cas A (consensus) mais pas le cas B (contesté)</title>
+        <text x="10" y="20" font-size="15" class="b">Jaraxxus : poids dans la moyenne</text>
+        <text x="10" y="40" font-size="14" class="sub">nomi.gg mesuré, Firestone illustratif</text>
+        <rect x="20" y="52" width="295.8" height="30" style="fill:var(--fs)"/>
+        <rect x="315.8" y="52" width="1.9" height="30" style="fill:var(--nomi)"/>
+        <rect x="317.7" y="52" width="2.3" height="30" style="fill:var(--muted)"/>
+        <text x="30" y="72" font-size="14" class="b" style="fill:var(--bg)">Firestone 98,6 %</text>
+        <text x="320" y="102" font-size="14" text-anchor="end">nomi.gg 0,6 % · a priori 0,7 %</text>
+        <text x="10" y="130" font-size="14" class="b">Intervalles à ± 2σ/√n</text>
+        <rect x="53" y="158" width="192" height="142" style="fill:var(--nomi-soft);opacity:0.55"/>
+        <text x="10" y="152" font-size="14">nomi.gg : 2,86 (51 parties, toutes)</text>
+        <rect x="53" y="160" width="192" height="12" rx="3" style="fill:var(--nomi-soft);stroke:var(--nomi);stroke-width:1.5"/>
+        <circle cx="149" cy="166" r="5" style="fill:var(--nomi)"/>
+        <text x="10" y="196" font-size="14">Firestone A : 3,40 (4 000, top 25 %)</text>
+        <rect x="219.5" y="204" width="21" height="12" rx="3" style="fill:var(--fs)"/>
+        <text x="320" y="234" font-size="14" text-anchor="end" class="b t-ok">recouvrement → consensus 3,40</text>
+        <text x="10" y="254" font-size="14">Firestone B : 3,80 (4 000, top 25 %)</text>
+        <rect x="279.5" y="262" width="21" height="12" rx="3" style="fill:var(--fs)"/>
+        <text x="320" y="292" font-size="14" text-anchor="end" class="b t-ask">écart → contested 2.9 ↔ 3.8</text>
+        <line x1="20" y1="300" x2="320" y2="300" style="stroke:var(--muted);stroke-width:1.5"/>
+        <g font-size="14" class="sub" text-anchor="middle"><text x="20" y="320" text-anchor="start">2,0</text><text x="95" y="320">2,5</text><text x="170" y="320">3,0</text><text x="245" y="320">3,5</text><text x="320" y="320" text-anchor="end">4,0</text></g>
+      </svg>
+      <figcaption>Firestone : valeur et effectif <b>inventés pour l'exemple</b> (l'ordre de grandeur, « plusieurs milliers », est le bon). nomi.gg : mesuré le 2026-10-08, toutes tranches, donc décoté (d = 0,5).</figcaption>
+    </figure>
+  </div>
+
+  <div class="mech why">
+    <figure>
+      <svg viewBox="0 0 340 600" role="img" aria-labelledby="t-tree">
+        <title id="t-tree">Arbre de décision d'un conflit : définition, patch, tranche, effectif et fenêtre, recouvrement des intervalles, puis consensus ou contesté</title>
+        <defs>
+          <marker id="tr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+        </defs>
+        <rect x="10" y="6" width="320" height="48" rx="8" style="fill:var(--surface);stroke:var(--text);stroke-width:2"/>
+        <g font-size="15" class="b" text-anchor="middle"><text x="170" y="26">Deux valeurs : même sujet,</text><text x="170" y="46">même mesure</text></g>
+        <path class="wire" d="M98 54 L98 70" marker-end="url(#tr-a)"/>
+        <!-- questions -->
+        <g font-size="15" text-anchor="middle">
+          <rect class="box" x="10" y="72" width="176" height="50" rx="8"/><text x="98" y="102">Même définition ?</text>
+          <rect class="box" x="10" y="146" width="176" height="50" rx="8"/><text x="98" y="176">Même patch ?</text>
+          <rect class="box" x="10" y="220" width="176" height="50" rx="8"/><text x="98" y="250">Tranche du joueur ?</text>
+          <rect class="box" x="10" y="294" width="176" height="50" rx="8"/><text x="98" y="315">Effectif ≥ 10,</text><text x="98" y="335">fenêtre connue ?</text>
+          <rect class="box" x="10" y="368" width="176" height="50" rx="8"/><text x="98" y="389">Intervalles qui</text><text x="98" y="409">se recouvrent ?</text>
+        </g>
+        <g class="wire" marker-end="url(#tr-a)">
+          <path d="M98 122 L98 144"/><path d="M98 196 L98 218"/><path d="M98 270 L98 292"/><path d="M98 344 L98 366"/>
+          <path d="M186 97 L200 97"/><path d="M186 171 L200 171"/><path d="M186 245 L200 245"/><path d="M186 319 L200 319"/>
+        </g>
+        <g font-size="14" class="sub" text-anchor="end"><text x="86" y="139">oui</text><text x="86" y="213">oui</text><text x="86" y="285">oui</text><text x="86" y="361">oui</text></g>
+        <!-- exits -->
+        <rect class="c-man" x="202" y="72" width="132" height="50" rx="8"/>
+        <g font-size="14" text-anchor="middle"><text x="268" y="93">non : à part,</text><text x="268" y="112">pas fusionnées</text></g>
+        <rect class="c-man" x="202" y="146" width="132" height="50" rx="8"/>
+        <g font-size="14" text-anchor="middle"><text x="268" y="167">non : l'ancienne</text><text x="268" y="186">déclassée, grise</text></g>
+        <rect class="c-new" x="202" y="220" width="132" height="50" rx="8"/>
+        <g font-size="14" text-anchor="middle"><text x="268" y="241">non : effectif</text><text x="268" y="260">décoté (× d)</text></g>
+        <path d="M268 270 L268 282 L106 282" style="stroke:var(--new);stroke-width:1.5;fill:none;stroke-dasharray:4 3" marker-end="url(#tr-a)"/>
+        <rect class="c-man" x="202" y="294" width="132" height="50" rx="8"/>
+        <g font-size="14" text-anchor="middle"><text x="268" y="315">non : à part,</text><text x="268" y="334">pas mélangée</text></g>
+        <!-- outcomes -->
+        <path class="wire" d="M98 418 L80 446" marker-end="url(#tr-a)"/>
+        <path class="wire" d="M98 418 L246 446" marker-end="url(#tr-a)"/>
+        <g font-size="14" class="sub"><text x="50" y="438">oui</text><text x="170" y="422">non</text></g>
+        <rect class="c-ok" x="10" y="450" width="156" height="92" rx="8"/>
+        <g font-size="14" text-anchor="middle"><text x="88" y="474" class="b t-ok">consensus</text><text x="88" y="496">moyenne pondérée</text><text x="88" y="520" class="b">2 sources ≈ 3.40</text></g>
+        <rect class="c-ask" x="174" y="450" width="156" height="92" rx="8" style="stroke-dasharray:none"/>
+        <g font-size="14" text-anchor="middle"><text x="252" y="474" class="b t-ask">contesté</text><text x="252" y="496">les deux chiffres</text><text x="252" y="520">contested 2.9 ↔ 3.8</text></g>
+        <g font-size="14" class="sub"><text x="10" y="570">Aucun choix silencieux : un conflit se voit,</text><text x="10" y="590">avec ses deux chiffres et leurs sources.</text></g>
+      </svg>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--soft);border:1.5px dashed var(--muted)"></i>affiché à part, ou déclassé</span>
+        <span><i class="sw" style="background:var(--new-soft);border:2px dashed var(--new)"></i>ajusté, puis on continue</span>
+      </div>
+    </figure>
+    <div>
+      <p><b>L'ordre compte.</b> La définition d'abord : « win » de nomi.gg et 1re place de Firestone se comparent, « lift » ne se compare à rien. Le patch ensuite : une donnée du patch précédent n'est pas fausse, elle est vieille ; elle s'affiche grise, avec son patch, tant qu'aucune donnée du patch courant ne la remplace.</p>
+      <p><b>Puis la tranche.</b> Pour Ali, la tranche alignée est le top 25 % de Firestone (≥ 6 656) ; une source toutes tranches confondues entre avec un effectif décoté. Le joueur n'a aujourd'hui aucun réglage de tranche ni de période (« last-patch » est en dur) : le socle le rendrait possible, sans l'imposer.</p>
+      <p><b>Enfin le recouvrement.</b> Quand les intervalles se recouvrent, la moyenne pondérée est le chiffre, et le badge dit « 2 sources ». Quand ils ne se recouvrent pas, le chiffre consolidé existe encore, mais le badge montre l'écart : c'est une information en soi, souvent un patch que l'une des fenêtres dilue.</p>
+      <p><b>Au patch suivant</b>, l'arbre se rejoue au premier chargement : rien n'est gardé d'une consolidation à l'autre, aucune règle ne retient un vieux verdict.</p>
+    </div>
+  </div>
+  <div class="proof">
+    <b>Preuve — les calculs de l'exemple</b>
+    <pre>nomi.gg   : x = 2,86   n = 51     SE = 2,3/√51   = 0,322   intervalle [2,22 ; 3,50]   d = 0,5 → n' = 25,5
+Firestone : x = 3,40   n = 4 000  SE = 2,3/√4000 = 0,036   intervalle [3,33 ; 3,47]   (cas A, inventé)
+            x = 3,80   n = 4 000                           intervalle [3,73 ; 3,87]   (cas B, inventé)
+a priori  : μ0 = 4,5   k = 30
+
+cas A : x̂ = (4000×3,40 + 25,5×2,86 + 30×4,5) / 4055,5 = 13 807,9 / 4055,5 = 3,40   3,33 &lt; 3,50 → recouvrement → consensus
+cas B : x̂ = (4000×3,80 + 25,5×2,86 + 30×4,5) / 4055,5 = 15 407,9 / 4055,5 = 3,80   3,73 &gt; 3,50 → aucun recouvrement → contesté
+poids : Firestone 4000/4055,5 = 98,6 %   nomi.gg 25,5/4055,5 = 0,63 %   a priori 30/4055,5 = 0,74 %</pre>
+    <p>Le précédent, mot pour mot : <code>(stat.DataPoints * stat.AveragePlacement + PriorGames * average) / (stat.DataPoints + PriorGames)</code>, <code>PriorGames = 30</code>, <code>MinimumGames = 10</code>, et le commentaire « one game's placement varies by about 2.3 places, the difference between heroes on one composition by about 0.4, and 2.3² / 0.4² ≈ 30 » (<code>HeroCompAffinity.cs:43-70</code>). Les seuils de cette note (d = 0,5 ; ± 2σ/√n ; 10 parties) sont des jugements, pas des mesures : la CLI d'inspection (§ 8) sert à les mesurer avant de les régler.</p>
+  </div>
+
+  <h2 id="identifiants">7. Les identifiants : une clé commune, et un pont sans clé</h2>
+  <p class="lead">Héros, cartes et trinkets ont la même clé partout : Firestone, nomi.gg et HearthDb écrivent <code>TB_BaconShop_HERO_37</code> et <code>BG36_620</code> de la même façon. Les compos n'ont aucune clé commune : on les rapproche par leurs cartes, avec le pont qui existe déjà, et on n'y fusionne aucun chiffre.</p>
+  <div class="mech why">
+    <figure>
+      <svg viewBox="0 0 340 530" role="img" aria-labelledby="t-ids">
+        <title id="t-ids">Clé commune pour les héros, cartes et trinkets ; pas de clé pour les compos, rapprochées par les cartes</title>
+        <defs>
+          <marker id="id-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+        </defs>
+        <rect class="box" x="2" y="4" width="336" height="232" rx="8"/>
+        <text x="14" y="28" font-size="16" class="b">Clé commune</text>
+        <rect class="c-ok" x="14" y="42" width="186" height="28" rx="5"/><text x="22" y="61" font-size="14" class="mono">TB_BaconShop_HERO_37</text><text x="212" y="61" font-size="14" class="b">héros</text>
+        <text x="14" y="90" font-size="14" class="sub">skin → héros de base (HeroIdNormalizer)</text>
+        <rect class="c-ok" x="14" y="104" width="186" height="28" rx="5"/><text x="22" y="123" font-size="14" class="mono">BG36_620</text><text x="212" y="123" font-size="14" class="b">carte</text>
+        <text x="14" y="152" font-size="14" class="sub">dorée _G → base ; guide HDT : dbfId → id</text>
+        <rect class="c-ok" x="14" y="166" width="186" height="28" rx="5"/><text x="22" y="185" font-size="14" class="mono">trinketCardId</text><text x="212" y="185" font-size="14" class="b">trinket</text>
+        <text x="14" y="220" font-size="14" class="b t-ok">Firestone = nomi.gg = HearthDb</text>
+
+        <rect class="box" x="2" y="248" width="336" height="276" rx="8"/>
+        <text x="14" y="272" font-size="16" class="b">Pas de clé : les compos</text>
+        <rect class="c-man" x="14" y="286" width="174" height="28" rx="5"/><text x="22" y="305" font-size="14" class="mono">undead_butcher</text><text x="198" y="305" font-size="14">Firestone</text>
+        <rect class="c-man" x="14" y="322" width="174" height="28" rx="5"/><text x="22" y="341" font-size="14" class="mono">Undead Butcher/11</text><text x="198" y="341" font-size="14">HDT</text>
+        <rect class="c-man" x="14" y="358" width="174" height="28" rx="5"/><text x="22" y="377" font-size="14">plateau gagnant</text><text x="198" y="377" font-size="14" class="t-ask">nomi.gg</text>
+        <path class="wire" d="M101 388 L101 404" marker-end="url(#id-a)"/>
+        <rect x="14" y="408" width="312" height="72" rx="8" style="fill:var(--surface);stroke:var(--text);stroke-width:2"/>
+        <g font-size="14" text-anchor="middle"><text x="170" y="430" class="b">rapprochées par les cartes</text><text x="170" y="451">≥ 2 cartes partagées ET</text><text x="170" y="470">≥ la moitié des cartes clés</text></g>
+        <text x="14" y="506" font-size="14" class="b t-ask">taux de recoupement : jamais mesuré</text>
+      </svg>
+    </figure>
+    <div>
+      <p><b>Une seule résolution, passée en fonction.</b> La bibliothèque Stats ne dépend pas de HearthDb : les guides de HDT arrivent en <code>dbfId</code>, traduits par <code>HearthDb.Cards.AllByDbfId</code> côté plugin. Un adaptateur nomi.gg recevrait la même fonction ; il n'en a pas besoin pour les ids, déjà au bon format.</p>
+      <p><b>Les compos ne se consolident pas en chiffres.</b> Un archétype Firestone (place moyenne sur 25 archétypes) et un « plateau gagnant » de nomi.gg (10 plateaux, cartes clés et leur part) ne mesurent pas la même chose. Le guide de HDT reste la clé d'affichage ; Firestone et nomi.gg s'y rattachent par le pont, comme preuves (« 4/5 boards »), pas comme moyennes à fusionner.</p>
+      <p><b>Le pont n'a jamais été mesuré sur de vraies données</b> (24 compos Firestone contre ≈ 23 guides) : la ligne <code>bridge:</code> du journal d'HDT le dira à la première partie. Avant d'y rattacher nomi.gg, la CLI d'inspection (§ 8) peut le mesurer hors jeu.</p>
+    </div>
+  </div>
+  <div class="proof">
+    <b>Preuve — où vivent les clés</b>
+    <p>Héros : <code>heroCardId</code> ramené au héros de base (<code>HeroIdNormalizer.cs:19-33</code>). Cartes : id chaîne, <code>_G</code> ramené à la base ; guides HDT en dbfId → id par <code>HearthDb.Cards.AllByDbfId</code> (<code>HdtCompGuides.cs:94</code>). Trinkets : <code>trinketCardId</code>. Compos : archétype Firestone (<code>undead_butcher</code>), nom HDT (<code>Undead Butcher/11</code>), rapprochés par <code>GuideBridge.cs:33-75</code> (pont si ≥ 2 cartes partagées et ≥ la moitié des clés). nomi.gg : <code>heroes[].id</code> = <code>TB_BaconShop_HERO_37</code>, <code>cards[].id</code> = <code>BG36_620</code> ; <code>boards[]</code> : <code>tribe</code>, <code>hero</code>, <code>board[7]</code>, <code>core[] {id, share}</code>, sans nom de compo.</p>
+  </div>
+
+  <h2 id="ou">8. Où consolider : trois options</h2>
+  <p class="lead">Dans le plugin, en fonction pure de la bibliothèque <code>BronzebeardHud.Stats</code>, testée sur données synthétiques comme le reste. Pas de service externe ni de base à maintenir ailleurs. Plus un outil en ligne de commande, dans <code>tools/</code>, qui réutilise cette bibliothèque pour <b>mesurer le désaccord réel</b> sur un instantané local avant de régler les seuils.</p>
+  <table class="cards">
+    <thead><tr><th>Option</th><th>Pour</th><th>Contre</th><th>Coût</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Option"><b>A. Dans le plugin</b> : chaque poste télécharge et consolide au chargement</td><td data-label="Pour">Aucune infrastructure ; aucune redistribution ; chaque joueur a ses sources ; testé comme le reste.</td><td data-label="Contre">Chaque poste fait ses requêtes (déjà le cas pour Firestone). Consolider quelques milliers de lignes au chargement : négligeable.</td><td data-label="Coût">Modéré, une fois : interface, registre, enregistrement, fonction, tests.</td></tr>
+      <tr><td data-label="Option"><b>B. Hors ligne</b> : un travail planifié consolide et publie un fichier que le plugin lit</td><td data-label="Pour">Une requête par source et par cycle ; poste léger.</td><td data-label="Contre">Une infrastructure permanente hors du plugin ; on <b>republierait</b> les données de Firestone et de nomi.gg, ce qu'aucun accord ne couvre ; sa panne prive tout le monde ; le dépôt public ne peut pas porter de données réelles.</td><td data-label="Coût">Élevé et permanent.</td></tr>
+      <tr><td data-label="Option"><b>C. Hybride (recommandé)</b> : A, plus une CLI d'inspection qui lit le cache local</td><td data-label="Pour">Tout ce que A apporte, et des seuils réglés sur des mesures plutôt que supposés.</td><td data-label="Contre">Un projet de plus dans <code>tools/</code>. Elle ne publie rien ; ses sorties restent hors du dépôt.</td><td data-label="Coût">A, plus peu.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="abstraction">9. L'abstraction dans le code</h2>
+  <p class="lead">Une source par fichier, un adaptateur par genre de stat, un registre qui les tient, un garde-fou et une politique de cache par source, un champ <code>patch</code>/<code>build</code> dans tous les formats locaux, et <code>source</code> en liste ouverte.</p>
+  <table class="cards why">
+    <thead><tr><th>Point</th><th>Aujourd'hui</th><th>Proposé</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Point"><b>Un fichier, plusieurs adaptateurs</b></td><td data-label="Aujourd'hui">Un importeur par fichier Firestone.</td><td data-label="Proposé">Le JSON de nomi.gg porte héros, cartes, trinkets, courbe et tribus : un téléchargement, mis en cache par URL, lu par un adaptateur par genre.</td></tr>
+      <tr><td data-label="Point"><b>Cache</b></td><td data-label="Aujourd'hui"><code>StatsCache.GetAsync&lt;T&gt;</code> prend déjà URL, chemin, chargement, import et sérialisation ; chaque propriétaire crée son <code>HttpStatsFetcher</code> et son <code>StatsCache</code>.</td><td data-label="Proposé">Ce patron devient la politique de cache d'une source ; un registre unique crée fetchers et caches.</td></tr>
+      <tr><td data-label="Point"><b>Garde-fou</b></td><td data-label="Aujourd'hui">Un seul <code>data-refresh</code> pour tous les chargements.</td><td data-label="Proposé">Un par source (<code>data-firestone-heroes</code>, <code>data-nomi</code>…) : une source qui lève est coupée seule, et le dit une fois.</td></tr>
+      <tr><td data-label="Point"><b><code>source</code></b></td><td data-label="Aujourd'hui">Deux valeurs, toute autre refusée.</td><td data-label="Proposé">Liste ouverte : une valeur connue a une étiquette courte, une inconnue s'affiche sous son nom.</td></tr>
+      <tr><td data-label="Point"><b>Build du jeu</b></td><td data-label="Aujourd'hui">Inconnu du plugin.</td><td data-label="Proposé">nomi.gg écrit le sien (253216) ; HDT et HearthDb le connaissent peut-être : <b>à vérifier</b> dans l'API d'HDT. Sans lui, la fraîcheur compare deux dates, pas deux patchs.</td></tr>
+      <tr><td data-label="Point"><b>Redessin</b></td><td data-label="Aujourd'hui"><code>_tavernKey</code>, <code>_choiceKey</code> ; <code>CompService.Version</code> compte les changements.</td><td data-label="Proposé">Les clés incluent la version de la vue consolidée : une source rafraîchie en partie redessine.</td></tr>
+      <tr><td data-label="Point"><b>Encart des héros</b></td><td data-label="Aujourd'hui">Une ligne par source, « HSR » / « FS », deux au plus.</td><td data-label="Proposé">Une ligne consolidée : l'étiquette binaire disparaît, la ligne « comp ≈ » retrouve sa place.</td></tr>
+    </tbody>
+  </table>
+  <div class="proof">
+    <b>Preuve — l'esquisse d'interface (noms proposés, rien n'est écrit)</b>
+    <pre>public interface IStatsSource
+{
+    // "firestone", "nomi.gg", "hsreplay-manual": an open list
+    string Source { get; }
+
+    // Hero, CardTurn, Composition, Trinket, TierCurve, PatchDelta
+    IReadOnlyList&lt;StatKind&gt; Kinds { get; }
+
+    // Max age, conditional request, latest.json first
+    RefreshPolicy Policy { get; }
+
+    Task&lt;SourceSnapshot&gt; LoadAsync(IConditionalFetcher fetcher, CancellationToken cancel);
+}
+
+// SourceSnapshot: Provenance (url, etag, generatedAt, fetchedAt,
+//                 patch, build, window, mmr) + StatRecord[]
+// StatsConsolidation.Consolidate(snapshots, playerContext)
+//     → ConsolidatedView (value, n, verdict, contributions)</pre>
+  </div>
+
+  <h2 id="maj">10. Mises à jour automatiques</h2>
+  <p class="lead">La requête conditionnelle au démarrage (ETag, <code>304</code> si rien n'a changé) existe ; elle s'étend à chaque source, avec sa cadence. nomi.gg n'est collecté automatiquement <b>qu'après accord écrit de son auteur</b> ; d'ici là, son JSON se dépose à la main dans <code>stats\manual\</code>, comme HSReplay.</p>
+  <div class="mech why">
+    <figure>
+      <svg viewBox="0 0 340 650" role="img" aria-labelledby="t-cyc">
+        <title id="t-cyc">Cycle de mise à jour : Firestone en requête conditionnelle, nomi.gg par latest.json puis le fichier du patch, après accord, et l'import manuel</title>
+        <defs>
+          <marker id="cy-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+        </defs>
+        <rect x="60" y="4" width="220" height="40" rx="20" style="fill:var(--surface);stroke:var(--text);stroke-width:2"/>
+        <text x="170" y="30" font-size="15" class="b" text-anchor="middle">Démarrage du plugin</text>
+        <path class="wire" d="M170 44 L170 58" marker-end="url(#cy-a)"/>
+
+        <rect class="c-ok" x="2" y="60" width="336" height="184" rx="8"/>
+        <text x="14" y="84" font-size="15" class="b">Firestone (4 fichiers)</text>
+        <g font-size="14" text-anchor="middle">
+          <rect class="box" x="14" y="96" width="312" height="32" rx="5"/><text x="170" y="117">GET conditionnel (If-None-Match)</text>
+          <rect class="box" x="14" y="144" width="152" height="32" rx="5"/><text x="90" y="165">304 : cache gardé</text>
+          <rect class="box" x="174" y="144" width="152" height="32" rx="5"/><text x="250" y="165">200 : remplacé</text>
+          <rect class="box" x="14" y="198" width="312" height="32" rx="5"/><text x="170" y="219">puis toutes les 8 h ? (max-age)</text>
+        </g>
+        <g class="wire" marker-end="url(#cy-a)"><path d="M120 128 L94 142"/><path d="M220 128 L246 142"/><path d="M170 176 L170 196"/></g>
+
+        <rect class="c-ask" x="2" y="258" width="336" height="200" rx="8"/>
+        <text x="14" y="282" font-size="15" class="b t-ask">nomi.gg, après accord</text>
+        <g font-size="14" text-anchor="middle">
+          <rect class="box" x="14" y="294" width="312" height="32" rx="5"/><text x="170" y="315">GET /patch/data/latest.json</text>
+          <rect class="box" x="14" y="342" width="152" height="50" rx="5"/><text x="90" y="363">même patch : ETag,</text><text x="90" y="382">au plus 1 par jour</text>
+          <rect class="box" x="174" y="342" width="152" height="50" rx="5"/><text x="250" y="363">nouveau patch :</text><text x="250" y="382">GET &lt;patch&gt;.json</text>
+          <rect class="box" x="14" y="410" width="312" height="32" rx="5"/><text x="170" y="431">patch clos : figé, puis déclassé</text>
+        </g>
+        <g class="wire" marker-end="url(#cy-a)"><path d="M120 326 L94 340"/><path d="M220 326 L246 340"/><path d="M250 392 L250 408"/></g>
+
+        <rect class="c-man" x="2" y="472" width="336" height="130" rx="8"/>
+        <text x="14" y="496" font-size="15" class="b">Import manuel (HSReplay, nomi.gg)</text>
+        <g font-size="14" text-anchor="middle">
+          <rect class="box" x="14" y="508" width="312" height="32" rx="5"/><text x="170" y="529">fichier déposé dans stats\manual\</text>
+          <rect class="box" x="14" y="556" width="312" height="32" rx="5"/><text x="170" y="577">lu au démarrage, provenance lue dedans</text>
+        </g>
+        <path class="wire" d="M170 540 L170 554" marker-end="url(#cy-a)"/>
+        <g font-size="14" class="b"><text x="10" y="626">Un garde-fou par source : une panne</text><text x="10" y="646">ne coupe que la sienne.</text></g>
+      </svg>
+    </figure>
+    <div>
+      <p><b>Firestone.</b> Aujourd'hui, chaque fichier est redemandé au démarrage, puis les âges du cache valent dans la session (héros et trinkets 24 h, compos 7 jours). Le serveur dit <code>max-age=28800</code>, soit 8 h ; le rythme réel de régénération n'est pas établi (une seule mesure : tous les fichiers datés du 2026-10-08 entre 00:11 et 03:55 UTC).</p>
+      <p><b>nomi.gg : un correctif à la position de départ.</b> On pouvait croire qu'un téléchargement par patch suffit, puisqu'il y a un fichier par patch. Les faits suggèrent l'inverse : la fenêtre du fichier finit le jour même (2026-10-08) et il a été modifié à 03:03 ce matin-là. Il est donc probablement régénéré tant que le patch est en cours ; le télécharger une seule fois gèlerait les premiers jours, les plus minces. D'où : <code>latest.json</code>, puis le fichier du patch en requête conditionnelle, au plus une fois par jour ; un patch clos se fige.</p>
+      <p><b>Le volume</b>, pour l'issue : un petit <code>latest.json</code> et, s'il a changé, 35 Ko par jour et par utilisateur ; un <code>304</code> sinon. Un <code>User-Agent</code> qui nomme le plugin et son dépôt permettrait à l'auteur de nous reconnaître, et de nous couper s'il le souhaite.</p>
+    </div>
+  </div>
+
+  <div class="ask-box">
+    <p><b>Brouillon d'issue pour <code>RainWritesCode/NomisKitchenHDT</code></b>, en anglais. <b>Seul Ali la poste</b> ; rien n'a été envoyé.</p>
+    <pre>Title: Permission to read your patch analysis from an open-source HDT plugin
+
+Hi! I maintain Tavern Compass, a free, MIT-licensed Hearthstone Deck Tracker plugin
+for Battlegrounds (https://github.com/elphono/tavern-compass). In game, it shows comp
+targets, tavern frames and hero-pick stats, today from Firestone's public data (with
+its author's agreement) and from HDT's own comp guides.
+
+Your patch analysis on nomi.gg has things no other source has: the before/after view
+of a patch, tribe shifts, the tier-up curve, trinket winners and losers. We would like
+to show a few of these figures in game. The site has no terms of use, so we would
+rather ask than assume.
+
+What the plugin would do, only with your agreement:
+- read /patch/data/latest.json, then /patch/analysis/&lt;patch&gt;.json, with a conditional
+  request (ETag), at most once a day per player, cached on the player's machine;
+  nothing else on the site;
+- send a User-Agent naming the plugin and its repository;
+- show the figures with their sample size, credited "data: nomi.gg" next to them;
+- never redistribute the files (the repository holds no real data) and never use them
+  for model training or datasets.
+
+Two questions while we are at it: what does "lift" measure on the cards, and what do
+the curve strings such as "3-4-6-7" stand for? We would rather show them right.
+
+The plugin sends nothing else: no games, no player data. If you would rather we
+didn't, or want a different rate, credit or anything else, just say so and we will
+follow it. Thanks for the analysis page!</pre>
+  </div>
+
+  <h2 id="ihm">11. Nouveaux composants d'interface</h2>
+  <p class="lead">Neuf idées, rangées par la source qu'elles lisent. Les deux premières n'attendent rien d'autre que card-stats ; celles qui lisent nomi.gg attendent l'accord. Toutes suivent les mêmes règles : aucun texte sous 12 px, rien sur le jeu, rien que HDT ou le jeu n'affiche déjà, chaque indication alignée sur ce qu'elle concerne.</p>
+</main>
+
+<div class="wide why">
+  <figure class="screen">
+    <svg viewBox="0 0 640 360" role="img" aria-labelledby="t-map">
+      <title id="t-map">Écran de taverne 1920 × 1080 réduit au tiers, avec les emplacements numérotés des composants proposés</title>
+      <rect class="g-bg" x="0" y="0" width="640" height="360" rx="8"/>
+      <g class="g-card2"><rect x="8" y="40" width="44" height="30" rx="4"/><rect x="8" y="76" width="44" height="30" rx="4"/><rect x="8" y="112" width="44" height="30" rx="4"/><rect x="8" y="148" width="44" height="30" rx="4"/><rect x="8" y="184" width="44" height="30" rx="4"/><rect x="8" y="220" width="44" height="30" rx="4"/><rect x="8" y="256" width="44" height="30" rx="4"/><rect x="8" y="292" width="44" height="30" rx="4"/></g>
+      <circle cx="320" cy="32" r="22" class="g-card2"/>
+      <g class="g-card"><rect x="159" y="72" width="40" height="52" rx="4"/><rect x="205" y="72" width="40" height="52" rx="4"/><rect x="251" y="72" width="40" height="52" rx="4"/><rect x="297" y="72" width="40" height="52" rx="4"/><rect x="343" y="72" width="40" height="52" rx="4"/><rect x="389" y="72" width="40" height="52" rx="4"/><rect x="435" y="72" width="40" height="52" rx="4"/></g>
+      <rect x="205" y="72" width="40" height="52" rx="4" style="fill:none;stroke:#ff4fdc;stroke-width:2.5"/>
+      <rect x="203" y="60" width="44" height="8" rx="2" style="fill:#ff4fdc"/>
+      <rect x="341" y="60" width="44" height="8" rx="2" style="fill:#b8bfcc"/>
+      <g class="g-card2"><rect x="159" y="168" width="40" height="52" rx="4"/><rect x="205" y="168" width="40" height="52" rx="4"/><rect x="251" y="168" width="40" height="52" rx="4"/><rect x="297" y="168" width="40" height="52" rx="4"/><rect x="343" y="168" width="40" height="52" rx="4"/></g>
+      <rect x="288" y="132" width="64" height="30" rx="4" style="fill:none;stroke:#f2f2f2;stroke-width:1.5;stroke-dasharray:4 3"/>
+      <circle cx="320" cy="262" r="22" class="g-card2"/>
+      <g class="g-card2"><rect x="230" y="322" width="34" height="44" rx="4"/><rect x="268" y="322" width="34" height="44" rx="4"/><rect x="306" y="322" width="34" height="44" rx="4"/><rect x="344" y="322" width="34" height="44" rx="4"/></g>
+      <rect x="484" y="46" width="133" height="180" rx="5" style="fill:none;stroke:#b8bfcc;stroke-width:1.5;stroke-dasharray:5 4"/>
+      <rect class="g-panel" x="394" y="230" width="163" height="106" rx="5"/>
+      <rect x="394" y="230" width="163" height="13" rx="3" style="fill:#2c3447"/>
+      <rect x="402" y="247" width="110" height="5" rx="2" style="fill:#b8bfcc"/>
+      <rect class="g-panel" x="394" y="338" width="163" height="16" rx="3"/>
+      <g font-size="26" class="g-t">
+        <text x="150" y="108" text-anchor="end">Bob</text>
+        <text x="150" y="204" text-anchor="end">plateau</text>
+        <text x="220" y="352" text-anchor="end">main</text>
+        <text x="476" y="298" text-anchor="middle">panneau</text>
+        <text x="550" y="146" text-anchor="middle">popup</text>
+      </g>
+      <g class="pin" font-size="26" text-anchor="middle">
+        <circle class="p-blue" cx="225" cy="40" r="18"/><text x="225" y="49">1</text>
+        <circle class="p-blue" cx="372" cy="147" r="18"/><text x="372" y="156">2</text>
+        <circle class="p-grey" cx="590" cy="250" r="18"/><text x="590" y="259">5</text>
+        <circle class="p-amb" cx="590" cy="320" r="18"/><text x="590" y="329">6</text>
+        <circle class="p-amb" cx="600" cy="72" r="18"/><text x="600" y="81">7</text>
+        <circle class="p-green" cx="502" cy="206" r="18"/><text x="502" y="215">8</text>
+      </g>
+    </svg>
+    <div class="legend">
+      <span><i class="pinl blue">1</i>étiquette d'une carte de Bob</span>
+      <span><i class="pinl blue">2</i>au-dessus d'une option de choix (pointillés)</span>
+      <span><i class="pinl grey">5</i>ligne grise du panneau</span>
+      <span><i class="pinl amb">6</i>encart de puissance</span>
+      <span><i class="pinl amb">7</i>ligne de contexte du popup</span>
+      <span><i class="pinl green">8</i>popup au survol</span>
+    </div>
+    <figcaption>Écran 1080p au tiers : rangée de Bob en haut, plateau au milieu, panneau « Compositions » de 488 px à droite du héros, son encart dessous, le popup au-dessus. Le choix du héros (3, 4, 5) est un autre écran, dessiné à part ci-dessous. Couleur des repères : <span style="color:#2563eb;font-weight:700">card-stats (autorisé)</span>, <span style="color:#b45309;font-weight:700">nomi.gg (après accord)</span>, <span style="color:#15803d;font-weight:700">consolidation</span>, gris : aucune donnée nouvelle.</figcaption>
+  </figure>
+
+  <div class="crops">
+    <figure>
+      <svg viewBox="0 0 340 360" role="img" aria-labelledby="t-c1">
+        <title id="t-c1">Croquis : une carte de Bob avec sa valeur à ce tour, et une option de choix sans compo</title>
+        <text x="10" y="20" font-size="15" class="b">1 · Carte de Bob, à ce tour</text>
+        <rect class="g-bg" x="2" y="30" width="336" height="150" rx="8"/>
+        <text x="90" y="52" font-size="14" text-anchor="middle" class="g-mag b">core Undead 2/4</text>
+        <text x="90" y="72" font-size="14" text-anchor="middle" class="g-up">t6 ▲ 3.9 vs 4.4</text>
+        <text x="250" y="72" font-size="14" text-anchor="middle" class="g-up">t6 ▲ 4.0 vs 4.4</text>
+        <rect class="g-card" x="20" y="82" width="140" height="90" rx="8"/>
+        <rect x="20" y="82" width="140" height="90" rx="8" style="fill:none;stroke:#ff4fdc;stroke-width:3"/>
+        <rect class="g-card" x="180" y="82" width="140" height="90" rx="8"/>
+        <g font-size="14"><text x="10" y="202">Deux lignes au plus : une 3e agrandirait</text><text x="10" y="222">toute la rangée, donc la valeur s'efface.</text></g>
+        <text x="10" y="258" font-size="15" class="b">2 · Option d'un choix, sans compo</text>
+        <rect class="g-bg" x="2" y="268" width="336" height="86" rx="8"/>
+        <text x="90" y="292" font-size="14" text-anchor="middle" class="g-m">aujourd'hui : —</text>
+        <text x="250" y="292" font-size="14" text-anchor="middle" class="g-t">t6 ▲ 4.0 vs 4.4</text>
+        <path d="M150 288 L186 288" style="stroke:#b8bfcc;stroke-width:1.5"/><path d="M184 283 L192 288 L184 293 Z" style="fill:#b8bfcc"/>
+        <rect class="g-card" x="20" y="302" width="140" height="44" rx="8"/>
+        <rect class="g-card" x="180" y="302" width="140" height="44" rx="8"/>
+      </svg>
+      <figcaption>« t6 ▲ 3.9 vs 4.4 » : la place moyenne des parties où la carte est jouée au tour 6, contre les autres. Une corrélation, pas une cause : les plateaux qui gagnent achètent plus.</figcaption>
+    </figure>
+    <figure>
+      <svg viewBox="0 0 340 420" role="img" aria-labelledby="t-c2">
+        <title id="t-c2">Croquis : l'encart des héros aujourd'hui, consolidé avec l'effectif, puis contesté ; dessous, la ligne d'état du patch</title>
+        <text x="10" y="20" font-size="15" class="b">3 · 4 · Choix du héros</text>
+        <rect class="g-bg" x="2" y="30" width="336" height="384" rx="8"/>
+        <path d="M130 120 V72 A40 40 0 0 1 210 72 V120 Z" class="g-card"/>
+        <text x="40" y="146" font-size="14" class="g-m">aujourd'hui, deux sources :</text>
+        <rect class="g-panel" x="40" y="152" width="260" height="56" rx="6"/>
+        <g font-size="14" class="g-t"><text x="52" y="174">A 3.41 · 12% FS 25%</text><text x="52" y="196">B 3.62 · 9% HSR</text></g>
+        <text x="40" y="228" font-size="14" class="g-m">consolidé, avec l'effectif :</text>
+        <rect class="g-panel" x="40" y="234" width="260" height="56" rx="6"/>
+        <g font-size="14" class="g-t"><text x="52" y="256">A 3.40 · 4 051 games</text><text x="52" y="278">2 sources agree · top 4 54%</text></g>
+        <text x="40" y="310" font-size="14" class="g-m">contesté :</text>
+        <rect class="g-panel" x="40" y="316" width="260" height="56" rx="6" style="stroke:#f5b83d"/>
+        <text x="52" y="338" font-size="14" class="g-amb b">contested 2.9 ↔ 3.8</text>
+        <text x="52" y="360" font-size="14" class="g-t">nomi.gg 51 g · Firestone 4 000 g</text>
+        <text x="170" y="400" font-size="14" text-anchor="middle" class="g-amb">Patch 36.6.3 · Undead ▲ · Mech ▼</text>
+      </svg>
+      <figcaption>3 : une ligne consolidée remplace une ligne par source, l'effectif prend la place du taux de choix, et la ligne « comp ≈ » (absente ici) retrouve la sienne. 4 : à la première partie après un patch, la ligne d'état sous les héros. Croquis, pas à l'échelle.</figcaption>
+    </figure>
+    <figure>
+      <svg viewBox="0 0 340 380" role="img" aria-labelledby="t-c3">
+        <title id="t-c3">Croquis : le panneau avec sa ligne de fraîcheur, l'encart de puissance avec un repère de montée de tier, et la ligne de contexte du popup</title>
+        <text x="10" y="20" font-size="15" class="b">5 · 6 · 7 · Panneau, encart, popup</text>
+        <rect class="g-panel" x="10" y="30" width="320" height="168" rx="6"/>
+        <rect x="10" y="30" width="320" height="30" rx="5" style="fill:#2c3447"/>
+        <text x="20" y="50" font-size="14" class="g-t b">Compositions · HDT free · Meta ↗</text>
+        <text x="20" y="80" font-size="14" class="g-m">data 36.6.2 ≠ game 36.6.3</text>
+        <rect x="20" y="92" width="10" height="44" style="fill:#e8b93a"/>
+        <text x="40" y="112" font-size="14" class="g-t">Undead Butcher</text>
+        <g class="g-card"><ellipse cx="206" cy="114" rx="14" ry="17"/><ellipse cx="240" cy="114" rx="14" ry="17"/><ellipse cx="274" cy="114" rx="14" ry="17"/><ellipse cx="308" cy="114" rx="14" ry="17"/></g>
+        <rect x="20" y="144" width="10" height="44" style="fill:#7ec850"/>
+        <text x="40" y="164" font-size="14" class="g-t">Mech Magnet</text>
+        <g class="g-card"><ellipse cx="206" cy="166" rx="14" ry="17"/><ellipse cx="240" cy="166" rx="14" ry="17"/><ellipse cx="274" cy="166" rx="14" ry="17"/></g>
+        <rect class="g-panel" x="10" y="204" width="320" height="58" rx="6"/>
+        <g><circle cx="26" cy="222" r="5" style="fill:#4a5570"/><circle cx="40" cy="222" r="5" style="fill:#4a5570"/><circle cx="54" cy="222" r="6" style="fill:#4ade80"/><circle cx="68" cy="222" r="5" style="fill:#4a5570"/></g>
+        <text x="82" y="227" font-size="14" class="g-t">▲ +58% Board 190 · avg 120</text>
+        <g><circle cx="26" cy="246" r="5" style="fill:#4a5570"/><circle cx="40" cy="246" r="6" style="fill:#f5d33d"/><circle cx="54" cy="246" r="5" style="fill:#4a5570"/><circle cx="68" cy="246" r="5" style="fill:#4a5570"/></g>
+        <text x="82" y="251" font-size="14" class="g-t">≈ +12% Opp. 160 · avg 143</text>
+        <rect x="10" y="266" width="320" height="28" rx="6" style="fill:#11151f;stroke:#f5b83d;stroke-width:1.5;stroke-dasharray:5 4"/>
+        <text x="20" y="285" font-size="14" class="g-amb">top 4: tier 5 by turn 8 · you: 9</text>
+        <rect class="g-panel" x="10" y="306" width="320" height="68" rx="6"/>
+        <text x="20" y="328" font-size="14" class="g-m">≈ 3,5 with your hero (23) · turn 13</text>
+        <text x="20" y="352" font-size="14" class="g-amb">Undead +0.3 since 36.6.3 (nomi.gg)</text>
+      </svg>
+      <figcaption>5 : la fraîcheur, grise, dans la ligne de note du panneau. 6 : le repère de montée de tier n'a pas de place libre ; une 3e rangée (pointillés) coûterait 16 px. 7 : la tribu depuis le patch, dans la ligne de contexte du détail et du popup.</figcaption>
+    </figure>
+  </div>
+</div>
+
+<main style="padding-top:0">
+  <table class="cards">
+    <thead><tr><th>#</th><th>Composant</th><th>Stat lue · source</th><th>Où (layout existant)</th><th>Ce qu'il ne doit pas faire</th></tr></thead>
+    <tbody>
+      <tr><td class="n"><span class="pinl blue">1</span></td><td data-label="Composant"><b>Valeur d'un sbire de Bob à ce tour</b> : « t6 ▲ 3.9 vs 4.4 »</td><td data-label="Stat lue">card-stats <code>turnStats</code> : place moyenne quand jouée à ce tour contre les autres parties · Firestone</td><td data-label="Où">Ligne d'étiquette de la carte, seule place alignée sur elle (<code>TavernMarkers</code>)</td><td data-label="Pas">Pas de 3e ligne (la rangée entière grandirait, <code>TavernMarkers.cs:127-128</code>) ; rien sous le bruit (seuils à mesurer) ; ne pas répéter le tier, que HDT et le jeu montrent ; ne pas se présenter comme une cause.</td></tr>
+      <tr><td class="n"><span class="pinl blue">2</span></td><td data-label="Composant"><b>Étiquette d'un choix sans compo</b> : « — » devient « t6 ▲ 4.0 vs 4.4 »</td><td data-label="Stat lue">card-stats, tour courant · Firestone</td><td data-label="Où">Au-dessus de l'option, ≤ 2 lignes (<code>ChoiceAdvicePanel</code>), en gris neutre</td><td data-label="Pas">Ne jamais passer devant une étiquette de cible : elle ne remplace que « — ».</td></tr>
+      <tr><td class="n"><span class="pinl green">3</span></td><td data-label="Composant"><b>Héros : consensus ou contesté, avec l'effectif</b> : « A 3.40 · 4 051 games », « contested 2.9 ↔ 3.8 »</td><td data-label="Stat lue">vue consolidée · Firestone + manuel aujourd'hui, nomi.gg ensuite</td><td data-label="Où">Encart des héros (0,725–0,805 H)</td><td data-label="Pas">Pas une ligne par source ; ne pas grossir un chiffre mince (l'erreur de l'app de Nomi) ; ne pas couvrir le bouton OK.</td></tr>
+      <tr><td class="n"><span class="pinl amb">4</span></td><td data-label="Composant"><b>Bandeau « patch »</b> : tribus buffées et nerfées, héros qui ont le plus bougé</td><td data-label="Stat lue"><code>tribes {pre, post}</code>, <code>buffed</code>, <code>nerfed</code>, héros · nomi.gg</td><td data-label="Où">Ligne d'état sous les héros, aux premières parties d'un patch</td><td data-label="Pas">Pas une fenêtre : une ligne, qui disparaît d'elle-même après quelques parties.</td></tr>
+      <tr><td class="n"><span class="pinl grey">5</span></td><td data-label="Composant"><b>Fraîcheur</b> : « data 36.6.2 ≠ game 36.6.3 »</td><td data-label="Stat lue"><code>patch</code>/<code>build</code> des données contre celui du jeu · aucune donnée nouvelle</td><td data-label="Où">Ligne d'état des héros ; ligne de note grise du panneau (<code>CompsPanel.cs:270-271,901-937</code>), qui cède sa place aux cibles</td><td data-label="Pas">Rien quand tout est à jour. Dépend du build du jeu côté HDT (à vérifier).</td></tr>
+      <tr><td class="n"><span class="pinl amb">6</span></td><td data-label="Composant"><b>Repère de montée de tier</b> : « top 4: tier 5 by turn 8 · you: 9 »</td><td data-label="Stat lue"><code>curve.medians</code>, <code>tier5[]</code> · nomi.gg</td><td data-label="Où">Aucune place libre : une 3e rangée de l'encart (+16 px), ou la ligne de note du panneau, ou le journal d'abord</td><td data-label="Pas">Ne pas dupliquer Tier 7 s'il l'affiche déjà (à vérifier) ; la lecture de « 3-4-6-7 » est à confirmer.</td></tr>
+      <tr><td class="n"><span class="pinl amb">7</span></td><td data-label="Composant"><b>Tribu depuis le patch</b> : « Undead +0.3 since 36.6.3 »</td><td data-label="Stat lue"><code>tribes {pre, post}</code>, <code>tidbits</code> · nomi.gg</td><td data-label="Où">Ligne de contexte grise du détail et du popup (<code>GuideView.cs:39-44</code>)</td><td data-label="Pas">Pas dans la ligne du guide : elle porte déjà nom et ovales.</td></tr>
+      <tr><td class="n"><span class="pinl green">8</span></td><td data-label="Composant"><b>« Pourquoi »</b> : sources, chiffres, verdict</td><td data-label="Stat lue">contributions de la vue consolidée</td><td data-label="Où">Toujours dans le journal d'HDT ; au survol seulement là où le survol existe déjà (lignes du panneau, <code>GuideHover</code>)</td><td data-label="Pas">L'encart des héros n'est pas survolable (<code>IsHitTestVisible = false</code>) : n'y rien promettre au survol.</td></tr>
+      <tr><td class="n"><span class="pinl amb">9</span></td><td data-label="Composant"><b>Trinkets gagnants et perdants</b></td><td data-label="Stat lue"><code>trinkets {lesser, greater}</code> · nomi.gg, avec Firestone</td><td data-label="Où">L'étiquette de trinket existante (<code>ChoiceAdvice.cs:362-367</code>), consolidée</td><td data-label="Pas">Pas une liste de plus : le même badge consensus / contesté que les héros.</td></tr>
+    </tbody>
+  </table>
+  <p class="why"><b>Écartés</b> : l'overlay APM, les tribus du lobby en double, le partage de parties, les plateaux adverses et les chances de combat (§ 3). Et un rappel qui vaut pour tous : card-stats dit qu'une carte jouée à ce tour <b>va avec</b> une meilleure place ; il ne dit pas qu'elle la <b>cause</b>. L'étiquette donne le chiffre et sa comparaison, jamais l'ordre « achète ».</p>
+
+  <h2 id="chantiers">12. Ordre des chantiers</h2>
+  <p class="lead">card-stats d'abord, mais <b>écrit comme la première source du nouveau format</b> : l'ajouter à l'ancienne ferait un cinquième importeur ad hoc à migrer aussitôt. Puis le reste du socle, puis nomi.gg une fois l'accord obtenu, puis les composants qui en dépendent. C'est l'ordre proposé au départ, avec un seul changement : le format du socle avance avec card-stats au lieu de le suivre.</p>
+  <table class="cards">
+    <thead><tr><th>#</th><th>Chantier</th><th>Pourquoi à ce rang</th><th>Critère de vérification</th></tr></thead>
+    <tbody>
+      <tr><td class="n">a</td><td data-label="Chantier"><b>card-stats</b>, première source au format commun (provenance, patch, effectif) ; composants 1 et 2</td><td data-label="Pourquoi">Autorisé (après la décision 1), le plus riche jamais exploité, ne dépend d'aucun accord ; ouvre deux aides.</td><td data-label="Vérification">Fichier synthétique → « t6 ▲ … » dans la simulation (<code>--choice</code>) ; ligne <code>data card-stats … downloaded</code> puis <code>unchanged (304)</code> au 2e démarrage ; un test refuse une carte sans effectif ; mutation du seuil détectée.</td></tr>
+      <tr><td class="n">b</td><td data-label="Chantier"><b>Socle</b> : les trois autres importeurs migrés, registre, garde-fou par source, <code>source</code> ouvert, consolidation pure, CLI d'inspection</td><td data-label="Pourquoi">Sans lui, une 2e source de héros se juxtapose ; prérequis de nomi.gg.</td><td data-label="Vérification">Mêmes entrées → mêmes aides qu'avant (tests existants verts) ; deux sources synthétiques en désaccord → « contested » ; une source qui lève n'éteint pas l'autre ; mutations de la règle de recouvrement et de la décote détectées ; la CLI sort le tableau des désaccords d'un instantané réel, hors dépôt.</td></tr>
+      <tr><td class="n">c</td><td data-label="Chantier"><b>nomi.gg</b>, après accord écrit</td><td data-label="Pourquoi">Seule source de l'avant / après patch.</td><td data-label="Vérification">Réponse de l'auteur citée dans <code>CLAUDE.md</code> (« Décisions ») ; lignes <code>data nomi.gg …</code> ; crédit visible à l'écran.</td></tr>
+      <tr><td class="n">d</td><td data-label="Chantier"><b>Composants</b> 3 à 9</td><td data-label="Pourquoi">Ils lisent la vue consolidée (b), et nomi.gg pour 4, 6, 7, 9.</td><td data-label="Vérification">Captures de la simulation ; le test du plancher de 12 px vert ; vus en jeu par Ali.</td></tr>
+    </tbody>
+  </table>
+  <p class="why">Un petit gain indépendant de tout : afficher l'effectif dans l'encart des héros (composant 3, sans la consolidation). Le chiffre est déjà chargé ; reste à lui faire place dans les 184 px de l'encart. Il peut passer avant même (a), si Ali le veut.</p>
+
+  <h2 id="inchange">13. Ce qui ne change pas</h2>
+  <ul>
+    <li><b>HSReplay n'est pas contourné</b> : import manuel seulement.</li>
+    <li><b>Aucune donnée réelle dans le dépôt</b> : tests et simulation sur données synthétiques ; les sorties de la CLI restent hors dépôt. <b>Aucun test ne le vérifie aujourd'hui</b> : <code>RepositoryHygieneTests</code> ne cherche que des BattleTags, des pseudos purgés et des numéros de compte, alors que <code>CLAUDE.md</code> (lignes 369-370) l'affirme pour les données de Firestone et HSReplay. L'étendre (par exemple : refuser un <code>*.gz.json</code>, ou un JSON qui porte <code>lastUpdateDate</code>, <code>dataPoints</code> au-delà d'un seuil, ou l'ETag d'une source) est la bonne pratique à poser, dans un chantier à part.</li>
+    <li><b>HDT lit la mémoire du jeu, le plugin jamais.</b></li>
+    <li><b>Le plugin n'envoie rien</b> : aucune partie, aucune donnée de joueur ; seulement des requêtes de lecture.</li>
+  </ul>
+
+  <h2 id="decisions">14. Décisions à prendre par Ali</h2>
+  <table class="cards">
+    <thead><tr><th>#</th><th>Question</th><th>Issues</th><th>Recommandation</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td data-label="Question">card-stats est-il autorisé ? (<code>ROADMAP.md</code> dit non, <code>CLAUDE.md</code> dit oui)</td><td data-label="Issues">(a) <code>CLAUDE.md</code> fait foi, la roadmap se corrige ; (b) reconfirmer auprès de l'auteur de Firestone avant ; (c) renoncer à card-stats.</td><td data-label="Recommandation">(a) : l'accord du 2026-09-27 le nomme. Puis corriger la ligne « Next » de la roadmap.</td></tr>
+      <tr><td class="n">2</td><td data-label="Question">Quelle tranche pour card-stats ?</td><td data-label="Issues"><code>mmr-100</code> (tout le monde, effectif maximal) ; <code>mmr-50</code> (la plus proche d'Ali parmi les variantes vérifiées) ; les deux.</td><td data-label="Recommandation"><code>mmr-50</code> si son effectif par carte et par tour tient : à mesurer d'abord avec la CLI.</td></tr>
+      <tr><td class="n">3</td><td data-label="Question">Demander l'accord de nomi.gg ?</td><td data-label="Issues">Poster le brouillon tel quel ; le modifier ; ne pas demander (import manuel seulement) ; ne pas utiliser nomi.gg.</td><td data-label="Recommandation">Poster, après relecture. En attendant : import manuel.</td></tr>
+      <tr><td class="n">4</td><td data-label="Question">Où consolider ?</td><td data-label="Issues">A dans le plugin ; B hors ligne avec un fichier publié ; C hybride.</td><td data-label="Recommandation">C : le plugin consolide, la CLI mesure.</td></tr>
+      <tr><td class="n">5</td><td data-label="Question">Ordre des chantiers</td><td data-label="Issues">L'ordre proposé au départ (card-stats, socle, nomi.gg, interface) ; celui de la note (card-stats écrit au nouveau format) ; le socle d'abord.</td><td data-label="Recommandation">Celui de la note (§ 12).</td></tr>
+      <tr><td class="n">6</td><td data-label="Question">Un conflit entre sources, à l'écran</td><td data-label="Issues">Montrer « contested » avec les deux chiffres ; montrer la seule moyenne ; ne rien montrer.</td><td data-label="Recommandation">« contested » : ne pas choisir en silence.</td></tr>
+      <tr><td class="n">7</td><td data-label="Question">L'effectif dans l'encart des héros</td><td data-label="Issues">Il remplace le taux de choix ; il s'y ajoute (place à trouver) ; rien.</td><td data-label="Recommandation">Il remplace le taux de choix, qui passe au journal.</td></tr>
+      <tr><td class="n">8</td><td data-label="Question">Les seuils de départ (k = 30, d = 0,5, 10 parties, ± 2σ/√n, écart minimal d'une carte)</td><td data-label="Issues">Les prendre comme points de départ ; les fixer autrement ; mesurer d'abord.</td><td data-label="Recommandation">Points de départ, recalibrés sur les mesures de la CLI.</td></tr>
+      <tr><td class="n">9</td><td data-label="Question">Le repère de montée de tier (composant 6)</td><td data-label="Issues">3e rangée de l'encart (+16 px) ; ligne de note du panneau ; journal seulement d'abord ; rien.</td><td data-label="Recommandation">Journal d'abord, pour juger de son intérêt sur quelques parties.</td></tr>
+      <tr><td class="n">10</td><td data-label="Question">L'overlay APM de Nomi's Kitchen</td><td data-label="Issues">Écarter ; une ligne de journal ; un widget.</td><td data-label="Recommandation">Écarter.</td></tr>
+      <tr><td class="n">11</td><td data-label="Question">Étendre <code>RepositoryHygieneTests</code> aux données réelles</td><td data-label="Issues">Oui, dans un petit chantier ; non.</td><td data-label="Recommandation">Oui : la règle est écrite, rien ne l'exécute.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="non-etabli">15. Ce qui n'est pas établi</h2>
+  <table class="cards">
+    <thead><tr><th>Point</th><th>Ce qu'on sait</th><th>La mesure qui trancherait</th></tr></thead>
+    <tbody>
+      <tr><td data-label="Point"><b>Rythme réel de Firestone</b></td><td data-label="On sait">Une mesure : fichiers du 2026-10-08 entre 00:11 et 03:55 UTC, <code>max-age=28800</code>.</td><td data-label="Mesure">Relever <code>Last-Modified</code> plusieurs jours de suite.</td></tr>
+      <tr><td data-label="Point"><b>Accord de nomi.gg</b></td><td data-label="On sait">Rien n'a été demandé.</td><td data-label="Mesure">La réponse à l'issue.</td></tr>
+      <tr><td data-label="Point"><b>Fichier de nomi.gg régénéré pendant le patch</b></td><td data-label="On sait">Probable (fenêtre qui finit le jour même, modifié le matin) ; une seule mesure.</td><td data-label="Mesure">Comparer l'ETag d'un jour à l'autre.</td></tr>
+      <tr><td data-label="Point"><b>Build du jeu côté HDT</b></td><td data-label="On sait">nomi.gg donne 253216 ; côté HDT, rien de vérifié.</td><td data-label="Mesure">Chercher dans l'API d'HDT et de HearthDb ce qui expose le build du client.</td></tr>
+      <tr><td data-label="Point"><b>« last-patch » de Firestone et « post » de nomi.gg</b></td><td data-label="On sait">Rien ne dit qu'ils commencent au même build.</td><td data-label="Mesure">Le premier jour d'un patch, comparer les dates de début.</td></tr>
+      <tr><td data-label="Point"><b>Définitions</b> : <code>totalPlayed</code>, « lift », « 3-4-6-7 »</td><td data-label="On sait">Les noms de champs, pas leur sens.</td><td data-label="Mesure">Le code public de Firestone ; demander à l'auteur de nomi.gg dans l'issue.</td></tr>
+      <tr><td data-label="Point"><b>Taux de recoupement du pont</b></td><td data-label="On sait">Jamais mesuré sur de vraies données.</td><td data-label="Mesure">La ligne <code>bridge:</code> à la première partie, ou la CLI.</td></tr>
+      <tr><td data-label="Point"><b>Les seuils</b> (k, d, 10 parties, ± 2σ/√n)</td><td data-label="On sait">Des jugements, calqués sur le précédent de <code>HeroCompAffinity</code>.</td><td data-label="Mesure">La distribution réelle des désaccords, par la CLI.</td></tr>
+      <tr><td data-label="Point"><b>Doublons avec HDT</b> : tribus du lobby au choix du héros, courbe de montée en Tier 7</td><td data-label="On sait">Non vérifié.</td><td data-label="Mesure">Regarder l'écran d'HDT, gratuit et Tier 7, en partie.</td></tr>
+    </tbody>
+  </table>
+  <div class="proof">
+    <b>Preuve — comment cette note a été faite</b>
+    <p>Aucune requête vers nomi.gg ni HSReplay pour cette note : les mesures des sources viennent de deux recherches faites le même jour, reprises telles quelles. Le code a été lu, pas modifié ; aucune suite de tests n'a tourné pour cette note, qui ne touche pas au code. Les deux captures de l'app Android ont été regardées et décrites, pas copiées dans le dépôt.</p>
+  </div>
+</main>
+</body>
+</html>
