@@ -41,6 +41,25 @@ public class ChoiceLayoutTests
         }
     }
 
+    [Theory]
+    [InlineData(3439.0, 1368.0, 381.0)]
+    [InlineData(1920.0, 1080.0, 300.2)]
+    public void TrinketLabels_StayAboveThePriceCoin(double width, double height, double coinTop)
+    {
+        // The game's price coin sticks out above the trinket's frame. Its top was measured on a screenshot of the
+        // trinket shop on 2026-10-08 (3439 × 1368 overlay): y = 381, 0.042 × H above the card's top; the 1080p case
+        // scales it. Labels of one or two lines must end above it, and not by much more than the gap.
+        foreach (var lines in new[] { 1, 2 })
+        {
+            foreach (var label in ChoiceLayout.Labels(ChoiceKind.Trinket, 4, width, height, lines))
+            {
+                var bottom = label.Top + label.Height;
+                Assert.True(bottom <= coinTop, $"{lines} line(s): label ends at {bottom:0.0}, below the coin's top {coinTop}");
+                Assert.True(bottom >= coinTop - 0.015 * height, $"{lines} line(s): label ends at {bottom:0.0}, far above the coin");
+            }
+        }
+    }
+
     [Fact]
     public void HdtsConstants_AtFullHd()
     {

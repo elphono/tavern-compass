@@ -26,8 +26,9 @@ public static class ChoiceLayout
 {
     private readonly struct Grid
     {
-        public Grid(double cardHeight, double aspect, double spacing, double centre, double top)
+        public Grid(double cardHeight, double aspect, double spacing, double centre, double top, double overhang = 0)
         {
+            Overhang = overhang;
             CardHeight = cardHeight;
             Aspect = aspect;
             Spacing = spacing;
@@ -40,11 +41,15 @@ public static class ChoiceLayout
         public double Spacing { get; }
         public double Centre { get; }
         public double Top { get; }
+
+        /// <summary>How far above the card's top the game draws over it, in fractions of the height; labels go above that.</summary>
+        public double Overhang { get; }
     }
 
     private static readonly Grid Discover = new(0.39, 28 / 39.0, 0.27, 0.53, 0.29);
     private static readonly Grid DarkGift = new(0.605, 33.2 / 60.5, 0.287, 0.519, 0.185);
-    private static readonly Grid Trinket = new(0.32, 25 / 36.5, 0.192, 0.51, 0.32);
+    // The price coin sticks out 0.042 × H above a trinket's frame (screenshot of the trinket shop, 2026-10-08, 3439 × 1368).
+    private static readonly Grid Trinket = new(0.32, 25 / 36.5, 0.192, 0.51, 0.32, overhang: 0.042);
 
     /// <summary>Gap between a label and the top of its card, × H.</summary>
     public const double LabelGap = 0.006;
@@ -84,8 +89,9 @@ public static class ChoiceLayout
     {
         var s = TavernLayout.Scale(height);
         var labelHeight = (Math.Max(1, lines) * TavernLayout.MarkerFontSize * 1.3 + 2 * TavernLayout.MarkerPadding) * s;
+        var overhang = GridOf(kind)?.Overhang ?? 0;
         return Cards(kind, count, width, height)
-            .Select(card => new LayoutRect(card.CenterX, card.Top - LabelGap * height - labelHeight / 2, card.Width, labelHeight))
+            .Select(card => new LayoutRect(card.CenterX, card.Top - (overhang + LabelGap) * height - labelHeight / 2, card.Width, labelHeight))
             .ToList();
     }
 }
