@@ -5,6 +5,8 @@ namespace BronzebeardHud.Stats.Tests;
 /// <summary>
 /// The repository is public: no real BattleTag, opponent name or account number may be committed. The ones that had
 /// slipped into old test fixtures were purged from the history on 2026-10-06; tests and docs use made-up names.
+/// Nor any real stats file: Firestone and nomi.gg agreed to our reading their data, not to our republishing it; tests use
+/// synthetic data.
 /// </summary>
 public class RepositoryHygieneTests
 {
@@ -31,6 +33,36 @@ public class RepositoryHygieneTests
     {
         ".cs", ".md", ".html", ".txt", ".json", ".yml", ".yaml", ".csproj", ".props", ".sh", ".py", ".sln", ".editorconfig",
     };
+
+    /// <summary>A JSON file this size is a downloaded stats file, not a fixture: the largest fixture is 22 KB.</summary>
+    private const long MaxJsonBytes = 100_000;
+
+    /// <summary>Fields only a server's file carries: Firestone's update date, nomi.gg's high-MMR player count.</summary>
+    private static readonly string[] ServerSignatures = { "\"" + "lastUpdate" + "Date\"", "\"" + "high" + "Players\"" };
+
+    private static readonly string[] Skipped = { "bin", "obj", "lib", ".git", ".claude", "node_modules" };
+
+    /// <summary>Why a file looks like real stats data: a compressed download, an outsized JSON, or a server's own fields.</summary>
+    internal static IReadOnlyList<string> DataProblems(string relativePath, long bytes, string jsonText)
+    {
+        var found = new List<string>();
+        if (relativePath.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) || relativePath.EndsWith(".gz.json", StringComparison.OrdinalIgnoreCase))
+        {
+            found.Add($"{relativePath}: a downloaded stats file (.gz)");
+        }
+
+        if (relativePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            if (bytes > MaxJsonBytes)
+            {
+                found.Add($"{relativePath}: {bytes} bytes, larger than any fixture");
+            }
+
+            found.AddRange(ServerSignatures.Where(s => jsonText.Contains(s, StringComparison.Ordinal)).Select(s => $"{relativePath}: carries {s}"));
+        }
+
+        return found;
+    }
 
     internal static IReadOnlyList<string> Problems(string text)
     {
@@ -79,15 +111,13 @@ public class RepositoryHygieneTests
     public void Repository_HoldsNoBattleTagNoOpponentNameAndNoAccountNumber()
     {
         var root = RepositoryRoot();
-        var skipped = new[] { "bin", "obj", "lib", ".git", ".claude", "node_modules" };
         var checkedFiles = 0;
         var problems = new List<string>();
 
-        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        foreach (var file in RepositoryFiles(root))
         {
             var relative = Path.GetRelativePath(root, file);
-            if (relative.Split(Path.DirectorySeparatorChar).Any(part => skipped.Contains(part))
-                || !TextExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+            if (!TextExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -103,6 +133,43 @@ public class RepositoryHygieneTests
         Assert.True(checkedFiles > 100, $"only {checkedFiles} text files found: is the root right ({root})?");
         Assert.Empty(problems);
     }
+
+    [Fact]
+    public void DataScanner_FlagsRealStatsFiles_AndLetsSyntheticOnesThrough()
+    {
+        // Built at run time, so that this file holds no signature of its own.
+        var firestone = "{\"" + "lastUpdate" + "Date\": \"2026-10-08T00:10:31Z\", \"cardStats\": []}";
+        var nomi = "{\"overview\": {\"" + "high" + "Players\": 30}}";
+
+        Assert.NotEmpty(DataProblems("stats/card-stats.gz.json", 1_000, "{}"));
+        Assert.NotEmpty(DataProblems("stats/hero-stats.gz", 1_000, string.Empty));
+        Assert.NotEmpty(DataProblems("tests/Fixtures/big.json", 200_000, "{}"));
+        Assert.NotEmpty(DataProblems("tests/Fixtures/firestone.json", 100, firestone));
+        Assert.NotEmpty(DataProblems("tests/Fixtures/nomi.json", 100, nomi));
+
+        Assert.Empty(DataProblems("tests/Fixtures/comp-cache-schema1-shape.json", 22_305, "{\"schema\": 1, \"compositions\": []}"));
+        // A test file may name the fields to build synthetic data: only .json files are read for signatures.
+        Assert.Empty(DataProblems("tests/TrinketTests.cs", 100, firestone));
+    }
+
+    [Fact]
+    public void Repository_HoldsNoRealStatsData()
+    {
+        var root = RepositoryRoot();
+        var problems = new List<string>();
+        foreach (var file in RepositoryFiles(root))
+        {
+            var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+            var json = relative.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+            problems.AddRange(DataProblems(relative, new FileInfo(file).Length, json ? File.ReadAllText(file) : string.Empty));
+        }
+
+        Assert.Empty(problems);
+    }
+
+    private static IEnumerable<string> RepositoryFiles(string root) =>
+        Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Where(file => !Path.GetRelativePath(root, file).Split(Path.DirectorySeparatorChar).Any(part => Skipped.Contains(part)));
 
     private static string RepositoryRoot()
     {
