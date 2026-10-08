@@ -256,7 +256,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   au-dessus du panneau, à droite des plateaux (1080p : x = 1452, bas à 9 px du panneau ; au-dessus de Skip combat
   quand il est là), bord droit sur celui du panneau quand rien ne gêne, poussé de côté sinon ; jamais sur une zone du jeu,
   le panneau, Skip combat ni la place d'un aperçu de carte du panneau ; en dessous si le panneau est en haut ; rien s'il
-  n'y a de place nulle part (`guide popup: no room`, une fois par partie). **Pas une infobulle de HDT** : HDT n'a qu'un
+  n'y a de place nulle part (`guide popup: no room`, une fois par partie). **À côté du panneau** (2026-10-08, issue #15) : quand ni
+  au-dessus ni en dessous ne tiennent le popup entier, il prend la place la plus proche du panneau sur toute la hauteur, à
+  côté de lui, si elle en montre plus (disposition d'Ali, panneau sur toute la hauteur à gauche : 1 section sur 6 en dessous,
+  le popup entier à droite des plateaux). **Pas une infobulle de HDT** : HDT n'a qu'un
   emplacement d'infobulle pour tout l'overlay, une infobulle sur la ligne aurait empêché l'aperçu de carte de ses ovales ;
   le popup est un élément du canvas, rien n'y est survolable ni cliquable, et l'aperçu d'un ovale de la ligne peut se
   montrer en même temps. Événements de la sonde de HDT et de WPF traités pareil (`GuideHover`) : une deuxième entrée ne

@@ -92,21 +92,37 @@ public static class GuidePopupLayout
         var aligned = panel.Right - popupWidth;
         var lowest = margin;
         var highest = width - margin - popupWidth;
+        var beside = obstacles.Append((Left: panel.Left - gap, Top: panel.Top - gap, Right: panel.Right + gap, Bottom: panel.Top + panel.Height + gap)).ToList();
         var xs = new[] { aligned, lowest, highest }
-            .Concat(obstacles.Select(o => o.Right))
-            .Concat(obstacles.Select(o => o.Left - popupWidth))
+            .Concat(beside.Select(o => o.Right))
+            .Concat(beside.Select(o => o.Left - popupWidth))
             .Select(x => Math.Max(lowest, Math.Min(highest, x)))
             .Distinct()
             .ToList();
 
-        foreach (var above in new[] { true, false })
+        // Above the panel, below it, then beside it at full height (issue #15: a panel down the side of the screen leaves
+        // one section's room above and below). The first that holds the whole popup; else the one that shows the most.
+        var places = new[]
         {
-            var spanTop = above ? margin : panel.Top + panel.Height + gap;
-            var spanBottom = above ? panel.Top - gap : height - margin;
+            Best(PopupSide.Above, margin, panel.Top - gap, obstacles),
+            Best(PopupSide.Below, panel.Top + panel.Height + gap, height - margin, obstacles),
+            Best(PopupSide.Beside, margin, height - margin, beside),
+        }.Where(p => p != null).Select(p => p!.Value).ToList();
+        if (places.Count == 0)
+        {
+            return null;
+        }
+
+        var whole = places.FirstOrDefault(p => p.Height >= popupHeight - Tolerance);
+        return whole.Height > 0 ? whole.Rect : places.Aggregate((a, b) => b.Height > a.Height + Tolerance ? b : a).Rect;
+
+        (double Height, double Distance, double Shift, LayoutRect Rect)? Best(PopupSide side, double spanTop, double spanBottom,
+            List<(double Left, double Top, double Right, double Bottom)> around)
+        {
             (double Height, double Distance, double Shift, LayoutRect Rect)? best = null;
             foreach (var x in xs)
             {
-                var blocked = obstacles.Where(o => o.Left < x + popupWidth && x < o.Right).Select(o => (o.Top, o.Bottom));
+                var blocked = around.Where(o => o.Left < x + popupWidth && x < o.Right).Select(o => (o.Top, o.Bottom));
                 foreach (var (top, bottom) in Free(spanTop, spanBottom, blocked))
                 {
                     var h = Math.Min(popupHeight, bottom - top);
@@ -115,9 +131,18 @@ public static class GuidePopupLayout
                         continue;
                     }
 
-                    // Against the panel's side of the free interval: as close to the panel as the interval allows.
-                    var rectTop = above ? bottom - h : top;
-                    var distance = above ? panel.Top - bottom : top - (panel.Top + panel.Height);
+                    var rectTop = side switch
+                    {
+                        PopupSide.Above => bottom - h,
+                        PopupSide.Below => top,
+                        _ => Math.Max(top, Math.Min(bottom - h, panel.Top)),
+                    };
+                    var distance = side switch
+                    {
+                        PopupSide.Above => panel.Top - bottom,
+                        PopupSide.Below => top - (panel.Top + panel.Height),
+                        _ => x >= panel.Right ? x - panel.Right : panel.Left - (x + popupWidth),
+                    };
                     var candidate = (h, distance, Math.Abs(x - aligned), new LayoutRect(x + popupWidth / 2, rectTop + h / 2, popupWidth, h));
                     if (best is not { } b || Better(candidate, b))
                     {
@@ -126,13 +151,17 @@ public static class GuidePopupLayout
                 }
             }
 
-            if (best is { } found)
-            {
-                return found.Rect;
-            }
+            return best;
         }
+    }
 
-        return null;
+    private enum PopupSide
+    {
+        Above,
+
+        Below,
+
+        Beside,
     }
 
     private const double Tolerance = 1e-6;

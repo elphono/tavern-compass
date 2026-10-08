@@ -111,14 +111,43 @@ public class GuidePopupLayoutTests
         AssertClear(popup.Value, panel, width, height, Array.Empty<LayoutRect>(), "top");
     }
 
-    [Fact]
-    public void NoRoomAboveNorBelow_GivesNothing()
+    /// <summary>
+    /// Ali's layout, measured on 2026-10-08 (issue #15): the panel down the left edge, 0.10 → 0.82 of the height. Above it
+    /// and below it there is room for one section; the popup showed 1 of 6. Beside the panel, at full height, the whole
+    /// popup fits: it goes there, clear of everything, the nearest such place to the panel.
+    /// </summary>
+    [Theory]
+    [InlineData(3439, 1368)]
+    [InlineData(1920, 1080)]
+    public void ATallPanel_ThePopupGoesBesideIt_WholeRatherThanCutAboveOrBelow(double width, double height)
     {
-        // A panel as tall as the window: nothing above it, nothing below it.
-        var full = At(1920 - 10 - 488, 0, 488, 1080);
-        Assert.Null(GuidePopupLayout.Place(full, 1920, 1080, PopupWidth(1080), 400));
+        var panel = At(0, 0.10263 * height, 0.22442 * width, 0.7215 * height);
+        var popupHeight = 900 * height / 1080;
 
-        // Room on both sides, but less than the least the popup can show.
+        var rect = GuidePopupLayout.Place(panel, width, height, PopupWidth(height), popupHeight, minHeight: 150 * height / 1080)!.Value;
+
+        Assert.Equal(popupHeight, rect.Height, precision: 6);
+        Assert.True(rect.Left >= panel.Right, $"left {rect.Left:0.#}, the panel ends at {panel.Right:0.#}");
+        AssertClear(rect, panel, width, height, Array.Empty<LayoutRect>(), "beside");
+        Assert.False(NoGoZones.Overlaps(rect, GuidePopupLayout.PreviewArea(panel, width, height)), "on a card preview's place");
+
+        // The nearest such place: a popup further left by the gap kept around obstacles, and a pixel, would cover something.
+        var further = At(rect.Left - GuidePopupLayout.Gap * height - 1, rect.Top, rect.Width, rect.Height);
+        Assert.True(NoGoZones.For(width, height).Any(z => NoGoZones.Overlaps(further, z.Rect)) || NoGoZones.Overlaps(further, panel)
+            || NoGoZones.Overlaps(further, GuidePopupLayout.PreviewArea(panel, width, height)), $"left {rect.Left:0.#} is not the nearest place");
+    }
+
+    [Fact]
+    public void NoRoomAboveNorBelow_GoesBeside_AndNoRoomAnywhere_GivesNothing()
+    {
+        // A panel as tall as the window: nothing above it, nothing below it; beside it, the room above the boards (≈ 301 px).
+        var full = At(1920 - 10 - 488, 0, 488, 1080);
+        var beside = GuidePopupLayout.Place(full, 1920, 1080, PopupWidth(1080), 400);
+        Assert.NotNull(beside);
+        Assert.InRange(beside!.Value.Height, 250, 400);
+        AssertClear(beside.Value, full, 1920, 1080, Array.Empty<LayoutRect>(), "full-height panel");
+
+        // Room everywhere, but less than the least the popup can show.
         var panel = TavernLayout.TargetPanel(1920, 1080);
         Assert.Null(GuidePopupLayout.Place(panel, 1920, 1080, PopupWidth(1080), 5000, minHeight: 1500));
     }
@@ -150,7 +179,7 @@ public class GuidePopupLayoutTests
 
     /// <summary>
     /// Every window size, every place of the panel, popups from tiny to taller than the window, with and without the Skip
-    /// combat button to avoid: a popup is either refused or clear of every zone, the panel, the button and the card
+    /// combat button to avoid: a popup is either refused or clear of every zone, the panel (above, below or beside it), the button and the card
     /// previews, inside the overlay, as wide as asked, as tall as asked or as the room, never under its minimum. The sweep
     /// must place most of them, or it proves nothing.
     /// </summary>
@@ -181,7 +210,6 @@ public class GuidePopupLayoutTests
                         placed++;
                         AssertClear(rect, panel, width, height, avoid, what);
                         Assert.True(rect.Height <= popupHeight + 1e-6 && rect.Height >= minimum - 1e-6, $"{what}: height {rect.Height:0.#}");
-                        Assert.True(Bottom(rect) <= panel.Top + 1e-6 || rect.Top >= Bottom(panel) - 1e-6, $"{what}: neither above nor below the panel");
                         Assert.False(NoGoZones.Overlaps(rect, GuidePopupLayout.PreviewArea(panel, width, height)), $"{what}: on a card preview's place");
                     }
                 }
