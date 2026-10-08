@@ -15,14 +15,20 @@ sources serait réécrire ce qui est vu en jeu, sans source réelle qui en ait b
 traduire** des fichiers déjà chargés en chiffres avec leur provenance ; les services restent ceux qui chargent. Si
 nomi.gg (chantier c) demande autre chose, on le verra sur pièce.
 
+**Second écart, constaté en codant l'étape 3** : les formats locaux sont déjà communs à toutes les sources (un fichier
+de héros HSReplay tapé à la main a le même format qu'un fichier de héros Firestone) ; ce qui est propre à une source,
+c'est son importeur, et il existe. Deux classes `FirestoneSource` et `HsReplayManualSource` n'auraient fait que la même
+traduction deux fois : il n'y a qu'une traduction par format local, `SourceSnapshot.Of(fichier)`. nomi.gg aura son
+importeur (chantier c), qui écrira l'un de ces formats ou un nouveau, traduit de la même façon.
+
 ## Étapes
 
 | # | Étape | Fichiers | Vérification |
 |---|---|---|---|
-| 1 | **`source` en liste ouverte** : un fichier d'une source inconnue se charge ; une étiquette courte pour les connues (`FS`, `HSR`), le nom sinon | `HeroStatsLoader`, `CompositionLoader`, `StatsSources`, `HeroPickPanel` | test : `source: "nomi.gg"` se charge ; l'étiquette d'une inconnue est son nom |
-| 2 | **La provenance sur chaque fichier** : `HeroStatsFile`, `CompositionFile`, `TrinketStatsFile` exposent `Provenance` (`StatProvenance`) | ces trois fichiers | test : un fichier relu rend la même provenance |
-| 3 | **Les chiffres au format commun** : `StatRecord` (genre, sujet, mesure, valeur, effectif, unité) et `SourceSnapshot` (provenance, chiffres) ; `FirestoneSource` (héros, trinkets, cartes) et `HsReplayManualSource` (héros) | nouveaux | tests de traduction sur données synthétiques |
-| 4 | **`StatsConsolidation.Consolidate`**, fonction pure (§ 6.2) : aligner (même genre, sujet, mesure, unité ; patch le plus récent quand il est connu), décote d = 0,5 hors tranche du joueur, rappel k = 30 vers μ0, verdict `Single` / `Consensus` / `Contested` / `Apart` (sous 10 parties), contributions | nouveau | tableaux d'entrées → sorties ; mutations : recouvrement, décote, seuil de 10 |
+| 1 ✓ | **`source` en liste ouverte** : un fichier d'une source inconnue se charge ; une étiquette courte pour les connues (`FS`, `HSR`), le nom sinon | `HeroStatsLoader`, `CompositionLoader`, `StatsSources`, `HeroPickPanel` | test : `source: "nomi.gg"` se charge ; l'étiquette d'une inconnue est son nom |
+| 2 ✓ | **La provenance sur chaque fichier** : `HeroStatsFile`, `CompositionFile`, `TrinketStatsFile` exposent `Provenance` (`StatProvenance`) | ces trois fichiers | test : un fichier relu rend la même provenance |
+| 3 ✓ | **Les chiffres au format commun** : `StatRecord` (genre, sujet, mesure, valeur, effectif, unité) et `SourceSnapshot` (provenance, chiffres), `SourceSnapshot.Of` pour les héros, les trinkets et les cartes | `StatsConsolidation.cs` | tests de traduction sur données synthétiques ✓ |
+| 4 ✓ | **`StatsConsolidation.Consolidate`**, fonction pure (§ 6.2) : aligner (même genre, sujet, mesure, unité ; patch le plus récent quand il est connu), décote d = 0,5 hors tranche du joueur, rappel k = 30 vers μ0, verdict `Single` / `Consensus` / `Contested` / `Apart` (sous 10 parties), contributions | `StatsConsolidation.cs` | tableaux d'entrées → sorties, dont l'exemple chiffré de la note ✓ ; 9 mutations détectées (recouvrement au contact exact, décote, tranche, seuil de 10, patch, fenêtre, effectifs nuls) ✓ |
 | 5 | **Un garde-fou par source** : `data-firestone` et `data-manual` à la place de `data-refresh` ; une source qui lève est coupée seule | `Plugin`, `StatsService`, `CompService` | lecture et build (le plugin n'a pas de tests unitaires) ; en jeu, ligne du garde-fou |
 | 6 | **Un seul fetcher et un seul cache**, créés par le plugin et passés aux services | `Plugin`, services | build ; même journal `data …` qu'avant |
 | 7 | **La vue consolidée** calculée quand une source change, et une ligne de journal (`stats view: …`) ; aucune aide ne la lit encore (composant 3, chantier d) | `Plugin` | même affichage qu'avant (simulation, tests) |
