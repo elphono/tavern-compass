@@ -32,3 +32,6 @@ jobs:
 
       - name: Build the simulation harness
         run: dotnet build tools/BronzebeardHud.Harness -c Release -warnaserror
+
+      - name: Build the stats inspection tool
+        run: dotnet build tools/BronzebeardHud.Inspect -c Release -warnaserror

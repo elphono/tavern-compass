@@ -32,7 +32,7 @@ importeur (chantier c), qui écrira l'un de ces formats ou un nouveau, traduit d
 | 5 ✓ | **Un garde-fou par source** : `data-firestone` et `data-manual` à la place de `data-refresh` ; une source qui lève est coupée seule | `Plugin`, `StatsService`, `CompService` | lecture et build (le plugin n'a pas de tests unitaires) ; en jeu, ligne du garde-fou |
 | 6 ✓ | **Un seul fetcher et un seul cache**, créés par le plugin et passés aux services | `Plugin`, services | build ; même journal `data …` qu'avant |
 | 7 ✓ | **La vue consolidée** calculée quand une source change, et une ligne de journal (`stats view: …`) ; aucune aide ne la lit encore (composant 3, chantier d) | `Plugin` | même affichage qu'avant (simulation, tests) |
-| 8 | **CLI d'inspection** `tools/BronzebeardHud.Inspect` : lit le cache local sans réseau, construit les instantanés, sort les désaccords et l'effectif par tranche ; refuse d'écrire dans le dépôt | nouveau projet | lancée sur le cache d'Ali ; sortie hors dépôt |
+| 8 ✓ | **CLI d'inspection** `tools/BronzebeardHud.Inspect` : lit le cache local sans réseau, construit les instantanés, sort les désaccords et l'effectif par tranche ; refuse d'écrire dans le dépôt | nouveau projet | lancée sur le cache d'Ali ; sortie hors dépôt |
 | 9 | Documentation : `CLAUDE.md`, issue #9 | — | — |
 
 ## Ce que la CLI peut mesurer aujourd'hui, franchement
@@ -40,3 +40,13 @@ importeur (chantier c), qui écrira l'un de ces formats ou un nouveau, traduit d
 Le dossier `manual\` d'Ali est vide : il n'existe **aucun** désaccord entre deux sources à mesurer. Ce qui se mesure :
 l'écart entre les tranches de Firestone (top 25 % contre tous les joueurs), qui éclaire la décote d, et l'effectif par
 héros et par tranche, qui éclaire le seuil de 10 parties. Les seuils restent des points de départ jusqu'à nomi.gg.
+
+## Ce qu'elle a mesuré le 2026-10-08 (cache d'Ali, chiffres gardés hors dépôt)
+
+Témoin d'abord : une tranche copiée de « tous les joueurs » donne 0 contested et des écarts nuls.
+
+| Mesure | Résultat | Conséquence |
+|---|---|---|
+| Top 25 % contre tous les joueurs, comme deux sources | 20 héros sur 116 « contested » ; écart moyen **systématique** de +0,16 place (top 50 % : 19, top 10 % : 8, top 1 % : 26) | un écart de **population** suffit à dire « contested » ; nomi.gg, toutes tranches, le déclenchera souvent pour cette raison. La décote d change un poids, pas un biais : à revoir quand nomi.gg sera là (chantier c), avec ses vrais chiffres |
+| Héros sous 10 parties | 0 de la tranche 100 à 10 ; 17 en top 1 % | le seuil de 10 ne mord qu'en top 1 % |
+| Une carte à un tour (t3–t10), sous 200 parties | plus de la moitié des chiffres dans chaque tranche (médiane 119 en top 25 %) | la valeur de carte ne s'affiche que pour à peu près une carte sur deux ; baisser le seuil élargirait l'aide au prix du bruit, à arbitrer |

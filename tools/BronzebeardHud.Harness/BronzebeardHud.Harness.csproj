@@ -3,8 +3,8 @@
   <!-- Simulation of the plugin's panels in a plain Windows window, so that they can be moved, resized and looked
        at without Hearthstone running. The REAL panel sources are compiled in (Compile Include, below): PanelMover,
        CompsPanel, GuideView, GuidePopup, TavernMarkers, SkipCombatPanel, ChoiceAdvicePanel, CardImages, PreviewPlacer, OverlayLayer.
-       ChoiceAdvicePanel builds its own trinket stats cache (StatsCache over HttpStatsFetcher) but only fetches when the
-       plugin polls it: the harness never does, and hands ChoiceAdvisor synthetic trinket stats instead.
+       ChoiceAdvicePanel is given a stats cache whose fetcher refuses the network (NoNetwork, HarnessWindow.cs): the harness
+       never polls it, and hands ChoiceAdvisor synthetic trinket stats instead.
        What they ask of HDT (OverlayExtensions, Log, Database, the asset downloaders) is answered by HdtShim.cs, so
        the harness needs no HDT assembly and does not depend on HDT's version. What HDT's overlay window does around
        them (click-through above the game, hover polled at 60 Hz) is NOT simulated.
