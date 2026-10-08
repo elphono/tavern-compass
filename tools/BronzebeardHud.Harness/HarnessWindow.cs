@@ -316,8 +316,15 @@ internal sealed class HarnessWindow : Window
         }
     }
 
+    private readonly bool _cardValues;
+    private int _bracket = HarnessData.Bracket;
+
+    private CardTurnNote? CardNote(string cardId) =>
+        _cardValues ? CardTurnValue.For(HarnessData.CardStats, cardId, HarnessData.Turn) : null;
+
     public HarnessWindow(Options options)
     {
+        _cardValues = options.CardValues;
         _folder = Path.Combine(Path.GetTempPath(), "BronzebeardHarness");
         Directory.CreateDirectory(_folder);
         LayoutPath = options.Layout ?? Path.Combine(_folder, "layout.json");
@@ -371,6 +378,7 @@ internal sealed class HarnessWindow : Window
             }),
             line => Log.Info(line),
             element => CursorInside?.Invoke(element) ?? GuidePopup.IsCursorOver(element));
+        Comps.Bracket = (BracketChoice.Label(_bracket), NextBracket);
         ResetGuards();
         Markers = new TavernMarkers(Overlay, id => Log.Info($"pin toggled: {id}"));
         _skip = new SkipCombatPanel(Overlay, _mover, () => Log.Info("Skip combat clicked (nothing is killed here)"));
@@ -455,7 +463,9 @@ internal sealed class HarnessWindow : Window
             Log.Info(TavernHighlights.LogLine(line, targets));
         }
 
-        Markers.Show(HarnessData.Shop, Highlights, HarnessData.Pins, HarnessData.Shop.Select(_ => true).ToList());
+        // Plugin.UpdateTavern: the value of each card at this turn (CardTurnValue), with --card-values.
+        var notes = HarnessData.Shop.Select(id => CardNote(id)).ToList();
+        Markers.Show(HarnessData.Shop, Highlights, HarnessData.Pins, HarnessData.Shop.Select(_ => true).ToList(), notes);
         if (_skipShown)
         {
             _skip.Show();
@@ -525,7 +535,8 @@ internal sealed class HarnessWindow : Window
             return;
         }
 
-        var advice = ChoiceAdvisor.Advise(options, cards.All, targets, _lobby.Playable, _lobby.Tribes, HarnessData.TrinketStat, HarnessData.Bracket, _bridge);
+        var advice = ChoiceAdvisor.Advise(options, cards.All, targets, _lobby.Playable, _lobby.Tribes, HarnessData.TrinketStat, HarnessData.Bracket, _bridge,
+            CardNote);
         Choice = advice;
         if (advice.HasMarkers)
         {
@@ -593,6 +604,16 @@ internal sealed class HarnessWindow : Window
     private void ToggleGuide(string id)
     {
         Log.Info(_tracker.ToggleLine(id, _tracker.Toggle(id)));
+        Refresh();
+    }
+
+    /// <summary>Plugin.NextBracket: the panel's bracket button, the next bracket; here only the label and the log line follow.</summary>
+    private void NextBracket()
+    {
+        var next = BracketChoice.Next(_bracket);
+        Log.Info($"bracket {BracketChoice.Label(next)} chosen in the overlay (was {BracketChoice.Label(_bracket)})");
+        _bracket = next;
+        Comps.Bracket = (BracketChoice.Label(_bracket), NextBracket);
         Refresh();
     }
 

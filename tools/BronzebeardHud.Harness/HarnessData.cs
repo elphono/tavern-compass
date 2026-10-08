@@ -287,6 +287,21 @@ internal static class HarnessData
     /// <summary>The MMR bracket the harness plays in (MmrBracket's percentile): the trinkets' placement for it is shown.</summary>
     public const int Bracket = 25;
 
+    /// <summary>The shop turn of the scene, for the card values (<c>--card-values</c>).</summary>
+    public const int Turn = 6;
+
+    /// <summary>
+    /// Invented card stats at <see cref="Turn"/> (never Firestone's), against a filler card that sets the turn's average
+    /// near 4.0: 50 (nothing for any guide) and 42 (pinned) clearly better, "▲"; 16 (a target's core card) clearly worse,
+    /// "▼", in its second line; every other card unknown, so nothing is said of it.
+    /// </summary>
+    public static CardStatsFile CardStats { get; } = new(
+        new StatProvenance("harness", null, null, null, "last-patch", Bracket, null),
+        new[] { (50, 400, 3.5), (42, 400, 3.55), (16, 600, 4.4) }
+            .Select(c => new CardStat(Pool[c.Item1], new[] { new CardTurnStat(Turn, c.Item2, c.Item3) }))
+            .Append(new CardStat("HARNESS_FILLER", new[] { new CardTurnStat(Turn, 5000, 4.0) }))
+            .ToList());
+
     /// <summary>
     /// Invented trinket stats (never Firestone's), one per trinket: a placement for every player and per bracket, the
     /// last one without the harness's bracket (its placement for every player is shown) and the third without a pick rate.

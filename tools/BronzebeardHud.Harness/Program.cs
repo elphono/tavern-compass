@@ -65,6 +65,9 @@ internal sealed class Options
     /// <summary>The Skip combat button hidden, as in the tavern (it shows in combat only in the plugin).</summary>
     public bool NoSkip { get; private set; }
 
+    /// <summary>Invented card stats at turn 6 (HarnessData.CardStats): the values on Bob's cards and in place of a choice's "—".</summary>
+    public bool CardValues { get; private set; }
+
     /// <summary>Milliseconds the screenshot waits for card names and pictures, which arrive asynchronously.</summary>
     public int Wait { get; private set; } = 8000;
 
@@ -124,6 +127,9 @@ internal sealed class Options
                     break;
                 case "--no-skip":
                     options.NoSkip = true;
+                    break;
+                case "--card-values":
+                    options.CardValues = true;
                     break;
                 case "--wait" when i + 1 < args.Length:
                     options.Wait = int.Parse(args[++i]);

@@ -35,6 +35,10 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 
 Ce qui reste ouvert :
 
+- **Vérifier en jeu card-stats et la tranche à chaud** (2026-10-08, ci-dessous « card-stats de Firestone ») : la ligne
+  `data card-stats mmr-… last-patch: downloaded`, les valeurs sur les cartes de Bob (ligne `tavern values`) et à la place
+  d'un « — », le bouton de tranche ; que le tour de HDT (`GetTurnNumber`) soit bien celui de Firestone n'est que supposé.
+  Les DLL n'ont pas été déployées : HDT n'est pas installé sur la machine où le chantier a été fait.
 - **Vérifier en jeu les deux correctifs du 2026-10-07** (`docs/journal/2026-10-07-jauge-adverse-cadres-coches.md`) : la
   rangée de l'adversaire — sur une partie entière, aucune ligne `opponent power …` n'avait de plateau (`seen=none` partout) ; la prochaine doit
   porter `seen=<tour>` en combat et, en taverne, contre un adversaire déjà affronté ; sinon, `read=[…]` dit à lui seul
@@ -101,7 +105,9 @@ Ce qui reste ouvert :
   simulation contre HDT 1.55.6) : `dotnet format whitespace --folder --verify-no-changes .` (le style est celui du
   `.editorconfig`), `dotnet test -warnaserror` et les builds Release du plugin et de la simulation en `-warnaserror` : le
   code n'a aucun avertissement, un nouveau fait échouer la construction. `RepositoryHygieneTests` refuse tout BattleTag,
-  pseudo de joueur ou numéro de compte réel dans un fichier du dépôt (les données de test sont inventées).
+  pseudo de joueur ou numéro de compte réel dans un fichier du dépôt (les données de test sont inventées), et tout fichier de
+  stats réel (2026-10-08 : un `.gz`, un `.json` de plus de 100 Ko, ou portant un champ propre aux serveurs de Firestone ou de
+  nomi.gg).
 - **Historique réécrit le 2026-10-07** (purge des données personnelles, voir « Décisions ») : les hashes de commit cités
   dans les documents ont été recalculés ; un clone fait avant cette date est à refaire (`git clone`, ou `git fetch` puis
   `git reset --hard origin/main` si l'arbre est propre). L'ancienne app autonome reste atteignable par le tag
@@ -337,6 +343,24 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   read=[heroes 12,40 asked 40 → turn 8, 7 entities, 7 minions] · Opp. … power=…` quand la jauge de l'adversaire change
   (`read` : les entités héros de ce `PLAYER_ID`, celle demandée à HDT, puis `no snapshot` ou ce que contient le plateau ;
   `no hero entity` si aucun héros ne le porte).
+- **card-stats de Firestone** (2026-10-08, chantier a de `docs/plans/2026-10-08-stats-multi-sources.html`, plan
+  `docs/plans/2026-10-08-chantier-a-card-stats-plan.md`) : la première source au format commun (`StatProvenance` : source,
+  URL, dates, fenêtre, tranche, patch ; `CardStatsFile`, un fichier par tranche, `firestone-card-stats-mmr-25-last-patch.json`,
+  ≈ 0,6 Mo, même règle quotidienne que les héros ; `CardStatsRefresh` : une instance par tranche, jamais le fichier d'une
+  autre tranche à l'écran). **Valeur d'une carte à ce tour** (`CardTurnValue`) : sa place moyenne quand elle est jouée à
+  ce tour **contre la moyenne de toutes les cartes jouées à ce tour** (pondérée par l'effectif), jamais contre les parties
+  où elle ne l'est pas — mesuré le 2026-10-08, celles-là sont pires pour 320 cartes sur 320 au tour 6 : jouer va avec
+  survivre. Rien sous le bruit : 200 parties au moins, écart ≥ max(0,1 ; 2 × 2,3 / √n) (points de départ, décision 8).
+  Montrée sur la **dernière ligne libre** de l'étiquette d'une carte de Bob (« t6 ▲ 3.6 vs 3.9 » ; jamais à la place d'un
+  rôle ; une carte qui n'a que sa valeur : étiquette neutre, sans cadre) et **à la place du « — »** d'un choix
+  (`ChoiceReason.CardValue`, après cible, plateaux, pivot et guide ; jamais pour un trinket). Corrélation, pas cause :
+  jamais « achète ». Garde-fou `card-stats` ; lignes `data card-stats mmr-25 last-patch: …` et `tavern values turn=6
+  bracket=mmr-25 [id:t6 ▲ 3.6 vs 3.9 (400), …]`. Les tranches publiées : `mmr-100`, 50, 25, 10, 1 (médiane par carte et par
+  tour, tours 3–10 : 191, 143, 118, 92 jouées). **Tranche changeable à chaud** (Ali, 2026-10-08 : « on devrait pouvoir
+  hot-swap dans l'overlay ») : un bouton « top 25% » dans la barre de titre du panneau « Compositions », un clic → la
+  tranche suivante (`BracketChoice` : 100 → 50 → 25 → 10 → 1 → 100) pour le reste de la partie ; stats de héros, jauge,
+  trinkets et card-stats la suivent (tous lisent `StatsService.Bracket`) ; oubliée à la partie suivante ; ligne `bracket
+  top 10% chosen in the overlay (was top 25%, rating …)`. Vu seulement dans la simulation (`--card-values`).
 - Les compositions de Firestone (`CompService`, `TavernAdvisor`, `CompositionRows`, `CompDetail`, `CompTransitions`,
   `MinionLineups`) restent chargées et dans le code ; elles ne sont plus affichées en liste (hors ligne « comp ≈ » de
   l'encart des héros), mais orientent les aides par le pont ci-dessous. Une erreur d'un fichier de `manual\` est dite une
