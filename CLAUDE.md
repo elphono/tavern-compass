@@ -71,7 +71,9 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
   est coupée seule par `FeatureGuard` et le dit une fois. Lire cette ligne **avant** de supposer une cause.
 - **Avant de pousser** (la CI GitHub, `.github/workflows/ci.yml`, refait la même chose et construit en plus le plugin et la
   simulation contre HDT 1.55.6) : `dotnet format whitespace --folder --verify-no-changes .` (le style est celui du
-  `.editorconfig`), `dotnet test -warnaserror` et les builds Release du plugin et de la simulation en `-warnaserror` : le
+  `.editorconfig`), `dotnet test -warnaserror` et les builds Release du plugin, de la simulation et de la CLI d'inspection
+  en `-warnaserror` (juger chaque étape sur son **code de sortie** : une sortie filtrée par `| tail` a laissé passer un
+  build cassé le 2026-10-08) : le
   code n'a aucun avertissement, un nouveau fait échouer la construction. `RepositoryHygieneTests` refuse tout BattleTag,
   pseudo de joueur ou numéro de compte réel dans un fichier du dépôt (les données de test sont inventées), et tout fichier de
   stats réel (2026-10-08 : un `.gz`, un `.json` de plus de 100 Ko, ou portant un champ propre aux serveurs de Firestone ou de
@@ -337,6 +339,20 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   tranche suivante (`BracketChoice` : 100 → 50 → 25 → 10 → 1 → 100) pour le reste de la partie ; stats de héros, jauge,
   trinkets et card-stats la suivent (tous lisent `StatsService.Bracket`) ; oubliée à la partie suivante ; ligne `bracket
   top 10% chosen in the overlay (was top 25%, rating …)`. Vu seulement dans la simulation (`--card-values`).
+- **Socle des sources** (2026-10-08, chantier b, plan `docs/plans/2026-10-08-chantier-b-socle-plan.md`, issue #9) :
+  `source` est une liste ouverte (un fichier d'une source inconnue se charge, affiché sous son nom ; « FS », « HSR » pour
+  les connues, `StatsSources.Label`) ; chaque fichier de stats expose sa `Provenance` au format commun ;
+  `SourceSnapshot.Of(fichier)` le traduit en chiffres (`StatRecord` : genre, sujet, mesure, valeur, effectif, unité) ;
+  `StatsConsolidation.Consolidate` (fonction pure, § 6.2 de la note) aligne, décote de moitié hors tranche du joueur,
+  rappelle de 30 parties vers 4,5 et juge : `Single`, `Consensus`, `Contested` (deux intervalles x ± 2σ/√n disjoints),
+  `Apart` (sous 10 parties, ou sans fenêtre). **Aucune aide ne lit encore la vue** (composant 3, chantier d) : le plugin
+  la calcule quand une source change et l'écrit au journal, `stats view bracket=mmr-25 sources=[…] · heroes 116 (116
+  single, …) · trinkets … · cards 783 in 9866 figures (…)`, garde-fou `stats-view`. Un garde-fou par source :
+  `data-firestone` (fichiers de Firestone) et `data-manual` (`stats\manual\`, lu au démarrage puis une fois par partie) à
+  la place de `data-refresh`. Un seul fetcher et un seul cache, créés par le plugin et passés aux services. CLI
+  `tools/BronzebeardHud.Inspect` (README) : lit le cache sans réseau ni écriture ; mesuré le 2026-10-08, un écart de
+  **population** suffit à dire « contested » (top 25 % contre tous : 20 héros sur 116, +0,16 place en moyenne) — la
+  décote ne corrige pas un biais, à revoir avec nomi.gg.
 - Les compositions de Firestone (`CompService`, `TavernAdvisor`, `CompositionRows`, `CompDetail`, `CompTransitions`,
   `MinionLineups`) restent chargées et dans le code ; elles ne sont plus affichées en liste (hors ligne « comp ≈ » de
   l'encart des héros), mais orientent les aides par le pont ci-dessous. Une erreur d'un fichier de `manual\` est dite une
