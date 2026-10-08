@@ -64,6 +64,25 @@ public class LobbyGuidesTests
         Assert.Null(Of("DEMON", "MECHANICAL", "PIRATE", "UNDEAD", "DRAGON").Reason(Menagerie.Id)); // only FELBOAR missing
     }
 
+    /// <summary>
+    /// Ali's game of 2026-10-08: Menagerie, playable without quilboars, showed a quilboar among its key cards. The guide stays
+    /// (one key card of four); the panel asks, card by card, which cannot show up, and leaves those out of the line.
+    /// </summary>
+    [Fact]
+    public void CannotShowUp_TheKeyCardsOfAnAbsentTribe_NeverANeutralAnAmalgamADualTypeOrAnUnknownCard()
+    {
+        var noBoars = Of("DEMON", "MECHANICAL", "PIRATE", "UNDEAD", "DRAGON");
+
+        Assert.Contains(noBoars.Playable.All, g => g.Id == Menagerie.Id);
+        Assert.Equal(new[] { "FELBOAR" }, Menagerie.CoreCards.Where(noBoars.CannotShowUp));
+        Assert.False(noBoars.CannotShowUp("ROTTING")); // beast or undead: the undead are there
+        Assert.False(noBoars.CannotShowUp("NOT_IN_THE_DATABASE"));
+        Assert.True(Of("UNDEAD", "DEMON", "MECHANICAL", "PIRATE", "QUILBOAR").CannotShowUp("DRAKE"));
+
+        Assert.False(LobbyGuides.Unknown(All).CannotShowUp("FELBOAR")); // lobby not known yet: nothing is ruled out
+        Assert.False(Of().CannotShowUp("FELBOAR"));
+    }
+
     [Fact]
     public void ADualTypeCard_ShowsUpWhenEitherTribeIsThere_AnAmalgamAlways_AnUnknownCardIsNeverHeldAgainstAGuide()
     {

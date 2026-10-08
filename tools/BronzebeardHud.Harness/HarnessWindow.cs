@@ -444,6 +444,7 @@ internal sealed class HarnessWindow : Window
 
         var targets = round.Targets;
         var note = !_lobby.Known && _lobby.All.Count > 0 ? "Lobby tribes unknown: every guide listed" : null;
+        Comps.CannotShowUp = _lobby.CannotShowUp; // as Plugin.UpdateComps
         Comps.Show(round.Board, targets, cards.All.Select(c => c.CardId), CompGuideSources.HdtFree, null, note);
         Comps.SetPower(HarnessData.Power(_power));
         var (opponent, opponentLine) = HarnessData.OpponentPower(_opponentPower, id => Database.GetCardFromId(id)?.LocalizedName ?? id);

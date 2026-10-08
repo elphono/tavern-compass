@@ -220,6 +220,15 @@ internal sealed class CompsPanel
     /// <summary>The bracket button of the title bar ("top 25%"): the bracket shown, and what a click does; no button while null.</summary>
     public (string Label, Action Next)? Bracket { get; set; }
 
+    /// <summary>
+    /// Whether a key card cannot show up in this game's lobby (LobbyGuides.CannotShowUp): left out of a guide's line, greyed
+    /// and struck in its detail and popup (Ali, 2026-10-08, a quilboar among Menagerie's key cards in a lobby without them).
+    /// </summary>
+    public Func<string, bool> CannotShowUp { get; set; } = _ => false;
+
+    private FrameworkElement KeyOval(string cardId, double scale, double height) =>
+        CannotShowUp(cardId) ? CardImages.Unavailable(Oval(cardId, scale, height, onClick: null), scale) : Oval(cardId, scale, height, onClick: null);
+
     /// <summary>When false, no "Meta ↗" button (the meta-snapshot feature was switched off by its guard).</summary>
     public bool MetaEnabled { get; set; } = true;
 
@@ -358,7 +367,10 @@ internal sealed class CompsPanel
         }
 
         var panel = new LayoutRect(left + _panel.ActualWidth / 2, top + _panel.ActualHeight / 2, _panel.ActualWidth, _panel.ActualHeight);
-        return new GuidePopupContent(guide, CompTargets.Find(_targets, guide), _held, _pivotsFor(guide), _contextFor(guide), panel, _mover.VisiblePanels(except: _panel));
+        return new GuidePopupContent(guide, CompTargets.Find(_targets, guide), _held, _pivotsFor(guide), _contextFor(guide), panel, _mover.VisiblePanels(except: _panel))
+        {
+            CannotShowUp = CannotShowUp,
+        };
     }
 
     /// <summary>Opens a guide's detail in place of the list, as a click on its name does; false when it is not listed.</summary>
@@ -552,8 +564,9 @@ internal sealed class CompsPanel
         grid.Children.Add(ovals);
         void FillOvals()
         {
-            var (shown, more) = PanelFit.ListOvals(guide.CoreCards.Count);
-            foreach (var card in guide.CoreCards.Take(shown))
+            var possible = guide.CoreCards.Where(card => !CannotShowUp(card)).ToList();
+            var (shown, more) = PanelFit.ListOvals(possible.Count);
+            foreach (var card in possible.Take(shown))
             {
                 ovals.Children.Add(Oval(card, scale, height, open));
             }
@@ -983,7 +996,7 @@ internal sealed class CompsPanel
         }
 
         // Hover on an oval of the detail shows the card (beside the panel); a click on it does nothing.
-        var sections = GuideView.Sections(guide, _held, _pivotsFor(guide), scale, card => Oval(card, scale, height, onClick: null));
+        var sections = GuideView.Sections(guide, _held, _pivotsFor(guide), scale, card => KeyOval(card, scale, height));
         var more = GuideView.MoreSections(scale);
         foreach (var element in chrome.Concat(sections).Append(more))
         {

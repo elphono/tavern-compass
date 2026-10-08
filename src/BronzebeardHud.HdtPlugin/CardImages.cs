@@ -45,6 +45,30 @@ internal static class CardImages
     /// </param>
     /// <param name="onClick">When given, a click on the vignette calls it with the card id (clickable while the overlay stays locked).</param>
     /// <param name="tier">When given, the tavern tier in a badge on the top left corner.</param>
+    /// <summary>
+    /// A key card that cannot show up in the lobby (LobbyGuides.CannotShowUp), in a guide's detail or popup: the oval faded
+    /// and struck through, so that the guide is seen to count it without it looking like a card to aim at.
+    /// </summary>
+    public static FrameworkElement Unavailable(FrameworkElement oval, double scale)
+    {
+        oval.Opacity = 0.35;
+        var grid = new Grid { IsHitTestVisible = oval.IsHitTestVisible };
+        grid.Children.Add(oval);
+        grid.Children.Add(new System.Windows.Shapes.Line
+        {
+            X1 = 0,
+            Y1 = 1,
+            X2 = 1,
+            Y2 = 0,
+            Stretch = Stretch.Fill,
+            Stroke = new SolidColorBrush(Color.FromRgb(0xE0, 0x3A, 0x3A)),
+            StrokeThickness = 3 * scale,
+            Margin = new Thickness(4 * scale),
+            IsHitTestVisible = false,
+        });
+        return grid;
+    }
+
     public static FrameworkElement Vignette(string cardId, bool owned, double width, double scale, double previewHeight, Action<FrameworkElement>? placePreview,
         Action<string>? onClick = null, int? tier = null)
     {

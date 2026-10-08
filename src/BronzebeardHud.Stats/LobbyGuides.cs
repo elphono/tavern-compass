@@ -36,9 +36,12 @@ public sealed class LobbyGuides
     public const double MissingKeyShare = 0.5;
 
     private readonly Dictionary<string, string> _reasons;
+    private readonly Func<string, IReadOnlyCollection<string>?>? _cardTribes;
 
-    private LobbyGuides(CompGuideSet all, CompGuideSet playable, IReadOnlyList<LeftOutGuide> leftOut, IReadOnlyList<string> tribes)
+    private LobbyGuides(CompGuideSet all, CompGuideSet playable, IReadOnlyList<LeftOutGuide> leftOut, IReadOnlyList<string> tribes,
+        Func<string, IReadOnlyCollection<string>?>? cardTribes = null)
     {
+        _cardTribes = cardTribes;
         All = all;
         Playable = playable;
         LeftOut = leftOut;
@@ -87,7 +90,7 @@ public sealed class LobbyGuides
             .Select(t => new CompGuideTier(t.Tier, t.Guides.Where(g => !out_.Contains(g.Id)).ToList()))
             .Where(t => t.Guides.Count > 0)
             .ToList(), guides.UnknownCards);
-        return new LobbyGuides(guides, playable, leftOut, tribes);
+        return new LobbyGuides(guides, playable, leftOut, tribes, cardTribes);
     }
 
     /// <summary>Why the lobby cannot play a guide; null when it can (or when the lobby is not known).</summary>
@@ -106,16 +109,9 @@ public sealed class LobbyGuides
         var missing = new List<(string Card, IReadOnlyList<string> Tribes)>();
         foreach (var card in guide.CoreCards)
         {
-            var known = cardTribes(CardIds.Normalize(card));
-            if (known == null || known.Contains(Stats.Tribes.Any))
+            if (AbsentTribes(card, lobbyTribes, cardTribes) is { } cardAbsent)
             {
-                continue; // unknown: never held against the guide; an amalgam is every tribe
-            }
-
-            var battlegrounds = known.Where(Stats.Tribes.All.Contains).ToList();
-            if (battlegrounds.Count > 0 && !battlegrounds.Any(lobbyTribes.Contains))
-            {
-                missing.Add((card, battlegrounds));
+                missing.Add((card, cardAbsent));
             }
         }
 
@@ -126,6 +122,26 @@ public sealed class LobbyGuides
 
         var absent = missing.SelectMany(m => m.Tribes).Distinct(StringComparer.Ordinal);
         return $"key cards {string.Join(", ", missing.Select(m => m.Card))}: no {string.Join(", ", absent)}";
+    }
+
+    /// <summary>
+    /// True when this card cannot show up in the lobby: every one of its Battlegrounds tribes is absent. Never for a neutral
+    /// card, an amalgam, a card the database does not know, or while the lobby is not known. The panel leaves such a key card
+    /// out of a guide's line, and shows it greyed and struck in the detail and the popup (Ali, 2026-10-08).
+    /// </summary>
+    public bool CannotShowUp(string cardId) => Known && _cardTribes != null && AbsentTribes(cardId, Tribes, _cardTribes) != null;
+
+    /// <summary>The card's Battlegrounds tribes when none is in the lobby; null when it can show up (or is unknown).</summary>
+    private static IReadOnlyList<string>? AbsentTribes(string card, IReadOnlyCollection<string> lobbyTribes, Func<string, IReadOnlyCollection<string>?> cardTribes)
+    {
+        var known = cardTribes(CardIds.Normalize(card));
+        if (known == null || known.Contains(Stats.Tribes.Any))
+        {
+            return null; // unknown: never held against the guide; an amalgam is every tribe
+        }
+
+        var battlegrounds = known.Where(Stats.Tribes.All.Contains).ToList();
+        return battlegrounds.Count > 0 && !battlegrounds.Any(lobbyTribes.Contains) ? battlegrounds : null;
     }
 
     /// <summary>Why the lobby cannot play this guide; null when it can.</summary>

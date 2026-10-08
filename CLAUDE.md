@@ -221,7 +221,11 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   d'une carte clé neutre tenue). Un guide est écarté si sa tribu principale n'est pas dans la partie (même si ses cartes
   clés sont neutres), ou si au moins la moitié de ses cartes clés ne peuvent pas y apparaître (tribus de HearthDb,
   `HdtEntityAdapter.CardTribes` : une carte à deux tribus apparaît si l'une est là, un amalgame toujours, une carte inconnue
-  n'est jamais retenue contre un guide). Écarté : ni listé, ni cible, ni cadre, ni étiquette de choix, ni pivot. Tribus lues
+  n'est jamais retenue contre un guide). Écarté : ni listé, ni cible, ni cadre, ni étiquette de choix, ni pivot. **Une carte clé
+  d'une tribu absente dans un guide gardé** (2026-10-08 : un quilboar — « huran » en français — parmi les cartes clés de
+  Menagerie, sans quilboars dans le lobby ; Menagerie n'a pas de tribu principale et n'a qu'une carte clé sur quatre
+  impossible) : retirée des ovales de la ligne, grisée et barrée dans le détail et le popup (`LobbyGuides.CannotShowUp`,
+  `CardImages.Unavailable`, décision d'Ali). Tribus lues
   par `HdtEntityAdapter.LobbyTribeNames` (mémoire du jeu lue par HDT), redemandées une fois par seconde au plus tant
   qu'inconnues, puis gardées pour la partie ; **inconnues : rien n'est écarté**, et le panneau le dit. Une case cochée sur
   un guide que le lobby, une fois connu, ne joue pas est décochée (une ligne de journal).

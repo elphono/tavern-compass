@@ -29,6 +29,9 @@ internal sealed class GuidePopupContent
     }
 
     public CompGuide Guide { get; }
+
+    /// <summary>A key card the lobby cannot offer: greyed and struck (CardImages.Unavailable).</summary>
+    public Func<string, bool> CannotShowUp { get; set; } = _ => false;
     public CompTarget? Target { get; }
     public ICollection<string> Held { get; }
     public IReadOnlyList<GuidePivot>? Pivots { get; }
@@ -213,7 +216,11 @@ internal sealed class GuidePopup
         }
 
         var sections = GuideView.Sections(guide, content.Held, content.Pivots, scale,
-            card => CardImages.Vignette(card, content.Held.Contains(card), PanelFit.OvalWidth * scale, scale, 0, placePreview: null, onClick: null, CompsPanel.TierOf(card)));
+            card =>
+            {
+                var oval = CardImages.Vignette(card, content.Held.Contains(card), PanelFit.OvalWidth * scale, scale, 0, placePreview: null, onClick: null, CompsPanel.TierOf(card));
+                return content.CannotShowUp(card) ? CardImages.Unavailable(oval, scale) : oval;
+            });
         var more = GuideView.MoreSections(scale);
         foreach (var element in head.Concat(sections).Append(more))
         {

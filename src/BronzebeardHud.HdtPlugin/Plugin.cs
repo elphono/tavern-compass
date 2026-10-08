@@ -872,6 +872,7 @@ public sealed class Plugin : IPlugin
 
         _targetsVersion++;
         var note = _lobby is { Known: false } && _lobby.All.Count > 0 ? "Lobby tribes unknown: every guide listed" : null;
+        _compsPanel.CannotShowUp = _lobby != null ? _lobby.CannotShowUp : _ => false;
         _compsPanel.Show(_compsBoard, _tracker.Targets, cards.All.Select(c => c.CardId), _guides.Guides?.Source, CompGuidesStatus(_guides), note);
     }
 
