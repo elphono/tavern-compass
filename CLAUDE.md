@@ -354,6 +354,20 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   `tools/BronzebeardHud.Inspect` (README) : lit le cache sans réseau ni écriture ; mesuré le 2026-10-08, un écart de
   **population** suffit à dire « contested » (top 25 % contre tous : 20 héros sur 116, +0,16 place en moyenne) — la
   décote ne corrige pas un biais, à revoir avec nomi.gg.
+- **nomi.gg** (2026-10-08, chantier c, issue #10) : `NomiCache` lit `/patch/data/latest.json` puis
+  `/patch/analysis/<patch>.json` en requêtes conditionnelles, **une tentative par jour au plus, redémarrages d'HDT et
+  échecs compris** (date de la tentative écrite dans `stats\nomi-state.json` **avant** la première requête ; le cache de
+  Firestone, lui, redemande à chaque démarrage) ; un patch clos n'est plus jamais demandé ; le nom du patch, venu du
+  réseau, ne passe que s'il n'a que des chiffres et des points (il nomme une URL et un fichier). `NomiAnalysis` ne garde
+  que ce que lira le chantier d : héros, tribus avant / après, buffs et nerfs, trinkets gagnants et perdants, médianes de
+  montée de tier ; ni noms, ni plateaux, ni cartes. Fichier `stats\nomi-patch-analysis-<patch>.json`. `User-Agent` de
+  toutes les requêtes : `TavernCompass/<version> (+https://github.com/elphono/tavern-compass)`. Service `NomiService`,
+  garde-fou `data-nomi`, ligne `data nomi.gg patch analysis: downloaded|unchanged (304)|cached|FAILED … (patch 36.6.3)` ;
+  la source entre dans la vue consolidée (`stats view`). **Rien ne s'affiche encore** : le crédit « data: nomi.gg »
+  viendra avec le premier chiffre montré (chantier d). Mesuré le 2026-10-08 (CLI, section 4) : nomi.gg place ses héros
+  ≈ 0,3 place mieux que Firestone, systématiquement (population de joueurs volontaires, place moyenne 3,78) ; contre le
+  top 25 %, 8 héros sur 58 « contested ». Le vrai fichier avait une tribu sans partie et **sans** champ `avg` : l'import
+  l'accepte (test), il refusait le fichier entier.
 - Les compositions de Firestone (`CompService`, `TavernAdvisor`, `CompositionRows`, `CompDetail`, `CompTransitions`,
   `MinionLineups`) restent chargées et dans le code ; elles ne sont plus affichées (la ligne « comp ≈ » de l'encart
   des héros est retirée depuis le 2026-10-08, décision d'Ali), mais orientent les aides par le pont ci-dessous. Une erreur d'un fichier de `manual\` est dite une

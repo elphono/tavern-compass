@@ -60,6 +60,12 @@ public sealed class SourceSnapshot
     public static SourceSnapshot Of(TrinketStatsFile file) => new(file.Provenance,
         file.Trinkets.Where(t => t.DataPoints > 0).Select(t => new StatRecord("trinket", t.TrinketCardId, "placement", t.AveragePlacement, t.DataPoints, "games")).ToList());
 
+    /// <summary>nomi.gg's heroes and its winning and losing trinkets: average placement in games, every bracket mixed.</summary>
+    public static SourceSnapshot Of(NomiAnalysisFile file) => new(file.Provenance,
+        file.Heroes.Where(h => h.Games > 0).Select(h => new StatRecord("hero", h.HeroCardId, "placement", h.AveragePlacement, h.Games, "games"))
+            .Concat(file.Trinkets.Where(t => t.Games > 0).Select(t => new StatRecord("trinket", t.TrinketCardId, "placement", t.AveragePlacement, t.Games, "games")))
+            .ToList());
+
     /// <summary>The cards' average placement at each turn, sample in plays.</summary>
     public static SourceSnapshot Of(CardStatsFile file) => new(file.Provenance,
         file.Cards.SelectMany(c => c.Turns.Where(t => t.Played > 0).Select(t =>

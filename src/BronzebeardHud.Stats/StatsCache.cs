@@ -63,7 +63,20 @@ public sealed class HttpStatsFetcher : IStatsFetcher, IConditionalFetcher, IDisp
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
         };
         _client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(60) };
-        _client.DefaultRequestHeaders.UserAgent.ParseAdd("BronzebeardHud-HdtPlugin/0.1");
+        _client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+    }
+
+    /// <summary>
+    /// Names the plugin, its version (Directory.Build.props) and its repository on every request, as promised to nomi.gg's
+    /// owner, so that a site can tell us apart and reach us.
+    /// </summary>
+    public static string UserAgent
+    {
+        get
+        {
+            var v = typeof(HttpStatsFetcher).Assembly.GetName().Version ?? new Version(0, 0, 0);
+            return $"TavernCompass/{v.Major}.{v.Minor}.{v.Build} (+https://github.com/elphono/tavern-compass)";
+        }
     }
 
     public async Task<string> FetchAsync(string url, CancellationToken cancellationToken)

@@ -1,17 +1,20 @@
 using System.Globalization;
 using BronzebeardHud.Stats;
 
-// Usage: dotnet run --project tools/BronzebeardHud.Inspect -- <stats folder> [--bracket 25]
+// Usage: dotnet run --project tools/BronzebeardHud.Inspect -- <stats folder> [--bracket 25] [--nomi-raw <analysis.json>]
 // The stats folder is the plugin's (%LocalAppData%\BronzebeardHud\stats). Nothing is downloaded, nothing is written.
+// --nomi-raw reads a nomi.gg analysis as the site serves it (saved from a browser) instead of the plugin's cached one.
 var inv = CultureInfo.InvariantCulture;
 if (args.Length < 1 || !Directory.Exists(args[0]))
 {
-    Console.Error.WriteLine("usage: BronzebeardHud.Inspect <stats folder> [--bracket 25]");
+    Console.Error.WriteLine("usage: BronzebeardHud.Inspect <stats folder> [--bracket 25] [--nomi-raw <analysis.json>]");
     return 2;
 }
 
 var folder = args[0];
-var player = args.Length >= 3 && args[1] == "--bracket" ? int.Parse(args[2], inv) : 25;
+string? Option(string name) => args.SkipWhile(a => a != name).Skip(1).FirstOrDefault();
+var player = Option("--bracket") is { } bracketText ? int.Parse(bracketText, inv) : 25;
+var nomiRaw = Option("--nomi-raw");
 var brackets = new[] { 100, 50, 25, 10, 1 };
 const string period = "last-patch";
 var cache = new StatsCache(folder, new NoNetwork(), () => DateTimeOffset.UtcNow); // only for its file names
@@ -39,6 +42,9 @@ var heroes = brackets.ToDictionary(b => b, b => Read(cache.HeroStatsPath(b, peri
 var cards = brackets.ToDictionary(b => b, b => Read(cache.CardStatsPath(b, period), CardStatsLoader.Load));
 var trinkets = Read(cache.TrinketStatsPath(period), TrinketStatsLoader.Load);
 var manual = HeroStatsLoader.LoadDirectory(Path.Combine(folder, "manual"));
+var nomiPath = Directory.GetFiles(folder, "nomi-patch-analysis-*.json").OrderBy(p => p, StringComparer.Ordinal).LastOrDefault();
+var nomi = nomiRaw != null ? Read(nomiRaw, path => NomiAnalysis.Import(File.ReadAllText(path), path, File.GetLastWriteTimeUtc(path)))
+    : nomiPath == null ? null : Read(nomiPath, path => NomiAnalysis.Parse(File.ReadAllText(path)));
 
 static string Q(IReadOnlyList<double> sorted, double q) =>
     sorted.Count == 0 ? "–" : sorted[(int)Math.Floor(q * (sorted.Count - 1))].ToString("0.00", CultureInfo.InvariantCulture);
@@ -59,6 +65,11 @@ if (trinkets != null)
 if (cards[player] is { } myCards)
 {
     snapshots.Add(SourceSnapshot.Of(myCards));
+}
+
+if (nomi != null)
+{
+    snapshots.Add(SourceSnapshot.Of(nomi));
 }
 
 var view = StatsConsolidation.Consolidate(snapshots, player);
@@ -102,6 +113,26 @@ foreach (var b in brackets)
     var plays = cards[b]?.Cards.SelectMany(c => c.Turns).Where(t => t.Turn is >= 3 and <= 10).Select(t => (double)t.Played).OrderBy(v => v).ToList()
         ?? new List<double>();
     Console.WriteLine($"  mmr-{b,-4} | {games.Count,6} | {Q(games, 0.5)}, {Q(games, 0.1)}, {(games.Count == 0 ? "–" : games[0].ToString("0", inv))} | {games.Count(g => g < StatsConsolidation.MinimumCount),8} | {plays.Count,19} | {Q(plays, 0.5)}, {Q(plays, 0.1)} | {plays.Count(p => p < CardTurnValue.MinimumPlayed),9}");
+}
+
+// 4. Firestone against nomi.gg: the first real disagreement between two sources, and what the rule makes of it.
+Console.WriteLine();
+Console.WriteLine($"# 4. Heroes: Firestone against nomi.gg (patch {nomi?.Provenance.Patch ?? "–"}, every bracket, discount {StatsConsolidation.OtherBracketDiscount})");
+Console.WriteLine("  Firestone | heroes | contested | |Δ| median, p90 (places) | Δ mean (nomi − Firestone) | nomi games median");
+foreach (var b in brackets)
+{
+    if (heroes[b] is not { } h || nomi == null)
+    {
+        continue;
+    }
+
+    var pairView = StatsConsolidation.Consolidate(new[] { SourceSnapshot.Of(h), SourceSnapshot.Of(nomi) }, b);
+    var both = pairView.Stats.Where(s => s.Kind == "hero" && s.Contributions.Count(c => c.Included) == 2).ToList();
+    double Value(ConsolidatedStat s, string source) => s.Contributions.First(c => c.Provenance.Source == source).Record.Value;
+    var deltas = both.Select(s => Math.Abs(Value(s, StatsSources.NomiGg) - Value(s, StatsSources.Firestone))).OrderBy(d => d).ToList();
+    var mean = both.Count == 0 ? 0 : both.Average(s => Value(s, StatsSources.NomiGg) - Value(s, StatsSources.Firestone));
+    var games = both.Select(s => (double)s.Contributions.First(c => c.Provenance.Source == StatsSources.NomiGg).Record.Count).OrderBy(g => g).ToList();
+    Console.WriteLine($"  mmr-{b,-5} | {both.Count,6} | {both.Count(s => s.Verdict == StatVerdict.Contested),9} | {Q(deltas, 0.5)}, {Q(deltas, 0.9)} | {mean.ToString("+0.00;-0.00", inv),24} | {Q(games, 0.5)}");
 }
 
 return 0;

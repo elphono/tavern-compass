@@ -64,6 +64,8 @@ dotnet build src/BronzebeardHud.HdtPlugin -c Release -p:HdtInstallDir=/path/to/H
 - The comp guides are the ones HDT already downloads; **the plugin makes no HSReplay request**.
 - Hero, comp and trinket statistics are Firestone's public aggregates, used with its author's permission, cached
   under `%LocalAppData%\BronzebeardHud\stats\` and re-checked with conditional requests (ETag) at startup.
+- [nomi.gg](https://nomi.gg)'s patch analysis is read with its owner's permission: at most one conditional request a
+  day, never redistributed. Every request names the plugin in its User-Agent.
 - Card images come from [HearthstoneJSON](https://hearthstonejson.com/) and are cached locally.
 - Nothing is sent anywhere: no account, no telemetry.
 

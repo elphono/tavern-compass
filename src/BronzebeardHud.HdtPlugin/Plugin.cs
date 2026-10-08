@@ -31,6 +31,7 @@ public sealed class Plugin : IPlugin
     private OpponentMmrPanel? _opponentMmr;
     private ChoiceAdvicePanel? _choices;
     private CardStatsService? _cardStats;
+    private NomiService? _nomi;
 
     // One fetcher and one cache for every service (chantier b): created at load, the fetcher disposed at unload.
     private HttpStatsFetcher? _fetcher;
@@ -39,6 +40,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _heroSelectionGuard;
     private readonly FeatureGuard _firestoneGuard;
     private readonly FeatureGuard _manualGuard;
+    private readonly FeatureGuard _nomiGuard;
     private readonly FeatureGuard _statsViewGuard;
     private readonly FeatureGuard _compsGuard;
     private readonly FeatureGuard _markersGuard;
@@ -97,6 +99,7 @@ public sealed class Plugin : IPlugin
     private int _selectionVersion;
     private int _gameNumber;
     private int _manualGame = -1;
+    private int _nomiGame = -1;
     private string _statsViewKey = string.Empty;
 
     // The "Skip combat" button: shown in combat, acts once per combat (SkipCombatState).
@@ -119,6 +122,7 @@ public sealed class Plugin : IPlugin
         // "data-firestone" the features still load Firestone's files themselves, only later (at hero pick, trinket choice).
         _firestoneGuard = new FeatureGuard("data-firestone", (n, e) => Disable(n, e, () => { }));
         _manualGuard = new FeatureGuard("data-manual", (n, e) => Disable(n, e, () => { }));
+        _nomiGuard = new FeatureGuard("data-nomi", (n, e) => Disable(n, e, () => { }));
         // The consolidated view of every source's figures (chantier b): only a log line so far, no help reads it yet.
         _statsViewGuard = new FeatureGuard("stats-view", (n, e) => Disable(n, e, () => { }));
         // The panel, HDT's guides and the targets: one feature since the two composition panels became one (2026-10-04).
@@ -664,6 +668,7 @@ public sealed class Plugin : IPlugin
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, cache);
         _cardStats = new CardStatsService(cache);
+        _nomi = new NomiService(StatsDirectory, _fetcher);
         _skipCombat = new SkipCombatPanel(Core.OverlayCanvas, _mover, SkipCombat);
     }
 
@@ -702,6 +707,7 @@ public sealed class Plugin : IPlugin
         _heroEffectsKey = string.Empty;
         _cover.Reset(); // the panels are new: nothing of them is hidden yet
         _manualGame = -1; // the services are new: their hand-typed files are read again
+        _nomiGame = -1;
         _statsViewKey = string.Empty;
     }
 
@@ -717,6 +723,7 @@ public sealed class Plugin : IPlugin
         _opponentMmr = null;
         _choices?.Detach();
         _cardStats = null;
+        _nomi = null;
         _choices = null;
         _skipCombat?.Detach();
         _skipCombat = null;
@@ -740,6 +747,7 @@ public sealed class Plugin : IPlugin
 
         _manualGuard.Run(RefreshManual);
         _firestoneGuard.Run(() => RefreshData(game));
+        _nomiGuard.Run(RefreshNomi);
         _statsViewGuard.Run(UpdateStatsView);
         _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
         _compsGuard.Run(() => UpdateComps(game)); // the targets first: the frames and the choices follow them
@@ -1014,7 +1022,7 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        var key = $"{_stats.Version}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_cardStats?.Version}";
+        var key = $"{_stats.Version}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_cardStats?.Version}|{_nomi?.Version}";
         if (key == _statsViewKey)
         {
             return;
@@ -1032,9 +1040,36 @@ public sealed class Plugin : IPlugin
             snapshots.Add(SourceSnapshot.Of(cards));
         }
 
+        if (_nomi?.File is { } nomi)
+        {
+            snapshots.Add(SourceSnapshot.Of(nomi));
+        }
+
         var view = StatsConsolidation.Consolidate(snapshots, _stats.Bracket);
         var sources = string.Join(", ", snapshots.Select(s => $"{s.Provenance.Source} mmr-{s.Provenance.MmrPercentile?.ToString() ?? "all"} ({s.Records.Count})"));
         Log.Info($"Bronzebeard HUD: stats view bracket=mmr-{_stats.Bracket} sources=[{sources}] · {view.Summary("hero")} · {view.Summary("trinket")} · {view.Summary("card")}");
+    }
+
+    /// <summary>nomi.gg's patch analysis: asked at the plugin's start and once per game; NomiCache keeps it to one attempt a day.</summary>
+    private void RefreshNomi()
+    {
+        if (_nomi == null)
+        {
+            return;
+        }
+
+        if (_nomiGame != _gameNumber)
+        {
+            _nomiGame = _gameNumber;
+            _nomi.BeginGame(_gameNumber);
+        }
+
+        _nomi.Poll();
+        if (_nomi.PendingLogLine is { } line)
+        {
+            Log.Info(line);
+            _nomi.PendingLogLine = null;
+        }
     }
 
     /// <summary>The hand-typed files (stats\manual\), read at the plugin's start and once per game: the "data-manual" source.</summary>

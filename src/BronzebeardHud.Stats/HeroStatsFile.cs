@@ -16,6 +16,9 @@ public static class StatsSources
     /// <summary>Copied by hand from hsreplay.net.</summary>
     public const string HsReplayManual = "hsreplay-manual";
 
+    /// <summary>nomi.gg's patch analysis, read with its owner's agreement (CLAUDE.md, "Décisions").</summary>
+    public const string NomiGg = "nomi.gg";
+
     /// <summary>The short label on screen: "FS", "HSR", or an unknown source's own name.</summary>
     public static string Label(string source) => source switch
     {
