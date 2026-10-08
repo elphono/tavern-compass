@@ -19,7 +19,7 @@ l'historique git (tag `archive/standalone-app`, dernier état avant son retrait)
 privé, `github.com/elphono/bg_treehudder`. Le format annoté de `Power.log`, les plans de portage Rust → C# et la maquette
 de l'ancien panneau (`docs/mock/`) ont été retirés avec elle.
 
-## État du projet (au 2026-10-06)
+## État du projet (au 2026-10-08)
 
 Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des décisions est dans
 `docs/journal/2026-09-26-plugin-hdt.md`.
@@ -33,49 +33,17 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 | 5 | top 4 des héros, plateau vs courbe du héros, compo par héros, bilan par adversaire | ✓ | ✗ |
 | 6 | affinité compo ↔ héros, nombre de compos réglable, épinglage au clic, pivots, « comment les tops le jouent », bouton Meta | ✓ | ✗ |
 
-Ce qui reste ouvert :
+Ce qui reste ouvert **vit dans les issues GitHub** (depuis le 2026-10-08, à la demande d'Ali), rangées par milestone :
+c'est le siège unique du travail en cours, ne pas le recopier ici. `gh issue list -R elphono/tavern-compass` ; une issue se
+ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps quand un point est vu en jeu.
 
-- **Vérifier en jeu card-stats et la tranche à chaud** (2026-10-08, ci-dessous « card-stats de Firestone ») : la ligne
-  `data card-stats mmr-… last-patch: downloaded`, les valeurs sur les cartes de Bob (ligne `tavern values`) et à la place
-  d'un « — », le bouton de tranche ; que le tour de HDT (`GetTurnNumber`) soit bien celui de Firestone n'est que supposé.
-  Les DLL n'ont pas été déployées : HDT n'est pas installé sur la machine où le chantier a été fait.
-- **Vérifier en jeu les deux correctifs du 2026-10-07** (`docs/journal/2026-10-07-jauge-adverse-cadres-coches.md`) : la
-  rangée de l'adversaire — sur une partie entière, aucune ligne `opponent power …` n'avait de plateau (`seen=none` partout) ; la prochaine doit
-  porter `seen=<tour>` en combat et, en taverne, contre un adversaire déjà affronté ; sinon, `read=[…]` dit à lui seul
-  pourquoi (aucun héros, pas de plateau chez HDT, plateau vide ou d'un autre tour) ; en fin de combat, la ligne
-  `scope=combat id=… (kept)` au lieu de `id=0 … not known yet` (arbitrage d'Ali rendu : l'adversaire du combat est gardé
-  jusqu'à la taverne). Et, une case cochée, plus aucun cadre
-  sur les cartes de Bob hors des guides cochés (ligne `tavern highlights=[…] … frames from ticked=[…]`) ; vu seulement dans
-  la simulation (`--selftest`, `--scenario 5 --tick 3`).
-- **Vérifier en jeu l'encart de puissance et le resize par + / −** (2026-10-06, `docs/journal/2026-10-06-encart-puissance-resize.md`,
-  note HTML § 12) : l'encart sous le cadre (feux, halo, − à gauche, + à droite), le panneau qui suit N à chaque appui
-  (ligne `targets n=… panel resized to …`), son bas gardé en bas d'écran, la boîte de la poignée gardée jusqu'à un appui ; la
-  rangée de l'adversaire (ligne `opponent power …` : plateau, héros, tour vu, moyenne), en combat le plateau affronté, en
-  taverne le dernier plateau vu du prochain adversaire. **Trois arbitrages à confirmer par Ali** : « avec notre board
-  seulement » gardé plateau + main ; une case cochée garde N lignes (au moins toutes les cibles) ; la taille donnée par
-  + / − oubliée à la partie suivante. Vus seulement dans la simulation (`--count`, `--opp-power`, `--play`).
-- **Vérifier en jeu le filtre des tribus du lobby, la règle des cases et l'indicateur de puissance** (2026-10-06,
-  `docs/journal/2026-10-06-tribus-cases-puissance.md`, note HTML § 11) : la ligne `lobby tribes=[…] read at …` (quand HDT a
-  les tribus : jamais mesuré, seulement déduit), `lobby tribes=[…] (…): k/n guides playable; left out: …` ; plus aucune
-  compo d'une tribu absente (liste, cadres, choix) ; une case cochée garde les compos en cours (« in progress ») ; la
-  jauge rouge / jaune / verte / dorée sous la liste. Vus seulement dans la simulation (`--scenario 3|4|5`, `--power …`).
-- **Vérifier en jeu le panneau unique « Compositions »** (2026-10-04, `docs/journal/2026-10-04-panneau-unique.md`) :
-  liste des guides de HDT et couleurs des cibles, détail au clic, cadres sur les cartes de Bob, étiquettes des choix,
-  tribus du lobby (bêtes), popup du guide au survol d'une ligne (et l'aperçu de carte au premier survol d'un ovale). Vu
-  seulement dans la simulation (captures, `--selftest` ; les étiquettes des choix depuis le 2026-10-04, `--choice` ; le
-  survol, `--hover`).
-- **Vérifier en jeu le pont guides HDT ↔ compos Firestone et le masquage pendant un choix** (2026-10-04,
-  `docs/journal/2026-10-04-panneau-unique.md` § « Stats Firestone → aides ») : le taux de recoupement réel (24 compos
-  Firestone contre ≈ 23 guides de HDT) n'a **jamais été mesuré** — lire la ligne `bridge:` du journal d'HDT à la première
-  partie ; le masquage des marqueurs et du panneau pendant un choix est une décision du pilote, **à confirmer par Ali**.
-  Vus seulement dans la simulation, sur des compos Firestone synthétiques.
-- **Vérifier en jeu la poignée de redimensionnement** (2026-10-04) : le calcul est testé et éprouvé par mutation,
-  mais le pointage sous HDT, le cadre pointillé, le rendu d'un panneau étroit et le retour au défaut par « Reset » ne
-  se voient que sous Windows.
-- **Vérifier en jeu** les phases 5 et 6 (liste exhaustive : spec § 5), et le Skip combat relancé par Battle.net
-  (`docs/journal/2026-09-27-*.md`).
-- **Deux arbitrages d'Ali** : garder la ligne « comp ≈ » sous chaque héros (échantillons minces, 17
-  parties en médiane) ; garder le bilan par adversaire s'il doublonne l'interface du jeu.
+| Milestone | Issues | Contenu |
+|---|---|---|
+| Vérifier en jeu | #2 à #8 | tout ce qui n'est vu que dans la simulation (card-stats et tranche à chaud, à déployer d'abord ; jauge adverse ; encart et + / − ; tribus et cases ; panneau unique, pont, masquage ; phases 5 et 6) et les arbitrages d'Ali (label `arbitrage`) |
+| Stats multi-sources | #9 à #12 | chantiers b (socle), c (nomi.gg), d (composants 3 à 9), f (nos propres données) |
+| Idées à explorer | #1, #14 | l'anti-danse du board (idée gardée par Ali), la simulation de la couche d'overlay d'HDT |
+| — | #13 | releases empaquetées |
+
 - **Import HSReplay jamais utilisé** : `stats\manual\` est vide, seules les 24 compos Firestone tournent.
 - Hors périmètre, tranché : notification Timewarped (mécanique absente des parties de la saison 14,
   prouvé sur les logs), stats de quêtes (fichier Firestone vide), marqueur « prochain adversaire »
