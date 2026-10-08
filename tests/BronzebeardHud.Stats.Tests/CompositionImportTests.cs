@@ -153,5 +153,10 @@ public class CompositionImportTests
             CompositionLoader.Parse(json.Replace("\"BG32_880\"", "\"BG32_324\""))).Message);   // core and addon at once
         Assert.StartsWith("compositions[1].tribes", Assert.Throws<StatsFormatException>(() =>
             CompositionLoader.Parse(json.Replace("\"PIRATE\"", "\"PIRATES\""))).Message);
+
+        // The source is an open list: an unknown one loads under its name, an empty one is refused.
+        Assert.Equal("nomi.gg", CompositionLoader.Parse(json.Replace("\"hsreplay-manual\"", "\"nomi.gg\"")).Source);
+        Assert.StartsWith("source", Assert.Throws<StatsFormatException>(() =>
+            CompositionLoader.Parse(json.Replace("\"hsreplay-manual\"", "\"\""))).Message);
     }
 }

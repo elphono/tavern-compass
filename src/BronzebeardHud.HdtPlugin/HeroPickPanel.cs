@@ -200,7 +200,7 @@ internal sealed class HeroPickPanel
         IsHitTestVisible = false,
     };
 
-    private static string SourceLabel(string source) => source == StatsSources.HsReplayManual ? "HSR" : "FS";
+    private static string SourceLabel(string source) => StatsSources.Label(source);
 
     private static Brush TierBrush(string? tier) => tier switch
     {

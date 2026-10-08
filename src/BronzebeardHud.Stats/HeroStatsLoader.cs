@@ -97,10 +97,9 @@ public static class HeroStatsLoader
         }
 
         var source = RequiredString(obj, "source", "source");
-        if (!StatsSources.All.Contains(source))
+        if (source.Length == 0)
         {
-            throw new StatsFormatException(
-                $"source: expected one of {string.Join(", ", StatsSources.All)}, got \"{source}\"");
+            throw new StatsFormatException("source: expected a non-empty string");
         }
 
         if (obj["heroes"] is not JArray heroesArray)

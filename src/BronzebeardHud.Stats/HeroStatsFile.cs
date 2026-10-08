@@ -4,7 +4,10 @@ using System.Linq;
 
 namespace BronzebeardHud.Stats;
 
-/// <summary>Known values of the <c>source</c> field of a local stats file.</summary>
+/// <summary>
+/// Known values of the <c>source</c> field of a local stats file. An open list (chantier b): a file of another source
+/// loads, and is shown under its own name.
+/// </summary>
 public static class StatsSources
 {
     /// <summary>Downloaded from Firestone's public JSON endpoints.</summary>
@@ -13,7 +16,13 @@ public static class StatsSources
     /// <summary>Copied by hand from hsreplay.net.</summary>
     public const string HsReplayManual = "hsreplay-manual";
 
-    public static readonly IReadOnlyList<string> All = new[] { Firestone, HsReplayManual };
+    /// <summary>The short label on screen: "FS", "HSR", or an unknown source's own name.</summary>
+    public static string Label(string source) => source switch
+    {
+        Firestone => "FS",
+        HsReplayManual => "HSR",
+        _ => source,
+    };
 }
 
 /// <summary>How much having one tribe in the lobby moves a hero's average placement (Firestone tribeStats).</summary>
@@ -164,6 +173,9 @@ public sealed class HeroStatsFile
 
     /// <summary>The source's MMR brackets, when it publishes them; empty otherwise.</summary>
     public IReadOnlyList<MmrThreshold> MmrThresholds { get; }
+
+    /// <summary>The header in the common format (chantier b).</summary>
+    public StatProvenance Provenance => new(Source, SourceUrl, GeneratedAt, FetchedAt, TimePeriod, MmrPercentile, patch: null);
 
     public HeroStat? Find(string baseHeroCardId) =>
         Heroes.FirstOrDefault(h => string.Equals(h.HeroCardId, baseHeroCardId, StringComparison.Ordinal));

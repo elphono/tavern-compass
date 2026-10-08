@@ -55,6 +55,9 @@ public sealed class TrinketStatsFile
     public DateTimeOffset? FetchedAt { get; }
     public string? TimePeriod { get; }
 
+    /// <summary>The header in the common format (chantier b): always Firestone; one file holds every bracket, so none is named.</summary>
+    public StatProvenance Provenance => new(StatsSources.Firestone, SourceUrl, GeneratedAt, FetchedAt, TimePeriod, mmrPercentile: null, patch: null);
+
     public TrinketStat? Find(string trinketCardId) =>
         Trinkets.FirstOrDefault(t => string.Equals(t.TrinketCardId, trinketCardId, StringComparison.Ordinal));
 }

@@ -83,12 +83,22 @@ public class HeroStatsLoaderTests
         Assert.StartsWith("schema:", e.Message);
     }
 
+    /// <summary>The source is an open list (chantier b): an unknown one loads under its name; an empty one is refused.</summary>
     [Fact]
-    public void Parse_UnknownSource_IsRejected()
+    public void Parse_UnknownSource_Loads_AnEmptyOneIsRejected()
     {
-        var e = Assert.Throws<StatsFormatException>(() => HeroStatsLoader.Parse(ValidFile.Replace("hsreplay-manual", "hsreplay")));
+        Assert.Equal("nomi.gg", HeroStatsLoader.Parse(ValidFile.Replace("hsreplay-manual", "nomi.gg")).Source);
+
+        var e = Assert.Throws<StatsFormatException>(() => HeroStatsLoader.Parse(ValidFile.Replace("\"hsreplay-manual\"", "\"\"")));
         Assert.StartsWith("source:", e.Message);
     }
+
+    [Theory]
+    [InlineData("firestone", "FS")]
+    [InlineData("hsreplay-manual", "HSR")]
+    [InlineData("nomi.gg", "nomi.gg")]
+    public void SourceLabel_KnownSourcesAreShort_AnUnknownOneKeepsItsName(string source, string label) =>
+        Assert.Equal(label, StatsSources.Label(source));
 
     [Fact]
     public void Parse_MissingPlacement_NamesTheField()

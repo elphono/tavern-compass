@@ -147,6 +147,9 @@ public sealed class CompositionFile
     public DateTimeOffset? GeneratedAt { get; }
     public DateTimeOffset? FetchedAt { get; }
     public string? TimePeriod { get; }
+
+    /// <summary>The header in the common format (chantier b); a composition file has no MMR bracket.</summary>
+    public StatProvenance Provenance => new(Source, SourceUrl, GeneratedAt, FetchedAt, TimePeriod, mmrPercentile: null, patch: null);
 }
 
 /// <summary>
@@ -184,9 +187,9 @@ public static class CompositionLoader
         }
 
         var source = obj.Value<string>("source");
-        if (source == null || !StatsSources.All.Contains(source))
+        if (string.IsNullOrEmpty(source))
         {
-            throw new StatsFormatException($"source: expected one of {string.Join(", ", StatsSources.All)}");
+            throw new StatsFormatException("source: expected a non-empty string");
         }
 
         if (obj["compositions"] is not JArray array || array.Count == 0)
