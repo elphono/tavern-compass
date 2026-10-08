@@ -21,10 +21,12 @@ public class ChoiceCoverTests
         {
             lines.Add(cover.Observe(OverlayPhase.Shop, kind));
             Assert.True(cover.Hidden);
+            Assert.Equal(kind != ChoiceKind.Trinket, cover.PanelHidden);
             lines.Add(cover.Observe(OverlayPhase.Shop, kind)); // the next updates of the same choice: no line
             lines.Add(cover.Observe(OverlayPhase.Shop, kind));
             lines.Add(cover.Observe(OverlayPhase.Shop, ChoiceKind.None));
             Assert.False(cover.Hidden);
+            Assert.False(cover.PanelHidden);
             lines.Add(cover.Observe(OverlayPhase.Shop, ChoiceKind.None));
         }
 
@@ -32,10 +34,30 @@ public class ChoiceCoverTests
         {
             ChoiceCover.HiddenLine, null, null, ChoiceCover.RestoredLine, null,
             ChoiceCover.HiddenLine, null, null, ChoiceCover.RestoredLine, null,
-            ChoiceCover.HiddenLine, null, null, ChoiceCover.RestoredLine, null,
+            ChoiceCover.PanelKeptLine, null, null, ChoiceCover.RestoredLine, null,
         }, lines);
+        Assert.Equal("Bronzebeard HUD: choice open (trinkets): markers hidden, panel kept", ChoiceCover.PanelKeptLine);
         Assert.Equal("Bronzebeard HUD: choice open: markers and panel hidden", ChoiceCover.HiddenLine);
         Assert.Equal("Bronzebeard HUD: choice closed: restored", ChoiceCover.RestoredLine);
+    }
+
+    [Fact]
+    public void Trinkets_HideBobsMarkers_ButKeepThePanel()
+    {
+        // Ali, 2026-10-08: the "Compositions" panel must not disappear while choosing a trinket. The markers stay hidden:
+        // the trinket shop covers Bob's row, and their ◇ would fall inside the options.
+        var cover = new ChoiceCover();
+
+        Assert.Equal(ChoiceCover.PanelKeptLine, cover.Observe(OverlayPhase.Shop, ChoiceKind.Trinket));
+        Assert.True(cover.Hidden);
+        Assert.False(cover.PanelHidden);
+
+        // Another kind while still open (a discover from a trinket): the panel goes, one line; back to trinkets, it returns.
+        Assert.Equal(ChoiceCover.HiddenLine, cover.Observe(OverlayPhase.Shop, ChoiceKind.Discover));
+        Assert.True(cover.PanelHidden);
+        Assert.Equal(ChoiceCover.PanelKeptLine, cover.Observe(OverlayPhase.Shop, ChoiceKind.Trinket));
+        Assert.False(cover.PanelHidden);
+        Assert.Null(cover.Observe(OverlayPhase.Shop, ChoiceKind.Trinket));
     }
 
     [Fact]
@@ -45,6 +67,7 @@ public class ChoiceCoverTests
 
         Assert.Equal(ChoiceCover.HiddenLine, cover.Observe(OverlayPhase.Shop, ChoiceKind.Unsupported));
         Assert.True(cover.Hidden);
+        Assert.True(cover.PanelHidden);
     }
 
     [Fact]
@@ -72,7 +95,8 @@ public class ChoiceCoverTests
         cover.Reset();
 
         Assert.False(cover.Hidden);
+        Assert.False(cover.PanelHidden);
         Assert.Null(cover.Observe(OverlayPhase.Shop, ChoiceKind.None));
-        Assert.Equal(ChoiceCover.HiddenLine, cover.Observe(OverlayPhase.Shop, ChoiceKind.Trinket));
+        Assert.Equal(ChoiceCover.HiddenLine, cover.Observe(OverlayPhase.Shop, ChoiceKind.DarkGift));
     }
 }

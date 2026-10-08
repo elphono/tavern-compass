@@ -1124,7 +1124,7 @@ public sealed class Plugin : IPlugin
 
     /// <summary>
     /// While a choice is open in the shop (ChoiceCover: any kind ChoiceClassifier tells from None), the markers on Bob's
-    /// cards and the "Compositions" panel with its popup are off the screen, and back as they were once it closes: nothing
+    /// cards and, for any kind but trinkets, the "Compositions" panel with its popup are off the screen, and back as they were once it closes: nothing
     /// is computed again for that, the panel and the markers keep what they were last given. One log line per transition.
     /// A decision to be confirmed in game by Ali (docs/journal/2026-10-04-panneau-unique.md).
     /// </summary>
@@ -1137,7 +1137,7 @@ public sealed class Plugin : IPlugin
         }
 
         _markers?.Suspend(_cover.Hidden);
-        _compsPanel?.Suspend(_cover.Hidden);
+        _compsPanel?.Suspend(_cover.PanelHidden);
     }
 
     /// <summary>

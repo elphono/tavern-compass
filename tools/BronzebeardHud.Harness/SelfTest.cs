@@ -1043,6 +1043,19 @@ internal static class SelfTest
         var popupAgain = popup.IsVisible;
         Raise(comps.ShownLines[guide.Id], UIElement.MouseLeaveEvent);
         check("after the choice, a hovered line shows its popup again", popupAgain, $"popup visible {popupAgain}");
+
+        // Trinkets (Ali, 2026-10-08): Bob's markers leave the screen, the panel and its inset stay, the same elements.
+        window.ShowChoice(ChoiceKind.Trinket);
+        window.UpdateLayout();
+        var markersTrinket = MarkerSignatures(window);
+        var panelTrinket = comps.Element.IsVisible && comps.Inset.IsVisible && RectOf(comps.Element) == panelBefore;
+        var contentTrinket = comps.Content;
+        window.ShowChoice(ChoiceKind.None);
+        window.UpdateLayout();
+        check("trinket shop open: Bob's markers leave the screen, the panel and its inset stay where they were",
+            markersTrinket.Count == 0 && panelTrinket && MarkerSignatures(window).SequenceEqual(markersBefore),
+            $"trinkets open: {markersTrinket.Count} marker elements, panel {Describe(RectOf(comps.Element))} visible {panelTrinket}, "
+            + $"same content {ReferenceEquals(contentTrinket, comps.Content)}; closed: markers identical {MarkerSignatures(window).SequenceEqual(markersBefore)}");
         window.CursorInside = null;
     }
 

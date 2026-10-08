@@ -288,7 +288,9 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   (« core Nom (S) », neutre) ; sinon « — ». Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est
   à la fois BEAST et PET). **Pendant un choix** ouvert en taverne (toute sorte que `ChoiceClassifier` distingue de
   `None`, y compris sans disposition connue), cadres, étiquettes et ◇ des cartes de Bob, le panneau « Compositions » et
-  son popup sont retirés de l'écran (`ChoiceCover`, `TavernMarkers.Suspend`, `CompsPanel.Suspend`), puis remis tels quels
+  son popup sont retirés de l'écran (`ChoiceCover`, `TavernMarkers.Suspend`, `CompsPanel.Suspend`) — **sauf le panneau pendant
+  un choix de trinkets**, qui reste affiché (Ali, 2026-10-08 : « le panel composition ne doit pas disparaître lors du choix
+  des trinkets » ; `ChoiceCover.PanelHidden`, ligne `choice open (trinkets): markers hidden, panel kept`) —, puis remis tels quels
   à sa fermeture, sans recalcul (le panneau : les mêmes éléments si rien n'a changé). Raison, mesurée dans la simulation :
   les ◇ tombaient dans les cartes d'un Dark Gift (un clic épinglait au lieu de choisir) et le panneau, à sa place par
   défaut en 1080p, couvrait le bas de la 3e option (302 × 43 px en découverte, 359 × 162 px en Dark Gift). Décision du
