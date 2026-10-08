@@ -12,25 +12,18 @@ public class HeroCompAffinityTests
     private static readonly Composition C = Comp("mech_c", "Mech C", "MECHANICAL", 3.9, new CompHeroStat("HERO_H", 9, 1.8));
     private static readonly Composition[] All = { A, B, C };
 
+    /// <summary>Each comp's estimate for a hero, pulled towards the comp's average; small samples left out; an unknown hero gets nothing.</summary>
     [Fact]
-    public void ThreeHeroes_TheSteadierCompBeatsTheLuckyOne_SmallSamplesLeftOut_UnknownHeroGetsNothing()
+    public void Effects_PullEachPairTowardsTheComp_SmallSamplesLeftOut_UnknownHeroGetsNothing()
     {
-        var h = HeroCompAffinity.Best("HERO_H", All)!;
+        var h = HeroCompAffinity.Effects("HERO_H", All);
         // A: (12 × 2.5 + 30 × 4.2) / 42 = 3.714…; B: (40 × 3.3 + 30 × 3.6) / 70 = 3.428…; C: 9 games, left out.
-        Assert.Equal(("pirate_b", 3.428571, 40), (h.Composition.Id, Math.Round(h.Estimate, 6), h.Games));
-        Assert.Equal("comp ≈ Pirate B 3,4 (40)", h.Label);
+        Assert.Equal(new[] { ("pirate_b", 3.428571, 40), ("undead_a", 3.714286, 12) },
+            h.Values.OrderBy(p => p.Estimate).Select(p => (p.Composition.Id, Math.Round(p.Estimate, 6), p.Games)));
 
-        var g = HeroCompAffinity.Best("HERO_G", All)!;
-        Assert.Equal("comp ≈ Undead A 4,3 (15)", g.Label); // (15 × 4.5 + 30 × 4.2) / 45 = 4.3
+        Assert.Equal(4.3, HeroCompAffinity.Effects("HERO_G", All)["undead_a"].Estimate, precision: 9); // (15 × 4.5 + 30 × 4.2) / 45
 
-        Assert.Null(HeroCompAffinity.Best("HERO_K", All));
-    }
-
-    [Fact]
-    public void OnlyCompsPlayableInTheLobbyCount()
-    {
-        var withoutPirates = TavernAdvisor.Playable(All, new[] { "UNDEAD", "MECHANICAL", "BEAST", "DEMON", "NAGA" });
-        Assert.Equal(("undead_a", 3.714286), (HeroCompAffinity.Best("HERO_H", withoutPirates)!.Composition.Id, Math.Round(HeroCompAffinity.Best("HERO_H", withoutPirates)!.Estimate, 6)));
+        Assert.Empty(HeroCompAffinity.Effects("HERO_K", All));
     }
 
     [Fact]

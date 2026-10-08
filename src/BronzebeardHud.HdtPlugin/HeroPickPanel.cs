@@ -19,7 +19,6 @@ internal sealed class HeroPickPanel
     private readonly List<Border> _badges = new();
     private readonly TextBlock _status = new() { Foreground = Brushes.Gold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, IsHitTestVisible = false };
     private IReadOnlyList<HeroPickRow> _rows = new List<HeroPickRow>();
-    private IReadOnlyDictionary<int, string> _compLines = new Dictionary<int, string>();
     private bool _visible;
 
     public HeroPickPanel(Canvas canvas)
@@ -30,11 +29,9 @@ internal sealed class HeroPickPanel
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
-    /// <param name="compLines">Hero entity id → its best composition line (HeroCompAffinity), when known.</param>
-    public void Show(IReadOnlyList<HeroPickRow> rows, string? status, IReadOnlyDictionary<int, string>? compLines = null)
+    public void Show(IReadOnlyList<HeroPickRow> rows, string? status)
     {
         _rows = rows;
-        _compLines = compLines ?? new Dictionary<int, string>();
         foreach (var badge in _badges)
         {
             _canvas.Children.Remove(badge);
@@ -110,7 +107,7 @@ internal sealed class HeroPickPanel
             badge.BorderThickness = new Thickness(HeroPickLayout.BadgeBorder * scale);
             badge.Padding = new Thickness(HeroPickLayout.BadgePaddingX * scale, HeroPickLayout.BadgePaddingY * scale, HeroPickLayout.BadgePaddingX * scale, HeroPickLayout.BadgePaddingY * scale);
             var row = (HeroPickRow)badge.Tag;
-            badge.Child = BuildContent(row, scale, _compLines.TryGetValue(row.Hero.EntityId, out var compLine) ? compLine : null);
+            badge.Child = BuildContent(row, scale);
             Canvas.SetLeft(badge, rect.Left);
             Canvas.SetTop(badge, rect.Top);
             badge.Visibility = Visibility.Visible;
@@ -135,7 +132,7 @@ internal sealed class HeroPickPanel
     /// (two at most), the odds under the first, then the comp line, wrapped. What does not fit the badge is left
     /// out (<see cref="HeroPickLayout.ItemsThatFit"/>), never shrunk.
     /// </summary>
-    private static UIElement BuildContent(HeroPickRow row, double scale, string? compLine)
+    private static UIElement BuildContent(HeroPickRow row, double scale)
     {
         var items = new List<(double Height, UIElement[] Lines)>();
         if (!row.HasData)
@@ -166,12 +163,6 @@ internal sealed class HeroPickPanel
                     items.Add((HeroPickLayout.BodyLine, new UIElement[] { Line(odds, PanelTypography.Body, HeroPickLayout.BodyLine, scale, Brushes.LightGray) }));
                 }
             }
-        }
-
-        var maxChars = MarkerText.MaxChars(HeroPickLayout.ContentWidth, PanelTypography.Small, 0);
-        if (compLine != null && HeroPickLayout.Wrap(compLine, maxChars) is { Count: > 0 } wrapped)
-        {
-            items.Add((wrapped.Count * HeroPickLayout.SmallLine, wrapped.Select(l => (UIElement)Line(l, PanelTypography.Small, HeroPickLayout.SmallLine, scale, Brushes.White)).ToArray()));
         }
 
         var lines = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };

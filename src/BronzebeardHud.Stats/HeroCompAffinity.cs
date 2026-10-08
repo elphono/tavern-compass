@@ -27,8 +27,6 @@ public sealed class HeroCompPick
     public double Gain => (Composition.AveragePlacement ?? Estimate) - Estimate;
 
     /// <summary>"comp ≈ Mech Volumizer 3,0 (23)": estimated placement with a decimal comma, and the number of games.</summary>
-    public string Label => $"comp ≈ {Composition.Name} {Estimate.ToString("0.0", CultureInfo.GetCultureInfo("fr-FR"))} ({Games})";
-
     /// <summary>On the composition's line in the shop: "≈ 3,5 with your hero (23)", next to its own average.</summary>
     public string ShopText => $"≈ {Estimate.ToString("0.0", CultureInfo.GetCultureInfo("fr-FR"))} with your hero ({Games})";
 }
@@ -51,12 +49,6 @@ public static class HeroCompAffinity
     public const int MinimumGames = 10;
 
     /// <summary>The composition with the best estimate for this hero among the playable ones; null when none qualifies.</summary>
-    public static HeroCompPick? Best(string baseHeroCardId, IReadOnlyList<Composition> playable) =>
-        Effects(baseHeroCardId, playable).Values
-            .OrderBy(p => p.Estimate)
-            .ThenBy(p => p.Composition.Id, StringComparer.Ordinal)
-            .FirstOrDefault();
-
     /// <summary>The hero's estimate on one composition; null when the composition has no average or too few games with it.</summary>
     public static HeroCompPick? Effect(string baseHeroCardId, Composition composition)
     {

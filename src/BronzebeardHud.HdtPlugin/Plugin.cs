@@ -48,7 +48,6 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _selectionGuard;
     private readonly FeatureGuard _warbandGuard;
     private readonly FeatureGuard _opponentPowerGuard;
-    private readonly FeatureGuard _heroCompsGuard;
     private readonly FeatureGuard _compCountGuard;
     private readonly FeatureGuard _pinsGuard;
     private readonly FeatureGuard _pivotsGuard;
@@ -144,8 +143,6 @@ public sealed class Plugin : IPlugin
         // leaves the inset alone, the other row and the panel keep running.
         _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _compsPanel?.SetPower(null)));
         _opponentPowerGuard = new FeatureGuard("opponent-power", (n, e) => Disable(n, e, () => _compsPanel?.SetOpponentPower(null)));
-        // Its lines are computed inside the hero panel's update; once switched off, they are simply not added.
-        _heroCompsGuard = new FeatureGuard("hero-comps", (n, e) => Disable(n, e, () => _shownKey = string.Empty));
         _compCountGuard = new FeatureGuard("comp-count", (n, e) => Disable(n, e, () => { }));
         // Once switched off, the panel and the targets are those of the whole list (LobbyGuides.Unknown, UpdateComps), as
         // before the lobby was read: guides of absent tribes come back, rather than no panel at all.
@@ -1371,29 +1368,12 @@ public sealed class Plugin : IPlugin
         }
 
         var tribes = ReadLobbyTribes("hero selection");
-        _comps?.Poll();
-        var key = string.Join(",", offered.Select(h => $"{h.EntityId}:{h.CardId}")) + "|" + _stats.Version + "|" + string.Join(",", tribes)
-                  + "|" + (_comps?.Version ?? 0);
+        var key = string.Join(",", offered.Select(h => $"{h.EntityId}:{h.CardId}")) + "|" + _stats.Version + "|" + string.Join(",", tribes);
         if (key != _shownKey)
         {
             _shownKey = key;
             var sources = _stats.Sources().Select(file => LobbyTribes.Apply(file, tribes)).ToList();
-
-            // Under each hero, the composition it does best with (plan, phase 5.3), guarded on its own.
-            IReadOnlyDictionary<int, string> compLines = new Dictionary<int, string>();
-            _heroCompsGuard.Run(() =>
-            {
-                var playable = TavernAdvisor.Playable(_comps?.Compositions() ?? Array.Empty<Composition>(), tribes);
-                compLines = offered
-                    .Select(h => (h.EntityId, Pick: HeroCompAffinity.Best(h.BaseCardId, playable)))
-                    .Where(x => x.Pick != null)
-                    .ToDictionary(x => x.EntityId, x => x.Pick!.Label);
-                if (_comps?.State == "ok")
-                {
-                    Log.Info($"Bronzebeard HUD: hero comps [{string.Join("; ", offered.Select(h => $"{h.BaseCardId}: {(compLines.TryGetValue(h.EntityId, out var l) ? l : "none")}"))}]");
-                }
-            });
-            _panel.Show(HeroPickAdvisor.BuildRows(offered, sources), _stats.Status, compLines);
+            _panel.Show(HeroPickAdvisor.BuildRows(offered, sources), _stats.Status);
         }
     }
 }

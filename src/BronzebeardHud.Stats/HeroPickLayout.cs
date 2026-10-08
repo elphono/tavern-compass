@@ -134,11 +134,10 @@ public static class HeroPickLayout
 
     /// <summary>
     /// Line heights inside a badge, in design pixels (× scale): a source line (its <see cref="PanelTypography.HeroTier"/>
-    /// tier letter), a <see cref="PanelTypography.Body"/> line, a <see cref="PanelTypography.Small"/> line, "no data".
+    /// tier letter), a <see cref="PanelTypography.Body"/> line, "no data".
     /// </summary>
     public const double SourceLine = 28;
     public const double BodyLine = 17;
-    public const double SmallLine = 16;
     public const double NoDataLine = 18;
 
     /// <summary>Room for the lines inside a badge, in design pixels.</summary>
@@ -166,41 +165,6 @@ public static class HeroPickLayout
         }
 
         return shown;
-    }
-
-    /// <summary>
-    /// <paramref name="text"/> cut between words into lines of at most <paramref name="maxChars"/> characters
-    /// (<see cref="MarkerText.DisplayLength"/>); null when a single word is longer than that, since it could only
-    /// be cut or shrunk.
-    /// </summary>
-    public static IReadOnlyList<string>? Wrap(string text, int maxChars)
-    {
-        var lines = new List<string>();
-        var current = string.Empty;
-        foreach (var word in text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (MarkerText.DisplayLength(word) > maxChars)
-            {
-                return null;
-            }
-
-            var joined = current.Length == 0 ? word : current + " " + word;
-            if (MarkerText.DisplayLength(joined) <= maxChars)
-            {
-                current = joined;
-                continue;
-            }
-
-            lines.Add(current);
-            current = word;
-        }
-
-        if (current.Length > 0)
-        {
-            lines.Add(current);
-        }
-
-        return lines;
     }
 
     private static bool Overlaps(LayoutRect a, LayoutRect b) =>

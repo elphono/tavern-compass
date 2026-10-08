@@ -59,6 +59,7 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
 | Stats nomi.gg | **accord du propriétaire du site**, obtenu par Ali le 2026-10-08, tel quel sur les termes de la demande : l'analyse de patch (`nomi.gg/patch/analysis/<patch>.json`) peut être collectée automatiquement, dans les limites que le projet s'est fixées (note `docs/plans/2026-10-08-stats-multi-sources.html` § 10 : une requête conditionnelle par jour au plus, `User-Agent` qui nomme le plugin, crédit à l'écran, aucune redistribution ni entraînement de modèle). Le code de Nomi's Kitchen (licence « MIT NON-AI ») se lit pour en comprendre les idées, il ne se copie pas |
 | Simulateur npm `simulate-bgs-battle` | usage personnel, autorisé ; inutile tant que Bob's Buddy (HDT) fait le travail |
 | MMR des adversaires | gardé tel quel. Le leaderboard EU s'arrête à 8 000 ; Ali est à ≈ 6 840 (région EU mesurée) ; plage par défaut 8 000 – 8 050 |
+| Arbitrages du 2026-10-08 | Les cibles se classent sur **plateau + main** ; une case cochée garde **N lignes, au moins toutes les cibles** ; la taille donnée par + / − **revient à celle de la poignée** à la partie suivante ; la ligne « comp ≈ » de l'encart des héros est **retirée** (17 parties en médiane) ; le bilan par adversaire est parti avec le panneau Combats (2026-09-27) ; valeur d'une carte : **moins de bruit**, le seuil de 200 parties reste (≈ une carte sur deux sans valeur, mesuré) |
 | Visibilité | dépôt GitHub **public** (privé du 2026-09-26 au 2026-10-06). Le 2026-10-07 (Ali) : licence MIT, nom « Tavern Compass », historique purgé de ses données personnelles (BattleTags, pseudo d'adversaire, numéros de compte, bundle Rust), nom affiché dans HDT changé sans toucher aux noms internes |
 
 ## Façon de travailler sur ce projet
@@ -185,7 +186,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   trois héros : 0,835 → 0,915 H). Cotes mesurées sur la capture Hearthstone d'Ali du 2026-09-26 18:29:44
   (2291 × 1360), fixées par `HeroPickLayoutTests` ; l'encart d'origine, centré à 0,667 H, cachait le reroll.
 - Aucun texte du plugin sous 12 px en 1080p (`PanelTypography`) et aucun `Viewbox` : ce qui ne tient pas est
-  omis, jamais rétréci (encart des héros : la ligne « comp ≈ » passe sur deux lignes ou disparaît ; MMR des
+  omis, jamais rétréci (MMR des
   adversaires : le rang disparaît, la cote reste). Un test lit les sources du plugin et y refuse `Viewbox` et
   `FontSize = <nombre>`.
 - **Panneau « Compositions »** (`CompsPanel`, un seul panneau depuis le 2026-10-04 à la place de « Target compositions »
@@ -354,8 +355,8 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   **population** suffit à dire « contested » (top 25 % contre tous : 20 héros sur 116, +0,16 place en moyenne) — la
   décote ne corrige pas un biais, à revoir avec nomi.gg.
 - Les compositions de Firestone (`CompService`, `TavernAdvisor`, `CompositionRows`, `CompDetail`, `CompTransitions`,
-  `MinionLineups`) restent chargées et dans le code ; elles ne sont plus affichées en liste (hors ligne « comp ≈ » de
-  l'encart des héros), mais orientent les aides par le pont ci-dessous. Une erreur d'un fichier de `manual\` est dite une
+  `MinionLineups`) restent chargées et dans le code ; elles ne sont plus affichées (la ligne « comp ≈ » de l'encart
+  des héros est retirée depuis le 2026-10-08, décision d'Ali), mais orientent les aides par le pont ci-dessous. Une erreur d'un fichier de `manual\` est dite une
   fois par `compositions data: …` (avertissement). `docs/mock/` est la maquette de l'ancien panneau Firestone.
 - **Pont guides HDT ↔ compos Firestone** (`GuideBridge`, 2026-10-04 ; branché par `Plugin.UpdateBridge`, garde-fou
   `guide-bridge`). Deux nomenclatures sans clé commune, rapprochées par les

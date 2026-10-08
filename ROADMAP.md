@@ -27,18 +27,13 @@ and, when there is one, the line of HDT's log that tells.
   chose, and the panel keeps room for them.
 - **Bridge between HDT's guides and Firestone's comps** — how many of the 24 Firestone comps match the ~23 guides
   has never been measured. Log: `bridge: …`.
-- **Cover during a choice** — panel, inset and frames hide while a discover, trinket or Dark Gift is open.
+- **During a choice** — Bob's frames and labels hide while a discover, trinket or Dark Gift is open; the panel stays.
 - **Resize handle** — pointing under HDT's real overlay, dotted frame, reset.
-- **Hero-pick comp line, odds and per-opponent summary** (phases 5 and 6 of the [plan](docs/plans/2026-09-26-parite-tier7-plan.md)).
+- **Hero-pick odds** (phases 5 and 6 of the [plan](docs/plans/2026-09-26-parite-tier7-plan.md)).
 - **Skip combat** when relaunched by Battle.net.
 
 ## Open questions
 
-- **Board only, or board and hand?** The N comps are ranked on what you hold on the board **and** in your hand: the hand
-  is what you will play next turn. Ranking on the board alone is a one-line change.
-- Should a panel resized by `−` / `+` keep its size from one game to the next? Today it goes back to its default.
-- Keep the "comp ≈" line under each hero in the hero-pick screen? Its samples are thin (17 games at the median).
-- Keep the per-opponent summary if it duplicates the game's own interface?
 - Duos have not been thought through for the opponent's gauge.
 
 ## Next
