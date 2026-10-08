@@ -98,9 +98,10 @@ public static class TavernHighlights
     /// the highlight ("core Undead Butcher 1/3" with the core cards held, "enabler Undead Butcher", "+ Undead Butcher" for
     /// an add-on, "+ Undead Butcher 3/5" for a card on 3 of the 5 top boards of its bridged comp), then the other targets the
     /// card matters to ("★ Beasts 1/2" for a core card, "+ Mechs 0/2" otherwise; the count is always core cards), "+2 more"
-    /// when they do not fit. Every line is built to fit <paramref name="maxChars"/>.
+    /// when they do not fit; last, the card's value at this turn (<paramref name="value"/>, CardTurnValue.Label) if a line is
+    /// left: it never pushes a role out. Every line is built to fit <paramref name="maxChars"/>.
     /// </summary>
-    public static IReadOnlyList<string> MarkerLines(TavernHighlight highlight, bool pinned, int maxChars, int maxLines = 2)
+    public static IReadOnlyList<string> MarkerLines(TavernHighlight highlight, bool pinned, int maxChars, int maxLines = 2, string? value = null)
     {
         var lines = new List<string>();
         if (pinned)
@@ -122,6 +123,11 @@ public static class TavernHighlights
         if (room > 0 && highlight.Others.Count > 0)
         {
             lines.AddRange(MarkerText.Lines(highlight.Others.Select(e => (e.Target.Guide.Name, e.CoreBefore, e.CoreTotal, e.IsCore)).ToList(), maxChars, room));
+        }
+
+        if (value != null && lines.Count < maxLines)
+        {
+            lines.Add(value);
         }
 
         return lines.Take(maxLines).ToList();

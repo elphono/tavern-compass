@@ -26,11 +26,15 @@ internal sealed class TavernMarkers
 {
     private const string PinnedColour = "#FFFFFF";
 
+    /// <summary>A card that only has its value at this turn: no frame, the neutral label of the choices (ChoiceAdvicePanel).</summary>
+    private static readonly Brush ValueBrush = new SolidColorBrush(Color.FromArgb(0xE6, 0x3A, 0x3A, 0x44));
+
     private readonly Canvas _canvas;
     private readonly Action<string> _togglePin;
     private readonly List<UIElement> _markers = new();
     private IReadOnlyList<string> _cards = Array.Empty<string>();
     private IReadOnlyList<TavernHighlight> _highlights = Array.Empty<TavernHighlight>();
+    private IReadOnlyList<string?> _values = Array.Empty<string?>();
     private IReadOnlyList<bool> _minionSlots = Array.Empty<bool>();
     private TavernPins _pins = TavernPins.Empty;
     private bool _visible;
@@ -71,10 +75,16 @@ internal sealed class TavernMarkers
     /// <param name="cards">Bob's row, left to right, the tavern spell included.</param>
     /// <param name="highlights">One per card (TavernHighlights.For); any other count draws no frame, the pins only.</param>
     /// <param name="minionSlots">One entry per card of Bob's row: true for a minion (it gets a pin button), false for the spell.</param>
-    public void Show(IReadOnlyList<string> cards, IReadOnlyList<TavernHighlight>? highlights, TavernPins pins, IReadOnlyList<bool> minionSlots)
+    /// <param name="values">
+    /// One per card: its value at this turn (CardTurnValue.Label), or null; drawn in the last line left (TavernHighlights.MarkerLines).
+    /// Any other count draws no value.
+    /// </param>
+    public void Show(IReadOnlyList<string> cards, IReadOnlyList<TavernHighlight>? highlights, TavernPins pins, IReadOnlyList<bool> minionSlots,
+        IReadOnlyList<string?>? values = null)
     {
         _cards = cards;
         _highlights = highlights != null && highlights.Count == cards.Count ? highlights : cards.Select(_ => TavernHighlight.None).ToList();
+        _values = values != null && values.Count == cards.Count ? values : cards.Select(_ => (string?)null).ToList();
         _pins = pins;
         _minionSlots = minionSlots;
         _visible = true;
@@ -121,21 +131,27 @@ internal sealed class TavernMarkers
         var slotWidth = TavernLayout.Markers(width, height, _cards.Count).FirstOrDefault().Width;
         var maxChars = MarkerText.MaxChars(slotWidth, fontSize, TavernLayout.MarkerPadding * scale);
         var marked = _cards
-            .Select((card, i) => (Position: i, Highlight: _highlights[i], Lines: TavernHighlights.MarkerLines(_highlights[i], _pins.IsPinned(card), maxChars)))
+            .Select((card, i) => (Position: i, Highlight: _highlights[i], Pinned: _pins.IsPinned(card),
+                Lines: TavernHighlights.MarkerLines(_highlights[i], _pins.IsPinned(card), maxChars, value: _values[i])))
             .Where(m => m.Lines.Count > 0)
             .ToList();
         var lineCount = marked.Count == 0 ? 1 : marked.Max(m => m.Lines.Count);
         var markers = TavernLayout.Markers(width, height, _cards.Count, lineCount);
         var slots = TavernLayout.CardSlots(width, height, _cards.Count);
 
-        foreach (var (position, highlight, lines) in marked)
+        foreach (var (position, highlight, pinned, lines) in marked)
         {
             // The target's colour; a card only pinned is white. Every colour of the palette is light, so the text is black.
+            // A card that only has its value gets no frame: a frame says "this card matters for a target".
+            var valueOnly = highlight.Kind == HighlightKind.None && !pinned;
             var colour = HexBrush.Of(highlight.Colour ?? PinnedColour);
             var slot = slots[position];
-            var frame = Frame(highlight.Kind, slot, colour, scale);
-            Canvas.SetLeft(frame, slot.Left);
-            Canvas.SetTop(frame, slot.Top);
+            var frame = valueOnly ? null : Frame(highlight.Kind, slot, colour, scale);
+            if (frame != null)
+            {
+                Canvas.SetLeft(frame, slot.Left);
+                Canvas.SetTop(frame, slot.Top);
+            }
 
             var rect = markers[position];
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
@@ -146,7 +162,7 @@ internal sealed class TavernMarkers
                     Text = line,
                     FontSize = fontSize,
                     FontWeight = FontWeights.Bold,
-                    Foreground = Brushes.Black,
+                    Foreground = valueOnly ? Brushes.White : Brushes.Black,
                     HorizontalAlignment = HorizontalAlignment.Center,
                 });
             }
@@ -156,7 +172,7 @@ internal sealed class TavernMarkers
             {
                 Width = rect.Width,
                 Height = rect.Height,
-                Background = colour,
+                Background = valueOnly ? ValueBrush : colour,
                 BorderBrush = Brushes.Black,
                 BorderThickness = new Thickness(1.5 * scale),
                 CornerRadius = new CornerRadius(5 * scale),
@@ -167,9 +183,13 @@ internal sealed class TavernMarkers
             Canvas.SetLeft(label, rect.Left);
             Canvas.SetTop(label, rect.Top);
 
-            OverlayLayer.Add(_canvas, frame);
+            if (frame != null)
+            {
+                OverlayLayer.Add(_canvas, frame);
+                _markers.Add(frame);
+            }
+
             OverlayLayer.Add(_canvas, label);
-            _markers.Add(frame);
             _markers.Add(label);
             FirstMarker ??= rect;
         }

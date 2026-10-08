@@ -174,6 +174,22 @@ public class TavernHighlightsTests
     }
 
     [Fact]
+    public void MarkerLines_TheCardValue_TakesTheLastLineLeft_AndNeverPushesARoleOut()
+    {
+        var targets = ThreeTargets();
+        TavernHighlight For(string card) => TavernHighlights.For(new[] { card }, targets).Single();
+        const string value = "t6 ▲ 3.6 vs 3.9";
+
+        Assert.Equal(new[] { value }, TavernHighlights.MarkerLines(TavernHighlight.None, pinned: false, maxChars: 20, value: value));
+        Assert.Equal(new[] { "core UB 2/2", value }, TavernHighlights.MarkerLines(For("KEY_U2"), pinned: false, maxChars: 15, value: value));
+        Assert.Equal(new[] { "◆ pinned", value }, TavernHighlights.MarkerLines(TavernHighlight.None, pinned: true, maxChars: 20, value: value));
+        // Two lines already: the value is the one left out.
+        Assert.Equal(new[] { "core Mech Magnet 1/2", "+ Undead Butcher 2/2" },
+            TavernHighlights.MarkerLines(For("SHARED"), pinned: false, maxChars: 20, value: value));
+        Assert.Equal(new[] { "◆ pinned", "core UB 2/2" }, TavernHighlights.MarkerLines(For("KEY_U2"), pinned: true, maxChars: 15, value: value));
+    }
+
+    [Fact]
     public void MarkerLines_Crowded_TheHighlightKeepsItsLine_TheOthersAreCounted()
     {
         // CROWD: a core card of the first target and an add-on of three others.
