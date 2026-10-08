@@ -9,15 +9,14 @@ using BronzebeardHud.Stats;
 namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
-/// Feeds the hero-pick panel: hand-typed HSReplay files first, then the cached Firestone file.
-/// Polled from HDT's UI thread; the download runs on the thread pool and is picked up by
-/// <see cref="Poll"/> once finished, so the UI thread never waits on the network.
+/// Feeds the hero-pick panel: hand-typed HSReplay files first (<see cref="ReloadManual"/>, under the plugin's
+/// "data-manual" guard), then the cached Firestone file (under "data-firestone"). Polled from HDT's UI thread; the download
+/// runs on the thread pool and is picked up by <see cref="Poll"/> once finished, so the UI thread never waits on the network.
 /// </summary>
-internal sealed class StatsService : IDisposable
+internal sealed class StatsService
 {
     private const string TimePeriod = "last-patch";
 
-    private readonly HttpStatsFetcher _fetcher = new();
     private readonly StatsCache _cache;
     private readonly string _manualDirectory;
     private Task<CacheResult>? _refresh;
@@ -26,9 +25,10 @@ internal sealed class StatsService : IDisposable
     private IReadOnlyList<StatsLoadError> _manualErrors = Array.Empty<StatsLoadError>();
     private int? _chosenBracket;
 
-    public StatsService(string statsDirectory)
+    /// <param name="cache">The plugin's one cache, shared by every service.</param>
+    public StatsService(StatsCache cache, string statsDirectory)
     {
-        _cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
+        _cache = cache;
         _manualDirectory = Path.Combine(statsDirectory, "manual");
     }
 
@@ -36,19 +36,25 @@ internal sealed class StatsService : IDisposable
     public int Version { get; private set; }
 
     /// <summary>
-    /// Called once when a hero selection starts: reload hand-typed files, then fetch (or reuse) the
-    /// "every player" file, read its bracket table, and switch to the player's own bracket.
+    /// Called once when a hero selection starts: fetch (or reuse) the "every player" file, read its bracket table, and
+    /// switch to the player's own bracket.
     /// </summary>
     /// <param name="rating">The player's MMR as HDT exposes it; null when unknown.</param>
     public void BeginHeroSelection(int? rating)
     {
-        (_manual, _manualErrors) = HeroStatsLoader.LoadDirectory(_manualDirectory);
         _chosenBracket = null; // a new game: the player's own bracket again (BracketChoice)
         if (_refresh == null || _refresh.IsCompleted)
         {
             _refresh = Task.Run(() => LoadForBracketAsync(rating));
         }
 
+        Version++;
+    }
+
+    /// <summary>The hand-typed hero files (stats\manual\*.json), read again: at the plugin's start and at each game.</summary>
+    public void ReloadManual()
+    {
+        (_manual, _manualErrors) = HeroStatsLoader.LoadDirectory(_manualDirectory);
         Version++;
     }
 
@@ -137,6 +143,4 @@ internal sealed class StatsService : IDisposable
             return problems.Count == 0 ? null : string.Join(" · ", problems);
         }
     }
-
-    public void Dispose() => _fetcher.Dispose();
 }

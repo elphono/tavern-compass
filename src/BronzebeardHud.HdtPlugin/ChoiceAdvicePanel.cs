@@ -19,23 +19,23 @@ namespace BronzebeardHud.HdtPlugin;
 /// UI thread from the plugin's start on (the first fetch always asks Firestone's server, see StatsCache), then
 /// asked again at each trinket choice so that the daily rule holds in a long session (TrinketStatsRefresh).
 /// </summary>
-internal sealed class ChoiceAdvicePanel : IDisposable
+internal sealed class ChoiceAdvicePanel
 {
     private static readonly Brush NeutralBrush = new SolidColorBrush(Color.FromArgb(0xE6, 0x3A, 0x3A, 0x44));
     private static readonly Brush TrinketBrush = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E));
     private static readonly Brush TrinketBorder = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F));
 
     private readonly Canvas _canvas;
-    private readonly HttpStatsFetcher _fetcher = new();
     private readonly StatsCache _cache;
     private readonly List<UIElement> _labels = new();
     private readonly TrinketStatsRefresh _trinkets;
     private ChoiceAdvice? _advice;
 
-    public ChoiceAdvicePanel(Canvas canvas, string statsDirectory)
+    /// <param name="cache">The plugin's one cache, shared by every service.</param>
+    public ChoiceAdvicePanel(Canvas canvas, StatsCache cache)
     {
         _canvas = canvas;
-        _cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
+        _cache = cache;
         _trinkets = new TrinketStatsRefresh("trinket-stats last-patch",
             () => Task.Run(() => _cache.GetTrinketStatsAsync("last-patch", RefreshPolicy.HeroStats, CancellationToken.None)));
         _canvas.SizeChanged += OnCanvasSizeChanged;
@@ -92,7 +92,6 @@ internal sealed class ChoiceAdvicePanel : IDisposable
         Clear();
     }
 
-    public void Dispose() => _fetcher.Dispose();
 
     private void OnCanvasSizeChanged(object sender, SizeChangedEventArgs e) => Relayout();
 

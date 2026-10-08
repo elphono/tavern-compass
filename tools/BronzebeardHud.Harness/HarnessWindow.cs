@@ -382,11 +382,11 @@ internal sealed class HarnessWindow : Window
         ResetGuards();
         Markers = new TavernMarkers(Overlay, id => Log.Info($"pin toggled: {id}"));
         _skip = new SkipCombatPanel(Overlay, _mover, () => Log.Info("Skip combat clicked (nothing is killed here)"));
-        // Its own trinket stats cache is never polled here, so it never fetches: the harness hands ChoiceAdvisor synthetic
-        // stats (HarnessData.TrinketStat) where the plugin hands it the panel's. The folder is the harness's, never the plugin's.
-        _choices = new ChoiceAdvicePanel(Overlay, Path.Combine(_folder, "stats"));
+        // Its trinket stats cache is never polled here: the harness hands ChoiceAdvisor synthetic stats
+        // (HarnessData.TrinketStat) where the plugin hands it the panel's. The folder is the harness's, never the plugin's,
+        // and its fetcher refuses the network, so that a poll added one day fails loudly instead of downloading.
+        _choices = new ChoiceAdvicePanel(Overlay, new StatsCache(Path.Combine(_folder, "stats"), new NoNetwork(), () => DateTimeOffset.UtcNow));
         Overlay.SizeChanged += (_, _) => LogChoice(); // after the panel's own handler: the labels at the new size
-        Closed += (_, _) => _choices.Dispose();
         _mover.ToggleMoveMode(); // move mode on from the start: the harness is for moving and resizing
         if (options.Choice != null)
         {
@@ -841,4 +841,11 @@ internal sealed class HarnessWindow : Window
             .ToList();
         return roles.Count == 0 ? "in no guide" : string.Join("\n", roles);
     }
+}
+
+/// <summary>The harness's fetcher: it never goes to the network (its data are synthetic).</summary>
+internal sealed class NoNetwork : IConditionalFetcher
+{
+    public Task<FetchedText> FetchAsync(string url, string? ifNoneMatch, CancellationToken cancellationToken) =>
+        throw new InvalidOperationException($"the harness does not download ({url})");
 }

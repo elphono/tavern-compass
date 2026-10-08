@@ -10,51 +10,44 @@ namespace BronzebeardHud.HdtPlugin;
 
 /// <summary>
 /// The compositions the tavern advisor aims at: hand-typed HSReplay files first
-/// (<c>stats\manual\*.comps.txt</c>, format in the spec), then Firestone's composition stats
-/// from the 7-day cache. Loaded by the first <see cref="Poll"/>, which the plugin makes right after its
-/// start, and that first load always asks Firestone's server (StatsCache); reloaded at each game, off the UI thread.
+/// (<c>stats\manual\*.comps.txt</c>, format in the spec, read by <see cref="LoadManual"/> under the plugin's
+/// "data-manual" guard), then Firestone's composition stats from the 7-day cache, under "data-firestone". Loaded by the
+/// first <see cref="Poll"/>, which the plugin makes right after its start, and that first load always asks Firestone's
+/// server (StatsCache); reloaded at each game, off the UI thread.
 /// </summary>
-internal sealed class CompService : IDisposable
+internal sealed class CompService
 {
     private const string TimePeriod = "last-patch";
 
-    private readonly HttpStatsFetcher _fetcher = new();
     private readonly StatsCache _cache;
     private readonly string _manualDirectory;
     private readonly CompositionRefresh _refresh;
-    private bool _manualLoaded;
     private IReadOnlyList<Composition> _manual = Array.Empty<Composition>();
     private readonly List<string> _manualErrors = new();
 
     /// <summary>Minions to flag in the tavern, from stats\manual\pins.txt.</summary>
     public TavernPins Pins { get; private set; } = TavernPins.Empty;
 
-    public CompService(string statsDirectory)
+    /// <param name="cache">The plugin's one cache, shared by every service.</param>
+    public CompService(StatsCache cache, string statsDirectory)
     {
-        _cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
+        _cache = cache;
         _manualDirectory = Path.Combine(statsDirectory, "manual");
         _refresh = new CompositionRefresh(() => Task.Run(() => _cache.GetCompositionsAsync(TimePeriod, RefreshPolicy.CompStats, CancellationToken.None)));
     }
 
     public int Version { get; private set; }
 
-    /// <summary>Called when a game's first shopping phase starts: re-read the manual files, reload Firestone's.</summary>
+    /// <summary>Called when a game's first shopping phase starts: reload Firestone's.</summary>
     public void BeginGame()
     {
-        LoadManual();
         _refresh.Request();
         Version++;
     }
 
-    /// <summary>Called on every update: loads what was never loaded, and collects a finished load.</summary>
+    /// <summary>Called on every update: loads Firestone's file if it never was, and collects a finished load.</summary>
     public void Poll()
     {
-        if (!_manualLoaded)
-        {
-            LoadManual();
-            Version++;
-        }
-
         if (_refresh.Poll())
         {
             Version++;
@@ -92,11 +85,10 @@ internal sealed class CompService : IDisposable
         }
     }
 
-    public void Dispose() => _fetcher.Dispose();
-
-    private void LoadManual()
+    /// <summary>The hand-typed files (stats\manual\*.comps.txt and pins.txt), read again: at the plugin's start and at each game.</summary>
+    public void LoadManual()
     {
-        _manualLoaded = true;
+        Version++;
         var manual = new List<Composition>();
         _manualErrors.Clear();
         if (Directory.Exists(_manualDirectory))

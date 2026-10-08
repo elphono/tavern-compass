@@ -10,16 +10,15 @@ namespace BronzebeardHud.HdtPlugin;
 /// thread (CardStatsRefresh: never another bracket's file on screen), and the value of a card at a turn (CardTurnValue).
 /// Polled from HDT's UI thread, like StatsService.
 /// </summary>
-internal sealed class CardStatsService : IDisposable
+internal sealed class CardStatsService
 {
     private const string TimePeriod = "last-patch";
 
-    private readonly HttpStatsFetcher _fetcher = new();
     private readonly CardStatsRefresh _refresh;
 
-    public CardStatsService(string statsDirectory)
+    /// <param name="cache">The plugin's one cache, shared by every service.</param>
+    public CardStatsService(StatsCache cache)
     {
-        var cache = new StatsCache(statsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
         _refresh = new CardStatsRefresh(bracket =>
             Task.Run(() => cache.GetCardStatsAsync(bracket, TimePeriod, RefreshPolicy.HeroStats, CancellationToken.None)));
     }
@@ -47,6 +46,4 @@ internal sealed class CardStatsService : IDisposable
 
     /// <summary>What card-stats says of the card at this turn; null when nothing above the noise, or no file yet.</summary>
     public CardTurnNote? Note(string cardId, int turn) => CardTurnValue.For(_refresh.File, cardId, turn);
-
-    public void Dispose() => _fetcher.Dispose();
 }

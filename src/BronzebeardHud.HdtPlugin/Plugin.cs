@@ -32,9 +32,13 @@ public sealed class Plugin : IPlugin
     private ChoiceAdvicePanel? _choices;
     private CardStatsService? _cardStats;
 
+    // One fetcher and one cache for every service (chantier b): created at load, the fetcher disposed at unload.
+    private HttpStatsFetcher? _fetcher;
+
     // One guard per feature: an unexpected exception disables that feature alone (see FeatureGuard).
     private readonly FeatureGuard _heroSelectionGuard;
-    private readonly FeatureGuard _dataGuard;
+    private readonly FeatureGuard _firestoneGuard;
+    private readonly FeatureGuard _manualGuard;
     private readonly FeatureGuard _compsGuard;
     private readonly FeatureGuard _markersGuard;
     private readonly FeatureGuard _opponentMmrGuard;
@@ -92,6 +96,7 @@ public sealed class Plugin : IPlugin
     private int _targetsVersion;
     private int _selectionVersion;
     private int _gameNumber;
+    private int _manualGame = -1;
 
     // The "Skip combat" button: shown in combat, acts once per combat (SkipCombatState).
     private SkipCombatPanel? _skipCombat;
@@ -109,8 +114,10 @@ public sealed class Plugin : IPlugin
     public Plugin()
     {
         _heroSelectionGuard = new FeatureGuard("hero-selection", (n, e) => Disable(n, e, () => _panel?.Hide()));
-        // Without it the features still load their data themselves, only later (at hero pick, trinket choice).
-        _dataGuard = new FeatureGuard("data-refresh", (n, e) => Disable(n, e, () => { }));
+        // One guard per source (chantier b): a source that throws is cut alone, the other keeps loading. Without
+        // "data-firestone" the features still load Firestone's files themselves, only later (at hero pick, trinket choice).
+        _firestoneGuard = new FeatureGuard("data-firestone", (n, e) => Disable(n, e, () => { }));
+        _manualGuard = new FeatureGuard("data-manual", (n, e) => Disable(n, e, () => { }));
         // The panel, HDT's guides and the targets: one feature since the two composition panels became one (2026-10-04).
         _compsGuard = new FeatureGuard("compositions", (n, e) => Disable(n, e, () =>
         {
@@ -630,8 +637,10 @@ public sealed class Plugin : IPlugin
         // (Plugins/PluginWrapper.cs:58-94): what was remembered for the previous panels must go with them.
         ResetSessionState();
         Directory.CreateDirectory(Path.Combine(StatsDirectory, "manual"));
-        _stats = new StatsService(StatsDirectory);
-        _comps = new CompService(StatsDirectory);
+        _fetcher = new HttpStatsFetcher();
+        var cache = new StatsCache(StatsDirectory, _fetcher, () => DateTimeOffset.UtcNow);
+        _stats = new StatsService(cache, StatsDirectory);
+        _comps = new CompService(cache, StatsDirectory);
         _mover = new PanelMover(Core.OverlayCanvas, Path.Combine(Path.GetDirectoryName(StatsDirectory)!, "layout.json"));
         try
         {
@@ -652,8 +661,8 @@ public sealed class Plugin : IPlugin
             action => _warbandGuard.Run(action), action => _opponentPowerGuard.Run(action), line => Log.Info(line));
         _markers = new TavernMarkers(Core.OverlayCanvas, TogglePin);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
-        _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory);
-        _cardStats = new CardStatsService(StatsDirectory);
+        _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, cache);
+        _cardStats = new CardStatsService(cache);
         _skipCombat = new SkipCombatPanel(Core.OverlayCanvas, _mover, SkipCombat);
     }
 
@@ -691,6 +700,7 @@ public sealed class Plugin : IPlugin
         _bridgeKey = string.Empty;
         _heroEffectsKey = string.Empty;
         _cover.Reset(); // the panels are new: nothing of them is hidden yet
+        _manualGame = -1; // the services are new: their hand-typed files are read again
     }
 
     public void OnUnload()
@@ -704,18 +714,16 @@ public sealed class Plugin : IPlugin
         _opponentMmr?.Dispose();
         _opponentMmr = null;
         _choices?.Detach();
-        _choices?.Dispose();
-        _cardStats?.Dispose();
         _cardStats = null;
         _choices = null;
         _skipCombat?.Detach();
         _skipCombat = null;
         _mover?.Detach();
         _panel = null;
-        _stats?.Dispose();
-        _comps?.Dispose();
         _stats = null;
         _comps = null;
+        _fetcher?.Dispose();
+        _fetcher = null;
     }
 
     public void OnButtonPress() => ToggleMoveMode();
@@ -728,7 +736,8 @@ public sealed class Plugin : IPlugin
             return;
         }
 
-        _dataGuard.Run(() => RefreshData(game));
+        _manualGuard.Run(RefreshManual);
+        _firestoneGuard.Run(() => RefreshData(game));
         _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
         _compsGuard.Run(() => UpdateComps(game)); // the targets first: the frames and the choices follow them
         _markersGuard.Run(() => UpdateTavern(game));
@@ -990,14 +999,27 @@ public sealed class Plugin : IPlugin
         _compsRound = -1;
     }
 
+    /// <summary>The hand-typed files (stats\manual\), read at the plugin's start and once per game: the "data-manual" source.</summary>
+    private void RefreshManual()
+    {
+        if (_stats == null || _comps == null || _manualGame == _gameNumber)
+        {
+            return;
+        }
+
+        _manualGame = _gameNumber;
+        _stats.ReloadManual();
+        _comps.LoadManual();
+    }
+
     /// <summary>
     /// From the first update after the plugin starts, in or out of a game: load every Firestone file (hero stats,
     /// compositions, trinkets). Each one's first load in a plugin session asks Firestone's server whatever the
     /// age of the cache (StatsCache), so starting HDT brings the freshest data; later loads keep the age rules; the
     /// compositions are asked again at each game's first shop. One line in HDT's log per finished load (DataRefresh).
     /// Firestone's compositions are no longer shown (HDT's guides replaced them on 2026-10-04): the hero badges still use
-    /// them, the bridge to HDT's guides draws on them (UpdateBridge), and the hand-typed pins of stats\manual\pins.txt
-    /// come with them.
+    /// them and the bridge to HDT's guides draws on them (UpdateBridge). The "data-firestone" source; the hand-typed files,
+    /// pins.txt included, are RefreshManual's ("data-manual").
     /// </summary>
     private void RefreshData(GameV2 game)
     {
