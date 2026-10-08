@@ -187,7 +187,7 @@ public static class CompositionLoader
         }
 
         var source = obj.Value<string>("source");
-        if (string.IsNullOrEmpty(source))
+        if (source is not { Length: > 0 })
         {
             throw new StatsFormatException("source: expected a non-empty string");
         }
