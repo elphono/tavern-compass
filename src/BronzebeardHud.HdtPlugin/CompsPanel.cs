@@ -254,6 +254,9 @@ internal sealed class CompsPanel
     /// <summary>True while a guide's detail stands in place of the list.</summary>
     public bool ShowsDetail => _view.ShowsDetail;
 
+    /// <summary>The bracket button of the title bar ("top 25%"): the bracket shown, and what a click does; no button while null.</summary>
+    public (string Label, Action Next)? Bracket { get; set; }
+
     /// <summary>When false, no "Meta ↗" button (the meta-snapshot feature was switched off by its guard).</summary>
     public bool MetaEnabled { get; set; } = true;
 
@@ -618,7 +621,7 @@ internal sealed class CompsPanel
 
     /// <summary>
     /// "Compositions" — or, in a guide's detail, the "← All comp guides" button in its place, as HDT puts it at the top —
-    /// then the source, Meta ↗ and "n targets" (− and + are in the inset).
+    /// then the source, the MMR bracket (a click: the next one), Meta ↗ and "n targets" (− and + are in the inset).
     /// </summary>
     private FrameworkElement TitleBar(double scale, bool detail = false) => TitleBar(scale, detail, out _);
 
@@ -635,6 +638,13 @@ internal sealed class CompsPanel
             tag.VerticalAlignment = VerticalAlignment.Center;
             tag.Margin = new Thickness(0, 0, 8 * scale, 0);
             right.Children.Add(tag);
+        }
+
+        if (Bracket is { } bracket)
+        {
+            var button = PanelButton(bracket.Label, scale, bracket.Next);
+            button.Margin = new Thickness(0, 0, 8 * scale, 0);
+            right.Children.Add(button);
         }
 
         if (MetaEnabled)

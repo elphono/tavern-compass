@@ -24,6 +24,7 @@ internal sealed class StatsService : IDisposable
     private CacheResult? _firestone;
     private IReadOnlyList<HeroStatsFile> _manual = Array.Empty<HeroStatsFile>();
     private IReadOnlyList<StatsLoadError> _manualErrors = Array.Empty<StatsLoadError>();
+    private int? _chosenBracket;
 
     public StatsService(string statsDirectory)
     {
@@ -42,6 +43,7 @@ internal sealed class StatsService : IDisposable
     public void BeginHeroSelection(int? rating)
     {
         (_manual, _manualErrors) = HeroStatsLoader.LoadDirectory(_manualDirectory);
+        _chosenBracket = null; // a new game: the player's own bracket again (BracketChoice)
         if (_refresh == null || _refresh.IsCompleted)
         {
             _refresh = Task.Run(() => LoadForBracketAsync(rating));
@@ -50,10 +52,22 @@ internal sealed class StatsService : IDisposable
         Version++;
     }
 
+    /// <summary>
+    /// A bracket picked in the overlay (BracketChoice) for the rest of the game: hero stats, the power gauge, trinkets and
+    /// card stats follow it, since they all read <see cref="Bracket"/>. A load still running is left to finish unseen.
+    /// </summary>
+    public void ChooseBracket(int bracket, int? rating)
+    {
+        _chosenBracket = bracket;
+        _refresh = Task.Run(() => LoadForBracketAsync(rating));
+        Version++;
+    }
+
     private async Task<CacheResult> LoadForBracketAsync(int? rating)
     {
+        var chosen = _chosenBracket;
         var all = await _cache.GetHeroStatsAsync(MmrBracket.EveryPlayer, TimePeriod, RefreshPolicy.HeroStats, CancellationToken.None).ConfigureAwait(false);
-        var bracket = MmrBracket.Select(rating, all.File?.MmrThresholds ?? Array.Empty<MmrThreshold>());
+        var bracket = chosen ?? MmrBracket.Select(rating, all.File?.MmrThresholds ?? Array.Empty<MmrThreshold>());
         if (bracket == MmrBracket.EveryPlayer)
         {
             return all;

@@ -814,7 +814,10 @@ public sealed class Plugin : IPlugin
         }
 
         var count = _settings.SuggestedCompositions;
+        var bracket = _stats?.Bracket ?? MmrBracket.EveryPlayer;
+        _compsPanel.Bracket = _stats == null ? null : (BracketChoice.Label(bracket), NextBracket);
         var key = string.Join(",", cards.All.Select(c => c.CardId).OrderBy(id => id, StringComparer.Ordinal)) + "|" + _guidesVersion + "|" + _selectionVersion + "|" + count
+                  + "|" + bracket       // the bracket button says which one is shown
                   + "|" + _bridgeVersion   // a guide's context line (detail, popup) follows the bridge and the hero
                   + "|" + _lobbyVersion;   // the lobby's tribes, once known, take guides out of the list and the targets
         if (key == _compsKey && _compsPanel.IsVisible)
@@ -1143,6 +1146,23 @@ public sealed class Plugin : IPlugin
     /// target the option serves. One line in HDT's log per choice, including the ones without a known layout, so that
     /// uncovered kinds show up.
     /// </summary>
+    /// <summary>
+    /// The panel's bracket button: the next bracket Firestone publishes, for the rest of the game (BracketChoice). Hero
+    /// stats, the power gauge, trinkets and card stats all follow it; one log line.
+    /// </summary>
+    private void NextBracket()
+    {
+        if (_stats == null)
+        {
+            return;
+        }
+
+        var next = BracketChoice.Next(_stats.Bracket);
+        var rating = Core.Game?.CurrentBattlegroundsRating;
+        Log.Info($"Bronzebeard HUD: bracket {BracketChoice.Label(next)} chosen in the overlay (was {BracketChoice.Label(_stats.Bracket)}, rating {rating?.ToString() ?? "unknown"})");
+        _stats.ChooseBracket(next, rating);
+    }
+
     /// <summary>
     /// Card stats follow the bracket of the hero stats once it is resolved (the player's own), so that the first load is
     /// not spent on the every-player file; one log line per finished load.
