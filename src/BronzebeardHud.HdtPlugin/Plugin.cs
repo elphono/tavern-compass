@@ -39,6 +39,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _heroSelectionGuard;
     private readonly FeatureGuard _firestoneGuard;
     private readonly FeatureGuard _manualGuard;
+    private readonly FeatureGuard _statsViewGuard;
     private readonly FeatureGuard _compsGuard;
     private readonly FeatureGuard _markersGuard;
     private readonly FeatureGuard _opponentMmrGuard;
@@ -97,6 +98,7 @@ public sealed class Plugin : IPlugin
     private int _selectionVersion;
     private int _gameNumber;
     private int _manualGame = -1;
+    private string _statsViewKey = string.Empty;
 
     // The "Skip combat" button: shown in combat, acts once per combat (SkipCombatState).
     private SkipCombatPanel? _skipCombat;
@@ -118,6 +120,8 @@ public sealed class Plugin : IPlugin
         // "data-firestone" the features still load Firestone's files themselves, only later (at hero pick, trinket choice).
         _firestoneGuard = new FeatureGuard("data-firestone", (n, e) => Disable(n, e, () => { }));
         _manualGuard = new FeatureGuard("data-manual", (n, e) => Disable(n, e, () => { }));
+        // The consolidated view of every source's figures (chantier b): only a log line so far, no help reads it yet.
+        _statsViewGuard = new FeatureGuard("stats-view", (n, e) => Disable(n, e, () => { }));
         // The panel, HDT's guides and the targets: one feature since the two composition panels became one (2026-10-04).
         _compsGuard = new FeatureGuard("compositions", (n, e) => Disable(n, e, () =>
         {
@@ -701,6 +705,7 @@ public sealed class Plugin : IPlugin
         _heroEffectsKey = string.Empty;
         _cover.Reset(); // the panels are new: nothing of them is hidden yet
         _manualGame = -1; // the services are new: their hand-typed files are read again
+        _statsViewKey = string.Empty;
     }
 
     public void OnUnload()
@@ -738,6 +743,7 @@ public sealed class Plugin : IPlugin
 
         _manualGuard.Run(RefreshManual);
         _firestoneGuard.Run(() => RefreshData(game));
+        _statsViewGuard.Run(UpdateStatsView);
         _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
         _compsGuard.Run(() => UpdateComps(game)); // the targets first: the frames and the choices follow them
         _markersGuard.Run(() => UpdateTavern(game));
@@ -997,6 +1003,41 @@ public sealed class Plugin : IPlugin
 
         Log.Info(CompTargets.RoundLine(_compsRound, _guides?.Guides?.Source, _compsBoard.Count, _compsCards, _tracker.Targets));
         _compsRound = -1;
+    }
+
+    /// <summary>
+    /// The figures of every source loaded (hero files, trinkets, the bracket's card stats), consolidated for the player's
+    /// bracket (StatsConsolidation, docs/plans/2026-10-08-stats-multi-sources.html § 6) whenever one of them changes: one
+    /// line in HDT's log per change. No help reads the view yet; the hero-pick line that will (component 3) is chantier d.
+    /// </summary>
+    private void UpdateStatsView()
+    {
+        if (_stats == null || _choices == null)
+        {
+            return;
+        }
+
+        var key = $"{_stats.Version}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_cardStats?.Version}";
+        if (key == _statsViewKey)
+        {
+            return;
+        }
+
+        _statsViewKey = key;
+        var snapshots = _stats.Sources().Select(SourceSnapshot.Of).ToList();
+        if (_choices.TrinketFile is { } trinkets)
+        {
+            snapshots.Add(SourceSnapshot.Of(trinkets));
+        }
+
+        if (_cardStats?.File is { } cards)
+        {
+            snapshots.Add(SourceSnapshot.Of(cards));
+        }
+
+        var view = StatsConsolidation.Consolidate(snapshots, _stats.Bracket);
+        var sources = string.Join(", ", snapshots.Select(s => $"{s.Provenance.Source} mmr-{s.Provenance.MmrPercentile?.ToString() ?? "all"} ({s.Records.Count})"));
+        Log.Info($"Bronzebeard HUD: stats view bracket=mmr-{_stats.Bracket} sources=[{sources}] · {view.Summary("hero")} · {view.Summary("trinket")} · {view.Summary("card")}");
     }
 
     /// <summary>The hand-typed files (stats\manual\), read at the plugin's start and once per game: the "data-manual" source.</summary>

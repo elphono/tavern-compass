@@ -56,6 +56,9 @@ internal sealed class ChoiceAdvicePanel
 
     public TrinketStat? TrinketStat(string cardId) => _trinkets.File?.Find(cardId);
 
+    /// <summary>The trinket stats loaded; null until a load brings them.</summary>
+    public TrinketStatsFile? TrinketFile => _trinkets.File;
+
     /// <summary>The diagnostic line of the finished load, until the plugin logs it; see <see cref="DataRefresh"/>.</summary>
     public string? PendingLogLine { get; set; }
 

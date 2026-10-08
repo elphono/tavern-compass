@@ -152,6 +152,36 @@ public sealed class ConsolidatedView
 
     public ConsolidatedStat? Find(string kind, string subject, string measure, string countUnit) =>
         _byKey.TryGetValue((kind, subject, measure, countUnit), out var stat) ? stat : null;
+
+    /// <summary>
+    /// For HDT's log: "heroes 116 (116 single, 0 consensus, 0 contested, 0 apart) contested=[A 3.0 ↔ 4.0]" — subjects
+    /// of a kind and the verdicts of their figures ("cards 806 in 9120 figures": one per turn), the contested ones named
+    /// with their sources' lowest and highest figures (five at most).
+    /// </summary>
+    public string Summary(string kind)
+    {
+        var stats = Stats.Where(s => s.Kind == kind).ToList();
+        var subjects = stats.Select(s => s.Subject).Distinct().Count();
+        var label = (kind == "hero" ? "heroes" : kind + "s") + " " + subjects.ToString(CultureInfo.InvariantCulture);
+        if (stats.Count == 0)
+        {
+            return label;
+        }
+
+        int Count(StatVerdict verdict) => stats.Count(s => s.Verdict == verdict);
+        if (stats.Count != subjects)
+        {
+            label += $" in {stats.Count.ToString(CultureInfo.InvariantCulture)} figures"; // a card has one figure per turn
+        }
+
+        var line = $"{label} ({Count(StatVerdict.Single)} single, {Count(StatVerdict.Consensus)} consensus, {Count(StatVerdict.Contested)} contested, {Count(StatVerdict.Apart)} apart)";
+        var contested = stats.Where(s => s.Verdict == StatVerdict.Contested).Take(5).Select(s =>
+        {
+            var values = s.Contributions.Where(c => c.Included).Select(c => c.Record.Value).ToList();
+            return string.Format(CultureInfo.InvariantCulture, "{0} {1:0.0} ↔ {2:0.0}", s.Subject, values.Min(), values.Max());
+        }).ToList();
+        return contested.Count == 0 ? line : $"{line} contested=[{string.Join(", ", contested)}]";
+    }
 }
 
 /// <summary>

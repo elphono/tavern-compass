@@ -28,6 +28,9 @@ internal sealed class CardStatsService
 
     public int? Bracket => _refresh.Bracket;
 
+    /// <summary>The bracket's card stats; null until its load brings them.</summary>
+    public CardStatsFile? File => _refresh.File;
+
     /// <summary>The diagnostic line of the finished load, until the plugin logs it; see <see cref="DataRefresh"/>.</summary>
     public string? PendingLogLine { get; set; }
 

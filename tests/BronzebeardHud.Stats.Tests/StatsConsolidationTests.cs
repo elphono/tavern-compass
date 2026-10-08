@@ -196,6 +196,23 @@ public class StatsConsolidationTests
         Assert.Equal(StatVerdict.Single, Only(StatsConsolidation.Consolidate(new[] { dated }, Player)).Verdict);
     }
 
+    /// <summary>HDT's log line: per kind, how many subjects and their verdicts, and the contested ones named (five at most).</summary>
+    [Fact]
+    public void Summary_CountsVerdictsPerKind_AndNamesTheContested()
+    {
+        var view = StatsConsolidation.Consolidate(new[]
+        {
+            Snap("firestone", Player, null, Hero("A", 3.0, 400), Hero("B", 4.0, 400), Hero("C", 5.0, 5),
+                new StatRecord("card", "K", "placement at turn 6", 4.0, 300, "plays"),
+                new StatRecord("card", "K", "placement at turn 7", 4.0, 5, "plays")),
+            Snap("other", Player, null, Hero("A", 4.0, 400), Hero("B", 4.05, 400)),
+        }, Player);
+
+        Assert.Equal("heroes 3 (0 single, 1 consensus, 1 contested, 1 apart) contested=[A 3.0 ↔ 4.0]", view.Summary("hero"));
+        Assert.Equal("cards 1 in 2 figures (1 single, 0 consensus, 0 contested, 1 apart)", view.Summary("card"));
+        Assert.Equal("trinkets 0", view.Summary("trinket"));
+    }
+
     /// <summary>No data, no line: the view is empty, never a made-up figure.</summary>
     [Fact]
     public void NoSnapshot_GivesAnEmptyView()
