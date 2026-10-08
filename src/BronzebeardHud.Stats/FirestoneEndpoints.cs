@@ -39,6 +39,16 @@ public static class FirestoneEndpoints
         return $"{Base}/trinket-stats/{timePeriod}/overview-from-hourly.gz.json";
     }
 
+    /// <summary>
+    /// Card stats per MMR bracket: how each card did when played at each turn. Covered by the maintainer's agreement of
+    /// 2026-09-27 (every public file); found and measured on 2026-10-08 (mmr-100: 806 cards, 1.46 MB uncompressed).
+    /// </summary>
+    public static string CardStats(int mmrPercentile, string timePeriod)
+    {
+        Check(mmrPercentile, timePeriod);
+        return $"{Base}/card-stats/mmr-{mmrPercentile}/{timePeriod}/overview-from-hourly.gz.json";
+    }
+
     public static string MmrPercentileTable(string timePeriod)
     {
         Check(100, timePeriod);

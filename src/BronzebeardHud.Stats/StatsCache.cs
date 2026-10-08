@@ -240,6 +240,22 @@ public sealed class StatsCache
             TrinketStatsLoader.Serialize,
             cancellationToken).ConfigureAwait(false);
 
+    public string CardStatsPath(int mmrPercentile, string timePeriod) =>
+        Path.Combine(_directory, $"firestone-card-stats-mmr-{mmrPercentile}-{timePeriod}.json");
+
+    /// <summary>Firestone card stats for one MMR bracket (about 0.6 MB once converted), same daily policy as the hero stats.</summary>
+    public async Task<(CardStatsFile? File, bool Downloaded, string? Error, bool Unchanged)> GetCardStatsAsync(
+        int mmrPercentile, string timePeriod, RefreshPolicy policy, CancellationToken cancellationToken) =>
+        await GetAsync(
+            FirestoneEndpoints.CardStats(mmrPercentile, timePeriod),
+            CardStatsPath(mmrPercentile, timePeriod),
+            policy,
+            CardStatsLoader.Load,
+            f => f.FetchedAt,
+            (body, url, at) => CardStatsLoader.ImportFirestone(body, url, at, mmrPercentile),
+            CardStatsLoader.Serialize,
+            cancellationToken).ConfigureAwait(false);
+
     private async Task<(T? File, bool Downloaded, string? Error, bool Unchanged)> GetAsync<T>(
         string url,
         string path,
