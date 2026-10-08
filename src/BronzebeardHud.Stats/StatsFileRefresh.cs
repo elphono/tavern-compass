@@ -4,32 +4,36 @@ using System.Threading.Tasks;
 namespace BronzebeardHud.Stats;
 
 /// <summary>
-/// The trinket stats the plugin shows during an HDT session.
+/// A stats file the plugin shows during an HDT session (trinket stats, card stats of one bracket).
 /// - The first poll loads them, from the plugin's start on (the cache's first use always asks Firestone's server).
-/// - Each new trinket choice asks the cache again, once per choice: the cache then applies its age rule
+/// - Each new occasion (a trinket choice) asks the cache again, once per choice: the cache then applies its age rule
 ///   (<see cref="RefreshPolicy.HeroStats"/> in the plugin), so a session longer than a day gets fresh stats
 ///   instead of keeping the ones loaded at start. Asking once per choice, not once per HDT update, keeps the
 ///   file from being read from disk several times a second.
 /// - The file shown is kept while a load runs, and when a load brings none or fails, so that a choice on screen
 ///   never loses its stats.
 /// </summary>
-public sealed class TrinketStatsRefresh
+public class StatsFileRefresh<T>
+    where T : class
 {
     private readonly string _what;
-    private readonly Func<Task<(TrinketStatsFile? File, bool Downloaded, string? Error, bool Unchanged)>> _load;
-    private Task<(TrinketStatsFile? File, bool Downloaded, string? Error, bool Unchanged)>? _running;
+    private readonly Func<T, DateTimeOffset?> _fetchedAt;
+    private readonly Func<Task<(T? File, bool Downloaded, string? Error, bool Unchanged)>> _load;
+    private Task<(T? File, bool Downloaded, string? Error, bool Unchanged)>? _running;
     private string? _lastChoice;
 
     /// <param name="what">Names the file in the log line, e.g. "trinket-stats last-patch".</param>
     /// <param name="load">One load through the cache, started off the UI thread by the caller.</param>
-    public TrinketStatsRefresh(string what, Func<Task<(TrinketStatsFile? File, bool Downloaded, string? Error, bool Unchanged)>> load)
+    /// <param name="fetchedAt">When a file was downloaded, for the log line.</param>
+    public StatsFileRefresh(string what, Func<Task<(T? File, bool Downloaded, string? Error, bool Unchanged)>> load, Func<T, DateTimeOffset?> fetchedAt)
     {
         _what = what;
         _load = load;
+        _fetchedAt = fetchedAt;
     }
 
     /// <summary>The stats to show; null until a load brings a file.</summary>
-    public TrinketStatsFile? File { get; private set; }
+    public T? File { get; private set; }
 
     /// <summary>True once a load has finished, whatever it brought.</summary>
     public bool Loaded => Version > 0;
@@ -45,7 +49,7 @@ public sealed class TrinketStatsRefresh
 
     public bool IsLoading => _running != null;
 
-    /// <summary>A trinket choice is on screen, named by an id unique to it: the first call for it asks the cache again.</summary>
+    /// <summary>An occasion to ask the cache again (a trinket choice, a new game), named by an id unique to it: the first call for it asks.</summary>
     public void BeginChoice(string choiceId)
     {
         if (string.Equals(choiceId, _lastChoice, StringComparison.Ordinal))
@@ -85,11 +89,11 @@ public sealed class TrinketStatsRefresh
             Error = "loading failed: " + (done.Exception?.GetBaseException().Message ?? "cancelled");
         }
 
-        LastLine = DataRefresh.Line(_what, downloaded, unchanged, Error, File?.FetchedAt);
+        LastLine = DataRefresh.Line(_what, downloaded, unchanged, Error, File == null ? null : _fetchedAt(File));
         return true;
     }
 
-    private Task<(TrinketStatsFile? File, bool Downloaded, string? Error, bool Unchanged)> Start()
+    private Task<(T? File, bool Downloaded, string? Error, bool Unchanged)> Start()
     {
         try
         {
@@ -97,7 +101,18 @@ public sealed class TrinketStatsRefresh
         }
         catch (Exception e)
         {
-            return Task.FromException<(TrinketStatsFile? File, bool Downloaded, string? Error, bool Unchanged)>(e);
+            return Task.FromException<(T? File, bool Downloaded, string? Error, bool Unchanged)>(e);
         }
+    }
+}
+
+/// <summary>The trinket stats the plugin shows during an HDT session; see <see cref="StatsFileRefresh{T}"/>.</summary>
+public sealed class TrinketStatsRefresh : StatsFileRefresh<TrinketStatsFile>
+{
+    /// <param name="what">Names the file in the log line, e.g. "trinket-stats last-patch".</param>
+    /// <param name="load">One load through the cache, started off the UI thread by the caller.</param>
+    public TrinketStatsRefresh(string what, Func<Task<(TrinketStatsFile? File, bool Downloaded, string? Error, bool Unchanged)>> load)
+        : base(what, load, f => f.FetchedAt)
+    {
     }
 }
