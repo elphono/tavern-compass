@@ -190,7 +190,10 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   adversaires : le rang disparaît, la cote reste). Un test lit les sources du plugin et y refuse `Viewbox` et
   `FontSize = <nombre>`.
 - **Panneau « Compositions »** (`CompsPanel`, un seul panneau depuis le 2026-10-04 à la place de « Target compositions »
-  et « HDT comp guides » : `docs/journal/2026-10-04-panneau-unique.md`), en taverne et en combat, par défaut sous le
+  et « HDT comp guides » : `docs/journal/2026-10-04-panneau-unique.md`), **dès la sélection du héros** (Ali, 2026-10-08 : « ça aide d'avoir les
+  compos » ; aucune carte tenue, la liste du lobby par tier et les cases à cocher, qui restent cochées en taverne ; à la
+  place par défaut il recouvre les encarts des héros de droite, 1 ou 2 selon leur nombre, mesuré), en taverne et en
+  combat, par défaut sous le
   plateau du joueur à droite du héros (`TavernLayout.TargetPanel`). **Source** : les Comp Guides que HDT affiche lui-même,
   lus par son API publique (`API.Core.OverlayWindow.BattlegroundsCompsGuidesVM` : `CurrentState`, `Comps` gratuite ou
   `CompsByTier` Tier 7, objets `HSReplay.Responses.BattlegroundsCompGuide`) ; HDT la charge à chaque début de partie, le

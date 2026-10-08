@@ -761,7 +761,7 @@ public sealed class Plugin : IPlugin
     }
 
     /// <summary>
-    /// The "Compositions" panel, in the shop and in combat. HDT's guides are read whenever its list or its state changes
+    /// The "Compositions" panel, from the hero selection on (no card held then), in the shop and in combat. HDT's guides are read whenever its list or its state changes
     /// (one log line: where from, how many, which tiers), and narrowed to the ones the lobby can play (UpdateLobby,
     /// LobbyGuides: one log line); in the shop those are ranked against the board and the hand whenever those change
     /// (CompTargets.Round, CompGuideMatch), and the targets follow (CompTargetTracker: the ticked guides, then the guides in
@@ -783,7 +783,8 @@ public sealed class Plugin : IPlugin
             _compsPanel.HideGuidePopup(); // the tavern closes (or opens): a guide's popup does not outlive it
         }
 
-        if (phase is not (OverlayPhase.Shop or OverlayPhase.Combat))
+        // Shown from the hero selection on (Ali, 2026-10-08: "it helps to have the comps" when picking a hero).
+        if (phase is not (OverlayPhase.HeroSelection or OverlayPhase.Shop or OverlayPhase.Combat))
         {
             LogCompsRound();
             _compsKey = string.Empty;
@@ -817,7 +818,11 @@ public sealed class Plugin : IPlugin
         }
 
         var cards = _compsCards;
-        if (phase == OverlayPhase.Shop)
+        if (phase == OverlayPhase.HeroSelection)
+        {
+            cards = BronzebeardHud.Stats.PlayerCards.None; // nothing held yet: the lobby's guides by tier, and the boxes to tick
+        }
+        else if (phase == OverlayPhase.Shop)
         {
             var round = game.GetTurnNumber();
             if (round != _compsRound)
@@ -915,7 +920,7 @@ public sealed class Plugin : IPlugin
     /// </summary>
     private void UpdateLobby(GameV2 game, OverlayPhase phase)
     {
-        var when = $"{(phase == OverlayPhase.Shop ? "shop" : "combat")} turn {game.GetTurnNumber()}";
+        var when = phase == OverlayPhase.HeroSelection ? "hero selection" : $"{(phase == OverlayPhase.Shop ? "shop" : "combat")} turn {game.GetTurnNumber()}";
         var tribes = ReadLobbyTribes(when);
         var key = _guidesVersion + "|" + string.Join(",", tribes);
         if (key == _lobbyKey)
