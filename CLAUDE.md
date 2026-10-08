@@ -76,6 +76,10 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
   pseudo de joueur ou numéro de compte réel dans un fichier du dépôt (les données de test sont inventées), et tout fichier de
   stats réel (2026-10-08 : un `.gz`, un `.json` de plus de 100 Ko, ou portant un champ propre aux serveurs de Firestone ou de
   nomi.gg).
+- **Release** (2026-10-08, issue #13) : la version vit dans `Directory.Build.props` (`<Version>`, que le plugin lit dans son
+  assembly) ; `tools/release.sh <app-version HDT installé>` refuse un arbre sale ou un tag existant, refait les contrôles de
+  la CI, construit contre l'HDT installé et écrit `out/TavernCompass-v<version>-hdt-<hdt>.zip` ; la release GitHub se crée
+  ensuite (la commande est imprimée, en brouillon). Monter `<Version>` avant la suivante.
 - **Historique réécrit le 2026-10-07** (purge des données personnelles, voir « Décisions ») : les hashes de commit cités
   dans les documents ont été recalculés ; un clone fait avant cette date est à refaire (`git clone`, ou `git fetch` puis
   `git reset --hard origin/main` si l'arbre est propre). L'ancienne app autonome reste atteignable par le tag
