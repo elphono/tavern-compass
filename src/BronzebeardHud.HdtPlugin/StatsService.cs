@@ -94,6 +94,9 @@ internal sealed class StatsService : IDisposable
     /// <summary>The diagnostic line of the last finished load, until the plugin logs it; see <see cref="DataRefresh"/>.</summary>
     public string? PendingLogLine { get; set; }
 
+    /// <summary>True once a load finished, whatever it brought: <see cref="Bracket"/> is then the player's, or 100 for good.</summary>
+    public bool BracketKnown => _firestone != null;
+
     /// <summary>The player's MMR bracket as last resolved (100 = every player until known).</summary>
     public int Bracket => _firestone?.File?.MmrPercentile ?? MmrBracket.EveryPlayer;
 

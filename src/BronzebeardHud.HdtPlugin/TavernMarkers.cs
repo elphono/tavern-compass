@@ -34,7 +34,7 @@ internal sealed class TavernMarkers
     private readonly List<UIElement> _markers = new();
     private IReadOnlyList<string> _cards = Array.Empty<string>();
     private IReadOnlyList<TavernHighlight> _highlights = Array.Empty<TavernHighlight>();
-    private IReadOnlyList<string?> _values = Array.Empty<string?>();
+    private IReadOnlyList<CardTurnNote?> _values = Array.Empty<CardTurnNote?>();
     private IReadOnlyList<bool> _minionSlots = Array.Empty<bool>();
     private TavernPins _pins = TavernPins.Empty;
     private bool _visible;
@@ -76,15 +76,16 @@ internal sealed class TavernMarkers
     /// <param name="highlights">One per card (TavernHighlights.For); any other count draws no frame, the pins only.</param>
     /// <param name="minionSlots">One entry per card of Bob's row: true for a minion (it gets a pin button), false for the spell.</param>
     /// <param name="values">
-    /// One per card: its value at this turn (CardTurnValue.Label), or null; drawn in the last line left (TavernHighlights.MarkerLines).
+    /// One per card: its value at this turn (CardTurnValue), or null; drawn in the last line left, in the form that fits
+    /// (CardTurnValue.Label, TavernHighlights.MarkerLines).
     /// Any other count draws no value.
     /// </param>
     public void Show(IReadOnlyList<string> cards, IReadOnlyList<TavernHighlight>? highlights, TavernPins pins, IReadOnlyList<bool> minionSlots,
-        IReadOnlyList<string?>? values = null)
+        IReadOnlyList<CardTurnNote?>? values = null)
     {
         _cards = cards;
         _highlights = highlights != null && highlights.Count == cards.Count ? highlights : cards.Select(_ => TavernHighlight.None).ToList();
-        _values = values != null && values.Count == cards.Count ? values : cards.Select(_ => (string?)null).ToList();
+        _values = values != null && values.Count == cards.Count ? values : cards.Select(_ => (CardTurnNote?)null).ToList();
         _pins = pins;
         _minionSlots = minionSlots;
         _visible = true;
@@ -132,7 +133,7 @@ internal sealed class TavernMarkers
         var maxChars = MarkerText.MaxChars(slotWidth, fontSize, TavernLayout.MarkerPadding * scale);
         var marked = _cards
             .Select((card, i) => (Position: i, Highlight: _highlights[i], Pinned: _pins.IsPinned(card),
-                Lines: TavernHighlights.MarkerLines(_highlights[i], _pins.IsPinned(card), maxChars, value: _values[i])))
+                Lines: TavernHighlights.MarkerLines(_highlights[i], _pins.IsPinned(card), maxChars, value: CardTurnValue.Label(_values[i], maxChars))))
             .Where(m => m.Lines.Count > 0)
             .ToList();
         var lineCount = marked.Count == 0 ? 1 : marked.Max(m => m.Lines.Count);

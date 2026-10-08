@@ -30,6 +30,7 @@ public sealed class Plugin : IPlugin
     private TavernMarkers? _markers;
     private OpponentMmrPanel? _opponentMmr;
     private ChoiceAdvicePanel? _choices;
+    private CardStatsService? _cardStats;
 
     // One guard per feature: an unexpected exception disables that feature alone (see FeatureGuard).
     private readonly FeatureGuard _heroSelectionGuard;
@@ -38,6 +39,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _markersGuard;
     private readonly FeatureGuard _opponentMmrGuard;
     private readonly FeatureGuard _choiceGuard;
+    private readonly FeatureGuard _cardStatsGuard;
     private readonly FeatureGuard _selectionGuard;
     private readonly FeatureGuard _warbandGuard;
     private readonly FeatureGuard _opponentPowerGuard;
@@ -121,6 +123,12 @@ public sealed class Plugin : IPlugin
         _opponentMmrGuard = new FeatureGuard("opponent-mmr", (n, e) => Disable(n, e, () => _opponentMmr?.Hide()));
         // Replaces "trinket-choice": trinkets are now one kind of choice among discovers and Dark Gifts.
         _choiceGuard = new FeatureGuard("discover-advice", (n, e) => Disable(n, e, () => _choices?.Hide()));
+        // The values of the cards at this turn (Bob's row, a choice's "—"): off alone, the frames and labels stay as before.
+        _cardStatsGuard = new FeatureGuard("card-stats", (n, e) => Disable(n, e, () =>
+        {
+            _tavernKey = string.Empty;
+            _choiceKey = string.Empty;
+        }));
         // The two rows of the power inset under the panel, one guard each: a row that throws (computing it or drawing it)
         // leaves the inset alone, the other row and the panel keep running.
         _warbandGuard = new FeatureGuard("warband-curve", (n, e) => Disable(n, e, () => _compsPanel?.SetPower(null)));
@@ -255,6 +263,7 @@ public sealed class Plugin : IPlugin
     });
 
     private string _loggedHighlights = string.Empty;
+    private string _loggedValues = string.Empty;
 
     /// <summary>
     /// In the shop: Bob's cards that serve the targets (TavernHighlights: core card → solid frame, enabler or add-on →
@@ -280,7 +289,9 @@ public sealed class Plugin : IPlugin
         // Bob's whole row, the tavern spell included: the game centres minions and spell together. Followed by entity:
         // a purchase, a reroll or an added card redraws the markers at once.
         var row = HdtEntityAdapter.TavernRow(game);
-        var key = string.Join(",", row.Select(s => $"{s.EntityId}:{s.CardId}")) + "|" + _targetsVersion + "|" + _pinsVersion + "|" + _bridgeVersion;
+        var turn = game.GetTurnNumber();
+        var key = string.Join(",", row.Select(s => $"{s.EntityId}:{s.CardId}")) + "|" + _targetsVersion + "|" + _pinsVersion + "|" + _bridgeVersion
+                  + "|" + _cardStats?.Version + "|" + turn;
         if (key == _tavernKey)
         {
             return;
@@ -299,7 +310,17 @@ public sealed class Plugin : IPlugin
             Log.Info(TavernHighlights.LogLine(line, targets));
         }
 
-        _markers.Show(bob, highlights, _gamePins.Merge(_comps?.Pins ?? TavernPins.Empty), row.Select(s => s.IsMinion).ToList());
+        // The value of each card at this turn, against every card played then (CardTurnValue): the last line left.
+        var notes = bob.Select(id => CardNote(id, turn)).ToList();
+        var valueLine = string.Join(",", bob.Zip(notes, (id, n) => CardTurnValue.Label(n, int.MaxValue) is { } v ? $"{id}:{v} ({n!.Played})" : null)
+            .Where(v => v != null));
+        if (valueLine != _loggedValues)
+        {
+            _loggedValues = valueLine;
+            Log.Info($"Bronzebeard HUD: tavern values turn={turn} bracket=mmr-{_cardStats?.Bracket?.ToString() ?? "none"} [{valueLine}]");
+        }
+
+        _markers.Show(bob, highlights, _gamePins.Merge(_comps?.Pins ?? TavernPins.Empty), row.Select(s => s.IsMinion).ToList(), notes);
     }
 
     /// <summary>Shows the "Skip combat" button in combat only, and not again in a combat already skipped.</summary>
@@ -632,6 +653,7 @@ public sealed class Plugin : IPlugin
         _markers = new TavernMarkers(Core.OverlayCanvas, TogglePin);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
         _choices = new ChoiceAdvicePanel(Core.OverlayCanvas, StatsDirectory);
+        _cardStats = new CardStatsService(StatsDirectory);
         _skipCombat = new SkipCombatPanel(Core.OverlayCanvas, _mover, SkipCombat);
     }
 
@@ -683,6 +705,8 @@ public sealed class Plugin : IPlugin
         _opponentMmr = null;
         _choices?.Detach();
         _choices?.Dispose();
+        _cardStats?.Dispose();
+        _cardStats = null;
         _choices = null;
         _skipCombat?.Detach();
         _skipCombat = null;
@@ -989,6 +1013,7 @@ public sealed class Plugin : IPlugin
         _stats.Poll();
         _comps.Poll();
         _choices.PollTrinketStats();
+        _cardStatsGuard.Run(() => PollCardStats());
         foreach (var line in new[] { _stats.PendingLogLine, _comps.PendingLogLine, _choices.PendingLogLine })
         {
             if (line != null)
@@ -1118,6 +1143,34 @@ public sealed class Plugin : IPlugin
     /// target the option serves. One line in HDT's log per choice, including the ones without a known layout, so that
     /// uncovered kinds show up.
     /// </summary>
+    /// <summary>
+    /// Card stats follow the bracket of the hero stats once it is resolved (the player's own), so that the first load is
+    /// not spent on the every-player file; one log line per finished load.
+    /// </summary>
+    private void PollCardStats()
+    {
+        if (_cardStats == null || _stats == null || !_stats.BracketKnown)
+        {
+            return;
+        }
+
+        _cardStats.SetBracket(_stats.Bracket);
+        _cardStats.Poll();
+        if (_cardStats.PendingLogLine is { } line)
+        {
+            Log.Info(line);
+            _cardStats.PendingLogLine = null;
+        }
+    }
+
+    /// <summary>The value of a card at this turn, under the card-stats guard: null when it is off or says nothing.</summary>
+    private CardTurnNote? CardNote(string cardId, int turn)
+    {
+        CardTurnNote? note = null;
+        _cardStatsGuard.Run(() => note = _cardStats?.Note(cardId, turn));
+        return note;
+    }
+
     private void UpdateChoice(GameV2 game)
     {
         if (_choices == null || _stats == null)
@@ -1142,7 +1195,8 @@ public sealed class Plugin : IPlugin
         }
 
         var loaded = kind == ChoiceKind.Trinket && _choices.PollTrinketStats();
-        var key = $"{ids}|{_targetsVersion}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_bridgeVersion}";
+        var turn = game.GetTurnNumber();
+        var key = $"{ids}|{_targetsVersion}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_bridgeVersion}|{_cardStats?.Version}|{turn}";
         if (key == _choiceKey && !loaded)
         {
             return;
@@ -1152,7 +1206,7 @@ public sealed class Plugin : IPlugin
         // The lobby's guides only: the fallback "core G (S)" and the pivots never name a guide of an absent tribe.
         var guides = _lobby?.Playable;
         var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _tracker.Targets, guides, _lobby?.Tribes ?? Array.Empty<string>(),
-            _choices.TrinketStat, _stats.Bracket, _bridge);
+            _choices.TrinketStat, _stats.Bracket, _bridge, id => CardNote(id, turn));
         if (advice.HasMarkers)
         {
             _choices.Show(advice);
@@ -1220,6 +1274,7 @@ public sealed class Plugin : IPlugin
             _inHeroSelection = true;
             _compsLoadedThisGame = false;
             _tracker.BeginGame(++_gameNumber); // a new game: no tick, no colour, no target
+            _cardStats?.BeginGame(_gameNumber);
             _gamePins.BeginGame(_gameNumber);
             _selectionVersion++;
             _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
