@@ -303,6 +303,20 @@ internal static class HarnessData
             .ToList());
 
     /// <summary>
+    /// The early cards' pool and tier, invented and fixed (the tiers HearthstoneJSON gives arrive after the first drawing):
+    /// the two good cards of <see cref="CardStats"/> at tier 3 and 4, the bad one at tier 3, so that both rows show.
+    /// </summary>
+    public static IReadOnlyDictionary<string, int> EarlyPool { get; } = new Dictionary<string, int>
+    {
+        [Pool[50]] = 3,
+        [Pool[42]] = 4,
+        [Pool[16]] = 3,
+        ["HARNESS_FILLER"] = 1,
+    };
+
+    public const int EarlyTier = 3;
+
+    /// <summary>
     /// Invented trinket stats (never Firestone's), one per trinket: a placement for every player and per bracket, the
     /// last one without the harness's bracket (its placement for every player is shown) and the third without a pick rate.
     /// </summary>

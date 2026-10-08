@@ -63,6 +63,12 @@ internal sealed class CompsPanel
     /// <summary>The panel's background and frame (the guide popup wears them too).</summary>
     internal static readonly Brush PanelBrush = new SolidColorBrush(Color.FromArgb(0xEB, 0x14, 0x14, 0x1E));
     internal static readonly Brush FrameBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F));
+
+    /// <summary>The early cards' colour: teal, apart from the four target colours and the gold of the status line.</summary>
+    internal static readonly Brush EarlyBrush = new SolidColorBrush(Color.FromRgb(0x22, 0xD3, 0xB6));
+
+    /// <summary>The early cards' section, tracked for the popup like a guide line (no guide id can be this).</summary>
+    internal const string EarlyKey = "@early";
     private static readonly Brush ButtonBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x44));
     private static readonly Brush MutedBrush = GuideView.MutedBrush;
     private static readonly Brush RuleBrush = new SolidColorBrush(Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF));
@@ -226,6 +232,55 @@ internal sealed class CompsPanel
     /// </summary>
     public Func<string, bool> CannotShowUp { get; set; } = _ => false;
 
+    private IReadOnlyList<EarlyCardsRow> _early = Array.Empty<EarlyCardsRow>();
+    private int _earlyTurn;
+    private string _earlyKey = string.Empty;
+
+    /// <summary>
+    /// The best cards of the player's tavern tier and of the next one at this turn (EarlyCards), in a section under the title
+    /// bar, early in the game; none: no section. Hovered, the section shows them with their figures in the popup.
+    /// </summary>
+    public void SetEarly(IReadOnlyList<EarlyCardsRow> rows, int turn)
+    {
+        var key = EarlyCards.LogLine(turn, 0, rows);
+        if (key == _earlyKey)
+        {
+            return;
+        }
+
+        _earlyKey = key;
+        _early = rows;
+        _earlyTurn = turn;
+        RelayoutIfShown();
+    }
+
+    /// <summary>"EARLY · turn 3", then one line per tier: "T2", "T3 next", and its cards' ovals (hover: the card).</summary>
+    private FrameworkElement EarlySection(double scale, double height)
+    {
+        var section = new StackPanel { Margin = new Thickness(0, 4 * scale, 0, 0), Background = Brushes.Transparent };
+        section.Children.Add(Text($"EARLY · turn {_earlyTurn.ToString(CultureInfo.InvariantCulture)}", PanelTypography.Small, scale, EarlyBrush, bold: true));
+        foreach (var row in _early)
+        {
+            var line = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 2 * scale, 0, 0) };
+            var label = Text($"T{row.Tier.ToString(CultureInfo.InvariantCulture)}{(row.IsNext ? " next" : string.Empty)}", PanelTypography.Body, scale, EarlyBrush, bold: true);
+            label.Width = 64 * scale;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            DockPanel.SetDock(label, Dock.Left);
+            line.Children.Add(label);
+            var ovals = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var card in row.Cards)
+            {
+                ovals.Children.Add(Oval(card.CardId, scale, height, onClick: null));
+            }
+
+            line.Children.Add(ovals);
+            section.Children.Add(line);
+        }
+
+        _popup.Track(section, EarlyKey);
+        return section;
+    }
+
     private FrameworkElement KeyOval(string cardId, double scale, double height) =>
         CannotShowUp(cardId) ? CardImages.Unavailable(Oval(cardId, scale, height, onClick: null), scale) : Oval(cardId, scale, height, onClick: null);
 
@@ -361,12 +416,18 @@ internal sealed class CompsPanel
         var guide = _board.All.Select(p => p.Guide).FirstOrDefault(g => g.Id == guideId);
         var left = Canvas.GetLeft(_panel);
         var top = Canvas.GetTop(_panel);
-        if (guide == null || !IsVisible || double.IsNaN(left) || double.IsNaN(top) || _panel.ActualWidth <= 0)
+        var early = guideId == EarlyKey && _early.Count > 0;
+        if ((guide == null && !early) || !IsVisible || double.IsNaN(left) || double.IsNaN(top) || _panel.ActualWidth <= 0)
         {
             return null;
         }
 
         var panel = new LayoutRect(left + _panel.ActualWidth / 2, top + _panel.ActualHeight / 2, _panel.ActualWidth, _panel.ActualHeight);
+        if (guide == null)
+        {
+            return new GuidePopupContent(_early, _earlyTurn, panel, _mover.VisiblePanels(except: _panel));
+        }
+
         return new GuidePopupContent(guide, CompTargets.Find(_targets, guide), _held, _pivotsFor(guide), _contextFor(guide), panel, _mover.VisiblePanels(except: _panel))
         {
             CannotShowUp = CannotShowUp,
@@ -889,6 +950,13 @@ internal sealed class CompsPanel
             note = Text(_note!, PanelTypography.Small, scale, MutedBrush);
             note.Margin = new Thickness(0, 4 * scale, 0, 0);
             chrome.Add(note);
+        }
+
+        if (_early.Count > 0)
+        {
+            var early = EarlySection(scale, height);
+            chrome.Add(early);
+            _shownLines[EarlyKey] = early;
         }
 
         var pieces = new List<(FrameworkElement Element, Action? FillOvals, CompGuideItemKind Kind, int Group, int Rank, string? GuideId)>();

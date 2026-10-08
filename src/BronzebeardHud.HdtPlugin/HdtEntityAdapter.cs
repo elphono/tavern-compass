@@ -301,6 +301,25 @@ internal static class HdtEntityAdapter
     /// HearthDb does not know (LobbyGuides never holds an unknown card against a guide). For LobbyGuides: which key cards can
     /// show up in this lobby.
     /// </summary>
+    /// <summary>The player's tavern tier (PLAYER_TECH_LEVEL on their hero); 0 when unknown.</summary>
+    public static int PlayerTavernTier(GameV2 game)
+    {
+        try
+        {
+            return game.Player.Board.FirstOrDefault(e => e.IsHero && !string.IsNullOrEmpty(e.CardId))?.GetTag(GameTag.PLAYER_TECH_LEVEL) ?? 0;
+        }
+        catch (Exception e) when (e is InvalidOperationException or NullReferenceException)
+        {
+            return 0; // the board changed while it was read
+        }
+    }
+
+    /// <summary>Battlegrounds' minion pool as HearthDb knows it: id, tavern tier (HDT's Database), tribes.</summary>
+    public static IReadOnlyList<(string Id, int Tier, IReadOnlyCollection<string>? Tribes)> BaconPoolMinions() =>
+        HearthDb.Cards.BaconPoolMinions.Keys
+            .Select(id => (Id: id, Tier: Database.GetCardFromId(id)?.TechLevel ?? 0, Tribes: CardTribes(id)))
+            .ToList();
+
     public static IReadOnlyCollection<string>? CardTribes(string cardId)
     {
         if (!HearthDb.Cards.All.TryGetValue(cardId, out var card))

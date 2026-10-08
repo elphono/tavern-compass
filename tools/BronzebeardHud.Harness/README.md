@@ -21,7 +21,8 @@ redimensionner et les regarder **sans lancer une partie** ni HDT.
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --hover 1 --hover-card 2   # la même, et le 2e ovale de la ligne survolé : l'aperçu de sa carte
 ```
 
-`--card-values` donne des stats de cartes inventées au tour 6 (`HarnessData.CardStats`) : « t6 ▲ 3.5 vs 4.0 » sans cadre
+`--card-values` donne des stats de cartes inventées au tour 6 (`HarnessData.CardStats`), d'où aussi la section « EARLY » des
+meilleures cartes du tier et du suivant en tête du panneau (`--hover early` la survole : son popup) : « t6 ▲ 3.5 vs 4.0 » sans cadre
 sur une carte de Bob qui ne sert aucune cible, après « ◆ pinned » sur la carte épinglée, et à la place du « — » de la 3e
 option d'un Dark Gift ; la carte clé de deux cibles n'a plus de ligne libre et ne la montre pas. Le bouton de tranche
 (« top 25% ») est toujours dans la barre de titre ; un clic passe à la suivante (journal seulement : les stats de la

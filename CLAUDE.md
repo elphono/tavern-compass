@@ -347,6 +347,19 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   tranche suivante (`BracketChoice` : 100 → 50 → 25 → 10 → 1 → 100) pour le reste de la partie ; stats de héros, jauge,
   trinkets et card-stats la suivent (tous lisent `StatsService.Bracket`) ; oubliée à la partie suivante ; ligne `bracket
   top 10% chosen in the overlay (was top 25%, rating …)`. Vu seulement dans la simulation (`--card-values`).
+- **Cartes du début de partie** (2026-10-08, Ali : « les meilleures cartes en T1/T2/T3… pour savoir quelles cartes on vise
+  quand on level up en early » ; « ceux de notre rang et celui d'au-dessus » ; « au tour actuel » ; section **et** popup,
+  pour comparer) : `EarlyCards.For` (fonction pure, testée, 9 mutations) prend, parmi les sbires du lobby
+  (`EarlyCards.Pool` : `HearthDb.Cards.BaconPoolMinions`, tier par HDT, règle d'apparition de `LobbyGuides`), ceux du
+  **tier de taverne du joueur** (`PLAYER_TECH_LEVEL` de son héros) **et du suivant** que card-stats dit meilleurs que
+  toutes les cartes jouées **à ce tour** (`CardTurnValue` : 200 parties, bruit), 4 par tier au plus, les meilleurs
+  d'abord ; aucun plafond de tier (une anomalie peut amener des sbires de tier 7, c'est le pool qui décide). Jusqu'au
+  **tour 6** ; à la sélection du héros, tier 1 et tour 1. Section « EARLY · turn n » sous la barre de titre du panneau
+  (« T2 », « T3 next », leurs ovales, teinte sarcelle) ; survolée, le popup des guides montre chaque carte, son nom et
+  « 3.5 vs 4.0 (400) ». Elle prend de la place à la liste des guides en début de partie (simulation, taille par défaut :
+  1 guide sur 8 restant). Garde-fou `card-stats` ; ligne `early cards turn=3 tier=2 [2: id 3.4 vs 3.8 (400), …; 3 next:
+  …]` quand elles changent. Simulation : `--card-values --hover early` (pool et tier inventés, fixes). **Pas encore vu en
+  jeu.**
 - **Socle des sources** (2026-10-08, chantier b, plan `docs/plans/2026-10-08-chantier-b-socle-plan.md`, issue #9) :
   `source` est une liste ouverte (un fichier d'une source inconnue se charge, affiché sous son nom ; « FS », « HSR » pour
   les connues, `StatsSources.Label`) ; chaque fichier de stats expose sa `Provenance` au format commun ;

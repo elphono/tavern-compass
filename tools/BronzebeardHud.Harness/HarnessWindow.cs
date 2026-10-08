@@ -290,6 +290,14 @@ internal sealed class HarnessWindow : Window
     /// </summary>
     public FrameworkElement LineOf(string which)
     {
+        // "early": the early cards' section (with --card-values), tracked for the popup like a guide line.
+        if (string.Equals(which, "early", StringComparison.OrdinalIgnoreCase))
+        {
+            return Comps.ShownLines.TryGetValue(CompsPanel.EarlyKey, out var section)
+                ? section
+                : throw new ArgumentException("--hover early: no early cards' section (it needs --card-values)");
+        }
+
         var guide = GuideOf(which);
         if (guide == null || !Comps.ShownLines.TryGetValue(guide.Id, out var line))
         {
@@ -445,6 +453,15 @@ internal sealed class HarnessWindow : Window
         var targets = round.Targets;
         var note = !_lobby.Known && _lobby.All.Count > 0 ? "Lobby tribes unknown: every guide listed" : null;
         Comps.CannotShowUp = _lobby.CannotShowUp; // as Plugin.UpdateComps
+        if (_cardValues)
+        {
+            // As Plugin.UpdateEarlyCards, on the invented card stats and pool.
+            var tier = HarnessData.EarlyTier;
+            var rows = EarlyCards.For(HarnessData.CardStats, HarnessData.Turn, tier, HarnessData.EarlyPool);
+            Log.Info("Bronzebeard HUD: " + EarlyCards.LogLine(HarnessData.Turn, tier, rows));
+            Comps.SetEarly(rows, HarnessData.Turn);
+        }
+
         Comps.Show(round.Board, targets, cards.All.Select(c => c.CardId), CompGuideSources.HdtFree, null, note);
         Comps.SetPower(HarnessData.Power(_power));
         var (opponent, opponentLine) = HarnessData.OpponentPower(_opponentPower, id => Database.GetCardFromId(id)?.LocalizedName ?? id);

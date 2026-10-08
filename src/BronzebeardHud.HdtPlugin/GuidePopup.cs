@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using BronzebeardHud.Stats;
+using Hearthstone_Deck_Tracker.Hearthstone;
 using Hearthstone_Deck_Tracker.Utility.Extensions;
 using Hearthstone_Deck_Tracker.Utility.Logging;
 
@@ -18,17 +19,36 @@ internal sealed class GuidePopupContent
 {
     public GuidePopupContent(CompGuide guide, CompTarget? target, ICollection<string> held, IReadOnlyList<GuidePivot>? pivots, string? context,
         LayoutRect panel, IReadOnlyList<LayoutRect> avoid)
+        : this(panel, avoid)
     {
         Guide = guide;
         Target = target;
         Held = held;
         Pivots = pivots;
         Context = context;
+    }
+
+    /// <summary>The early cards (EarlyCards) in place of a guide: the section at the panel's top, hovered.</summary>
+    public GuidePopupContent(IReadOnlyList<EarlyCardsRow> early, int turn, LayoutRect panel, IReadOnlyList<LayoutRect> avoid)
+        : this(panel, avoid)
+    {
+        Early = early;
+        Turn = turn;
+    }
+
+    private GuidePopupContent(LayoutRect panel, IReadOnlyList<LayoutRect> avoid)
+    {
+        Held = new HashSet<string>();
         Panel = panel;
         Avoid = avoid;
     }
 
-    public CompGuide Guide { get; }
+    /// <summary>The guide to draw; null for the early cards.</summary>
+    public CompGuide? Guide { get; }
+
+    public IReadOnlyList<EarlyCardsRow>? Early { get; }
+
+    public int Turn { get; }
 
     /// <summary>A key card the lobby cannot offer: greyed and struck (CardImages.Unavailable).</summary>
     public Func<string, bool> CannotShowUp { get; set; } = _ => false;
@@ -209,18 +229,30 @@ internal sealed class GuidePopup
 
         var guide = content.Guide;
         // The name and badges, then the line of Firestone context when the guide has one: always shown, never left out.
-        var head = new List<FrameworkElement> { Header(guide, content.Target, scale) };
-        if (GuideView.Context(content.Context, scale) is { } context)
+        var head = new List<FrameworkElement>();
+        List<FrameworkElement> sections;
+        if (guide != null)
         {
-            head.Add(context);
+            head.Add(Header(guide, content.Target, scale));
+            if (GuideView.Context(content.Context, scale) is { } context)
+            {
+                head.Add(context);
+            }
+
+            sections = GuideView.Sections(guide, content.Held, content.Pivots, scale,
+                card =>
+                {
+                    var oval = CardImages.Vignette(card, content.Held.Contains(card), PanelFit.OvalWidth * scale, scale, 0, placePreview: null, onClick: null, CompsPanel.TierOf(card));
+                    return content.CannotShowUp(card) ? CardImages.Unavailable(oval, scale) : oval;
+                }).ToList();
+        }
+        else
+        {
+            head.Add(GuideView.Text($"Early cards · turn {content.Turn.ToString(CultureInfo.InvariantCulture)}", PanelTypography.CompositionName, scale, Brushes.White, bold: true));
+            head.Add(GuideView.Text("placement when played this turn, vs every card played this turn", PanelTypography.Small, scale, GuideView.MutedBrush));
+            sections = (content.Early ?? Array.Empty<EarlyCardsRow>()).Select(row => EarlySection(row, scale)).ToList();
         }
 
-        var sections = GuideView.Sections(guide, content.Held, content.Pivots, scale,
-            card =>
-            {
-                var oval = CardImages.Vignette(card, content.Held.Contains(card), PanelFit.OvalWidth * scale, scale, 0, placePreview: null, onClick: null, CompsPanel.TierOf(card));
-                return content.CannotShowUp(card) ? CardImages.Unavailable(oval, scale) : oval;
-            });
         var more = GuideView.MoreSections(scale);
         foreach (var element in head.Concat(sections).Append(more))
         {
@@ -228,7 +260,7 @@ internal sealed class GuidePopup
         }
 
         _popup.Width = popupWidth;
-        _popup.BorderBrush = content.Target != null ? HexBrush.Of(content.Target.Colour) : CompsPanel.FrameBrush;
+        _popup.BorderBrush = content.Target != null ? HexBrush.Of(content.Target.Colour) : guide == null ? CompsPanel.EarlyBrush : CompsPanel.FrameBrush;
         _popup.Child = lines;
         _popup.Visibility = Visibility.Visible;
         lines.Measure(new Size(inner, double.PositiveInfinity));
@@ -278,9 +310,36 @@ internal sealed class GuidePopup
         if (log)
         {
             Shows++;
-            Log.Info($"Bronzebeard HUD: guide popup {guide.Name} shown at ({place.Left:0},{place.Top:0} {place.Width:0}×{place.Height:0}) "
+            Log.Info($"Bronzebeard HUD: guide popup {guide?.Name ?? "early cards"} shown at ({place.Left:0},{place.Top:0} {place.Width:0}×{place.Height:0}) "
                      + $"sections={fit.Shown.Count.ToString(CultureInfo.InvariantCulture)}/{fit.Total.ToString(CultureInfo.InvariantCulture)}");
         }
+    }
+
+    /// <summary>One tier of the early cards: "TIER 3 · NEXT", then one line per card, its oval, its name and its figures.</summary>
+    private static FrameworkElement EarlySection(EarlyCardsRow row, double scale)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var section = new StackPanel { Margin = new Thickness(0, 6 * scale, 0, 0) };
+        section.Children.Add(GuideView.Text($"TIER {row.Tier.ToString(inv)}{(row.IsNext ? " · NEXT" : string.Empty)}", PanelTypography.Small, scale, CompsPanel.EarlyBrush, bold: true));
+        foreach (var card in row.Cards)
+        {
+            var line = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 2 * scale, 0, 0) };
+            var oval = CardImages.Vignette(card.CardId, false, PanelFit.OvalWidth * scale, scale, 0, placePreview: null, onClick: null, CompsPanel.TierOf(card.CardId));
+            DockPanel.SetDock(oval, Dock.Left);
+            line.Children.Add(oval);
+            var figures = GuideView.Text($"{card.Note.Placement.ToString("0.0", inv)} vs {card.Note.TurnAverage.ToString("0.0", inv)} ({card.Note.Played.ToString(inv)})",
+                PanelTypography.Small, scale, GuideView.MutedBrush);
+            figures.VerticalAlignment = VerticalAlignment.Center;
+            DockPanel.SetDock(figures, Dock.Right);
+            line.Children.Add(figures);
+            var name = GuideView.Text(Database.GetCardFromId(card.CardId)?.LocalizedName ?? card.CardId, PanelTypography.Body, scale, Brushes.White, bold: true);
+            name.VerticalAlignment = VerticalAlignment.Center;
+            name.Margin = new Thickness(6 * scale, 0, 6 * scale, 0);
+            line.Children.Add(name);
+            section.Children.Add(line);
+        }
+
+        return section;
     }
 
     /// <summary>The guide's name, in its target's colour (else white), then its tier and difficulty badges on the right.</summary>

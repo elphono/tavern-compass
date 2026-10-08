@@ -99,6 +99,9 @@ public sealed class Plugin : IPlugin
     private int _selectionVersion;
     private int _gameNumber;
     private int _manualGame = -1;
+    private IReadOnlyDictionary<string, int>? _earlyPool;
+    private string _earlyPoolKey = string.Empty;
+    private string _earlyLine = string.Empty;
     private int _nomiGame = -1;
     private string _statsViewKey = string.Empty;
 
@@ -140,6 +143,7 @@ public sealed class Plugin : IPlugin
         // The values of the cards at this turn (Bob's row, a choice's "—"): off alone, the frames and labels stay as before.
         _cardStatsGuard = new FeatureGuard("card-stats", (n, e) => Disable(n, e, () =>
         {
+            _compsPanel?.SetEarly(Array.Empty<EarlyCardsRow>(), 0);
             _tavernKey = string.Empty;
             _choiceKey = string.Empty;
         }));
@@ -709,6 +713,8 @@ public sealed class Plugin : IPlugin
         _manualGame = -1; // the services are new: their hand-typed files are read again
         _nomiGame = -1;
         _statsViewKey = string.Empty;
+        _earlyPool = null;
+        _earlyLine = string.Empty;
     }
 
     public void OnUnload()
@@ -838,6 +844,8 @@ public sealed class Plugin : IPlugin
             LogCompsRound(); // the shop round is over: its last targets are the ones logged
         }
 
+        _cardStatsGuard.Run(() => UpdateEarlyCards(game, phase));
+
         var count = _settings.SuggestedCompositions;
         var bracket = _stats?.Bracket ?? MmrBracket.EveryPlayer;
         _compsPanel.Bracket = _stats == null ? null : (BracketChoice.Label(bracket), NextBracket);
@@ -874,6 +882,39 @@ public sealed class Plugin : IPlugin
         var note = _lobby is { Known: false } && _lobby.All.Count > 0 ? "Lobby tribes unknown: every guide listed" : null;
         _compsPanel.CannotShowUp = _lobby != null ? _lobby.CannotShowUp : _ => false;
         _compsPanel.Show(_compsBoard, _tracker.Targets, cards.All.Select(c => c.CardId), _guides.Guides?.Source, CompGuidesStatus(_guides), note);
+    }
+
+    /// <summary>
+    /// The early cards (EarlyCards, Ali 2026-10-08): the best cards of the player's tavern tier and of the next one at this
+    /// turn, among the lobby's minions, in a section of the panel up to turn 6 (tier 1 and turn 1 at the hero selection).
+    /// One log line when they change. Under the card-stats guard: they are card-stats.
+    /// </summary>
+    private void UpdateEarlyCards(GameV2 game, OverlayPhase phase)
+    {
+        if (_compsPanel == null)
+        {
+            return;
+        }
+
+        var turn = phase == OverlayPhase.HeroSelection ? 1 : game.GetTurnNumber();
+        var tier = phase == OverlayPhase.HeroSelection ? 1 : HdtEntityAdapter.PlayerTavernTier(game);
+        var tribes = _lobby?.Tribes ?? Array.Empty<string>();
+        var poolKey = string.Join(",", tribes);
+        if (_earlyPool == null || poolKey != _earlyPoolKey)
+        {
+            _earlyPoolKey = poolKey;
+            _earlyPool = EarlyCards.Pool(HdtEntityAdapter.BaconPoolMinions(), tribes);
+        }
+
+        var rows = EarlyCards.For(_cardStats?.File, turn, tier, _earlyPool);
+        var line = EarlyCards.LogLine(turn, tier, rows);
+        if (line != _earlyLine)
+        {
+            _earlyLine = line;
+            Log.Info("Bronzebeard HUD: " + line);
+        }
+
+        _compsPanel.SetEarly(rows, turn);
     }
 
     /// <summary>
