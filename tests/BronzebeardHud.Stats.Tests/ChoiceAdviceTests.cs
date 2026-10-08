@@ -247,4 +247,52 @@ public class ChoiceAdviceTests
             ChoiceAdvisor.DiagnosticLine(powers, Advise(powers, UndeadWithAPirateAddOn), All.Count, "hdt-free",
                 Array.Empty<IReadOnlyList<string>>(), null, 2291, 1360));
     }
+    private static readonly CardTurnNote GoodAtSix = new(6, 3.6, 3.92, 400, CardTurnVerdict.Better);
+
+    private static ChoiceAdvice AdviseWithValues(OfferedOption[] options, OwnedCard[] owned, Func<string, CardTurnNote?> cardValue) =>
+        ChoiceAdvisor.Advise(options, owned, TargetsFor(owned), All, Lobby, cardValue: cardValue);
+
+    [Fact]
+    public void CardValue_ReplacesTheDash_NeutralAndUncoloured()
+    {
+        var advice = AdviseWithValues(new[] { Minion(501, "NEUTRAL"), Minion(502, "OTHER") }, UndeadWithAPirateAddOn, id => id == "NEUTRAL" ? GoodAtSix : null);
+
+        Assert.Equal(ChoiceReason.CardValue, advice.Options[0].Reason);
+        Assert.Null(advice.Options[0].Colour);
+        Assert.Equal(new[] { "t6 ▲ 3.6 vs 3.9" }, Labels(advice)[0]);
+        Assert.Equal(new[] { "—" }, Labels(advice)[1]);
+    }
+
+    [Fact]
+    public void CardValue_NeverPassesATargetOrAGuide()
+    {
+        // U2 is a core card of the first target, MS2 of a guide playable in the lobby: both keep their labels.
+        var advice = AdviseWithValues(new[] { Minion(501, "U2"), Minion(502, "MS2") }, UndeadWithAPirateAddOn, _ => GoodAtSix);
+
+        Assert.Equal(new[] { ChoiceReason.Target, ChoiceReason.Guide }, advice.Options.Select(o => o.Reason));
+        Assert.DoesNotContain(Labels(advice).SelectMany(l => l), line => line.StartsWith("t6", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CardValue_WithoutValues_TheDashStays()
+    {
+        var advice = AdviseWithValues(new[] { Minion(501, "NEUTRAL"), Minion(502, "OTHER") }, UndeadWithAPirateAddOn, _ => null);
+
+        Assert.Equal(ChoiceReason.None, advice.Options[0].Reason);
+        Assert.Equal(new[] { "—" }, Labels(advice)[0]);
+    }
+
+    [Fact]
+    public void CardValue_IsNotAskedForATrinket()
+    {
+        var asked = 0;
+        var advice = AdviseWithValues(new[] { Trinket(601, "T1", "text"), Trinket(602, "T2", "text") }, UndeadWithAPirateAddOn, _ =>
+        {
+            asked++;
+            return GoodAtSix;
+        });
+
+        Assert.Equal(0, asked);
+        Assert.All(advice.Options, o => Assert.Equal(ChoiceReason.Trinket, o.Reason));
+    }
 }

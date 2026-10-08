@@ -179,7 +179,8 @@ public static class TrinketAffinity
 
 /// <summary>
 /// Why an option's label says what it says (the diagnostic line names it). For a minion or a spell, the first that applies, in
-/// this order: <see cref="Target"/>, <see cref="TopBoards"/>, <see cref="Pivot"/>, <see cref="Guide"/>, <see cref="None"/>.
+/// this order: <see cref="Target"/>, <see cref="TopBoards"/>, <see cref="Pivot"/>, <see cref="Guide"/>, <see cref="CardValue"/>,
+/// <see cref="None"/>.
 /// </summary>
 public enum ChoiceReason
 {
@@ -203,6 +204,12 @@ public enum ChoiceReason
 
     /// <summary>A core card of a guide a target can pivot to (<see cref="GuidePivots"/>): "pivot → Naga Spells (S)", neutral.</summary>
     Pivot,
+
+    /// <summary>
+    /// Nothing for any guide, but card-stats says something above the noise at this turn (<see cref="CardTurnValue"/>):
+    /// "t6 ▲ 3.6 vs 3.9", neutral. It only ever replaces "—".
+    /// </summary>
+    CardValue,
 }
 
 /// <summary>A guide a target can turn to (<see cref="GuidePivots.For"/>), of which the offered card is a core card.</summary>
@@ -225,9 +232,11 @@ public sealed class OptionAdvice
 {
     /// <param name="boards">What the targets' bridged comps say of the card (<see cref="BoardEvidence.For"/>); null: nothing known.</param>
     /// <param name="pivots">Guides a target can pivot to that the card is a core card of; null: none.</param>
+    /// <param name="cardValue">What card-stats says of the card at this turn; null: nothing above the noise, or no stats.</param>
     public OptionAdvice(int position, OfferedOption option, IReadOnlyList<GuideCardEffect> effects, IReadOnlyList<CompGuide> guides, TrinketNote? trinket,
-        IReadOnlyList<BoardEvidence>? boards = null, IReadOnlyList<ChoicePivot>? pivots = null)
+        IReadOnlyList<BoardEvidence>? boards = null, IReadOnlyList<ChoicePivot>? pivots = null, CardTurnNote? cardValue = null)
     {
+        CardValue = cardValue;
         Position = position;
         Option = option;
         Effects = effects;
@@ -270,12 +279,16 @@ public sealed class OptionAdvice
 
     public TrinketNote? Trinket { get; }
 
+    /// <summary>Said only when nothing else is (<see cref="ChoiceReason.CardValue"/>).</summary>
+    public CardTurnNote? CardValue { get; }
+
     public ChoiceReason Reason =>
         Trinket != null ? ChoiceReason.Trinket
         : Effects.Count > 0 ? ChoiceReason.Target
         : TopBoards.Count > 0 ? ChoiceReason.TopBoards
         : Pivots.Count > 0 ? ChoiceReason.Pivot
         : Guides.Count > 0 ? ChoiceReason.Guide
+        : CardValue != null ? ChoiceReason.CardValue
         : ChoiceReason.None;
 
     /// <summary>
@@ -333,7 +346,8 @@ public static class ChoiceAdvisor
         IReadOnlyCollection<string> lobbyTribes,
         Func<string, TrinketStat?>? trinketStat = null,
         int bracket = MmrBracket.EveryPlayer,
-        IReadOnlyDictionary<string, GuideEvidence>? bridge = null)
+        IReadOnlyDictionary<string, GuideEvidence>? bridge = null,
+        Func<string, CardTurnNote?>? cardValue = null)
     {
         var kind = ChoiceClassifier.Kind(options);
         if (kind is ChoiceKind.None or ChoiceKind.Unsupported)
@@ -384,7 +398,8 @@ public static class ChoiceAdvisor
                     .GroupBy(p => p.To.Id, StringComparer.Ordinal)
                     .Select(g => g.First())
                     .ToList();
-            return new OptionAdvice(position, option, effects, fallback, null, BoardEvidence.For(option.CardId, targets, bridge), pivots);
+            return new OptionAdvice(position, option, effects, fallback, null, BoardEvidence.For(option.CardId, targets, bridge), pivots,
+                cardValue?.Invoke(option.CardId));
         }).ToList();
         return new ChoiceAdvice(kind, advice, targets);
     }
@@ -441,6 +456,7 @@ public static class ChoiceAdvisor
             ChoiceReason.TopBoards => option.TopBoards.Select(b => MarkerText.Label("+", b.Target.Guide.Name, b.Card.Text!, maxChars)).ToList(),
             ChoiceReason.Pivot => option.Pivots.Select(p => MarkerText.Label("pivot →", p.To.Name, $"({p.To.TierLetter})", maxChars)).ToList(),
             ChoiceReason.Guide => option.Guides.Select(g => MarkerText.Label("core", g.Name, $"({g.TierLetter})", maxChars)).ToList(),
+            ChoiceReason.CardValue when CardTurnValue.Label(option.CardValue, maxChars) is { } value => new List<string> { value },
             _ => new List<string>(),
         };
         if (labels.Count == 0)
