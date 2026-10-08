@@ -37,7 +37,11 @@ only run in the simulation. The list is in the [roadmap](ROADMAP.md), under *To 
 
 ## Install
 
-There is no packaged release yet (see the [roadmap](ROADMAP.md)): build it.
+Download the zip of the latest [release](https://github.com/elphono/tavern-compass/releases), close HDT, and copy its
+`BronzebeardHud` folder into `%AppData%\HearthstoneDeckTracker\Plugins\`. Start HDT and enable the plugin in
+*Options → Plugins*. Each zip names the HDT version it was built against (`…-hdt-1.58.9.zip`).
+
+Or build it:
 
 ```bash
 dotnet build src/BronzebeardHud.HdtPlugin -c Release

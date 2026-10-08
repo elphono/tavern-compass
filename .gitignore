@@ -13,3 +13,6 @@ lib/
 
 # Claude Code: local settings and agent worktrees
 .claude/
+
+# Release zips (tools/release.sh)
+/out/

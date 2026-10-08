@@ -1,13 +1,13 @@
 # Roadmap
 
-State of the project on 2026-10-07. Detailed history, decision by decision, is in [`docs/journal/`](docs/journal/)
+State of the project on 2026-10-08. Detailed history, decision by decision, is in [`docs/journal/`](docs/journal/)
 (in French); the specification and the plan the plugin follows are in [`docs/plans/`](docs/plans/).
 
 | Horizon | What |
 |---|---|
-| **Shipped** | Hero-pick stats · MMR of the opponents · Compositions panel (HDT's comp guides as targets) · tavern frames · choice labels · lobby tribes filter · `−` / `+` that resize the panel for N comps · power inset (you and your opponent) · movable and resizable panels · simulation harness |
+| **Shipped** | Hero-pick stats · MMR of the opponents · Compositions panel (HDT's comp guides as targets) · tavern frames · choice labels · lobby tribes filter · `−` / `+` that resize the panel for N comps · power inset (you and your opponent) · movable and resizable panels · simulation harness · packaged releases |
 | **To verify in a live game** | Almost everything of the last two weeks: see below |
-| **Next** | Packaged releases · simulation of HDT's overlay layer · statistics from several sources (card stats done, see below) |
+| **Next** | Simulation of HDT's overlay layer · statistics from several sources (card stats done, see below) |
 | **Not planned** | See the end of this page |
 
 ## To verify in a live game
@@ -43,8 +43,8 @@ and, when there is one, the line of HDT's log that tells.
 
 ## Next
 
-- **Packaged releases.** GitHub only hosts HDT up to 1.55.6; newer versions come through HDT's own updater. A release
-  must be built against the HDT people run, so it is done by hand for now, then attached to a GitHub release.
+- **Packaged releases** — done on 2026-10-08: GitHub only hosts HDT up to 1.55.6, so a release is built by
+  `tools/release.sh` against the HDT installed on the maintainer's machine, and its zip names that version.
 - **Firestone card stats** — done on 2026-10-08, not yet seen in a live game: on Bob's cards and in place of a choice's "—", how a card did when played at this turn against every card played then ("t6 ▲ 3.6 vs 3.9"), nothing under the noise; the MMR bracket can be switched from the panel's title bar.
 - **Simulation of HDT's overlay layer** (clicks through the transparent overlay, hover probed at 60 Hz) and a scenario
   mode with an injected mouse. Today the simulation cannot show a defect that lives in that layer.

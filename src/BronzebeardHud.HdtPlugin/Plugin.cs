@@ -582,7 +582,8 @@ public sealed class Plugin : IPlugin
 
     public string ButtonText => "Move panels (on/off)";
     public string Author => "elphono";
-    public Version Version => new(0, 3, 0);
+    // Directory.Build.props sets it, for HDT and for the release tag alike.
+    public Version Version => typeof(Plugin).Assembly.GetName().Version;
     /// <summary>HDT's Plugins menu: move mode on/off, reset panel places, open the data folder.</summary>
     public MenuItem MenuItem => _menu ??= BuildMenu();
 
