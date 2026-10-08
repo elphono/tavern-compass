@@ -955,11 +955,11 @@ internal static class SelfTest
     }
 
     /// <summary>
-    /// (d) A choice opened in the shop takes off the screen Bob's frames, labels and ◇ buttons, the panel and a guide popup on
-    /// show, and no popup shows meanwhile; one log line when it opens, none for the next updates of the same choice or of
-    /// another; closing it puts back the same targets and the same markers (same places, colours and texts), the panel as
-    /// it was — the same elements, not rebuilt —, one log line, and a hovered line shows its popup again. A Dark Gift first:
-    /// its ◇ fell inside the options. Also measured, for the record: how much of each option the panel covers at its place.
+    /// (d) A choice opened in the shop takes off the screen Bob's frames, labels and ◇ buttons; the panel and its inset stay
+    /// where they are, the same elements (Ali, 2026-10-08: "the panel simply always visible"); one log line when it opens,
+    /// none for the next updates of the same choice or of another; closing it puts back the same targets and the same markers
+    /// (same places, colours and texts), one log line, and a hovered line shows its popup. A Dark Gift first: its ◇ fell
+    /// inside the options. Also measured, for the record: how much of each option the panel covers at its place.
     /// </summary>
     private static void CoverChecks(HarnessWindow window, Action<string, bool, string> check)
     {
@@ -997,25 +997,20 @@ internal static class SelfTest
         window.ShowChoice(ChoiceKind.DarkGift);
         window.UpdateLayout();
         var markersDuring = MarkerSignatures(window);
-        var panelDuring = comps.Element.IsVisible;
+        var panelDuring = comps.Element.IsVisible && RectOf(comps.Element) == panelBefore && ReferenceEquals(comps.Content, contentBefore);
         var insetDuring = comps.Inset.IsVisible;
-        var popupDuring = popup.IsVisible;
-        Raise(line, UIElement.MouseLeaveEvent);
-        Raise(line, UIElement.MouseEnterEvent); // the line "entered" again while the choice is open: no popup
-        Headless.Pump(400);
-        var popupOnHover = popup.IsVisible;
         Raise(line, UIElement.MouseLeaveEvent);
         window.ShowChoice(ChoiceKind.DarkGift); // the next updates of the same choice
         window.ShowChoice(ChoiceKind.Discover); // then another kind, still open
         window.UpdateLayout();
         var markersStill = MarkerSignatures(window);
-        var panelStill = comps.Element.IsVisible;
-        check("choice open: Bob's frames, labels and ◇, the panel with its power inset and a popup on show leave the screen; no popup on hover meanwhile",
+        var panelStill = comps.Element.IsVisible && RectOf(comps.Element) == panelBefore;
+        check("choice open: Bob's frames, labels and ◇ leave the screen; the panel and its power inset stay, the same elements",
             popupBefore && pinsBefore > 0 && markersBefore.Count > pinsBefore && markersDuring.Count == 0 && markersStill.Count == 0
-            && !panelDuring && !panelStill && !popupDuring && !popupOnHover && insetBefore && !insetDuring,
+            && panelDuring && panelStill && insetBefore && insetDuring,
             $"before: {markersBefore.Count} marker elements ({pinsBefore} ◇), panel shown, inset {insetBefore}, popup {popupBefore}; Dark Gift open: {markersDuring.Count} marker elements"
-            + $"{(markersDuring.Count > 0 ? " (" + string.Join(" | ", markersDuring.Take(3)) + ")" : string.Empty)}, panel {panelDuring}, inset {insetDuring}, popup {popupDuring}, "
-            + $"popup on hover {popupOnHover}; discover after it: {markersStill.Count}, panel {panelStill}; {measure}");
+            + $"{(markersDuring.Count > 0 ? " (" + string.Join(" | ", markersDuring.Take(3)) + ")" : string.Empty)}, panel kept {panelDuring}, inset {insetDuring}; "
+            + $"discover after it: {markersStill.Count}, panel kept {panelStill}; {measure}");
 
         window.ShowChoice(ChoiceKind.None);
         window.UpdateLayout();
@@ -1042,20 +1037,7 @@ internal static class SelfTest
         Headless.Pump(400);
         var popupAgain = popup.IsVisible;
         Raise(comps.ShownLines[guide.Id], UIElement.MouseLeaveEvent);
-        check("after the choice, a hovered line shows its popup again", popupAgain, $"popup visible {popupAgain}");
-
-        // Trinkets (Ali, 2026-10-08): Bob's markers leave the screen, the panel and its inset stay, the same elements.
-        window.ShowChoice(ChoiceKind.Trinket);
-        window.UpdateLayout();
-        var markersTrinket = MarkerSignatures(window);
-        var panelTrinket = comps.Element.IsVisible && comps.Inset.IsVisible && RectOf(comps.Element) == panelBefore;
-        var contentTrinket = comps.Content;
-        window.ShowChoice(ChoiceKind.None);
-        window.UpdateLayout();
-        check("trinket shop open: Bob's markers leave the screen, the panel and its inset stay where they were",
-            markersTrinket.Count == 0 && panelTrinket && MarkerSignatures(window).SequenceEqual(markersBefore),
-            $"trinkets open: {markersTrinket.Count} marker elements, panel {Describe(RectOf(comps.Element))} visible {panelTrinket}, "
-            + $"same content {ReferenceEquals(contentTrinket, comps.Content)}; closed: markers identical {MarkerSignatures(window).SequenceEqual(markersBefore)}");
+        check("after the choice, a hovered line shows its popup", popupAgain, $"popup visible {popupAgain}");
         window.CursorInside = null;
     }
 

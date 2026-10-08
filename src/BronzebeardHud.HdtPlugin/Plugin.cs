@@ -172,7 +172,6 @@ public sealed class Plugin : IPlugin
         {
             _cover.Reset();
             _markers?.Suspend(false);
-            _compsPanel?.Suspend(false);
         }));
         _pinsGuard = new FeatureGuard("tavern-pins", (n, e) => Disable(n, e, () =>
         {
@@ -1124,9 +1123,9 @@ public sealed class Plugin : IPlugin
 
     /// <summary>
     /// While a choice is open in the shop (ChoiceCover: any kind ChoiceClassifier tells from None), the markers on Bob's
-    /// cards and, for any kind but trinkets, the "Compositions" panel with its popup are off the screen, and back as they were once it closes: nothing
-    /// is computed again for that, the panel and the markers keep what they were last given. One log line per transition.
-    /// A decision to be confirmed in game by Ali (docs/journal/2026-10-04-panneau-unique.md).
+    /// cards are off the screen, and back as they were once it closes: nothing is computed again for that, the markers keep
+    /// what they were last given. One log line per transition. The "Compositions" panel stays on the screen (Ali,
+    /// 2026-10-08: "the panel simply always visible").
     /// </summary>
     private void UpdateChoiceCover(GameV2 game)
     {
@@ -1137,7 +1136,6 @@ public sealed class Plugin : IPlugin
         }
 
         _markers?.Suspend(_cover.Hidden);
-        _compsPanel?.Suspend(_cover.PanelHidden);
     }
 
     /// <summary>

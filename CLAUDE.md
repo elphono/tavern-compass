@@ -287,14 +287,13 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   cible peut pivoter (« pivot → Nom (S) », neutre) ; sinon le guide jouable dans le lobby dont elle est carte clé
   (« core Nom (S) », neutre) ; sinon « — ». Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est
   à la fois BEAST et PET). **Pendant un choix** ouvert en taverne (toute sorte que `ChoiceClassifier` distingue de
-  `None`, y compris sans disposition connue), cadres, étiquettes et ◇ des cartes de Bob, le panneau « Compositions » et
-  son popup sont retirés de l'écran (`ChoiceCover`, `TavernMarkers.Suspend`, `CompsPanel.Suspend`) — **sauf le panneau pendant
-  un choix de trinkets**, qui reste affiché (Ali, 2026-10-08 : « le panel composition ne doit pas disparaître lors du choix
-  des trinkets » ; `ChoiceCover.PanelHidden`, ligne `choice open (trinkets): markers hidden, panel kept`) —, puis remis tels quels
-  à sa fermeture, sans recalcul (le panneau : les mêmes éléments si rien n'a changé). Raison, mesurée dans la simulation :
-  les ◇ tombaient dans les cartes d'un Dark Gift (un clic épinglait au lieu de choisir) et le panneau, à sa place par
-  défaut en 1080p, couvrait le bas de la 3e option (302 × 43 px en découverte, 359 × 162 px en Dark Gift). Décision du
-  pilote, réversible, **à confirmer en jeu par Ali** ; garde-fou `choice-cover` (s'il tombe, tout est rétabli).
+  `None`, y compris sans disposition connue), cadres, étiquettes et ◇ des cartes de Bob sont retirés de l'écran
+  (`ChoiceCover`, `TavernMarkers.Suspend`), puis remis tels quels à sa fermeture, sans recalcul : les ◇ tombaient dans les
+  cartes d'un Dark Gift (un clic épinglait au lieu de choisir). **Le panneau « Compositions » reste toujours affiché**
+  (Ali, 2026-10-08 : « le panneau simplement toujours être visible », découverte, Dark Gift et trinkets compris ; il était
+  retiré depuis le 2026-10-04). À sa place par défaut en 1080p, il couvre le bas de la 3e option (302 × 53 px en
+  découverte, 359 × 172 px en Dark Gift, mesuré dans la simulation) : c'est à la disposition choisie par le joueur de
+  l'éviter. Garde-fou `choice-cover` (s'il tombe, les marqueurs sont rétablis).
 - **Journal** : `comp guides loaded from HDT (…)` à chaque nouvelle liste, `… comp guides: none from HDT (state …)` tant
   que HDT n'a rien ; `lobby tribes=[…] read at hero selection` (ou `shop turn n`) quand les tribus sont connues, `lobby
   tribes unknown at shop turn n: …` une fois si la taverne s'ouvre sans elles ; `lobby tribes=[…] (shop turn n): k/n guides
@@ -305,7 +304,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   lobby) ; `warband round=… hero=… Board … · +18% power=even` (`power=none (too early)`) ; `tavern highlights=[carte:core|enabler|addon:guide, carte:boards
   3/5:guide, …] targets=[…]` quand ils changent (`TavernHighlights.Summary`, `LogLine`), suivi de `frames from
   ticked=[…]` quand une case cochée réduit les cadres aux guides cochés ; `choice kind=…` par choix (raison et
-  évidence de chaque étiquette) ; `choice open: markers and panel hidden` / `choice closed: restored` à chaque transition ;
+  évidence de chaque étiquette) ; `choice open: markers hidden, panel kept` / `choice closed: markers restored` à chaque transition ;
   `comp detail id=… sections=k of n` à chaque détail ouvert ; `ticked guides=[…]` ; `targets n=4 panel resized to (x,y w×h)
   anchor=top|bottom lines=k/N shown, of m` à chaque appui sur + ou − (hors mode déplacement) ; `power inset at (x,y w×h): you
   ▲ +58% (ahead) · opp ≈ +12% (even)` quand ce que montre l'encart change (`– (none: too early)` sans donnée, `off` pour une

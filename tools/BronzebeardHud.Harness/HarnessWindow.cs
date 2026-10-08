@@ -519,14 +519,13 @@ internal sealed class HarnessWindow : Window
     {
         var options = HarnessData.Choice(_choiceKind);
 
-        // Plugin.UpdateChoiceCover: the scene is a shop; while a choice is open, the markers (and the panel, but for trinkets) are off the screen.
+        // Plugin.UpdateChoiceCover: the scene is a shop; while a choice is open, the markers are off the screen, the panel stays.
         if (_cover.Observe(OverlayPhase.Shop, ChoiceClassifier.Kind(options)) is { } line)
         {
             Log.Info(line);
         }
 
         Markers.Suspend(_cover.Hidden);
-        Comps.Suspend(_cover.PanelHidden);
 
         if (options.Count == 0)
         {

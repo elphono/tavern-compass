@@ -28,7 +28,7 @@ namespace BronzebeardHud.HdtPlugin;
 /// against theirs (BoardPowerView, one row each, each under its own feature guard), between − on the left and + on the right.
 ///
 /// Movable and resizable ("target-compositions", the id the panel always had: a place Ali saved stays valid), frame and inset
-/// together, in the shop and in combat, off the screen while a choice is open in the shop (<see cref="Suspend"/>). Its height
+/// together, in the shop and in combat, and on the screen while a choice is open (Ali, 2026-10-08: always visible). Its height
 /// (Ali, 2026-10-06: "with Move panels we set the window's default size and place; a press on + or − resizes the window to
 /// show the N best compositions"): a panel never resized by its handle is always sized to its content, N guide lines (− n +,
 /// or with a tick the targets shown: CompTargets.FitRows) and the inset; a panel resized by its handle keeps that box — its
@@ -126,9 +126,6 @@ internal sealed class CompsPanel
     private bool _inRelayout;
     private bool _relayoutAgain;
 
-    // A redraw was asked while a choice hid the panel (Suspend): it is redrawn when it comes back, not merely shown again.
-    private bool _staleWhileSuspended;
-
     /// <param name="toggle">Called with a guide id (CompGuide.Id) when its tick box is clicked.</param>
     /// <param name="count">How many targets are wanted (settings.json), shown in the title, set by − and + in the inset.</param>
     /// <param name="changeCount">Called with −1 or +1 when − or + is clicked.</param>
@@ -189,49 +186,15 @@ internal sealed class CompsPanel
         };
         OverlayLayer.Add(_canvas, _panel);
         _canvas.SizeChanged += OnCanvasSizeChanged;
-        _popup = new GuidePopup(canvas, PopupContent, () => _mover.MoveMode || _view.ShowsDetail || !IsVisible || Suspended, cursorOver ?? GuidePopup.IsCursorOver, run);
+        _popup = new GuidePopup(canvas, PopupContent, () => _mover.MoveMode || _view.ShowsDetail || !IsVisible, cursorOver ?? GuidePopup.IsCursorOver, run);
         _mover.MoveModeChanged += OnMoveModeChanged;
     }
 
     /// <summary>The inset's background: the panel's, a shade lighter at the top, so that it reads as a piece of its own.</summary>
     private static readonly Brush InsetBrush = new LinearGradientBrush(Color.FromArgb(0xF2, 0x24, 0x24, 0x32), Color.FromArgb(0xF2, 0x10, 0x10, 0x18), 90);
 
-    /// <summary>Shown by the plugin (in the shop and in combat), even while a choice hides it (<see cref="Suspended"/>).</summary>
+    /// <summary>Shown by the plugin (in the shop and in combat).</summary>
     public bool IsVisible { get; private set; }
-
-    /// <summary>True while a choice is open (ChoiceCover): the panel and its popup are off the screen, what it shows is kept.</summary>
-    public bool Suspended { get; private set; }
-
-    /// <summary>
-    /// While a choice is open the panel is taken off the screen with its guide popup (at its default place it covered the
-    /// bottom of the third option), and put back once it closes: the very same elements when nothing changed meanwhile,
-    /// redrawn from what it was last given otherwise (a new board, a resize). No popup shows meanwhile.
-    /// </summary>
-    public void Suspend(bool suspended)
-    {
-        if (suspended == Suspended)
-        {
-            return;
-        }
-
-        Suspended = suspended;
-        if (suspended)
-        {
-            _panel.Visibility = Visibility.Collapsed;
-            _popup.Hide();
-            return;
-        }
-
-        if (_staleWhileSuspended || !IsVisible)
-        {
-            _staleWhileSuspended = false;
-            Relayout();
-            return;
-        }
-
-        _panel.Visibility = Visibility.Visible;
-        _popup.Listed(_shownLines);
-    }
 
     /// <summary>The popup of a hovered guide line (the simulation's self-test drives it).</summary>
     public GuidePopup Popup => _popup;
@@ -389,7 +352,7 @@ internal sealed class CompsPanel
         var guide = _board.All.Select(p => p.Guide).FirstOrDefault(g => g.Id == guideId);
         var left = Canvas.GetLeft(_panel);
         var top = Canvas.GetTop(_panel);
-        if (guide == null || !IsVisible || Suspended || double.IsNaN(left) || double.IsNaN(top) || _panel.ActualWidth <= 0)
+        if (guide == null || !IsVisible || double.IsNaN(left) || double.IsNaN(top) || _panel.ActualWidth <= 0)
         {
             return null;
         }
@@ -764,9 +727,8 @@ internal sealed class CompsPanel
             return;
         }
 
-        if (!IsVisible || Suspended || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
+        if (!IsVisible || _canvas.ActualWidth <= 0 || _canvas.ActualHeight <= 0)
         {
-            _staleWhileSuspended |= Suspended;
             _panel.Visibility = Visibility.Collapsed;
             _popup.Hide();
             return;
