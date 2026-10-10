@@ -684,7 +684,11 @@ internal static class SelfTest
             if (kind == ChoiceKind.Trinket)
             {
                 var adjusted = said.Where(s => s.Any(line => line.StartsWith("≈ ", StringComparison.Ordinal) && targets.Any(t => line.Contains(t.Guide.Name)))).Count();
-                check($"{name}: every trinket shows its placement, one adjusted for a target's tribe", said.Count > 0 && said.All(s => s.Count > 0 && s[0].StartsWith("avg ", StringComparison.Ordinal)) && adjusted >= 1,
+                // A trinket nomi.gg contests shows both figures in place of its placement (component 9, HarnessData.TrinketView).
+                var contested = said.Count(s => s.Count == 2 && s[0].EndsWith(" contested", StringComparison.Ordinal) && s[1] == "nomi.gg ↔ FS");
+                check($"{name}: every trinket shows its placement or a contest, one adjusted for a target's tribe, one contested",
+                    said.Count > 0 && said.All(s => s.Count > 0 && (s[0].StartsWith("avg ", StringComparison.Ordinal) || s[0].EndsWith(" contested", StringComparison.Ordinal)))
+                    && adjusted >= 1 && contested == 1,
                     $"{adjusted} adjusted: " + string.Join("; ", said.Select((s, i) => $"#{i} {string.Join(" / ", s)}")));
             }
             else
@@ -863,11 +867,14 @@ internal static class SelfTest
     /// bridged guide (Pirate Discover: "≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards", computed by hand from
     /// HarnessData — 23 games at 2,9 pulled towards 3,9 by 30: 3,47; boards at turns 11, 12, 13, 13, 14), at
     /// PanelTypography.Small in the muted colour, between the name and the first section; not drawn for the guide bridged to
-    /// nothing (Mech Divine Shield).
+    /// nothing (Mech Divine Shield). Under it, on a line of its own, the guide's tribe since the patch (component 7, from
+    /// HarnessData.Nomi: pirates 4.07 → 3.70 over 300 and 900 games, 2σ = 0.31; mechs 3.96 → 4.30 over 350 and 800, 2σ = 0.29),
+    /// which the guide bridged to nothing shows alone.
     /// </summary>
     private static void ContextChecks(HarnessWindow window, Action<string, bool, string> check)
     {
-        const string expected = "≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards";
+        const string expected = "≈ 3,5 with your hero (23) · final turn ≈ 13 · 5 top boards\nPirate ▲ 4.07 → 3.70 since 36.6.3 (nomi.gg, 900 games)";
+        const string expectedAlone = "Mech ▼ 3.96 → 4.30 since 36.6.3 (nomi.gg, 800 games)";
         var scale = TavernLayout.Scale(window.Overlay.ActualHeight);
         var comps = window.Comps;
         var popup = comps.Popup;
@@ -876,9 +883,9 @@ internal static class SelfTest
         window.CursorInside = _ => false;
         window.UpdateLayout();
 
-        static TextBlock? ContextIn(DependencyObject root) => Texts(root).FirstOrDefault(t => t.IsVisible && Content(t).Contains(" top board"));
+        static TextBlock? ContextIn(DependencyObject root) => Texts(root).FirstOrDefault(t => t.IsVisible && (Content(t).Contains(" top board") || Content(t).Contains(" since 36.6.3")));
 
-        string LookAt(DependencyObject root, TextBlock? context)
+        string LookAt(DependencyObject root, TextBlock? context, string expected)
         {
             if (context == null)
             {
@@ -893,7 +900,7 @@ internal static class SelfTest
             return $"{(ok ? "ok" : "WRONG")} \"{Content(context)}\" {context.FontSize:0.#} px {colour} at y {y:0}, first section at {firstSection:0}";
         }
 
-        (string Detail, string Popup) Look(string name)
+        (string Detail, string Popup) Look(string name, string expected)
         {
             var guide = window.GuideOf(name)!;
             if (!comps.ShownLines.ContainsKey(guide.Id))
@@ -904,23 +911,23 @@ internal static class SelfTest
 
             Click(comps.Element, guide.Name);
             window.UpdateLayout();
-            var detail = comps.ShowsDetail ? LookAt(comps.Element, ContextIn(comps.Element)) : "detail not opened";
+            var detail = comps.ShowsDetail ? LookAt(comps.Element, ContextIn(comps.Element), expected) : "detail not opened";
             Click(comps.Element, "← All comp guides");
             window.UpdateLayout();
             var line = comps.ShownLines[guide.Id];
             Raise(line, UIElement.MouseEnterEvent);
             Headless.Pump(400);
             window.UpdateLayout();
-            var shown = popup.IsVisible ? LookAt(popup.Element, ContextIn(popup.Element)) : "popup not shown";
+            var shown = popup.IsVisible ? LookAt(popup.Element, ContextIn(popup.Element), expected) : "popup not shown";
             Raise(line, UIElement.MouseLeaveEvent);
             return (detail, shown);
         }
 
-        var bridged = Look("Pirate Discover");
-        var unbridged = Look("Mech Divine Shield");
-        check("context line: under the header of a bridged guide's detail and popup (small, muted), absent for a guide bridged to nothing",
+        var bridged = Look("Pirate Discover", expected);
+        var unbridged = Look("Mech Divine Shield", expectedAlone);
+        check("context line: under the header of a guide's detail and popup (small, muted), Firestone's for a bridged guide, then its tribe since the patch",
             bridged.Detail.StartsWith("ok ", StringComparison.Ordinal) && bridged.Popup.StartsWith("ok ", StringComparison.Ordinal)
-            && unbridged.Detail == "none" && unbridged.Popup == "none",
+            && unbridged.Detail.StartsWith("ok ", StringComparison.Ordinal) && unbridged.Popup.StartsWith("ok ", StringComparison.Ordinal),
             $"Pirate Discover: detail {bridged.Detail}; popup {bridged.Popup} | Mech Divine Shield: detail {unbridged.Detail}; popup {unbridged.Popup}");
         window.CursorInside = null;
     }
