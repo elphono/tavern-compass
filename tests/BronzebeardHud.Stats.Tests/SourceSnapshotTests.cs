@@ -16,6 +16,7 @@ public class SourceSnapshotTests
 
         Assert.Equal(new[] { "hero|H1|placement|3.9|1200|games", "hero|H3|placement|4.2|80|games" }, snapshot.Records.Select(Describe));
         Assert.Equal(("hsreplay-manual", 25), (snapshot.Provenance.Source, snapshot.Provenance.MmrPercentile));
+        Assert.Equal((1200 * 3.9 + 80 * 4.2) / 1280, snapshot.Means["hero"], precision: 9); // weighed by games, the empty hero out
     }
 
     [Fact]
@@ -28,6 +29,7 @@ public class SourceSnapshotTests
         }, null, null, null, "last-patch");
 
         Assert.Equal(new[] { "trinket|T1|placement|4.1|300|games" }, SourceSnapshot.Of(file).Records.Select(Describe));
+        Assert.Equal(4.1, SourceSnapshot.Of(file).Means["trinket"], precision: 9);
     }
 
     [Fact]
@@ -40,5 +42,6 @@ public class SourceSnapshotTests
 
         Assert.Equal(new[] { "card|C1|placement at turn 3|4|250|plays", "card|C1|placement at turn 7|3.7|90|plays" },
             SourceSnapshot.Of(file).Records.Select(Describe));
+        Assert.Empty(SourceSnapshot.Of(file).Means); // a placement at a turn is never recentred
     }
 }

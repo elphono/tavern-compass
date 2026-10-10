@@ -213,6 +213,54 @@ public class StatsConsolidationTests
         Assert.Equal("trinkets 0", view.Summary("trinket"));
     }
 
+    private static SourceSnapshot Centred(string source, int? mmr, double heroMean, params StatRecord[] records) =>
+        new(new StatProvenance(source, null, null, null, "last-patch", mmr, null), records, new Dictionary<string, double> { ["hero"] = heroMean });
+
+    /// <summary>
+    /// Ali, 2026-10-10: each source is recentred on its own mean. nomi.gg's volunteers place ≈ 0.3 better than Firestone's
+    /// players for every hero (measured 2026-10-08): a population, not a hero. Shifted onto the reference source (the
+    /// player's bracket), the same ranking is a consensus, not a contest.
+    /// </summary>
+    [Fact]
+    public void ASourcesOwnMean_IsShiftedOntoTheReference_APopulationGapIsNotAContest()
+    {
+        var firestone = Centred("firestone", Player, 4.0, Hero("H", 3.0, 1000), Hero("J", 5.0, 1000));
+        var nomi = Centred("nomi.gg", null, 3.5, Hero("H", 2.5, 3000), Hero("J", 4.5, 3000)); // more games: the bracket still wins
+
+        var view = StatsConsolidation.Consolidate(new[] { firestone, nomi }, Player);
+        var h = view.Find("hero", "H", "placement", "games")!;
+
+        Assert.Equal(StatVerdict.Consensus, h.Verdict);
+        Assert.Equal(new[] { (0.0, 3.0), (0.5, 3.0) }, h.Contributions.Select(c => (c.Shift, c.Value)));
+        Assert.Equal((1000 * 3.0 + 1500 * 3.0 + 30 * 4.0) / 2530, h.Value!.Value, precision: 9); // pulled towards the reference's mean
+        Assert.Equal(StatVerdict.Contested, StatsConsolidation.Consolidate(new[] { Snap("firestone", Player, null, Hero("H", 3.0, 1000)),
+            Snap("nomi.gg", null, null, Hero("H", 2.5, 1000)) }, Player).Stats.Single().Verdict); // the same figures, no mean known: contested
+    }
+
+    /// <summary>Without a source in the player's bracket, the reference is the source with the most games of that kind.</summary>
+    [Fact]
+    public void WithoutThePlayersBracket_TheReferenceIsTheLargestSource()
+    {
+        var big = Centred("firestone", null, 3.9, Hero("H", 3.4, 5000));
+        var small = Centred("nomi.gg", null, 3.6, Hero("H", 3.0, 100));
+
+        var h = StatsConsolidation.Consolidate(new[] { small, big }, Player).Stats.Single();
+
+        Assert.Equal(new[] { 0.3, 0.0 }, h.Contributions.Select(c => Math.Round(c.Shift, 9)));
+    }
+
+    /// <summary>Only an average placement is recentred: a card's placement at a turn is compared within its own source.</summary>
+    [Fact]
+    public void ACardsPlacementAtATurn_IsNeverShifted()
+    {
+        var cards = new SourceSnapshot(new StatProvenance("firestone", null, null, null, "last-patch", Player, null),
+            new[] { new StatRecord("card", "K", "placement at turn 6", 3.0, 300, "plays") }, new Dictionary<string, double> { ["card"] = 4.0 });
+        var other = new SourceSnapshot(new StatProvenance("nomi.gg", null, null, null, "last-patch", null, null),
+            new[] { new StatRecord("card", "K", "placement at turn 6", 3.0, 300, "plays") }, new Dictionary<string, double> { ["card"] = 3.5 });
+
+        Assert.All(StatsConsolidation.Consolidate(new[] { cards, other }, Player).Stats.Single().Contributions, c => Assert.Equal(0.0, c.Shift));
+    }
+
     /// <summary>No data, no line: the view is empty, never a made-up figure.</summary>
     [Fact]
     public void NoSnapshot_GivesAnEmptyView()

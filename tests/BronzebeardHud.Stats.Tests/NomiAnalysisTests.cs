@@ -83,9 +83,10 @@ public class NomiAnalysisTests
         Assert.Equal(file.Heroes.Select(h => (h.HeroCardId, h.Games, h.AveragePlacement)), copy.Heroes.Select(h => (h.HeroCardId, h.Games, h.AveragePlacement)));
         Assert.Equal(file.Trinkets.Select(t => (t.TrinketCardId, t.Winner)), copy.Trinkets.Select(t => (t.TrinketCardId, t.Winner)));
         Assert.Equal(file.TierMedians.Count, copy.TierMedians.Count);
+        Assert.Equal(new[] { ("lesser", 5000, 3.8), ("greater", 4000, 3.6) }, copy.TrinketKinds.Select(k => (k.Kind, k.Games, k.AveragePlacement)));
         Assert.Equal((file.Provenance.Patch, file.Provenance.TimePeriod, file.Build), (copy.Provenance.Patch, copy.Provenance.TimePeriod, copy.Build));
         Assert.DoesNotContain("\"name\"", json); // display names are HearthDb's, not copied
-        Assert.StartsWith("schema", Assert.Throws<StatsFormatException>(() => NomiAnalysis.Parse(json.Replace("\"schema\": 1", "\"schema\": 9"))).Message);
+        Assert.StartsWith("schema", Assert.Throws<StatsFormatException>(() => NomiAnalysis.Parse(json.Replace("\"schema\": 2", "\"schema\": 9"))).Message);
     }
 
     [Theory]
@@ -108,5 +109,10 @@ public class NomiAnalysisTests
         Assert.Equal(new[] { "hero|HERO_A|2.86|51", "trinket|T_WIN|3.09|55", "trinket|T_LOSE|5.2|60" },
             snapshot.Records.Select(r => string.Join("|", r.Kind, r.Subject, r.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), r.Count)));
         Assert.All(snapshot.Records, r => Assert.Equal(("placement", "games"), (r.Measure, r.CountUnit)));
+
+        // Its own means (recentring, 2026-10-10): the heroes' over its heroes, the trinkets' from each kind's average over every
+        // pick (5000 × 3.8 + 4000 × 3.6), never from the winners and losers alone, a chosen few.
+        Assert.Equal(2.86, snapshot.Means["hero"], precision: 9);
+        Assert.Equal((5000 * 3.8 + 4000 * 3.6) / 9000, snapshot.Means["trinket"], precision: 9);
     }
 }

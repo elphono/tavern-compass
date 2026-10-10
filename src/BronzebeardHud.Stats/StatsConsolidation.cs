@@ -39,10 +39,11 @@ public sealed class StatRecord
 /// <summary>The figures of one loaded file, with its provenance.</summary>
 public sealed class SourceSnapshot
 {
-    public SourceSnapshot(StatProvenance provenance, IReadOnlyList<StatRecord> records)
+    public SourceSnapshot(StatProvenance provenance, IReadOnlyList<StatRecord> records, IReadOnlyDictionary<string, double>? means = null)
     {
         Provenance = provenance;
         Records = records;
+        Means = means ?? new Dictionary<string, double>();
     }
 
     public StatProvenance Provenance { get; }
@@ -50,26 +51,59 @@ public sealed class SourceSnapshot
     public IReadOnlyList<StatRecord> Records { get; }
 
     /// <summary>
+    /// Per kind, the source's mean average placement over its whole population (recentring, Ali 2026-10-10): what its
+    /// players place on average, whichever hero or trinket. Absent: the source is not recentred for that kind.
+    /// </summary>
+    public IReadOnlyDictionary<string, double> Means { get; }
+
+    /// <summary>
     /// The heroes' average placement, sample in games. The local format is the same for every source (Firestone, a
     /// hand-typed HSReplay file, any other): what is proper to a source is its importer, not this translation.
     /// </summary>
-    public static SourceSnapshot Of(HeroStatsFile file) => new(file.Provenance,
+    public static SourceSnapshot Of(HeroStatsFile file) => Weighed(file.Provenance, "hero",
         file.Heroes.Where(h => h.DataPoints > 0).Select(h => new StatRecord("hero", h.HeroCardId, "placement", h.AveragePlacement, h.DataPoints, "games")).ToList());
 
     /// <summary>The trinkets' average placement over every player (the file names no bracket), sample in games picked.</summary>
-    public static SourceSnapshot Of(TrinketStatsFile file) => new(file.Provenance,
+    public static SourceSnapshot Of(TrinketStatsFile file) => Weighed(file.Provenance, "trinket",
         file.Trinkets.Where(t => t.DataPoints > 0).Select(t => new StatRecord("trinket", t.TrinketCardId, "placement", t.AveragePlacement, t.DataPoints, "games")).ToList());
 
-    /// <summary>nomi.gg's heroes and its winning and losing trinkets: average placement in games, every bracket mixed.</summary>
-    public static SourceSnapshot Of(NomiAnalysisFile file) => new(file.Provenance,
-        file.Heroes.Where(h => h.Games > 0).Select(h => new StatRecord("hero", h.HeroCardId, "placement", h.AveragePlacement, h.Games, "games"))
+    /// <summary>
+    /// nomi.gg's heroes and its winning and losing trinkets: average placement in games, every bracket mixed. The
+    /// trinkets' mean comes from each kind's average over every pick: the winners and losers alone are a chosen few.
+    /// </summary>
+    public static SourceSnapshot Of(NomiAnalysisFile file)
+    {
+        var heroes = file.Heroes.Where(h => h.Games > 0).Select(h => new StatRecord("hero", h.HeroCardId, "placement", h.AveragePlacement, h.Games, "games")).ToList();
+        var means = new Dictionary<string, double>();
+        if (Mean(heroes.Select(r => (r.Value, r.Count))) is { } heroMean)
+        {
+            means["hero"] = heroMean;
+        }
+
+        if (Mean(file.TrinketKinds.Select(k => (k.AveragePlacement, k.Games))) is { } trinketMean)
+        {
+            means["trinket"] = trinketMean;
+        }
+
+        return new SourceSnapshot(file.Provenance, heroes
             .Concat(file.Trinkets.Where(t => t.Games > 0).Select(t => new StatRecord("trinket", t.TrinketCardId, "placement", t.AveragePlacement, t.Games, "games")))
-            .ToList());
+            .ToList(), means);
+    }
 
     /// <summary>The cards' average placement at each turn, sample in plays.</summary>
     public static SourceSnapshot Of(CardStatsFile file) => new(file.Provenance,
         file.Cards.SelectMany(c => c.Turns.Where(t => t.Played > 0).Select(t =>
             new StatRecord("card", c.CardId, "placement at turn " + t.Turn.ToString(CultureInfo.InvariantCulture), t.AveragePlacement, t.Played, "plays"))).ToList());
+
+    private static SourceSnapshot Weighed(StatProvenance provenance, string kind, IReadOnlyList<StatRecord> records) =>
+        new(provenance, records, Mean(records.Select(r => (r.Value, r.Count))) is { } mean ? new Dictionary<string, double> { [kind] = mean } : null);
+
+    private static double? Mean(IEnumerable<(double Value, int Count)> figures)
+    {
+        var list = figures.Where(f => f.Count > 0).ToList();
+        var games = list.Sum(f => (double)f.Count);
+        return games > 0 ? list.Sum(f => f.Value * f.Count) / games : null;
+    }
 }
 
 public enum StatVerdict
@@ -90,8 +124,9 @@ public enum StatVerdict
 /// <summary>What one source brought to a consolidated figure, and why it counted or not.</summary>
 public sealed class StatContribution
 {
-    public StatContribution(StatProvenance provenance, StatRecord record, double discount, bool included, string? reason)
+    public StatContribution(StatProvenance provenance, StatRecord record, double discount, bool included, string? reason, double shift = 0)
     {
+        Shift = shift;
         Provenance = provenance;
         Record = record;
         Discount = discount;
@@ -110,6 +145,12 @@ public sealed class StatContribution
 
     /// <summary>Why it was left out: "older patch", "under 10 games", "no window"; null when included.</summary>
     public string? Reason { get; }
+
+    /// <summary>What recentring added: the reference's mean minus this source's own (0 when either is unknown).</summary>
+    public double Shift { get; }
+
+    /// <summary>The figure as combined: the source's, recentred.</summary>
+    public double Value => Record.Value + Shift;
 }
 
 public sealed class ConsolidatedStat
@@ -183,7 +224,7 @@ public sealed class ConsolidatedView
         var line = $"{label} ({Count(StatVerdict.Single)} single, {Count(StatVerdict.Consensus)} consensus, {Count(StatVerdict.Contested)} contested, {Count(StatVerdict.Apart)} apart)";
         var contested = stats.Where(s => s.Verdict == StatVerdict.Contested).Take(5).Select(s =>
         {
-            var values = s.Contributions.Where(c => c.Included).Select(c => c.Record.Value).ToList();
+            var values = s.Contributions.Where(c => c.Included).Select(c => c.Value).ToList();
             return string.Format(CultureInfo.InvariantCulture, "{0} {1:0.0} ↔ {2:0.0}", s.Subject, values.Min(), values.Max());
         }).ToList();
         return contested.Count == 0 ? line : $"{line} contested=[{string.Join(", ", contested)}]";
@@ -213,18 +254,42 @@ public static class StatsConsolidation
     /// <summary>One game's placement varies by about 2.3 places.</summary>
     public const double PlacementSpread = 2.3;
 
+    /// <summary>The only measure recentred: an average placement over a whole population.</summary>
+    public const string Recentred = "placement";
+
     public static ConsolidatedView Consolidate(IEnumerable<SourceSnapshot> snapshots, int playerPercentile)
     {
-        var stats = snapshots
-            .SelectMany(s => s.Records.Select(r => (s.Provenance, Record: r)))
+        var list = snapshots.ToList();
+        var references = list.SelectMany(s => s.Means.Keys).Distinct(StringComparer.Ordinal)
+            .ToDictionary(kind => kind, kind => Reference(list, kind, playerPercentile), StringComparer.Ordinal);
+        var stats = list
+            .SelectMany(s => s.Records.Select(r => (s.Provenance, Record: r, Shift: ShiftOf(s, r, references))))
             .GroupBy(x => (x.Record.Kind, x.Record.Subject, x.Record.Measure, x.Record.CountUnit))
-            .Select(g => Combine(g.Key, g.ToList(), playerPercentile))
+            .Select(g => Combine(g.Key, g.ToList(), playerPercentile,
+                g.Key.Measure == Recentred && references.TryGetValue(g.Key.Kind, out var mean) ? mean : PriorPlacement))
             .ToList();
         return new ConsolidatedView(stats);
     }
 
+    /// <summary>
+    /// The mean every source of a kind is recentred on (Ali, 2026-10-10): the source in the player's bracket, else the one
+    /// with the most games of that kind. Its figures stay as they are; the others move by the gap between the two means.
+    /// </summary>
+    private static double Reference(List<SourceSnapshot> snapshots, string kind, int playerPercentile)
+    {
+        var known = snapshots.Where(s => s.Means.ContainsKey(kind)).ToList();
+        var reference = known.FirstOrDefault(s => s.Provenance.MmrPercentile == playerPercentile)
+            ?? known.OrderByDescending(s => s.Records.Where(r => r.Kind == kind).Sum(r => (long)r.Count)).First();
+        return reference.Means[kind];
+    }
+
+    private static double ShiftOf(SourceSnapshot snapshot, StatRecord record, Dictionary<string, double> references) =>
+        record.Measure == Recentred && snapshot.Means.TryGetValue(record.Kind, out var own) && references.TryGetValue(record.Kind, out var reference)
+            ? reference - own
+            : 0;
+
     private static ConsolidatedStat Combine((string Kind, string Subject, string Measure, string Unit) key,
-        List<(StatProvenance Provenance, StatRecord Record)> figures, int playerPercentile)
+        List<(StatProvenance Provenance, StatRecord Record, double Shift)> figures, int playerPercentile, double prior)
     {
         var newest = figures.Select(f => f.Provenance.Patch).Where(p => p != null).OrderBy(p => p!, PatchOrder.Instance).LastOrDefault();
         var contributions = figures.Select(f =>
@@ -234,7 +299,7 @@ public static class StatsConsolidation
                 : f.Provenance.TimePeriod == null && f.Provenance.GeneratedAt == null ? "no window"
                 : f.Record.Count < MinimumCount ? $"under {MinimumCount} games"
                 : null;
-            return new StatContribution(f.Provenance, f.Record, discount, reason == null, reason);
+            return new StatContribution(f.Provenance, f.Record, discount, reason == null, reason, f.Shift);
         }).ToList();
 
         var counted = contributions.Where(c => c.Included).ToList();
@@ -244,7 +309,7 @@ public static class StatsConsolidation
         }
 
         var weight = counted.Sum(c => c.Discount * c.Record.Count) + PriorGames;
-        var value = (counted.Sum(c => c.Discount * c.Record.Count * c.Record.Value) + PriorGames * PriorPlacement) / weight;
+        var value = (counted.Sum(c => c.Discount * c.Record.Count * c.Value) + PriorGames * prior) / weight;
         var verdict = counted.Count == 1 ? StatVerdict.Single : AnyApart(counted) ? StatVerdict.Contested : StatVerdict.Consensus;
         return new ConsolidatedStat(key.Kind, key.Subject, key.Measure, key.Unit, value, counted.Sum(c => c.Record.Count), verdict, contributions);
     }
@@ -255,7 +320,7 @@ public static class StatsConsolidation
         var intervals = counted.Select(c =>
         {
             var half = 2 * PlacementSpread / Math.Sqrt(c.Record.Count);
-            return (Low: c.Record.Value - half, High: c.Record.Value + half);
+            return (Low: c.Value - half, High: c.Value + half);
         }).ToList();
         return intervals.Max(i => i.Low) > intervals.Min(i => i.High);
     }

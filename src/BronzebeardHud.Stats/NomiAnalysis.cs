@@ -74,6 +74,21 @@ public sealed class NomiTrinket
 }
 
 /// <summary>The median turn a group of players reached a tavern tier ("top4" reached tier 5 at turn 8).</summary>
+/// <summary>A kind of trinket ("lesser", "greater") over every pick: its games and their average placement.</summary>
+public sealed class NomiTrinketKind
+{
+    public NomiTrinketKind(string kind, int games, double averagePlacement)
+    {
+        Kind = kind;
+        Games = games;
+        AveragePlacement = averagePlacement;
+    }
+
+    public string Kind { get; }
+    public int Games { get; }
+    public double AveragePlacement { get; }
+}
+
 public sealed class NomiTierMedian
 {
     public NomiTierMedian(string scope, string group, int tier, double medianTurn, double reached)
@@ -106,8 +121,10 @@ public sealed class NomiTierMedian
 public sealed class NomiAnalysisFile
 {
     public NomiAnalysisFile(StatProvenance provenance, int? build, IReadOnlyList<string> buffed, IReadOnlyList<string> nerfed,
-        IReadOnlyList<NomiHero> heroes, IReadOnlyList<NomiTribe> tribes, IReadOnlyList<NomiTrinket> trinkets, IReadOnlyList<NomiTierMedian> tierMedians)
+        IReadOnlyList<NomiHero> heroes, IReadOnlyList<NomiTribe> tribes, IReadOnlyList<NomiTrinket> trinkets, IReadOnlyList<NomiTierMedian> tierMedians,
+        IReadOnlyList<NomiTrinketKind>? trinketKinds = null)
     {
+        TrinketKinds = trinketKinds ?? new NomiTrinketKind[0];
         Provenance = provenance;
         Build = build;
         Buffed = buffed;
@@ -130,6 +147,9 @@ public sealed class NomiAnalysisFile
     public IReadOnlyList<NomiTrinket> Trinkets { get; }
     public IReadOnlyList<NomiTierMedian> TierMedians { get; }
 
+    /// <summary>Each kind of trinket over every pick: the population the winners and losers are picked from.</summary>
+    public IReadOnlyList<NomiTrinketKind> TrinketKinds { get; }
+
     public DateTimeOffset? FetchedAt => Provenance.FetchedAt;
 }
 
@@ -139,7 +159,8 @@ public sealed class NomiAnalysisFile
 /// </summary>
 public static class NomiAnalysis
 {
-    public const int CurrentSchema = 1;
+    /// <summary>2 since 2026-10-10: the trinket kinds' averages (recentring); a cache in 1 is asked again.</summary>
+    public const int CurrentSchema = 2;
 
     public static NomiAnalysisFile Import(string json, string sourceUrl, DateTimeOffset fetchedAt)
     {
@@ -168,11 +189,17 @@ public static class NomiAnalysis
         }).ToList();
 
         var trinkets = new List<NomiTrinket>();
+        var kinds = new List<NomiTrinketKind>();
         foreach (var kind in new[] { "lesser", "greater" })
         {
             if (root["trinkets"]?[kind] is not JObject group)
             {
                 continue;
+            }
+
+            if (group["games"] != null && Optional(group, "avg", $"trinkets.{kind}") is { } average)
+            {
+                kinds.Add(new NomiTrinketKind(kind, Int(group, "games", $"trinkets.{kind}"), average));
             }
 
             foreach (var (list, winner) in new[] { ("winners", true), ("losers", false) })
@@ -207,7 +234,7 @@ public static class NomiAnalysis
         }
 
         return new NomiAnalysisFile(provenance, root["build"]?.Type == JTokenType.Integer ? root.Value<int>("build") : null,
-            Strings(root, "buffed"), Strings(root, "nerfed"), heroes, tribeList, trinkets, medians);
+            Strings(root, "buffed"), Strings(root, "nerfed"), heroes, tribeList, trinkets, medians, kinds);
     }
 
     public static string Serialize(NomiAnalysisFile file)
@@ -242,6 +269,12 @@ public static class NomiAnalysis
             ["games"] = t.Games,
             ["avg"] = t.AveragePlacement,
         }));
+        root["trinketKinds"] = new JArray(file.TrinketKinds.Select(k => new JObject
+        {
+            ["kind"] = k.Kind,
+            ["games"] = k.Games,
+            ["avg"] = k.AveragePlacement,
+        }));
         root["tierMedians"] = new JArray(file.TierMedians.Select(m => new JObject
         {
             ["scope"] = m.Scope,
@@ -273,7 +306,9 @@ public static class NomiAnalysis
                 t["winner"]?.Type == JTokenType.Boolean ? t.Value<bool>("winner") : throw new StatsFormatException($"trinkets[{i}].winner: expected a boolean"),
                 Int(t, "games", $"trinkets[{i}]"), Number(t, "avg", $"trinkets[{i}]"))).ToList(),
             Objects(root, "tierMedians").Select((m, i) => new NomiTierMedian(Text(m, "scope", $"tierMedians[{i}]"), Text(m, "group", $"tierMedians[{i}]"),
-                Int(m, "tier", $"tierMedians[{i}]"), Number(m, "median", $"tierMedians[{i}]"), Number(m, "reached", $"tierMedians[{i}]"))).ToList());
+                Int(m, "tier", $"tierMedians[{i}]"), Number(m, "median", $"tierMedians[{i}]"), Number(m, "reached", $"tierMedians[{i}]"))).ToList(),
+            Objects(root, "trinketKinds").Select((k, i) => new NomiTrinketKind(Text(k, "kind", $"trinketKinds[{i}]"), Int(k, "games", $"trinketKinds[{i}]"),
+                Number(k, "avg", $"trinketKinds[{i}]"))).ToList());
     }
 
     /// <summary>
