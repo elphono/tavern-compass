@@ -74,7 +74,7 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
   est coupée seule par `FeatureGuard` et le dit une fois. Lire cette ligne **avant** de supposer une cause.
 - **Avant de pousser** (la CI GitHub, `.github/workflows/ci.yml`, refait la même chose et construit en plus le plugin et la
   simulation contre HDT 1.55.6) : `dotnet format whitespace --folder --verify-no-changes .` (le style est celui du
-  `.editorconfig`), `dotnet test -warnaserror` et les builds Release du plugin, de la simulation et de la CLI d'inspection
+  `.editorconfig`), `dotnet test -warnaserror`, `python3 tools/test_nodance_observe.py` et les builds Release du plugin, de la simulation et de la CLI d'inspection
   en `-warnaserror` (juger chaque étape sur son **code de sortie** : une sortie filtrée par `| tail` a laissé passer un
   build cassé le 2026-10-08) : le
   code n'a aucun avertissement, un nouveau fait échouer la construction. `RepositoryHygieneTests` refuse tout BattleTag,
@@ -437,7 +437,7 @@ Nomi (§ 11) : `docs/journal/2026-10-10-anti-danse.md`.
 - **Lire** : `python3 tools/nodance-observe.py --at HH:MM:SS [--at …] [--zone Zone.log] Power_old.log Power.log` (lecture
   seule, Python standard ; pour chaque heure : options et réponses dans les ± 5 s, puis D-a, D-b ou « neither D-a nor
   D-b: cause not established » ; le joueur retrouvé partie par partie, aucun nom de joueur écrit). Tests :
-  `python3 tools/test_nodance_observe.py` (journaux inventés ; pas dans la CI). Les fréquences de la recherche votaient le
+  `python3 tools/test_nodance_observe.py` (journaux inventés ; une étape de la CI depuis le 2026-10-10). Les fréquences de la recherche votaient le
   joueur une fois par fichier, qui contient plusieurs parties : à revérifier.
 
 - **Ce que c'est** : un plugin **BepInEx 5** (5.4.23.5, HarmonyX 2.9.0) chargé **dans le client Hearthstone**, qui corrige

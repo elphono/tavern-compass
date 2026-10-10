@@ -27,6 +27,10 @@ jobs:
       - name: Tests (business logic)
         run: dotnet test BronzebeardHud.sln -c Release -warnaserror
 
+      # The anti-dance mod's log reader (tools/nodance-observe.py): standard Python, synthetic logs.
+      - name: Tests (log reader of the anti-dance mod)
+        run: python3 tools/test_nodance_observe.py
+
       - name: Build the HDT plugin
         run: dotnet build src/BronzebeardHud.HdtPlugin -c Release -warnaserror
 
