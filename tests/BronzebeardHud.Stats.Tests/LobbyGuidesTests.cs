@@ -22,6 +22,7 @@ public class LobbyGuidesTests
         ["DRAKE"] = new[] { "DRAGON" },
         ["ROTTING"] = new[] { "BEAST", "UNDEAD" },   // dual type
         ["GOLDEN_ONLY"] = new[] { "PIRATE" },
+        ["BRANN"] = Array.Empty<string>(),            // neutral
     };
 
     private static IReadOnlyCollection<string>? TribesOf(string cardId) => CardTribes.TryGetValue(cardId, out var tribes) ? tribes : null;
@@ -132,6 +133,31 @@ public class LobbyGuidesTests
             Of(NoBeasts).Line("shop turn 1"));
         Assert.Equal("Bronzebeard HUD: lobby tribes=[BEAST,DEMON,DRAGON,MECHANICAL,PIRATE,QUILBOAR,UNDEAD] (hero selection): 7/7 guides playable; left out: none",
             Of("UNDEAD", "BEAST", "DEMON", "DRAGON", "MECHANICAL", "PIRATE", "QUILBOAR").Line("hero selection"));
+    }
+
+    /// <summary>
+    /// Ali's game of 2026-10-10: Menagerie still offered without quilboars, its quilboar key card (Hot-Air Surveyor) and most
+    /// of its add-ons, the spell scaling among them, out of the lobby: "quasi injouable". One key card of four is not enough
+    /// to leave a guide out, but a missing key card together with at least half of the add-ons is.
+    /// </summary>
+    [Fact]
+    public void AMissingKeyCard_WithAtLeastHalfOfTheAddOnsMissing_LeavesTheGuideOut()
+    {
+        var spells = Guide("Menagerie - Spells", 1, 0, new[] { "AMALGAM", "TITUS", "FELBOAR", "BRANN" },
+            addons: new[] { "DRAKE", "IMP", "GOLDEN_ONLY", "HYENA" });
+        var noKeyMissing = Guide("Menagerie - Neutral", 1, 1, new[] { "AMALGAM", "TITUS" }, addons: new[] { "DRAKE", "IMP" });
+        string? Reason(CompGuide guide, params string[] lobby) => LobbyGuides.Of(Set(spells, noKeyMissing), lobby, TribesOf).Reason(guide.Id);
+
+        Assert.Equal("key cards FELBOAR and add-ons DRAKE, IMP, GOLDEN_ONLY: no QUILBOAR, DRAGON, DEMON, PIRATE",
+            Reason(spells, "BEAST", "MECHANICAL", "MURLOC", "UNDEAD", "NAGA"));                                      // 3 of 4 add-ons
+        Assert.Equal("key cards FELBOAR and add-ons DRAKE, IMP: no QUILBOAR, DRAGON, DEMON",
+            Reason(spells, "BEAST", "MECHANICAL", "PIRATE", "UNDEAD", "NAGA"));                                      // exactly half
+        Assert.Null(Reason(spells, "BEAST", "DEMON", "PIRATE", "UNDEAD", "NAGA"));                                   // 1 of 4 add-ons: kept
+        Assert.Null(Reason(spells, "QUILBOAR", "MECHANICAL", "MURLOC", "UNDEAD", "NAGA"));                           // no key card missing: kept
+        Assert.Null(Reason(noKeyMissing, "BEAST", "MECHANICAL", "MURLOC", "UNDEAD", "NAGA"));                        // every add-on missing, no key card
+
+        var three = Guide("Menagerie - Three", 1, 2, new[] { "AMALGAM", "TITUS", "FELBOAR" }, addons: new[] { "DRAKE", "HYENA", "LOBSTER" });
+        Assert.Null(LobbyGuides.Of(Set(three), new[] { "BEAST", "MECHANICAL", "MURLOC", "UNDEAD", "NAGA" }, TribesOf).Reason(three.Id)); // 1 of 3 add-ons: kept
     }
 
     [Fact]

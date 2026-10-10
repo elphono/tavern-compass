@@ -221,7 +221,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   Le tout passe par `CompTargets.Round`, qui ne prend que `LobbyGuides` : aucun guide d'une tribu absente n'est classé.
 - **Tribus du lobby** (`LobbyGuides`, 2026-10-06 : 15 rondes sur 69 d'Ali avaient une cible d'une tribu absente, à cause
   d'une carte clé neutre tenue). Un guide est écarté si sa tribu principale n'est pas dans la partie (même si ses cartes
-  clés sont neutres), ou si au moins la moitié de ses cartes clés ne peuvent pas y apparaître (tribus de HearthDb,
+  clés sont neutres), ou si au moins la moitié de ses cartes clés ne peuvent pas y apparaître, ou si une carte clé manque **et** au moins la moitié de ses add-ons (2026-10-10, Ali : Ménagerie sans quilboars ni le scaling des sorts, « quasi injouable » ; mesuré sur les 3 guides dont le journal garde les cartes, contre 18 lobbies : seule Ménagerie change, dans 8 lobbies) (tribus de HearthDb,
   `HdtEntityAdapter.CardTribes` : une carte à deux tribus apparaît si l'une est là, un amalgame toujours, une carte inconnue
   n'est jamais retenue contre un guide). Écarté : ni listé, ni cible, ni cadre, ni étiquette de choix, ni pivot. **Une carte clé
   d'une tribu absente dans un guide gardé** (2026-10-08 : un quilboar — « huran » en français — parmi les cartes clés de

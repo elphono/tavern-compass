@@ -35,6 +35,9 @@ public sealed class LobbyGuides
     /// <summary>A guide is left out when this share of its key cards, or more, cannot show up in the lobby.</summary>
     public const double MissingKeyShare = 0.5;
 
+    /// <summary>With a key card missing, the share of add-ons missing that leaves the guide out.</summary>
+    public const double MissingAddonShare = 0.5;
+
     private readonly Dictionary<string, string> _reasons;
     private readonly Func<string, IReadOnlyCollection<string>?>? _cardTribes;
 
@@ -115,13 +118,33 @@ public sealed class LobbyGuides
             }
         }
 
-        if (missing.Count == 0 || missing.Count < MissingKeyShare * guide.CoreCards.Count)
+        if (missing.Count == 0)
         {
             return null;
         }
 
-        var absent = missing.SelectMany(m => m.Tribes).Distinct(StringComparer.Ordinal);
-        return $"key cards {string.Join(", ", missing.Select(m => m.Card))}: no {string.Join(", ", absent)}";
+        if (missing.Count >= MissingKeyShare * guide.CoreCards.Count)
+        {
+            return $"key cards {string.Join(", ", missing.Select(m => m.Card))}: no {Absent(missing)}";
+        }
+
+        // A key card short is still a guide; a key card short and half of its support with it is not (2026-10-10).
+        var addons = new List<(string Card, IReadOnlyList<string> Tribes)>();
+        foreach (var card in guide.AddonCards)
+        {
+            if (AbsentTribes(card, lobbyTribes, cardTribes) is { } cardAbsent)
+            {
+                addons.Add((card, cardAbsent));
+            }
+        }
+
+        if (addons.Count == 0 || addons.Count < MissingAddonShare * guide.AddonCards.Count)
+        {
+            return null;
+        }
+
+        return $"key cards {string.Join(", ", missing.Select(m => m.Card))} and add-ons {string.Join(", ", addons.Select(m => m.Card))}: " +
+            $"no {Absent(missing.Concat(addons))}";
     }
 
     /// <summary>
@@ -129,6 +152,9 @@ public sealed class LobbyGuides
     /// card, an amalgam, a card the database does not know, or while the lobby is not known. The panel leaves such a key card
     /// out of a guide's line, and shows it greyed and struck in the detail and the popup (Ali, 2026-10-08).
     /// </summary>
+    private static string Absent(IEnumerable<(string Card, IReadOnlyList<string> Tribes)> cards) =>
+        string.Join(", ", cards.SelectMany(m => m.Tribes).Distinct(StringComparer.Ordinal));
+
     public bool CannotShowUp(string cardId) => Known && _cardTribes != null && AbsentTribes(cardId, Tribes, _cardTribes) != null;
 
     /// <summary>The card's Battlegrounds tribes when none is in the lobby; null when it can show up (or is unknown).</summary>
