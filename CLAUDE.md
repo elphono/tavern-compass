@@ -56,7 +56,9 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
 | Stack | plugin HDT, option 3 de l'étude ; HDT lit la mémoire, le plugin jamais |
 | Stats Firestone | **accord de l'auteur de Firestone**, étendu le 2026-09-27 à **toutes ses données publiques**, pour tous nos usages, pas seulement les JSON de stats (`static.zerotoheroes.com`) : aussi card-stats, battlegrounds-strategies, perfect-games, card-rules ; cache local, rafraîchissement modeste. Inchangé : aucune donnée réelle dans le dépôt, tests sur données synthétiques |
 | Stats HSReplay | usage local accepté, mais le site renvoie un challenge Cloudflare : **on ne contourne pas** une protection anti-bot ; import semi-manuel depuis le navigateur (spec § 6) |
-| Stats nomi.gg | **accord du propriétaire du site**, obtenu par Ali le 2026-10-08, tel quel sur les termes de la demande : l'analyse de patch (`nomi.gg/patch/analysis/<patch>.json`) peut être collectée automatiquement, dans les limites que le projet s'est fixées (note `docs/plans/2026-10-08-stats-multi-sources.html` § 10 : une requête conditionnelle par jour au plus, `User-Agent` qui nomme le plugin, crédit à l'écran, aucune redistribution ni entraînement de modèle). Le code de Nomi's Kitchen (licence « MIT NON-AI ») se lit pour en comprendre les idées, il ne se copie pas |
+| Stats nomi.gg | **accord du propriétaire du site**, obtenu par Ali le 2026-10-08, tel quel sur les termes de la demande : l'analyse de patch (`nomi.gg/patch/analysis/<patch>.json`) peut être collectée automatiquement, dans les limites que le projet s'est fixées (note `docs/plans/2026-10-08-stats-multi-sources.html` § 10 : une requête conditionnelle par jour au plus, `User-Agent` qui nomme le plugin, crédit à l'écran, aucune redistribution ni entraînement de modèle). Le code de Nomi's Kitchen (licence « MIT NON-AI ») se lit pour en comprendre les idées, il ne se copie pas (exception : son mod anti-danse, ligne « Mod anti-danse de Nomi ») |
+| Mod anti-danse de Nomi | 2026-10-10 : accord personnel du développeur de Nomi's Kitchen, obtenu par Ali, malgré la licence MIT NON-AI : analyse du mod `com.community.hs.NomiCantDance` par décompilation et désobfuscation, et reprise de son code, autorisées ; tout code repris est marqué à la source (commentaire d'origine en anglais : `Taken from NomiCantDance (Nomi's Kitchen), with its author's permission, 2026-10-10`) parce que le dépôt est public et sous MIT seule ; on préfère réécrire quand c'est aussi simple, on reprend tel quel ce que la décompilation montre plus juste que notre version |
+| Notre mod anti-danse | 2026-10-10 (Ali) : **observer d'abord** une danse réelle sans le mod (journal `[Zone]`, `tools/nodance-observe.py`) ; le mod reste **non installé** ; publication **discrète** (`README.md` et `ROADMAP.md` n'en parlent pas, l'issue #1 reste ouverte tant que rien n'est vu en jeu) |
 | Simulateur npm `simulate-bgs-battle` | usage personnel, autorisé ; inutile tant que Bob's Buddy (HDT) fait le travail |
 | MMR des adversaires | gardé tel quel. Le leaderboard EU s'arrête à 8 000 ; Ali est à ≈ 6 840 (région EU mesurée) ; plage par défaut 8 000 – 8 050 |
 | Arbitrages du 2026-10-08 | Les cibles se classent sur **plateau + main** ; une case cochée garde **N lignes, au moins toutes les cibles** ; la taille donnée par + / − **revient à celle de la poignée** à la partie suivante ; la ligne « comp ≈ » de l'encart des héros est **retirée** (17 parties en médiane) ; le bilan par adversaire est parti avec le panneau Combats (2026-09-27) ; valeur d'une carte : **moins de bruit**, le seuil de 200 parties reste (≈ une carte sur deux sans valeur, mesuré) |
@@ -423,7 +425,20 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 
 ## Mod anti-danse (depuis le 2026-10-10, issue #1 ouverte, rien vu en jeu)
 
-Journal, conception, écarts, procédure et scénario de vérification : `docs/journal/2026-10-10-anti-danse.md`.
+**État : mod écrit, non installé, en attente d'observation** (décision d'Ali : observer d'abord une danse réelle sans
+le mod). Journal, conception, écarts, procédure, marche à suivre d'observation (§ 10) et accord de l'auteur du mod de
+Nomi (§ 11) : `docs/journal/2026-10-10-anti-danse.md`.
+
+- **Observer** (sans le mod) : section `[Zone]` à ajouter à `%LocalAppData%\Blizzard\Hearthstone\log.config`, jeu fermé
+  (`LogLevel=1`, `FilePrinting=True`, `ConsolePrinting=False`, `ScreenPrinting=False`, `Verbose=True` ; HDT la garde, ne la
+  remet pas si on la retire). Les journaux tombent dans `E:\JEUX\Hearthstone\Logs\Hearthstone_<lancement>\` (`Power.log`,
+  `Power_old.log`, puis `Zone.log`). Ali note l'heure à la seconde, le geste, ce qui bouge, taverne ou combat, et rend le
+  dossier de la session (jamais dans le dépôt ni une issue : pseudos des adversaires).
+- **Lire** : `python3 tools/nodance-observe.py --at HH:MM:SS [--at …] [--zone Zone.log] Power_old.log Power.log` (lecture
+  seule, Python standard ; pour chaque heure : options et réponses dans les ± 5 s, puis D-a, D-b ou « neither D-a nor
+  D-b: cause not established » ; le joueur retrouvé partie par partie, aucun nom de joueur écrit). Tests :
+  `python3 tools/test_nodance_observe.py` (journaux inventés ; pas dans la CI). Les fréquences de la recherche votaient le
+  joueur une fois par fichier, qui contient plusieurs parties : à revérifier.
 
 - **Ce que c'est** : un plugin **BepInEx 5** (5.4.23.5, HarmonyX 2.9.0) chargé **dans le client Hearthstone**, qui corrige
   par Harmony la « danse » des sbires de la rangée du joueur en taverne. À l'inverse du plugin HDT, il **modifie le

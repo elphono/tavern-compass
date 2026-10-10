@@ -6,6 +6,10 @@ une bibliothèque pure testée, un mod BepInEx 5 construit contre le client inst
 WSL ; **rien n'est installé dans le dossier du jeu, rien n'est vu en jeu**, et HarmonyX n'a jamais tourné sur ce client
 (Unity 6000.3.11f1, Mono). Aucune ligne du client n'entre dans le dépôt : seulement des noms de types et de méthodes.
 
+**État : mod écrit, non installé, en attente d'observation.** Ali a décidé d'observer d'abord une danse réelle **sans le
+mod** (§ 10 : marche à suivre, outil `tools/nodance-observe.py`) ; l'auteur de Nomi's Kitchen a autorisé l'analyse et la
+reprise du code de son propre mod anti-danse (§ 11).
+
 ## 1. Ce qui a été établi (code du client lu, mesures)
 
 - **Trois écrivains** de la place d'un sbire, dans trois repères : la prédiction locale au lâcher (rang dans la rangée
@@ -20,7 +24,8 @@ WSL ; **rien n'est installé dans le dossier du jeu, rien n'est vu en jeu**, et 
   le serveur n'a jamais eu avec les règles du client, **0** avec le correctif.
 - Mesuré dans les journaux d'Ali (6 sessions) : les conditions de ces danses sont **rares** chez lui (3 placements sur 405
   pendant une liste en retard portant des places du plateau ; 0 déplacement sur 111 pendant une sortie non animée).
-  **Aucune danse réelle n'a été observée ni rattachée à un chemin.**
+  **Aucune danse réelle n'a été observée ni rattachée à un chemin.** Ces fréquences sont à revérifier : les scripts
+  retrouvaient le joueur une fois par fichier, qui contient plusieurs parties (§ 10).
 - Les six cibles (dont H6, facultative) et les 73 membres listés (60 appelés par le mod, 13 sur lesquels raisonne la
   conception) existent dans le client 36.6.3 (signatures lues en métadonnées,
   `Assembly-CSharp.dll` SHA-256 `3f677795…2b69728`).
@@ -159,10 +164,86 @@ Le README de Nomi's Kitchen décrit son « Fix Minion Dance » (« early alpha a
 conditions de Blizzard. Fait propre à cette recherche : le client a été décompilé (dans un dossier de travail hors du
 dépôt), ce que la clause « Derivative Works » nomme.
 
-## 9. Ce qui reste à décider (Ali)
+## 9. Décisions d'Ali, et ce qui reste à décider
 
-| Arbitrage | Issues |
-|---|---|
-| observer avant d'installer | (a) installer maintenant ; (b) d'abord un `Zone.log` d'une danse réelle ; (c) les deux, le mod journalisant ce qu'il fait |
-| les conditions de Blizzard | § 8 |
-| la vitrine publique | `README.md` et `ROADMAP.md` ne parlent pas du mod (décision d'Ali) ; l'issue #1 reste ouverte tant que rien n'est vu en jeu |
+| Arbitrage | Issues | Rendu (2026-10-10) |
+|---|---|---|
+| observer avant d'installer | (a) installer maintenant ; (b) d'abord un journal `Zone` d'une danse réelle ; (c) les deux | **(b)** : observer d'abord, sans le mod (§ 10) ; le mod reste non installé |
+| la vitrine publique | annoncer le mod ou non | **discret** : `README.md` et `ROADMAP.md` n'en parlent pas ; l'issue #1 reste ouverte tant que rien n'est vu en jeu |
+| le mod de Nomi | lire seulement ; analyser et reprendre | accord de son auteur (§ 11) |
+| les conditions de Blizzard | § 8 | à décider |
+
+## 10. Observer une danse réelle, sans le mod (marche à suivre d'Ali)
+
+Constaté en lecture seule sur la machine de jeu le 2026-10-10 : `log.config` existe, avec sept sections (`Achievements`,
+`FullScreenFX`, `Net`, `Power`, `Decks`, `Arena`, `LoadingScreen`), chacune de cinq lignes, fins de ligne Windows ;
+**aucune section `[Zone]`**. Les journaux du jeu tombent dans `E:\JEUX\Hearthstone\Logs\`, un dossier par lancement du
+jeu, nommé à l'heure du lancement (`Hearthstone_2026_10_10_09_14_34\`) ; dedans `Power.log` pendant la session, et
+`Power_old.log` dans les sessions terminées (un fichier tourné peut commencer au milieu d'une partie). Chaque ligne commence
+par l'heure locale de la machine, sans la date : `D 09:14:55.6078907 GameState.DebugPrintPower() - …`.
+
+1. **Activer le journal `[Zone]`**, Hearthstone fermé (HDT peut rester ouvert) : ouvrir
+   `%LocalAppData%\Blizzard\Hearthstone\log.config` dans le Bloc-notes et ajouter à la fin, sur le modèle des sections
+   présentes :
+
+   ```
+   [Zone]
+   LogLevel=1
+   FilePrinting=True
+   ConsolePrinting=False
+   ScreenPrinting=False
+   Verbose=True
+   ```
+
+   `Verbose=True` par prudence, comme `[Power]` : non établi qu'il soit nécessaire pour `Zone`. Au lancement suivant, un
+   `Zone.log` devrait apparaître à côté de `Power.log` (supposé par analogie avec les autres sections, pas encore vu).
+   **HDT ne retire pas cette section** (lu dans HDT 1.55.6, sous licence MIT : il relit toutes les sections, ajoute les cinq
+   qu'il exige — `Achievements`, `Arena`, `FullScreenFX`, `LoadingScreen`, `Power` — et, s'il réécrit le fichier, y remet
+   `LogLevel=1` et `FilePrinting=True` partout, sections inconnues comprises ; non relu dans la version 1.58 installée).
+   **Retour arrière** : supprimer ces six lignes, jeu fermé ; HDT ne remet pas `[Zone]`, qu'il n'exige pas.
+2. **Jouer normalement**, en essayant les gestes du § 7 (triple, vente, aimant, suivis aussitôt d'un déplacement), et
+   enregistrer l'écran si possible : barre de jeu Windows (`Win+Alt+R` démarre et arrête l'enregistrement, `Win+Alt+G`
+   garde les 30 dernières secondes si l'enregistrement en arrière-plan est activé) ou OBS (tampon de relecture). Sinon, la
+   note suffit.
+3. **À chaque danse vue, noter** :
+   - l'**heure à la seconde**, à l'horloge de Windows (c'est celle des journaux) ;
+   - le **geste qui précède** : déplacement, achat, vente, triple, aimant, découverte, effet de début ou de fin de tour… ;
+   - **ce qui bouge** : quels sbires, de quelle place à quelle place, et s'ils reviennent ou non ;
+   - **taverne ou combat**.
+4. **Rendre** :
+   - le **dossier entier** de la session, `E:\JEUX\Hearthstone\Logs\Hearthstone_<date et heure du lancement>\`
+     (`Power.log` et/ou `Power_old.log`, `Zone.log` et/ou `Zone_old.log`) ;
+   - les heures notées et ce qui a été vu ;
+   - la vidéo s'il y en a une ;
+   - `%AppData%\HearthstoneDeckTracker\Logs\hdt_log.txt` si l'overlay d'HDT a bougé lui aussi.
+
+   Ces journaux contiennent les pseudos des adversaires : ils ne vont **ni dans le dépôt, ni dans une issue**.
+
+**Lecture, en une commande** (lecture seule ; les noms de joueurs ne sont jamais écrits) :
+
+```bash
+python3 tools/nodance-observe.py --at 21:14:05 --at 21:20:31 [--zone Zone.log] Power_old.log Power.log
+```
+
+Pour chaque heure, l'outil liste les options envoyées et les réponses du serveur dans les ± 5 s (`--window`), puis dit si,
+au moment d'un placement ou d'un déplacement, la fenêtre **D-a** (une entrée ou sortie de la rangée reçue, pas encore jouée)
+ou **D-b** (un bloc portant des places de la rangée reçu avant l'option, joué après) était ouverte ; sinon « neither D-a
+nor D-b: cause not established ». Le joueur est retrouvé **partie par partie** (un fichier en contient plusieurs, et son
+identifiant change d'une partie à l'autre : 1 puis 2 dans un fichier du 2026-10-10). Avec `--zone`, il ajoute les
+déplacements du journal `Zone` dans la fenêtre. Tests : `python3 tools/test_nodance_observe.py`, 11 cas sur des journaux
+inventés, mutations détectées (fenêtre D-a sans « pas encore jouée », D-b jamais marqué, minuit, un seul joueur par
+fichier). Essayé en lecture seule sur un `Power_old.log` réel de 80 Mo : moins d'une seconde.
+
+**Constaté en écrivant l'outil, à reprendre** : les scripts de la recherche (`window.py`, `lag_at_send.py`,
+`moves_exposed.py`) votent le joueur **une fois par fichier** ; or un même fichier contient plusieurs parties où son
+identifiant change. Les fréquences du § 1 (« 3 placements sur 405 », « 0 déplacement sur 111 ») peuvent donc mêler le
+joueur et un autre : **non revérifiées**.
+
+## 11. Le mod de Nomi's Kitchen : accord de son auteur (2026-10-10)
+
+Accord personnel du développeur de Nomi's Kitchen, obtenu par Ali, malgré la licence « MIT NON-AI » : l'analyse du mod
+`com.community.hs.NomiCantDance` par décompilation et désobfuscation, et la reprise de son code, sont autorisées. Tout code
+repris est marqué à la source, en anglais (`Taken from NomiCantDance (Nomi's Kitchen), with its author's permission,
+2026-10-10`), parce que le dépôt est public et sous MIT seule ; on préfère réécrire quand c'est aussi simple, on reprend
+tel quel ce que la décompilation montre plus juste que notre version. L'analyse est en cours ; ce journal n'en contient
+encore rien.
