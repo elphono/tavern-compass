@@ -11,6 +11,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BronzebeardHud.Stats", "src
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BronzebeardHud.Stats.Tests", "tests\BronzebeardHud.Stats.Tests\BronzebeardHud.Stats.Tests.csproj", "{91CB099B-EAD8-47AC-9835-1CDE5A75D3B7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TavernCompass.NoDance.Core", "src\TavernCompass.NoDance.Core\TavernCompass.NoDance.Core.csproj", "{C4FC77EE-11FA-4D13-9177-4BEEE3629FD8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TavernCompass.NoDance.Core.Tests", "tests\TavernCompass.NoDance.Core.Tests\TavernCompass.NoDance.Core.Tests.csproj", "{C0DDFC28-CCA6-4EAB-B041-B2466A5850BC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,9 +32,19 @@ Global
 		{91CB099B-EAD8-47AC-9835-1CDE5A75D3B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{91CB099B-EAD8-47AC-9835-1CDE5A75D3B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{91CB099B-EAD8-47AC-9835-1CDE5A75D3B7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4FC77EE-11FA-4D13-9177-4BEEE3629FD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4FC77EE-11FA-4D13-9177-4BEEE3629FD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4FC77EE-11FA-4D13-9177-4BEEE3629FD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4FC77EE-11FA-4D13-9177-4BEEE3629FD8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0DDFC28-CCA6-4EAB-B041-B2466A5850BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0DDFC28-CCA6-4EAB-B041-B2466A5850BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0DDFC28-CCA6-4EAB-B041-B2466A5850BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0DDFC28-CCA6-4EAB-B041-B2466A5850BC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{510495FA-DA21-4313-A8E9-4B6FF875C31E} = {A6F591AC-3DCF-44CB-853E-F1AD9BB87FA3}
 		{91CB099B-EAD8-47AC-9835-1CDE5A75D3B7} = {CD101CFE-60A2-4BAC-8499-CE69037A31CB}
+		{C4FC77EE-11FA-4D13-9177-4BEEE3629FD8} = {A6F591AC-3DCF-44CB-853E-F1AD9BB87FA3}
+		{C0DDFC28-CCA6-4EAB-B041-B2466A5850BC} = {CD101CFE-60A2-4BAC-8499-CE69037A31CB}
 	EndGlobalSection
 EndGlobal

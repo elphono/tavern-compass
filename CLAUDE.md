@@ -421,6 +421,69 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 - Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre, et aucun pseudo, BattleTag ni
   identifiant de compte réel (un test refuse ceux qu'on a déjà purgés) ; les tests utilisent des données synthétiques.
 
+## Mod anti-danse (depuis le 2026-10-10, issue #1 ouverte, rien vu en jeu)
+
+Journal, conception, écarts, procédure et scénario de vérification : `docs/journal/2026-10-10-anti-danse.md`.
+
+- **Ce que c'est** : un plugin **BepInEx 5** (5.4.23.5, HarmonyX 2.9.0) chargé **dans le client Hearthstone**, qui corrige
+  par Harmony la « danse » des sbires de la rangée du joueur en taverne. À l'inverse du plugin HDT, il **modifie le
+  client** : l'EULA de Blizzard l'interdit en toutes lettres (« hacks », faits cités au § 8 du journal, sans avis).
+  L'installer, le publier (`README.md` et `ROADMAP.md` n'en parlent pas) et fermer l'issue #1 sont des décisions d'Ali.
+- **Le mécanisme** (établi en lisant le client, démontré sur un modèle, **aucune danse réelle observée**) : trois
+  écrivains de la place d'un sbire dans trois repères (prédiction au lâcher, temps réel carte par carte, liste traitée en
+  retard). **Correctif** : un seul écrivain, en fin d'image (`NoDanceDriver.LateUpdate`) : l'ordre affiché tant que l'action
+  du joueur n'a pas de réponse (en vol, délai 3 s), sinon l'ordre temps réel du serveur ; une carte déjà retirée par le
+  serveur reste derrière sa voisine de gauche ; les places pures rejouées par une liste serveur non confirmée sont
+  neutralisées sur la rangée du joueur. Portée : Battlegrounds hors Duos et spectateur, phase de taverne animée, étape temps
+  réel `MAIN_ACTION`, pas de combat temps réel ; rien n'est écrit tant qu'une carte est tenue ou qu'un choix est ouvert.
+- **Cibles** (`PatchTargets`, la seule liste, lue par le mod au chargement et par le test de signatures) : H1
+  `ZoneMgr.Awake` postfix, H2 `GameState.SendOption` prefix, H3 `PowerTask.DoRealTimeTask` postfix, H4
+  `ZoneMgr.AddPredictedLocalZoneChange` prefix + postfix, H5 `ZoneMgr.PostProcessServerChangeList` postfix (requises) ; H6
+  `ZoneMgr.OnRealTimeZonePosChange` prefix (facultative, réglage `Fixes.SkipPerCardRealTimeWrites`, désactivée). Les membres
+  appelés sont dans `ClientMembers.CalledByMod` ; au chargement, une cible requise ou un membre absent : **rien n'est patché**,
+  ligne `… disabled (missing: …)`. Une exception dans une partie requise arrête tout le mod pour la session (une ligne),
+  H6 s'arrête seule.
+- **Écarts avec la recherche** (journal § 3, chacun testé) : ancrage par clé (voisine, après elle) au lieu de « + 0,5 »
+  (trois cartes sortantes de suite) ; réconciliation quand une carte entre ou sort de la rangée (H5 marque au **début** de la
+  liste ; contre-exemple : deux jetons invoqués devant) ; H5 ne neutralise pas une entité qui change de zone dans la même
+  liste ; rien n'est écrit pendant un choix ouvert ; une seule DLL.
+
+| Projet | Cible | Rôle |
+|---|---|---|
+| `src/TavernCompass.NoDance.Core` | `netstandard2.0`, dans la solution | `BoardOrder.Target`, `RowReconciler` (sale, vol, délai, rangée qui change, compteurs), `ReplayedPositions`, `PatchTargets`, `ClientMembers`, `ClientSignature` ; sans le jeu, sans BepInEx |
+| `tests/TavernCompass.NoDance.Core.Tests` | `net8.0`, dans la solution | `ClientModel` (règles du client, cadencées par images comme le mod), trois scénarios, recherche exhaustive (1 724 / 2 072 sans le mod, 0 avec, H6 ou non), trois déplacements, gel en vol, ancrage, jetons, prédiction fausse ; signatures |
+| `mods/TavernCompass.NoDance` | `net48`, **hors de la solution** | le plugin (`com.tavern-compass.nodance`, « Tavern Compass — No Dance », version de `Directory.Build.props`) ; compile les sources du cœur |
+| `tools/nodance-deploy.sh` | WSL | installe BepInEx (si absent) et le mod dans le dossier du jeu |
+
+```bash
+dotnet build mods/TavernCompass.NoDance -c Release -warnaserror -p:HearthstoneManagedDir=/mnt/e/JEUX/Hearthstone/Hearthstone_Data/Managed/
+HEARTHSTONE_MANAGED=/mnt/e/JEUX/Hearthstone/Hearthstone_Data/Managed dotnet test tests/TavernCompass.NoDance.Core.Tests -warnaserror
+tools/nodance-deploy.sh --dry-run        # puis sans --dry-run (demande y) ; --uninstall [--purge] pour revenir
+```
+
+- **Build** : `HearthstoneManagedDir` n'a **pas de défaut** (erreur qui dit quoi passer) ; `Assembly-CSharp.dll`,
+  `UnityEngine.CoreModule.dll` et `UnityEngine.dll` lus là, jamais copiés (`Private=false`) ; `BepInEx.dll` et `0Harmony.dll`
+  extraits de l'archive officielle téléchargée dans `lib/bepinex/5.4.23.5/` (ignoré), refusée si son SHA-256 n'est pas celui
+  du `.csproj`. La CI ne construit pas le mod (il faut le jeu) ; elle teste le cœur.
+- **Signatures** : sans `HEARTHSTONE_MANAGED`, les 4 tests de `GameSignatureTests` sont **sautés avec la raison** ; avec, ils
+  lisent les métadonnées du client (rien n'est chargé) : chaque cible, ses paramètres liés par nom, chaque membre listé, un
+  témoin inventé rendu manquant, et chaque membre du client que **la DLL construite** référence doit être vérifié au
+  chargement. À relancer après chaque mise à jour du jeu et chaque changement du mod.
+- **Déploiement** (`tools/nodance-deploy.sh`, cible `/mnt/e/JEUX/Hearthstone`, `--game-dir` ou `HEARTHSTONE_DIR`) : refuse si
+  Hearthstone tourne, si la DLL est plus vieille que les sources, ou devant une installation de BepInEx à moitié ; n'écrase
+  jamais un BepInEx existant ; signale les autres plugins (celui de Nomi se battrait avec celui-ci) ; demande `y` ; compare
+  les SHA-1 ; imprime le retour arrière. `--uninstall` retire la DLL, `--purge` aussi BepInEx (`winhttp.dll`,
+  `doorstop_config.ini`, `.doorstop_version`, `changelog.txt` s'ils sont ceux de l'archive, et `BepInEx/`). Exercé sur un faux
+  dossier de jeu ; jamais lancé sur le vrai.
+- **Journal** (`BepInEx/LogOutput.log`) : `patch … : ok`, `5/5 required patches applied, 0/1 optional (game …)`, `attached to
+  ZoneMgr (game n)`, `option sent: entity=… position=… (in flight)`, `option answered after … ms` / `rejected` / `flight
+  timeout`, `prediction: entity=… slot=… predicted=… list=… (renumbered k)`, `server list … (PLAY): k replayed position(s)
+  neutralized`, `reconcile (raisons): shown [ids] -> [ids], k position(s) changed[, kept visual order (in flight)]`, `game
+  summary: flights=… reconciles=… order changes=… kept=… renumbered=… neutralized=… (game n)`. `order changes` et
+  `neutralized` à zéro sur plusieurs parties : le mod n'a rien fait.
+- **Pas vu en jeu** : tout, à commencer par BepInEx 5.4.23.5 et HarmonyX sur ce client Unity 6 Mono. Supposé : que les
+  danses vues par Ali soient celles du modèle (journal § 4, et le scénario d'Ali § 7).
+
 ## Docs
 
 | Dossier | Contenu |

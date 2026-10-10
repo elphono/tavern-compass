@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pure logic of the anti-dance mod (mods/TavernCompass.NoDance): the order of the player's row, the driver's state,
+       the list of Harmony targets and client members. netstandard2.0 so that both the net48 mod (which compiles these
+       sources into its own DLL) and the net8.0 tests use it; no reference to the game, to Unity or to BepInEx. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

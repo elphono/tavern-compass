@@ -1,0 +1,103 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- BepInEx 5 plugin for the Hearthstone client: the anti-dance mod of the player's row in the Battlegrounds shop
+       (docs/journal/2026-10-10-anti-danse.md). Not part of BronzebeardHud.sln, like the HDT plugin: it compiles against
+       the installed game's assemblies, which are never in this repository (public). Build:
+         dotnet build mods/TavernCompass.NoDance -c Release -p:HearthstoneManagedDir=/mnt/e/JEUX/Hearthstone/Hearthstone_Data/Managed/
+       BepInEx.dll and 0Harmony.dll come from the official BepInEx archive, downloaded into lib/bepinex/ (ignored by git)
+       and checked against its SHA-256 before anything is extracted. -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>TavernCompass.NoDance</AssemblyName>
+    <RootNamespace>TavernCompass.NoDance</RootNamespace>
+    <!-- Unity's Mono loads what BepInEx hands it; no need for a .config next to the DLL. -->
+    <GenerateBindingRedirectsOutputType>false</GenerateBindingRedirectsOutputType>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <BepInExVersion>5.4.23.5</BepInExVersion>
+    <BepInExZip>BepInEx_win_x64_$(BepInExVersion).zip</BepInExZip>
+    <BepInExZipUrl>https://github.com/BepInEx/BepInEx/releases/download/v$(BepInExVersion)/$(BepInExZip)</BepInExZipUrl>
+    <!-- Measured on the archive published on 2026-02-08 (docs/journal/2026-10-10-anti-danse.md). -->
+    <BepInExZipSha256>82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4</BepInExZipSha256>
+    <BepInExRoot Condition="'$(BepInExRoot)' == ''">$(MSBuildThisFileDirectory)..\..\lib\bepinex\$(BepInExVersion)\</BepInExRoot>
+    <BepInExCore>$(BepInExRoot)BepInEx\core\</BepInExCore>
+  </PropertyGroup>
+
+  <!-- No default on purpose: a missing game folder is an error that says what to pass, never a silent wrong path. -->
+  <PropertyGroup Condition="'$(HearthstoneManagedDir)' != ''">
+    <HearthstoneManaged>$([MSBuild]::EnsureTrailingSlash('$(HearthstoneManagedDir)'))</HearthstoneManaged>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- One DLL to deploy: the pure logic is compiled in, from the same sources as the tested library. -->
+    <Compile Include="..\..\src\TavernCompass.NoDance.Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build-only: .NET Framework reference assemblies, so net48 compiles without Windows. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <!-- The game's assemblies, read where the game is installed, never copied next to the mod. -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(HearthstoneManaged)Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(HearthstoneManaged)UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- BepInEx 5 is built against the single UnityEngine assembly; the game's forwards its types to the modules. -->
+    <Reference Include="UnityEngine">
+      <HintPath>$(HearthstoneManaged)UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Provided by BepInEx at run time (BepInEx/core). -->
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExCore)BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BepInExCore)0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="RequireHearthstoneManagedDir" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(HearthstoneManagedDir)' == ''"
+           Text="HearthstoneManagedDir is not set. The mod compiles against the installed game's assemblies, which are never in this repository. Pass the game's Managed folder, e.g.: dotnet build mods/TavernCompass.NoDance -c Release -p:HearthstoneManagedDir=/mnt/e/JEUX/Hearthstone/Hearthstone_Data/Managed/" />
+    <Error Condition="'$(HearthstoneManagedDir)' != '' And !Exists('$(HearthstoneManaged)Assembly-CSharp.dll')"
+           Text="Assembly-CSharp.dll not found in HearthstoneManagedDir=$(HearthstoneManagedDir): it must be the game's Hearthstone_Data/Managed folder." />
+  </Target>
+
+  <Target Name="FetchBepInEx" BeforeTargets="ResolveAssemblyReferences" DependsOnTargets="RequireHearthstoneManagedDir"
+          Condition="!Exists('$(BepInExCore)BepInEx.dll') Or !Exists('$(BepInExCore)0Harmony.dll')">
+    <Message Importance="high" Condition="!Exists('$(BepInExRoot)$(BepInExZip)')" Text="Downloading BepInEx $(BepInExVersion) from $(BepInExZipUrl)" />
+    <DownloadFile Condition="!Exists('$(BepInExRoot)$(BepInExZip)')" SourceUrl="$(BepInExZipUrl)" DestinationFolder="$(BepInExRoot)" />
+    <GetFileHash Files="$(BepInExRoot)$(BepInExZip)" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="BepInExZipActualSha256" />
+    </GetFileHash>
+    <!-- MSBuild compares strings without case: the task writes the hash in upper case. -->
+    <Error Condition="'$(BepInExZipActualSha256)' != '$(BepInExZipSha256)'"
+           Text="$(BepInExRoot)$(BepInExZip): SHA-256 $(BepInExZipActualSha256), expected $(BepInExZipSha256). Nothing extracted; delete the file to download it again." />
+    <Unzip SourceFiles="$(BepInExRoot)$(BepInExZip)" DestinationFolder="$(BepInExRoot)" />
+    <Error Condition="!Exists('$(BepInExCore)BepInEx.dll') Or !Exists('$(BepInExCore)0Harmony.dll')"
+           Text="BepInEx.dll or 0Harmony.dll not found in $(BepInExCore) after unpacking $(BepInExZip)" />
+  </Target>
+
+  <!-- BepInPlugin needs its version as a constant: written from Directory.Build.props' <Version>. -->
+  <Target Name="WriteBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildInfoFile>$(IntermediateOutputPath)BuildInfo.g.cs</BuildInfoFile>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(BuildInfoFile)" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="// &lt;auto-generated/&gt;;namespace TavernCompass.NoDance%3B;internal static class BuildInfo { public const string Version = &quot;$(Version)&quot;%3B }" />
+    <ItemGroup>
+      <Compile Include="$(BuildInfoFile)" />
+      <FileWrites Include="$(BuildInfoFile)" />
+    </ItemGroup>
+  </Target>
+
+</Project>
