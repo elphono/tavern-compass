@@ -158,8 +158,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   la place d'où part un redimensionnement est demandée au `PanelLayout` à chaque geste (`Resize` prend la place par
   défaut et lit le reste), car un rectangle gardé au dernier redessin est périmé dès qu'on déplace le panneau (un
   déplacement finit sans redessin) et renvoyait le panneau à sa place d'avant (constaté le 2026-10-04). Le journal d'HDT
-  dit `resize start` / `resize end` (place du panneau sur le canvas et place que dit le layout : elles doivent être
-  égales) et `panel moved`. Le calcul en lignes de l'ancien panneau (`PanelFit.Rows`, `DetailPivots`, et leur
+  dit `resize start` / `resize end` (place du panneau sur le canvas et boîte que dit le layout : position et largeur
+  doivent être égales ; la hauteur sur le canvas peut être plus petite, jamais plus grande, car le panneau ne montre que
+  des lignes entières et, dès que la boîte dépasse la taille par défaut, s'arrête à la dernière qui tient, le cadre
+  pointillé et la poignée restant sur la boîte ; relevé le 2026-10-10 : 20 lignes sur 28 avec un tel écart, de 3 à
+  106 px, aucune en position) et `panel moved`. Le calcul en lignes de l'ancien panneau (`PanelFit.Rows`, `DetailPivots`,
+  et leur
   `Tolerance` : une boîte exactement de la hauteur de n lignes, divisée par une échelle qui n'est pas une fraction
   binaire, rendait n − 1 lignes) est retiré depuis la fusion : le panneau unique mesure ses pièces en place, en pixels
   de l'overlay, et `CompGuideLayout` décide ce qui tient (`Fit` et `Sections`, avec la même tolérance).
