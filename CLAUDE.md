@@ -187,6 +187,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   côté, à l'écart (0,009 H au plus mesuré), ou passe dessous s'il faudrait plus de 0,03 H (celui du milieu à
   trois héros : 0,835 → 0,915 H). Cotes mesurées sur la capture Hearthstone d'Ali du 2026-09-26 18:29:44
   (2291 × 1360), fixées par `HeroPickLayoutTests` ; l'encart d'origine, centré à 0,667 H, cachait le reroll.
+  **Contenu** (2026-10-10, composant 3, issue #11) : une ligne consolidée (`HeroConsensus.For`, vue de la tranche du
+  joueur : fichiers de héros du lobby et nomi.gg) — tier, « 3.41 · 4,102 games » (l'effectif remplace le taux de choix, décision 7),
+  ou « 2.7 ↔ 3.8 contested » en ambre (décision 6, jamais la moyenne des deux) — puis ses sources (« FS 25% + nomi.gg », le crédit
+  de nomi.gg à l'écran), puis top 4 / 1er de la première source. Sans vue, ou sous 10 parties partout, les lignes par source
+  d'avant. Le « pourquoi » (composant 8) va au journal : `hero pick why=[H consensus 3.41 (4102 games) ← FS 25% 3.42 (4051) ·
+  nomi.gg 3.10+0.30 (51, ×0.5) · pick 18%; …]`. Simulation : `--screenshot --heroes --play`.
 - Aucun texte du plugin sous 12 px en 1080p (`PanelTypography`) et aucun `Viewbox` : ce qui ne tient pas est
   omis, jamais rétréci (MMR des
   adversaires : le rang disparaît, la cote reste). Un test lit les sources du plugin et y refuse `Viewbox` et

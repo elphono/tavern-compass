@@ -83,6 +83,27 @@ public class HeroPickAdvisorTests
         Assert.Equal((null, null), HeroPickAdvisor.PlacementOdds(distribution));
     }
 
+    /// <summary>With the consolidated view, a row carries its line (component 3), found by the hero's base card, skin or not.</summary>
+    [Fact]
+    public void BuildRows_WithTheView_EachRowCarriesItsConsolidatedLine()
+    {
+        var firestone = new HeroStatsFile(StatsSources.Firestone, TestData.GridPool().Heroes, mmrPercentile: 25, timePeriod: "last-patch");
+        var view = StatsConsolidation.Consolidate(new[] { SourceSnapshot.Of(firestone) }, 25);
+        var offered = new[]
+        {
+            new OfferedHero(entityId: 41, cardId: "GRID_16_SKIN_A", baseCardId: "GRID_16", position: 1),
+            new OfferedHero(entityId: 42, cardId: "GRID_02", baseCardId: "GRID_02", position: 2),
+            new OfferedHero(entityId: 43, cardId: "UNKNOWN_HERO", baseCardId: "UNKNOWN_HERO", position: 3),
+        };
+
+        var rows = HeroPickAdvisor.BuildRows(offered, new[] { firestone }, view);
+
+        Assert.Equal(new[] { "GRID_16", "GRID_02", null }, rows.Select(r => r.Stat?.Subject));
+        Assert.Equal(new[] { "FS 25%", "FS 25%", null }, rows.Select(r => r.Consensus?.Sources));
+        Assert.NotEqual(rows[0].Consensus!.Figure, rows[1].Consensus!.Figure);
+        Assert.Null(HeroPickAdvisor.BuildRows(offered, new[] { firestone })[0].Consensus); // no view: the per-source lines
+    }
+
     [Fact]
     public void BuildRows_NoOfferedHero_NoRow()
     {

@@ -41,6 +41,7 @@
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\CardImages.cs" Link="Plugin\CardImages.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\PreviewPlacer.cs" Link="Plugin\PreviewPlacer.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\OverlayLayer.cs" Link="Plugin\OverlayLayer.cs" />
+    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\HeroPickPanel.cs" Link="Plugin\HeroPickPanel.cs" />
     <!-- The zones a default panel must not cover, drawn under the panels: one definition, the tests' one. -->
     <Compile Include="..\..\tests\BronzebeardHud.Stats.Tests\NoGoZones.cs" Link="Plugin\NoGoZones.cs" />
   </ItemGroup>

@@ -306,6 +306,32 @@ internal static class HarnessData
     /// The early cards' pool and tier, invented and fixed (the tiers HearthstoneJSON gives arrive after the first drawing):
     /// the two good cards of <see cref="CardStats"/> at tier 3 and 4, the bad one at tier 3, so that both rows show.
     /// </summary>
+    /// <summary>
+    /// Four offered heroes, invented, for the hero badges (component 3): a consensus of two sources (one recentred), a
+    /// contest, one source alone, and a hero no source knows.
+    /// </summary>
+    public static IReadOnlyList<HeroPickRow> HeroRows()
+    {
+        var odds = new[] { 14.0, 13.0, 13.0, 12.0, 12.0, 12.0, 12.0, 12.0 };
+        var firestone = new HeroStatsFile(StatsSources.Firestone, new[]
+        {
+            new HeroStat("HARNESS_HERO_A", 3.42, 4051, pickRate: 0.18, placementDistribution: odds),
+            new HeroStat("HARNESS_HERO_B", 3.80, 12480, pickRate: 0.09, placementDistribution: odds),
+            new HeroStat("HARNESS_HERO_C", 4.61, 880, pickRate: 0.04, placementDistribution: odds),
+            new HeroStat("HARNESS_HERO_E", 4.10, 3000),
+        }, mmrPercentile: 25, timePeriod: "last-patch");
+        var nomi = new SourceSnapshot(new StatProvenance(StatsSources.NomiGg, null, null, null, "since 2026-10-02", null, null), new[]
+        {
+            new StatRecord("hero", "HARNESS_HERO_A", "placement", 3.10, 51, "games"),
+            new StatRecord("hero", "HARNESS_HERO_B", "placement", 2.60, 90, "games"),
+            new StatRecord("hero", "HARNESS_HERO_E", "placement", 3.80, 800, "games"),
+        }, new Dictionary<string, double> { ["hero"] = 3.75 });
+        var view = StatsConsolidation.Consolidate(new[] { SourceSnapshot.Of(firestone), nomi }, 25);
+        var offered = new[] { "HARNESS_HERO_A", "HARNESS_HERO_B", "HARNESS_HERO_C", "HARNESS_HERO_D" }
+            .Select((id, i) => new OfferedHero(entityId: 90 + i, cardId: id, baseCardId: id, position: i + 1)).ToList();
+        return HeroPickAdvisor.BuildRows(offered, new[] { firestone }, view);
+    }
+
     public static IReadOnlyDictionary<string, int> EarlyPool { get; } = new Dictionary<string, int>
     {
         [Pool[50]] = 3,

@@ -128,9 +128,9 @@ internal sealed class HeroPickPanel
     }
 
     /// <summary>
-    /// The badge's lines at their own size (<see cref="PanelTypography"/>, 12 px at least in 1080p): one per source
-    /// (two at most), the odds under the first, then the comp line, wrapped. What does not fit the badge is left
-    /// out (<see cref="HeroPickLayout.ItemsThatFit"/>), never shrunk.
+    /// The badge's lines at their own size (<see cref="PanelTypography"/>, 12 px at least in 1080p): the consolidated
+    /// line, its sources and the odds; without one, a line per source (two at most) and the odds under the first. What
+    /// does not fit the badge is left out (<see cref="HeroPickLayout.ItemsThatFit"/>), never shrunk.
     /// </summary>
     private static UIElement BuildContent(HeroPickRow row, double scale)
     {
@@ -138,6 +138,23 @@ internal sealed class HeroPickPanel
         if (!row.HasData)
         {
             items.Add((HeroPickLayout.NoDataLine, new UIElement[] { Line("no data", PanelTypography.HeroNoData, HeroPickLayout.NoDataLine, scale, Brushes.LightGray) }));
+        }
+        else if (row.Consensus is { } consensus)
+        {
+            // Component 3: one consolidated line and its sample (the pick rate goes to HDT's log), its sources under it,
+            // then the first source's top-4 and first-place shares.
+            var line = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Height = HeroPickLayout.SourceLine * scale };
+            var tier = row.Figures[0].Tier;
+            line.Children.Add(Line(tier ?? "–", PanelTypography.HeroTier, HeroPickLayout.SourceLine, scale, TierBrush(tier), FontWeights.Bold));
+            var figure = Line(" " + consensus.Figure, PanelTypography.Body, HeroPickLayout.BodyLine, scale, consensus.Contested ? ContestedBrush : Brushes.White);
+            figure.VerticalAlignment = VerticalAlignment.Center;
+            line.Children.Add(figure);
+            items.Add((HeroPickLayout.SourceLine, new UIElement[] { line }));
+            items.Add((HeroPickLayout.BodyLine, new UIElement[] { Line(consensus.Sources, PanelTypography.Small, HeroPickLayout.BodyLine, scale, Brushes.LightGray) }));
+            if (row.Figures[0].OddsText is { } odds)
+            {
+                items.Add((HeroPickLayout.BodyLine, new UIElement[] { Line(odds, PanelTypography.Body, HeroPickLayout.BodyLine, scale, Brushes.LightGray) }));
+            }
         }
         else
         {
@@ -190,6 +207,9 @@ internal sealed class HeroPickPanel
         TextAlignment = TextAlignment.Center,
         IsHitTestVisible = false,
     };
+
+    /// <summary>Amber: two sources disagree, and neither figure is the hero's.</summary>
+    private static readonly Brush ContestedBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x3B));
 
     private static string SourceLabel(string source) => StatsSources.Label(source);
 

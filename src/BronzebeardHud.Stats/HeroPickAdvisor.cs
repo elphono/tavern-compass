@@ -46,11 +46,19 @@ public sealed class HeroFigures
 /// <summary>One column of the hero-pick panel.</summary>
 public sealed class HeroPickRow
 {
-    public HeroPickRow(OfferedHero hero, IReadOnlyList<HeroFigures> figures)
+    public HeroPickRow(OfferedHero hero, IReadOnlyList<HeroFigures> figures, ConsolidatedStat? stat = null)
     {
         Hero = hero;
         Figures = figures;
+        Stat = stat;
+        Consensus = HeroConsensus.For(stat);
     }
+
+    /// <summary>The hero's consolidated figure, when a view was given; its "why" goes to HDT's log.</summary>
+    public ConsolidatedStat? Stat { get; }
+
+    /// <summary>The badge's consolidated line (component 3); null: the badge keeps its per-source lines.</summary>
+    public HeroConsensusLine? Consensus { get; }
 
     public OfferedHero Hero { get; }
 
@@ -84,13 +92,14 @@ public static class HeroPickAdvisor
 
     /// <param name="offered">Offered heroes, in on-screen order.</param>
     /// <param name="sources">Loaded stats files, most trusted first (the plugin puts hand-typed HSReplay data first).</param>
-    public static IReadOnlyList<HeroPickRow> BuildRows(IReadOnlyList<OfferedHero> offered, IReadOnlyList<HeroStatsFile> sources)
+    public static IReadOnlyList<HeroPickRow> BuildRows(IReadOnlyList<OfferedHero> offered, IReadOnlyList<HeroStatsFile> sources, ConsolidatedView? view = null)
     {
         var tiersBySource = sources.Select(HeroTiers.Compute).ToList();
         return offered
             .Select(hero =>
             {
                 var figures = new List<HeroFigures>();
+                ConsolidatedStat? consolidated = null;
                 for (var i = 0; i < sources.Count; i++)
                 {
                     var stat = sources[i].Find(hero.BaseCardId);
@@ -99,6 +108,7 @@ public static class HeroPickAdvisor
                         continue;
                     }
 
+                    consolidated ??= view?.Find("hero", stat.HeroCardId, "placement", "games");
                     figures.Add(new HeroFigures(
                         sources[i].Source,
                         tiersBySource[i][stat.HeroCardId],
@@ -109,7 +119,7 @@ public static class HeroPickAdvisor
                         stat.PlacementDistribution));
                 }
 
-                return new HeroPickRow(hero, figures);
+                return new HeroPickRow(hero, figures, consolidated);
             })
             .ToList();
     }

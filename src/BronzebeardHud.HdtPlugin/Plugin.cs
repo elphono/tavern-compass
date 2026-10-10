@@ -1097,6 +1097,26 @@ public sealed class Plugin : IPlugin
         Log.Info($"Bronzebeard HUD: stats view bracket=mmr-{_stats.Bracket} sources=[{sources}] · {view.Summary("hero")} · {view.Summary("trinket")} · {view.Summary("card")}");
     }
 
+    /// <summary>
+    /// The heroes' consolidated view for the hero badges (component 3): the lobby's hero files and nomi.gg's heroes, in the
+    /// player's bracket. Null when the stats-view guard is off or trips: the badges keep their per-source lines.
+    /// </summary>
+    private ConsolidatedView? HeroView(IReadOnlyList<HeroStatsFile> sources)
+    {
+        ConsolidatedView? view = null;
+        _statsViewGuard.Run(() =>
+        {
+            var snapshots = sources.Select(SourceSnapshot.Of).ToList();
+            if (_nomi?.File is { } nomi)
+            {
+                snapshots.Add(SourceSnapshot.Of(nomi));
+            }
+
+            view = StatsConsolidation.Consolidate(snapshots, _stats!.Bracket);
+        });
+        return view;
+    }
+
     /// <summary>nomi.gg's patch analysis: asked at the plugin's start and once per game; NomiCache keeps it to one attempt a day.</summary>
     private void RefreshNomi()
     {
@@ -1455,7 +1475,15 @@ public sealed class Plugin : IPlugin
         {
             _shownKey = key;
             var sources = _stats.Sources().Select(file => LobbyTribes.Apply(file, tribes)).ToList();
-            _panel.Show(HeroPickAdvisor.BuildRows(offered, sources), _stats.Status);
+            var view = HeroView(sources);
+            var rows = HeroPickAdvisor.BuildRows(offered, sources, view);
+            _panel.Show(rows, _stats.Status);
+            if (view != null)
+            {
+                // Component 8: the "why" of each badge's line, and the pick rate it no longer shows.
+                Log.Info("Bronzebeard HUD: hero pick why=[" + string.Join("; ", rows.Select(r =>
+                    HeroConsensus.Why(r.Hero.BaseCardId, r.Stat, r.Figures.FirstOrDefault()?.PickRate))) + "]");
+            }
         }
     }
 }
