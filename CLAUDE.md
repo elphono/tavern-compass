@@ -436,9 +436,17 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   et une courbe de héros inventée pour la jauge, `--power behind|even|ahead|shiny|none|early`, une autre pour le héros
   adverse, `--opp-power behind|even|ahead|shiny|none|next|unseen` ; `--count n` clique − / + jusqu'à n, `--play` coupe le
   mode déplacement) ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
-  la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. Elle ne simule
-  pas la couche d'HDT (clics transparents au-dessus du jeu, survol sondé à 60 Hz) ni la lecture d'HDT (plateau adverse,
-  `NEXT_OPPONENT_PLAYER_ID` : faits synthétiques) : un défaut qui y vivrait ne s'y voit pas.
+  la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. **La couche d'HDT**
+  est simulée sur une souris injectée (`--mouse 'line:1;wait:300'`, groupe `mouse` de `--selftest`, `HdtOverlay.cs`,
+  2026-10-10) : fenêtre transparente aux clics hors des éléments déclarés `IsOverlayHitTestVisible`, sonde de survol
+  (`UpdateHoverable` puis `Task.Delay(16)` : une passe toutes les ≈ 31 ms mesurées, pas 60 Hz), portées d'HDT 1.58.9
+  décompilé ; les événements que WPF y ajoute (deuxième entrée sur le nom d'une ligne, sortie quand la fenêtre redevient
+  transparente, curseur encore dans la ligne) suivent un modèle **déduit**, pas vu en jeu. Elle ne simule toujours pas la
+  conversion écran → overlay du curseur (DPI) ni la lecture d'HDT (plateau adverse, `NEXT_OPPONENT_PLAYER_ID` : faits
+  synthétiques) : un défaut qui y vivrait ne s'y voit pas. Constat du code d'HDT, reproduit dans la simulation : un élément
+  déclaré cliquable **avant** son `Loaded` est inscrit deux fois dans la `List` des cliquables et n'en est retiré qu'une —
+  chaque redessin du panneau y laisse une entrée morte par élément cliquable (4 146 entrées pour 29 éléments vivants à la
+  fin de l'autotest) ; effet en jeu non mesuré (`docs/journal/2026-10-10-couche-overlay-simulee.md`).
 - Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre, et aucun pseudo, BattleTag ni
   identifiant de compte réel (un test refuse ceux qu'on a déjà purgés) ; les tests utilisent des données synthétiques.
 

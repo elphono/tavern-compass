@@ -7,7 +7,9 @@
        never polls it, and hands ChoiceAdvisor synthetic trinket stats instead.
        What they ask of HDT (OverlayExtensions, Log, Database, the asset downloaders) is answered by HdtShim.cs, so
        the harness needs no HDT assembly and does not depend on HDT's version. What HDT's overlay window does around
-       them (click-through above the game, hover polled at 60 Hz) is NOT simulated.
+       them (click-through above the game, hover polled by a probe every 16 ms) is reproduced by HdtOverlay.cs on an
+       injected mouse (the "mouse" option and the self-test's "mouse" checks), from HDT 1.58.9 decompiled; WPF's own events
+       there are a deduced model.
        Written in C# without XAML, as the plugin, so that it builds under WSL. Not part of BronzebeardHud.sln. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>

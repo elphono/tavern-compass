@@ -19,6 +19,9 @@ redimensionner et les regarder **sans lancer une partie** ni HDT.
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover --close-choice   # le choix ouvert puis refermé : la scène rétablie
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --hover 1 --no-skip   # la ligne de la 1re cible survolée : son popup, comme en taverne
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --hover 1 --hover-card 2   # la même, et le 2e ovale de la ligne survolé : l'aperçu de sa carte
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --play --no-skip --mouse 'line:1;wait:300'   # la même chose par la couche d'HDT reproduite : souris injectée, sonde de survol
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --play --mouse 'line:1;wait:300;oval:1:2;nudge;wait:200'   # puis le 2e ovale : l'aperçu de sa carte, par la sonde
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --mouse 'pin:1;nudge;click'   # un clic sur le 1er ◇ : la fenêtre le prend (◇ déclaré cliquable)
 ```
 
 `--card-values` donne des stats de cartes inventées au tour 6 (`HarnessData.CardStats`), d'où aussi la section « EARLY » des
@@ -76,19 +79,64 @@ Le script compile sous WSL, copie dans `C:\temp\BronzebeardHarness` et lance l'e
 `--selftest` et `--screenshot` tournent depuis leur propre copie, `C:\temp\BronzebeardHarness-ci` (sortie dans son `out\`) : ils passent même fenêtre ouverte, sans toucher à son dossier.
 Ils lisent aussi leur propre disposition, `C:\temp\BronzebeardHarness-ci\layout.json` (jamais écrite : la disposition par défaut), sauf `--layout` explicite : la capture ne dépend pas de la fenêtre. Le journal et le cache d'images restent partagés.
 
+## Souris injectée : la couche d'HDT (`--mouse`)
+
+`--hover` et `--hover-card` lèvent les événements à la main. `--mouse <pas>` fait passer la scène par la couche d'HDT
+autour des panneaux, reproduite par `HdtOverlay.cs` sur un curseur injecté (et le groupe `mouse` de `--selftest` aussi).
+
+| HDT 1.58.9, lu dans son code décompilé (mêmes méthodes en 1.58.10) | La simulation |
+|---|---|
+| fenêtre transparente aux clics (`WS_EX_TRANSPARENT`) sauf quand le curseur est sur un élément déclaré `IsOverlayHitTestVisible` (`UpdateHoverable` → `SetClickthrough`) | un clic injecté hors de ces éléments va « au jeu » : rien de l'overlay ne le reçoit ; dessus, WPF le reçoit (pression, relâchement, et le `ButtonBase` du chemin cliqué) |
+| sonde : `UpdateHoverable`, puis `await Task.Delay(16)` ; `MouseEnter` et `MouseLeave` (`CustomMouseEventArgs`) sur les éléments `IsOverlayHoverVisible` dont le rectangle contient le curseur (géométrie seule, bornes strictes), groupés par enfant du canvas, le dernier enfant l'emporte | la même boucle et le même code, portés, sur le curseur injecté ; mesuré ici : une passe toutes les ≈ 31 ms, pas 16 (granularité de la minuterie de Windows) |
+| l'infobulle d'un élément survolable n'écoute que la sonde (`ShowTooltip`, `HideTooltip`) | pareil tant que la souris injectée tourne |
+| enregistrement des éléments : à chaque changement de la propriété, puis à leur `Loaded`, retrait à leur `Unloaded` ; une `List` pour les cliquables | pareil (`HdtShim.cs`) |
+
+**Déduit de WPF et de Windows, pas lu dans HDT ni vu en jeu** : là où la fenêtre prend la souris, WPF reçoit les
+déplacements et lève ses propres `MouseEnter` et `MouseLeave` sur ce qu'il touche et ses parents (une deuxième entrée sur
+une ligne quand le curseur arrive sur son nom) ; quand la sonde rend la fenêtre transparente, le déplacement suivant part au
+jeu et WPF perd la souris : un `MouseLeave` sur tout ce qu'il tenait, la ligne comprise, le curseur encore dedans. WPF
+n'apprend le curseur que par un déplacement : `nudge` en fait un d'un pixel.
+
+| Pas (séparés par `;`) | Ce qu'il fait |
+|---|---|
+| `x,y` | déplace le curseur en (x, y), pixels du canvas |
+| `out` | dans un coin, sur rien |
+| `title` | sur le titre « Compositions » du panneau |
+| `line:g` | sur le fond de la ligne du guide g (rang d'une cible ou nom), hors de tout élément déclaré cliquable |
+| `name:g` | sur le nom de cette ligne (déclaré cliquable : la fenêtre prend la souris) |
+| `oval:g:k` | sur son k-ième ovale |
+| `pin:k` | sur le k-ième ◇ au-dessus des cartes de Bob |
+| `skip` | sur le bouton Skip combat |
+| `nudge` | un pixel à droite : un autre déplacement, au même endroit à peu près |
+| `click` | pression et relâchement du bouton gauche où est le curseur |
+| `wait:ms` | laisse tourner la sonde et les minuteries |
+
+Chaque déplacement est suivi de 50 ms (la sonde est passée au moins une fois) ; la souris reste où elle est jusqu'à la
+capture. Le journal dit `simulated mouse: <pas> → (x,y)`, puis `simulated HDT overlay: …` à chaque changement de la
+fenêtre (transparente ou non, et sur quel élément) et à chaque clic (au jeu, ou à quel élément). Pendant la souris
+injectée, l'entrée de la vraie souris est absorbée au niveau du canvas (une capture prise par `PanelMover` ferait suivre au
+panneau le vrai curseur, loin de la fenêtre garée). Le mode déplacement de la simulation s'allume une fois la fenêtre
+chargée, comme le joueur l'allume sur un overlay déjà affiché : allumé avant, le code d'HDT inscrirait le panneau deux fois
+(au réglage, puis à son `Loaded`) dans sa liste et ne l'en retirerait qu'une fois, et le panneau resterait cliquable hors du
+mode déplacement.
+
 ## Ce qui est réel, ce qui est simulé
 
-| Réel : les sources du plugin, compilées telles quelles | Simulé : `HdtShim.cs` |
+| Réel : les sources du plugin, compilées telles quelles | Simulé : `HdtShim.cs`, `HdtOverlay.cs` |
 |---|---|
-| `PanelMover` (déplacer, poignée, cadre), `CompsPanel` (le panneau « Compositions »), `GuideView` et `GuidePopup` (le guide en popup au survol d'une ligne), `TavernMarkers` (cadres et étiquettes sur les cartes de Bob, boutons ◇), `SkipCombatPanel`, `ChoiceAdvicePanel` (étiquettes des choix ; son cache de stats de trinkets n'est jamais interrogé ici, aucune requête), `CardImages`, `PreviewPlacer`, `OverlayLayer` | `OverlayExtensions` (les deux premières sans effet : la fenêtre normale reçoit la souris ; l'infobulle est dessinée comme HDT la dessine, `HdtTooltip` : **un seul** emplacement sur le canvas, au-dessus des éléments du plugin, placé d'après la taille mesurée de l'infobulle, son placement et ses décalages, puis gardé dans la fenêtre — d'après `OverlayWindow.SetTooltip` de HDT 1.58.6 décompilé), `Log` (le volet de droite), `Database` (noms et paliers de HearthstoneJSON), les téléchargeurs d'images (art.hearthstonejson.com, cache dans `%TEMP%\BronzebeardHarness`) |
+| `PanelMover` (déplacer, poignée, cadre), `CompsPanel` (le panneau « Compositions »), `GuideView` et `GuidePopup` (le guide en popup au survol d'une ligne), `TavernMarkers` (cadres et étiquettes sur les cartes de Bob, boutons ◇), `SkipCombatPanel`, `ChoiceAdvicePanel` (étiquettes des choix ; son cache de stats de trinkets n'est jamais interrogé ici, aucune requête), `CardImages`, `PreviewPlacer`, `OverlayLayer` | `OverlayExtensions` (les éléments déclarés cliquables ou survolables sont inscrits comme HDT les inscrit ; sans souris injectée, la fenêtre normale reçoit la souris partout ; l'infobulle est dessinée comme HDT la dessine, `HdtTooltip` : **un seul** emplacement sur le canvas, au-dessus des éléments du plugin, placé d'après la taille mesurée de l'infobulle, son placement et ses décalages, puis gardé dans la fenêtre — d'après `OverlayWindow.SetTooltip` de HDT 1.58.6 décompilé), `HdtOverlay` (la fenêtre d'overlay et sa sonde, sur la souris injectée : ci-dessus), `Log` (le volet de droite), `Database` (noms et paliers de HearthstoneJSON), les téléchargeurs d'images (art.hearthstonejson.com, cache dans `%TEMP%\BronzebeardHarness`) |
 
 La logique de `Plugin.cs` (lecture d'HDT, `CompTargetTracker`, `TavernHighlights`) est rejouée par `HarnessWindow` avec les
 mêmes appels de `BronzebeardHud.Stats` : cibles et couleurs sont celles que le plugin calculerait sur ces cartes.
 
-**Pas simulé, et un défaut qui y vivrait ne se reproduit pas ici :** la couche d'HDT autour des panneaux, c'est-à-dire
-la fenêtre d'overlay transparente aux clics au-dessus du jeu et le survol sondé à 60 Hz (le `--selftest` lève lui-même
-`MouseEnter` et `MouseLeave` ; le double `MouseEnter` de la sonde et de WPF, et le `MouseLeave` que WPF lève quand la
-fenêtre repasse en clic-transparent, n'y sont qu'imités) ; la vraie rangée de Bob (ses sept cartes sont des boîtes grises
+**La couche d'HDT** autour des panneaux (fenêtre transparente aux clics, sonde de survol) est reproduite avec la souris
+injectée (`--mouse`, groupe `mouse` de `--selftest`) : la sonde et la transparence d'après le code d'HDT, les événements
+de WPF d'après un modèle déduit (section ci-dessus). Sans elle, la fenêtre normale reçoit la souris partout et les autres
+contrôles du survol lèvent `MouseEnter` et `MouseLeave` à la main, comme avant.
+
+**Pas simulé, et un défaut qui y vivrait ne se reproduit pas ici :** la conversion de la position du curseur à l'écran en
+pixels de l'overlay (`GetCursorPos`, `PointFromScreen` : la mise à l'échelle de Windows), un curseur immobile sous une
+fenêtre qui change (seul un déplacement injecté renseigne WPF), les éléments propres à HDT ; la vraie rangée de Bob (ses sept cartes sont des boîtes grises
 placées où `TavernLayout.CardSlots` met les cartes du jeu) ; la lecture du plateau adverse par
 `HdtEntityAdapter.OpponentFacts` (héros contrôlé par `game.Opponent`, `NEXT_OPPONENT_PLAYER_ID`, plateau figé par HDT au
 début du combat) : la simulation lui donne des faits inventés (`HarnessData.OpponentFacts`), seul le calcul et le rendu qui
@@ -148,7 +196,15 @@ combat ; ses textes (mêmes contrôles) ; ses sections dans l'ordre de HDT, les 
 journal par affichage ; l'aperçu de carte d'un ovale de la ligne en même temps, sans recouvrir ni le popup ni le panneau ;
 un `MouseLeave` alors que le curseur est encore dans la ligne ignoré, un vrai le cache ; le clic sur le nom (détail) et
 le mode déplacement le cachent ; **le pont** : une ligne `bridge:` qui nomme chaque guide, les deux pontés et le contre-exemple
-« no match » (mesuré sur les données : ≥ 2 cartes communes mais moins de la moitié des cartes clés) ; en découverte, « + T k/n boards »
+« no match » (mesuré sur les données : ≥ 2 cartes communes mais moins de la moitié des cartes clés) ; **la couche d'HDT** (souris
+injectée, `MouseChecks`, en dernier) : la sonde tourne sur sa minuterie ; hors mode déplacement un clic sur le titre du panneau part
+au jeu, en mode déplacement le même clic est au panneau, déclaré cliquable en entier (`panel moved`, posé où il était) ; un ◇ reçoit
+son clic (`pin toggled`), la carte de Bob dessous non ; la sonde entre dans une ligne par son fond (fenêtre transparente, aucun
+événement de WPF), pas de popup à 100 ms, le popup à 400 ms, une fois ; sur le nom, la fenêtre prend la souris et WPF lève une
+deuxième entrée sur la ligne : rien ne change ; revenu sur le fond, la sortie de WPF arrive curseur dans la ligne : le popup reste ;
+un ovale montre sa carte par la sonde, le quitter la retire ; le panneau redessiné sous le curseur immobile : la sonde quitte
+l'ancienne ligne et entre dans la nouvelle, rien ne change ; sortie réelle : le popup se cache. Chaque contrôle exige aussi que
+l'événement en cause ait été levé (journal des événements de `HdtOverlay`) ; en découverte, « + T k/n boards »
 dans la couleur de T, un rôle suivi de « · k/n boards », « pivot → G (X) » sur fond neutre, lus sur ce qui est dessiné ; sur une carte
 de Bob, un cadre pointillé « + T 3/5 » dans la couleur de T et la ligne `tavern highlights=[…:boards 3/5:…]` ; la ligne de contexte
 sous l'en-tête du détail et du popup d'un guide ponté (texte attendu calculé à la main, 12 px, gris), absente pour le non ponté ;
@@ -176,3 +232,6 @@ seule la simulation voit : tout feu allumé en jaune (7 contrôles), − jamais 
 boîte de la poignée, la partie suivante qui garde la taille de + / −, une boîte périmée prise au dernier redessin, les deux
 rangées sous un seul garde-fou (1 chacune). Le contrôle « panneau remis tel quel après un choix » lit désormais le contenu du
 cadre (`CompsPanel.Content`) : l'enfant du panneau (cadre + encart) ne change jamais, et le comparer ne prouvait plus rien.
+Ceux de la couche d'HDT (2026-10-10) : la sortie « curseur encore dans la ligne » non reconnue (`GuideHover.Leave`) fait tomber
+5 contrôles, dont 4 « mouse: » ; le panneau déclaré cliquable hors du mode déplacement (`PanelMover`) fait tomber le clic hors
+mode déplacement, pris par l'overlay au lieu du jeu — ce mutant-là passait l'autotest d'avant sans un seul rouge.
