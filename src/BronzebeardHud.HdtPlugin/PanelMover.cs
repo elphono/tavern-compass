@@ -360,8 +360,9 @@ internal sealed class PanelMover
     }
 
     /// <summary>
-    /// For the journal: where the panel is on the canvas, and what the layout says. They must agree; a gap between
-    /// the two is what a panel jumping to another place looks like.
+    /// For the journal: where the panel is on the canvas, and what the layout says. Position and width must agree; a
+    /// gap there is what a panel jumping to another place looks like. The canvas height may be smaller, never larger:
+    /// the panel only shows whole rows, and in a box taller than its default size it stops at the last one that fits.
     /// </summary>
     private string Where(Border panel, Resizer resizer)
     {
