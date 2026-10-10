@@ -98,8 +98,9 @@ public static class ChoiceClassifier
 /// <summary>A trinket's placement, and how far it moves once adjusted to the targets.</summary>
 public sealed class TrinketNote
 {
-    public TrinketNote(double? placement, double? pickRate, double adjustment, CompTarget? justifiedBy)
+    public TrinketNote(double? placement, double? pickRate, double adjustment, CompTarget? justifiedBy, ConsolidatedStat? consolidated = null)
     {
+        Consolidated = consolidated;
         Placement = placement;
         PickRate = pickRate;
         Adjustment = adjustment;
@@ -118,6 +119,16 @@ public sealed class TrinketNote
     public CompTarget? JustifiedBy { get; }
 
     public double? Adjusted => Placement - Adjustment;
+
+    /// <summary>The trinket in the consolidated view (component 9): Firestone with nomi.gg's winners and losers; null without a view.</summary>
+    public ConsolidatedStat? Consolidated { get; }
+
+    /// <summary>The sources other than Firestone that agree with it, recentred: "nomi.gg 3.75 (55)".</summary>
+    public string? OthersAgreeing =>
+        Consolidated is { Verdict: StatVerdict.Consensus } stat
+            ? string.Join(" · ", stat.Contributions.Where(c => c.Included && c.Provenance.Source != StatsSources.Firestone).Select(c =>
+                string.Format(CultureInfo.InvariantCulture, "{0} {1:0.00} ({2})", StatsSources.Label(c.Provenance.Source), c.Value, c.Record.Count)))
+            : null;
 }
 
 /// <summary>
@@ -347,7 +358,8 @@ public static class ChoiceAdvisor
         Func<string, TrinketStat?>? trinketStat = null,
         int bracket = MmrBracket.EveryPlayer,
         IReadOnlyDictionary<string, GuideEvidence>? bridge = null,
-        Func<string, CardTurnNote?>? cardValue = null)
+        Func<string, CardTurnNote?>? cardValue = null,
+        Func<string, ConsolidatedStat?>? trinketView = null)
     {
         var kind = ChoiceClassifier.Kind(options);
         if (kind is ChoiceKind.None or ChoiceKind.Unsupported)
@@ -377,7 +389,7 @@ public static class ChoiceAdvisor
             {
                 var stat = trinketStat?.Invoke(option.CardId);
                 var (adjustment, justifiedBy) = stat == null ? (0.0, null) : TrinketAffinity.Adjust(option.Text, targets);
-                var note = new TrinketNote(stat?.PlacementFor(bracket), stat?.PickRate, adjustment, justifiedBy);
+                var note = new TrinketNote(stat?.PlacementFor(bracket), stat?.PickRate, adjustment, justifiedBy, trinketView?.Invoke(option.CardId));
                 return new OptionAdvice(position, option, Array.Empty<GuideCardEffect>(), Array.Empty<CompGuide>(), note);
             }
 
@@ -423,6 +435,12 @@ public static class ChoiceAdvisor
                 return new[] { Fit(statsLoaded ? "no data" : "loading…", maxChars) };
             }
 
+            if (HeroConsensus.For(note.Consolidated) is { Contested: true } contest)
+            {
+                // Two sources apart: both figures in place of the placement, never one of them alone.
+                return new[] { Fit(contest.Figure, maxChars), Fit(contest.Sources, maxChars) };
+            }
+
             if (note.Adjustment > 0 && note.JustifiedBy != null)
             {
                 return new[]
@@ -433,7 +451,8 @@ public static class ChoiceAdvisor
             }
 
             var pick = note.PickRate is { } rate ? $" · {(rate * 100).ToString("0", inv)}%" : string.Empty;
-            return new[] { Fit($"avg {placement.ToString("0.00", inv)}{pick}", maxChars) };
+            var line = Fit($"avg {placement.ToString("0.00", inv)}{pick}", maxChars);
+            return note.OthersAgreeing is { Length: > 0 } others && maxLines > 1 ? new[] { line, Fit(others, maxChars) } : new[] { line };
         }
 
         string EffectLabel(GuideCardEffect e)

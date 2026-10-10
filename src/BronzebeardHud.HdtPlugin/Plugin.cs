@@ -104,6 +104,7 @@ public sealed class Plugin : IPlugin
     private string _earlyLine = string.Empty;
     private int _nomiGame = -1;
     private string _statsViewKey = string.Empty;
+    private ConsolidatedView? _statsView; // the last view built: the trinkets' labels read it (component 9)
 
     // The "Skip combat" button: shown in combat, acts once per combat (SkipCombatState).
     private SkipCombatPanel? _skipCombat;
@@ -1093,6 +1094,7 @@ public sealed class Plugin : IPlugin
         }
 
         var view = StatsConsolidation.Consolidate(snapshots, _stats.Bracket);
+        _statsView = view;
         var sources = string.Join(", ", snapshots.Select(s => $"{s.Provenance.Source} mmr-{s.Provenance.MmrPercentile?.ToString() ?? "all"} ({s.Records.Count})"));
         Log.Info($"Bronzebeard HUD: stats view bracket=mmr-{_stats.Bracket} sources=[{sources}] · {view.Summary("hero")} · {view.Summary("trinket")} · {view.Summary("card")}");
     }
@@ -1377,7 +1379,7 @@ public sealed class Plugin : IPlugin
 
         var loaded = kind == ChoiceKind.Trinket && _choices.PollTrinketStats();
         var turn = game.GetTurnNumber();
-        var key = $"{ids}|{_targetsVersion}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_bridgeVersion}|{_cardStats?.Version}|{turn}";
+        var key = $"{ids}|{_targetsVersion}|{_stats.Bracket}|{_choices.TrinketStatsVersion}|{_bridgeVersion}|{_cardStats?.Version}|{turn}|{_statsViewKey}";
         if (key == _choiceKey && !loaded)
         {
             return;
@@ -1387,7 +1389,7 @@ public sealed class Plugin : IPlugin
         // The lobby's guides only: the fallback "core G (S)" and the pivots never name a guide of an absent tribe.
         var guides = _lobby?.Playable;
         var advice = ChoiceAdvisor.Advise(options, HdtEntityAdapter.PlayerCards(game).All, _tracker.Targets, guides, _lobby?.Tribes ?? Array.Empty<string>(),
-            _choices.TrinketStat, _stats.Bracket, _bridge, id => CardNote(id, turn));
+            _choices.TrinketStat, _stats.Bracket, _bridge, id => CardNote(id, turn), id => _statsView?.Find("trinket", id, "placement", "games"));
         if (advice.HasMarkers)
         {
             _choices.Show(advice);

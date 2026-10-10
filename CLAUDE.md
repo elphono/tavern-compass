@@ -310,7 +310,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   compo pontée de la cible a des plateaux finaux) ; sinon une carte qu'aucune liste de la cible ne nomme mais sur ≥ 2
   plateaux de sa compo pontée (« + Nom 3/5 boards », dans sa couleur) ; sinon une carte clé d'un guide vers lequel une
   cible peut pivoter (« pivot → Nom (S) », neutre) ; sinon le guide jouable dans le lobby dont elle est carte clé
-  (« core Nom (S) », neutre) ; sinon « — ». Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est
+  (« core Nom (S) », neutre) ; sinon « — ». **Trinkets** (2026-10-10, composant 9, issue #11) : la place Firestone de la tranche (« avg 3.80 · 41% »), et sur une seconde ligne une autre source d'accord, recentrée (« nomi.gg 3.75 (55) », le crédit à l'écran ; pas de place quand la ligne « ≈ cible » est là) ; deux sources en désaccord : « 3.3 ↔ 4.1 contested » et leurs sources, à la place de la place (`TrinketNote.Consolidated`, vue de `UpdateStatsView`). nomi.gg ne publie que ses trinkets gagnants et perdants : les autres gardent l'étiquette d'avant. Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est
   à la fois BEAST et PET). **Pendant un choix** ouvert en taverne (toute sorte que `ChoiceClassifier` distingue de
   `None`, y compris sans disposition connue), cadres, étiquettes et ◇ des cartes de Bob sont retirés de l'écran
   (`ChoiceCover`, `TavernMarkers.Suspend`), puis remis tels quels à sa fermeture, sans recalcul : les ◇ tombaient dans les

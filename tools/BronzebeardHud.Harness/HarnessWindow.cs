@@ -553,7 +553,7 @@ internal sealed class HarnessWindow : Window
         }
 
         var advice = ChoiceAdvisor.Advise(options, cards.All, targets, _lobby.Playable, _lobby.Tribes, HarnessData.TrinketStat, HarnessData.Bracket, _bridge,
-            CardNote);
+            CardNote, HarnessData.TrinketView);
         Choice = advice;
         if (advice.HasMarkers)
         {

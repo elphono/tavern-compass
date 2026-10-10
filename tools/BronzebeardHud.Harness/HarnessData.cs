@@ -354,6 +354,24 @@ internal static class HarnessData
         new TrinketStat(Trinkets[3].Id, 3.66, 7300, 0.44, new Dictionary<int, double> { [100] = 3.66 }),
     }.ToDictionary(t => t.TrinketCardId, StringComparer.Ordinal);
 
+    /// <summary>
+    /// The trinkets in a consolidated view (component 9): Firestone's, with invented nomi.gg figures, the first agreeing
+    /// (its figure named under the placement), the second contested (both figures).
+    /// </summary>
+    private static readonly ConsolidatedView TrinketsView = StatsConsolidation.Consolidate(new[]
+    {
+        new SourceSnapshot(new StatProvenance(StatsSources.Firestone, null, null, null, "last-patch", null, null),
+            TrinketStats.Values.Select(t => new StatRecord("trinket", t.TrinketCardId, "placement", t.AveragePlacement, t.DataPoints, "games")).ToList(),
+            new Dictionary<string, double> { ["trinket"] = 3.9 }),
+        new SourceSnapshot(new StatProvenance(StatsSources.NomiGg, null, null, null, "since 2026-10-02", null, null), new[]
+        {
+            new StatRecord("trinket", Trinkets[0].Id, "placement", 3.70, 60, "games"),
+            new StatRecord("trinket", Trinkets[1].Id, "placement", 3.10, 400, "games"),
+        }, new Dictionary<string, double> { ["trinket"] = 3.7 }),
+    }, Bracket);
+
+    public static ConsolidatedStat? TrinketView(string cardId) => TrinketsView.Find("trinket", cardId, "placement", "games");
+
     /// <summary>The trinket stats ChoiceAdvisor asks for, as the plugin hands it the panel's cache (ChoiceAdvicePanel.TrinketStat).</summary>
     public static TrinketStat? TrinketStat(string cardId) => TrinketStats.TryGetValue(cardId, out var stat) ? stat : null;
 
