@@ -203,6 +203,7 @@ public class ChoiceAdviceTests
             ["TRINKET_A"] = new("TRINKET_A", 3.70, 900, 0.41, new Dictionary<int, double> { [25] = 3.80 }),
             ["TRINKET_C"] = new("TRINKET_C", 4.00, 4000, 0.22, new Dictionary<int, double> { [25] = 4.10 }),
             ["TRINKET_F"] = new("TRINKET_F", 4.30, 700, 0.31, new Dictionary<int, double> { [25] = 4.40 }),
+            ["TRINKET_S"] = new("TRINKET_S", 3.00, 8, 0.02, new Dictionary<int, double> { [25] = 3.10 }),
         };
         var firestone = new SourceSnapshot(new StatProvenance(StatsSources.Firestone, null, null, null, "last-patch", null, null),
             stats.Values.Select(t => new StatRecord("trinket", t.TrinketCardId, "placement", t.AveragePlacement, t.DataPoints, "games")).ToList(),
@@ -211,9 +212,11 @@ public class ChoiceAdviceTests
         {
             new StatRecord("trinket", "TRINKET_A", "placement", 3.45, 55, "games"),
             new StatRecord("trinket", "TRINKET_C", "placement", 2.90, 300, "games"),
+            new StatRecord("trinket", "TRINKET_S", "placement", 3.20, 80, "games"),
         }, new Dictionary<string, double> { ["trinket"] = 3.6 });
         var view = StatsConsolidation.Consolidate(new[] { firestone, nomi }, 25);
-        var options = new[] { Trinket(1, "TRINKET_A", "Gain 2 Gold."), Trinket(2, "TRINKET_C", "Gain 3 Gold."), Trinket(3, "TRINKET_F", "Gain 1 Gold.") };
+        var options = new[] { Trinket(1, "TRINKET_A", "Gain 2 Gold."), Trinket(2, "TRINKET_C", "Gain 3 Gold."), Trinket(3, "TRINKET_F", "Gain 1 Gold."),
+            Trinket(4, "TRINKET_S", "Gain 4 Gold.") };
 
         var advice = ChoiceAdvisor.Advise(options, UndeadWithAPirateAddOn, TargetsFor(UndeadWithAPirateAddOn), All, Lobby,
             id => stats.TryGetValue(id, out var s) ? s : null, bracket: 25, trinketView: id => view.Find("trinket", id, "placement", "games"));
@@ -221,6 +224,7 @@ public class ChoiceAdviceTests
         Assert.Equal(new[] { "avg 3.80 · 41%", "nomi.gg 3.75 (55)" }, Labels(advice)[0]); // 3.45 + 0.30, recentred
         Assert.Equal(new[] { "3.2 ↔ 4.0 contested", "nomi.gg ↔ FS" }, Labels(advice)[1]);
         Assert.Equal(new[] { "avg 4.40 · 31%" }, Labels(advice)[2]);
+        Assert.Equal(new[] { "avg 3.10 · 2%" }, Labels(advice)[3]); // Firestone under 10 games: nomi.gg alone agrees with nothing
     }
 
     [Fact]
