@@ -391,8 +391,15 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   montée de tier ; ni noms, ni plateaux, ni cartes. Fichier `stats\nomi-patch-analysis-<patch>.json`. `User-Agent` de
   toutes les requêtes : `TavernCompass/<version> (+https://github.com/elphono/tavern-compass)`. Service `NomiService`,
   garde-fou `data-nomi`, ligne `data nomi.gg patch analysis: downloaded|unchanged (304)|cached|FAILED … (patch 36.6.3)` ;
-  la source entre dans la vue consolidée (`stats view`). **Rien ne s'affiche encore** : le crédit « data: nomi.gg »
-  viendra avec le premier chiffre montré (chantier d). Mesuré le 2026-10-08 (CLI, section 4) : nomi.gg place ses héros
+  la source entre dans la vue consolidée (`stats view`). **Affiché depuis le 2026-10-10** (chantier d, issue #11) : encart des
+  héros, trinkets (ci-dessus), et `PatchNotes` (garde-fou `patch-notes`) — bannière « Patch 36.6.3 · buffed … · nerfed … · nomi.gg » sous
+  les héros pour les **trois premières parties** d'un patch (`patch-banner.json`, à côté de `settings.json`), et la tribu principale
+  d'un guide depuis le patch sur une ligne à elle de la ligne de contexte du détail et du popup (« Pirate ▲ 4.07 → 3.70 since 36.6.3
+  (nomi.gg, 900 games) » ; ▲ / ▼ seulement au-delà de 2 erreurs types, « within noise » sinon). Au journal seulement (décision 9) :
+  `tier pace tier=5 turn=9 · nomi.gg medians: top4 8 (99%), …` à chaque tier atteint, et `freshness game build=… nomi.gg build=…
+  (patch …): same build|game newer|data newer` à chaque partie (HDT : `GameMetaData.HearthstoneBuild` ; Firestone ne donne aucun patch).
+  Mesuré sur le vrai fichier : les médianes de montée de tier sont quasi identiques entre top 4, premier et bottom 4 (tier 5 au tour
+  8 pour tous) — le repère ne départage guère, d'où le journal d'abord. Mesuré le 2026-10-08 (CLI, section 4) : nomi.gg place ses héros
   ≈ 0,3 place mieux que Firestone, systématiquement (population de joueurs volontaires, place moyenne 3,78) ; contre le
   top 25 %, 8 héros sur 58 « contested ». **Recentrage** (Ali, 2026-10-10) : chaque source est recentrée sur sa propre moyenne (`SourceSnapshot.Means` : moyenne des héros pondérée par les parties ; pour les trinkets de nomi.gg, la moyenne de chaque sorte sur tous les choix, `NomiTrinketKind`, jamais les seuls gagnants et perdants), décalée sur celle de la source de référence (celle de la tranche du joueur, sinon la plus grosse), qui sert aussi de moyenne de rappel ; une place à un tour (cartes) n'est jamais recentrée. Mesuré (CLI) : nomi.gg contre le top 25 %, 2 héros « contested » sur 58 au lieu de 8 ; top 25 % contre tous, 5 sur 116 au lieu de 20. Cache nomi.gg en schéma 2 (un cache en 1 est redemandé à la prochaine tentative du jour). Le vrai fichier avait une tribu sans partie et **sans** champ `avg` : l'import
   l'accepte (test), il refusait le fichier entier.

@@ -237,7 +237,7 @@ internal static class Headless
 
                 if (options.Heroes)
                 {
-                    new BronzebeardHud.HdtPlugin.HeroPickPanel(window.Overlay).Show(HarnessData.HeroRows(), null);
+                    new BronzebeardHud.HdtPlugin.HeroPickPanel(window.Overlay).Show(HarnessData.HeroRows(), BronzebeardHud.Stats.PatchNotes.Banner(HarnessData.Nomi));
                 }
 
                 Pump(options.Wait);

@@ -332,6 +332,20 @@ internal static class HarnessData
         return HeroPickAdvisor.BuildRows(offered, new[] { firestone }, view);
     }
 
+    /// <summary>An invented nomi.gg analysis (components 4 and 7): buffs and nerfs, and every tribe before and after the patch.</summary>
+    public static NomiAnalysisFile Nomi { get; } = new(
+        new StatProvenance(StatsSources.NomiGg, null, null, null, "since 2026-10-02", null, "36.6.3"), 253216,
+        new[] { "quilboar", "pirate", "undead" }, new[] { "aberration" }, Array.Empty<NomiHero>(),
+        new[]
+        {
+            new NomiTribe("beast", 400, 3.80, 900, 3.55), new NomiTribe("demon", 300, 3.70, 700, 3.75),
+            new NomiTribe("mech", 350, 3.96, 800, 4.30), new NomiTribe("murloc", 200, 3.40, 500, 3.52),
+            new NomiTribe("pirate", 300, 4.07, 900, 3.70), new NomiTribe("undead", 300, 4.48, 900, 3.93),
+            new NomiTribe("naga", 250, 3.60, 600, 3.66), new NomiTribe("elemental", 200, 4.00, 500, 3.90),
+            new NomiTribe("dragon", 220, 3.72, 600, 3.95), new NomiTribe("quilboar", 260, 3.40, 800, 3.30),
+        },
+        Array.Empty<NomiTrinket>(), Array.Empty<NomiTierMedian>());
+
     public static IReadOnlyDictionary<string, int> EarlyPool { get; } = new Dictionary<string, int>
     {
         [Pool[50]] = 3,

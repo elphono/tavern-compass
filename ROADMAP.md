@@ -1,13 +1,13 @@
 # Roadmap
 
-State of the project on 2026-10-08. Detailed history, decision by decision, is in [`docs/journal/`](docs/journal/)
+State of the project on 2026-10-10. Detailed history, decision by decision, is in [`docs/journal/`](docs/journal/)
 (in French); the specification and the plan the plugin follows are in [`docs/plans/`](docs/plans/).
 
 | Horizon | What |
 |---|---|
 | **Shipped** | Hero-pick stats · MMR of the opponents · Compositions panel (HDT's comp guides as targets) · tavern frames · choice labels · lobby tribes filter · `−` / `+` that resize the panel for N comps · power inset (you and your opponent) · movable and resizable panels · simulation harness · packaged releases |
 | **To verify in a live game** | Almost everything of the last two weeks: see below |
-| **Next** | Simulation of HDT's overlay layer · statistics from several sources (card stats done, see below) |
+| **Next** | Simulation of HDT's overlay layer · statistics from several sources (card stats and nomi.gg done, see below) |
 | **Not planned** | See the end of this page |
 
 ## To verify in a live game
@@ -29,6 +29,11 @@ and, when there is one, the line of HDT's log that tells.
   has never been measured. Log: `bridge: …`.
 - **During a choice** — Bob's frames and labels hide while a discover, trinket or Dark Gift is open; the panel stays.
 - **Resize handle** — pointing under HDT's real overlay, dotted frame, reset.
+- **Statistics from several sources** (2026-10-10) — the hero badges show one line per hero, its sample size and its
+  sources ("3.41 · 4,102 games", "FS 25% + nomi.gg"), or both figures in amber when two sources disagree; a trinket that
+  nomi.gg also rates names it, or shows both figures; a banner under the heroes for the first three games of a patch; a
+  guide's tribe since the patch in its detail and popup. Log: `hero pick why=[…]`, `patch banner …`, `freshness …`,
+  `tier pace …`.
 - **Hero-pick odds** (phases 5 and 6 of the [plan](docs/plans/2026-09-26-parite-tier7-plan.md)).
 - **Skip combat** when relaunched by Battle.net.
 
@@ -44,7 +49,7 @@ and, when there is one, the line of HDT's log that tells.
 - **Simulation of HDT's overlay layer** (clicks through the transparent overlay, hover probed at 60 Hz) and a scenario
   mode with an injected mouse. Today the simulation cannot show a defect that lives in that layer.
 - **HSReplay manual import** is implemented but has never been used: the folder is empty and only Firestone's comps run.
-- **Statistics from several sources**: one local format that keeps where each figure comes from (source, patch, MMR bracket, sample size), consolidation that shows "contested" rather than silently picking a source, Firestone's card stats first, then nomi.gg's patch analysis (its owner has agreed), with the MMR bracket switchable in game. Design note (in French): [docs/plans/2026-10-08-stats-multi-sources.html](docs/plans/2026-10-08-stats-multi-sources.html).
+- **Statistics from several sources**: one local format that keeps where each figure comes from (source, patch, MMR bracket, sample size), consolidation that shows "contested" rather than silently picking a source, Firestone's card stats first, then nomi.gg's patch analysis (its owner has agreed), with the MMR bracket switchable in game. Done on 2026-10-10 (each source recentred on its own mean, so that a population gap is not read as a disagreement); not yet seen in a live game. Design note (in French): [docs/plans/2026-10-08-stats-multi-sources.html](docs/plans/2026-10-08-stats-multi-sources.html).
 
 ## Not planned
 

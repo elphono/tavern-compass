@@ -42,6 +42,7 @@ public sealed class Plugin : IPlugin
     private readonly FeatureGuard _manualGuard;
     private readonly FeatureGuard _nomiGuard;
     private readonly FeatureGuard _statsViewGuard;
+    private readonly FeatureGuard _patchNotesGuard;
     private readonly FeatureGuard _compsGuard;
     private readonly FeatureGuard _markersGuard;
     private readonly FeatureGuard _opponentMmrGuard;
@@ -105,6 +106,9 @@ public sealed class Plugin : IPlugin
     private int _nomiGame = -1;
     private string _statsViewKey = string.Empty;
     private ConsolidatedView? _statsView; // the last view built: the trinkets' labels read it (component 9)
+    private string? _patchBanner;         // under the heroes, for the first games of a patch (component 4)
+    private int _paceGame = -1;
+    private int _paceTier = 1;
 
     // The "Skip combat" button: shown in combat, acts once per combat (SkipCombatState).
     private SkipCombatPanel? _skipCombat;
@@ -129,6 +133,8 @@ public sealed class Plugin : IPlugin
         _nomiGuard = new FeatureGuard("data-nomi", (n, e) => Disable(n, e, () => { }));
         // The consolidated view of every source's figures (chantier b): only a log line so far, no help reads it yet.
         _statsViewGuard = new FeatureGuard("stats-view", (n, e) => Disable(n, e, () => { }));
+        // What nomi.gg says of the patch (issue #11, components 4 to 7): the banner, a guide's tribe, the pace and freshness lines.
+        _patchNotesGuard = new FeatureGuard("patch-notes", (n, e) => Disable(n, e, () => _patchBanner = null));
         // The panel, HDT's guides and the targets: one feature since the two composition panels became one (2026-10-04).
         _compsGuard = new FeatureGuard("compositions", (n, e) => Disable(n, e, () =>
         {
@@ -208,6 +214,64 @@ public sealed class Plugin : IPlugin
                 _compsPanel.SelectionEnabled = false;
             }
         }));
+    }
+
+    /// <summary>
+    /// A guide's context line, in its detail and its popup: Firestone's (TargetContext) and, on a line of its own, its main
+    /// tribe since the patch (PatchNotes.TribeSince, component 7).
+    /// </summary>
+    private string? GuideContext(CompGuide guide)
+    {
+        string? tribe = null;
+        _patchNotesGuard.Run(() => tribe = PatchNotes.TribeSince(guide, _nomi?.File));
+        var lines = new[] { TargetContext.For(guide, _bridge, _heroEffects), tribe }.Where(l => l != null).ToList();
+        return lines.Count > 0 ? string.Join("\n", lines) : null;
+    }
+
+    /// <summary>%LocalAppData%\BronzebeardHud\patch-banner.json: how many games of the current patch showed the banner.</summary>
+    private static string PatchBannerPath => Path.Combine(Path.GetDirectoryName(StatsDirectory)!, "patch-banner.json");
+
+    /// <summary>
+    /// A new game (component 4 and 5): counts it for the patch's banner, shown under the heroes for the first games of a
+    /// patch, and logs the game's build against nomi.gg's.
+    /// </summary>
+    private void BeginPatchNotes(GameV2 game)
+    {
+        _patchBanner = null;
+        var nomi = _nomi?.File;
+        Log.Info("Bronzebeard HUD: " + PatchNotes.Freshness(game.MetaData.HearthstoneBuild, nomi));
+        if (nomi?.Provenance.Patch is not { } patch)
+        {
+            return;
+        }
+
+        var state = File.Exists(PatchBannerPath) ? File.ReadAllText(PatchBannerPath) : null;
+        var (show, next) = PatchNotes.CountGame(state, patch);
+        File.WriteAllText(PatchBannerPath, next);
+        _patchBanner = show ? PatchNotes.Banner(nomi) : null;
+        Log.Info($"Bronzebeard HUD: patch banner {(show ? "shown: " + _patchBanner : "not shown")} ({next})");
+    }
+
+    /// <summary>Component 6, the log first (decision 9): each tier the player reaches, at which turn, against nomi.gg's medians.</summary>
+    private void UpdateTierPace(GameV2 game)
+    {
+        if (_paceGame != _gameNumber)
+        {
+            _paceGame = _gameNumber;
+            _paceTier = 1;
+        }
+
+        if (HdtEntityAdapter.IsHeroSelection(game))
+        {
+            return;
+        }
+
+        var tier = HdtEntityAdapter.PlayerTavernTier(game);
+        if (tier > _paceTier)
+        {
+            _paceTier = tier;
+            Log.Info("Bronzebeard HUD: " + PatchNotes.TierPace(tier, game.GetTurnNumber(), _nomi?.File));
+        }
     }
 
     /// <summary>%LocalAppData%\BronzebeardHud\settings.json, next to layout.json.</summary>
@@ -667,7 +731,7 @@ public sealed class Plugin : IPlugin
         }
         _panel = new HeroPickPanel(Core.OverlayCanvas);
         _compsPanel = new CompsPanel(Core.OverlayCanvas, _mover, ToggleGuide, () => _settings.SuggestedCompositions, ChangeSuggested, OpenMetaSnapshot,
-            PivotsFor, DetailShown, guide => TargetContext.For(guide, _bridge, _heroEffects), action => _compsGuard.Run(action),
+            PivotsFor, DetailShown, GuideContext, action => _compsGuard.Run(action),
             action => _warbandGuard.Run(action), action => _opponentPowerGuard.Run(action), line => Log.Info(line));
         _markers = new TavernMarkers(Core.OverlayCanvas, TogglePin);
         _opponentMmr = new OpponentMmrPanel(Core.OverlayCanvas);
@@ -757,6 +821,7 @@ public sealed class Plugin : IPlugin
         _nomiGuard.Run(RefreshNomi);
         _statsViewGuard.Run(UpdateStatsView);
         _heroSelectionGuard.Run(() => UpdateHeroSelection(game));
+        _patchNotesGuard.Run(() => UpdateTierPace(game));
         _compsGuard.Run(() => UpdateComps(game)); // the targets first: the frames and the choices follow them
         _markersGuard.Run(() => UpdateTavern(game));
         _coverGuard.Run(() => UpdateChoiceCover(game)); // in the same update: a choice that opens never shows them over it
@@ -1461,6 +1526,7 @@ public sealed class Plugin : IPlugin
             _gamePins.BeginGame(_gameNumber);
             _selectionVersion++;
             _stats.BeginHeroSelection(game.CurrentBattlegroundsRating);
+            _patchNotesGuard.Run(() => BeginPatchNotes(game));
         }
 
         _stats.Poll();
@@ -1479,7 +1545,8 @@ public sealed class Plugin : IPlugin
             var sources = _stats.Sources().Select(file => LobbyTribes.Apply(file, tribes)).ToList();
             var view = HeroView(sources);
             var rows = HeroPickAdvisor.BuildRows(offered, sources, view);
-            _panel.Show(rows, _stats.Status);
+            var status = new[] { _stats.Status, _patchBanner }.Where(l => !string.IsNullOrEmpty(l));
+            _panel.Show(rows, string.Join("\n", status));
             if (view != null)
             {
                 // Component 8: the "why" of each badge's line, and the pick rate it no longer shows.

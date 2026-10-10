@@ -372,7 +372,8 @@ internal sealed class HarnessWindow : Window
         Comps = new CompsPanel(Overlay, _mover, ToggleGuide, () => _count, ChangeCount, () => Log.Info("Meta clicked"),
             guide => GuidePivots.For(guide, _lobby.Playable, Held()),
             (guide, fit) => Log.Info($"comp detail id={guide.Id} sections={fit.Shown.Count} of {fit.Total}"),
-            guide => TargetContext.For(guide, _bridge, _heroEffects),
+            guide => string.Join("\n", new[] { TargetContext.For(guide, _bridge, _heroEffects), PatchNotes.TribeSince(guide, HarnessData.Nomi) }
+                .Where(l => l != null)) is { Length: > 0 } context ? context : null,
             action => action(),
             action => _powerGuard.Run(action),
             action => _opponentGuard.Run(() =>
