@@ -42,8 +42,8 @@ sa voisine de gauche ; les places rejouées par une liste traitée en retard son
 | H1 | `ZoneMgr.Awake` postfix | attache `NoDanceDriver` (un par partie) | oui |
 | H2 | `GameState.SendOption` prefix | lit l'option et sa position avant leur effacement : « en vol » | oui |
 | H3 | `PowerTask.DoRealTimeTask` postfix | marque la rangée « sale » ; suit `BACON_IN_COMBAT_PHASE` | oui |
-| H4 | `ZoneMgr.AddPredictedLocalZoneChange` prefix + postfix | renumérote 1..n sans réordonner avant la prédiction ; journal | oui |
-| H5 | `ZoneMgr.PostProcessServerChangeList` postfix | neutralise les places pures rejouées ; marque « sale » | oui |
+| H4 | `ZoneMgr.AddPredictedLocalZoneChange` prefix + postfix | renumérote 1..n sans réordonner avant la prédiction ; après, une carte posée depuis la main est montrée à sa place serveur (C2, § 12) ; journal | oui |
+| H5 | `ZoneMgr.PostProcessServerChangeList` postfix | neutralise les places rejouées et celles que le client invente en fusionnant (C1, § 12) ; marque « sale » | oui |
 | H6 | `ZoneMgr.OnRealTimeZonePosChange` prefix | saute l'écriture carte par carte (réglage, désactivé) | non |
 
 Portée : Battlegrounds, phase de taverne animée, étape temps réel `MAIN_ACTION`, pas de combat temps réel, pas de carte
@@ -66,8 +66,9 @@ tenue ni de choix en attente. Hors portée : combat, Bob, main, adversaire, Duos
   `ProcessChanges`, qui attend les animations). Contre-exemple ajouté au modèle : deux jetons invoqués devant la rangée ;
   le client seul a raison (il applique les places des voisines), le correctif sans ce déclencheur affiche `S A T B` au
   lieu de `S T A B`. Test `Tokens_summoned_in_front_enter_at_their_server_place`, mutation détectée.
-- **H5 ne neutralise pas** la place d'une entité qui change de zone ou de contrôleur dans la même liste (une carte rendue
-  à la main y reçoit sa place dans la main).
+- **H5 ne neutralise pas** la place d'une entité qu'un changement **envoyé par le serveur** fait changer de zone ou de
+  contrôleur dans la même liste (une carte rendue à la main y reçoit sa place dans la main) ; ceux qu'invente le client en
+  fusionnant ne comptent pas (C1, § 12).
 - **Rien n'est écrit pendant un choix ouvert** (`MustWaitForChoices`) : la liste du client attendrait, et une liste
   périmée s'appliquerait ensuite ; la rangée reste « sale » jusqu'à la fermeture.
 - **Une exception dans une partie requise arrête tout le mod** pour la session (le client garde son comportement) : la
@@ -88,10 +89,11 @@ tenue ni de choix en attente. Hors portée : combat, Bob, main, adversaire, Duos
 
 ## 5. Vérifié sans le jeu
 
-- `dotnet test` : 48 tests du cœur ; sans `HEARTHSTONE_MANAGED`, les 4 tests de signatures sont **sautés avec la raison** ;
-  avec, 129 passent (6 cibles et noms de paramètres liés, 73 membres, témoin négatif, références de la DLL du mod).
+- `dotnet test` : 56 tests du cœur ; sans `HEARTHSTONE_MANAGED`, les 4 tests de signatures sont **sautés avec la raison** ;
+  avec, 142 passent (6 cibles et noms de paramètres liés, 78 membres, témoin négatif, références de la DLL du mod).
 - Mutations (suite entière) : gel en vol retiré (10 tests tombent), ancrage retiré (5), tri par place serveur retiré (11),
-  déclencheur « row changed » retiré (5), neutralisation retirée (10), neutralisation d'une carte qui change de zone (1).
+  déclencheur « row changed » retiré (5), neutralisation retirée (10), neutralisation d'une carte qui change de zone (1) ;
+  après le § 12 : C1 retiré (8), C1b retiré (1), C1 et C1b ensemble (12), C2 retiré (2), ligne d'écriture tardive muette (1).
 - Témoin des signatures : une cible inventée `H7` fait échouer le test en la nommant.
 - Build du mod contre le client installé, `-warnaserror` ; sans `HearthstoneManagedDir`, erreur explicite. L'archive BepInEx
   est téléchargée (vérifié dans un dossier vide) et refusée si son SHA-256 diffère (vérifié sur une archive altérée).
@@ -134,9 +136,11 @@ mesurée : 2,3 s).
 | action envoyée | `option sent: entity=4911 position=1 (in flight)` |
 | réponse | `option answered after 287 ms` / `option rejected after … ms` / `flight timeout after 3000 ms` |
 | prédiction | `prediction: entity=4911 slot=1 predicted=1 list=842 (renumbered 2)` |
-| place rejouée | `server list 857 (PLAY): 2 replayed position(s) neutralized` |
-| réconciliation | `reconcile (options): shown [4911 4912 4915] -> [4912 4911 4915], 2 position(s) changed` ; gelée : `…, kept visual order (in flight)` |
-| fin de partie | `game summary: flights=… answered=… rejected=… timeouts=… reconciles=… order changes=… kept=… renumbered=… neutralized=… (game 3)` |
+| place rejouée | `server list 857 (PLAY): 2 replayed position(s) neutralized, 3 merged position(s) neutralized` |
+| écriture tardive (tranche C1 en jeu) | `position written by a server list after the row was reconciled: [4912: 2->1, 4911: 1->2]` |
+| carte posée depuis la main | `reconcile (drop): shown [4911 4920 4913 4915] -> [4911 4913 4920 4915], 2 position(s) changed, placed at server slot 3 (drawn slot 2)` |
+| réconciliation | `reconcile (options): shown [4911 4912 4915] -> [4912 4911 4915], 2 position(s) changed` ; gelée : `…, kept visual order (in flight)` ; pendant une liste serveur : `reconcile (server list active): …` |
+| fin de partie | `game summary: flights=… answered=… rejected=… timeouts=… reconciles=… order changes=… kept=… renumbered=… neutralized=… (merged …) drops=… late writes=… (game 3)` |
 | faute | `H5 ZoneMgr.PostProcessServerChangeList postfix failed: the mod stops for the rest of the session, …` |
 
 ## 8. Les conditions de Blizzard (faits, sans avis)
@@ -245,5 +249,43 @@ Accord personnel du développeur de Nomi's Kitchen, obtenu par Ali, malgré la l
 `com.community.hs.NomiCantDance` par décompilation et désobfuscation, et la reprise de son code, sont autorisées. Tout code
 repris est marqué à la source, en anglais (`Taken from NomiCantDance (Nomi's Kitchen), with its author's permission,
 2026-10-10`), parce que le dépôt est public et sous MIT seule ; on préfère réécrire quand c'est aussi simple, on reprend
-tel quel ce que la décompilation montre plus juste que notre version. L'analyse est en cours ; ce journal n'en contient
-encore rien.
+tel quel ce que la décompilation montre plus juste que notre version. L'analyse est faite (§ 12) : **rien de son code n'a
+été repris**, bien que l'accord le permette ; le dépôt ne contient aucun code de Nomi.
+
+## 12. Ce que montre le mod de Nomi (lu avec l'accord de son auteur)
+
+Lu par décompilation et désobfuscation, hors du dépôt ; résumé ici en nos mots, sans extrait.
+
+- **Deux versions.** 1.0.0, ressource du plugin HDT de Nomi's Kitchen (commit du 2026-09-24), sept cibles : celles que la
+  note du 2026-10-08 nommait. 1.1.2, intégrée au mod Firestone de Nomi's Kitchen (publié le 2026-09-30), dix cibles : les
+  sept, plus `ZoneMgr.OnRealTimeZonePosChange`, `PowerProcessor.OnPowerHistory` et `PowerProcessor.FlushDelayedRealTimeTasks`.
+- **Quatre corrections, nommées dans ses journaux.** *drop* : une carte posée depuis la main est montrée d'emblée à sa
+  place serveur, pas au rang dessiné ; *merge* : une carte en attente n'est plus replacée par l'heuristique du client
+  quand il fusionne une liste serveur ; *replay* : une liste jouée en retard ne renvoie plus une carte à une place plus
+  ancienne (notre D-b), par un horodatage des tâches au nombre d'options envoyées ; *magnet* (1.1.2) : tant qu'un sbire
+  magnétique fusionné reste affiché, les écritures temps réel sont regroupées par paquet et toute la rangée est recalée.
+- **Ce qu'il ne fait pas** : rien pour un déplacement sur le plateau pendant une sortie non animée (notre D-a), hors
+  pièce magnétique ; rien en combat ; aucun gel pendant le vol ; aucun écrivain à chaque image.
+- **Sa méthode contre la nôtre.** Lui corrige **dans** la réconciliation du client, étape par étape (prédiction, fusion,
+  post-traitement), avec un écrivain global seulement autour des pièces magnétiques ; nous, un écrivain unique en aval, à
+  chaque image, plus un filtre des places rejouées.
+- **Sa ligne de chargement** (1.0.0) : « This mod modifies the Hearthstone client; Blizzard's terms do not allow client
+  modification. »
+- **Ne pas installer les deux mods ensemble** : ils patchent les mêmes méthodes du client, sans coordination
+  (`tools/nodance-deploy.sh` signale un autre plugin présent).
+
+Ce que la lecture a changé chez nous, chaque règle réécrite en nos termes, chacune avec un test qui échouait d'abord :
+
+| | Constat | Règle (réécrite) | Test |
+|---|---|---|---|
+| **C1** (défaut réel) | quand une prédiction du joueur est en attente, le client fusionne la liste serveur et ajoute, pour **chaque** carte de la rangée, un changement qui nomme la zone, **sans tâche** (`ZoneMgr.MergeServerChangeList`) ; H5 prenait ces cartes pour des transferts et **ne neutralisait plus rien**, précisément dans le cas D-b. Le modèle, une fois la fusion modélisée, le montre partout : 1 628 cas faux sur 2 072 avec l'ancienne règle | seul un changement envoyé par le serveur (porteur d'une tâche) fait d'une entité un transfert ; un changement inventé par le client en fusionnant ne déplace jamais une carte déjà dans la rangée : sa position est neutralisée, l'écrivain range | `Positions_of_a_list_the_client_merged_are_still_neutralized`, `Sell_then_move_with_the_sale_list_merged_and_written_a_frame_later_never_shows_BDC` |
+| **C1b** (défense en profondeur) | une liste serveur peut écrire des positions plusieurs images après son post-traitement, quand la marque qu'elle a laissée est déjà consommée | tant qu'une liste serveur est en cours (`ZoneMgr.HasActiveServerChange`), la rangée est sale à chaque image | `While_a_server_list_is_active_a_late_write_is_reconciled_at_the_next_frame` |
+| **C2** (amélioration, idée *drop*) | au lâcher d'une carte de la main, nous gardions le rang dessiné pendant le vol (`ANTB` ≈ 300 ms, puis `ATNB` quand le jeton reste collé à son créateur) | au lâcher d'une carte venue d'une autre zone, l'ordre gelé est celui que le serveur aura : la carte à la place serveur que le client a prédite, les cartes du serveur dans leur ordre temps réel autour, les sortantes à leur ancre ; pas tant qu'un sbire de la rangée est une cible magnétique (non étudié) | `A_card_played_from_the_hand_is_shown_at_its_server_slot_from_the_drop` |
+
+Mutations : C1 retiré, 8 tests tombent (dont la recherche exhaustive) ; C1b retiré, 1 (son test : C1 couvre seul les
+scénarios) ; les deux ensemble, 12 (les scénarios de vente et de sortie) ; C2 retiré, 2. Pour trancher C1 en jeu, l'écrivain
+écrit `position written by a server list after the row was reconciled: [...]` quand, pendant une liste serveur et sans
+paquet temps réel ni prédiction, il trouve une position de la rangée différente de celle qu'il y a laissée.
+
+**Question ouverte, à trancher après observation (C2')** : la même règle pour un **déplacement** sur le plateau (montrer
+d'emblée la place serveur plutôt que le rang dessiné). Nomi ne le fait pas, et rien n'est observé.

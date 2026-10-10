@@ -199,7 +199,7 @@ internal static class Hooks
             var driver = NoDanceDriver.Current;
             if (driver != null)
             {
-                driver.LogPrediction(__result);
+                driver.AfterPrediction(__result);
             }
         }
         catch (Exception e)

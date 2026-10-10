@@ -169,7 +169,13 @@ internal sealed class NoDanceDriver : MonoBehaviour
         _renumbered = moves.Count;
     }
 
-    internal void LogPrediction(ZoneChangeList? list)
+    /// <summary>
+    /// H4's postfix: the prediction's log line; then, for a card dropped from another zone (the hand), the order frozen
+    /// for the flight becomes the one the server will have, the card at the slot the client predicted for the server
+    /// (C2). A move inside the row is left as drawn (not decided, see the journal). Skipped while a minion of the row is
+    /// a magnetic target: the client's magnetic play follows the prediction, not studied.
+    /// </summary>
+    internal void AfterPrediction(ZoneChangeList? list)
     {
         int renumbered = _renumbered;
         _renumbered = 0;
@@ -181,9 +187,31 @@ internal sealed class NoDanceDriver : MonoBehaviour
         var card = list.GetLocalTriggerCard();
         var entity = card == null ? null : card.GetEntity();
         var trigger = list.GetLocalTriggerChange();
+        int slot = trigger == null ? 0 : trigger.GetDestinationPosition();
+        int predicted = list.GetPredictedPosition();
         NoDancePlugin.Log?.LogInfo($"prediction: entity={(entity == null ? 0 : entity.GetEntityId())} "
-            + $"slot={(trigger == null ? 0 : trigger.GetDestinationPosition())} predicted={list.GetPredictedPosition()} "
+            + $"slot={slot} predicted={predicted} "
             + $"list={list.GetId()}{(renumbered > 0 ? $" (renumbered {renumbered})" : string.Empty)}");
+
+        var zone = PlayerRow();
+        if (trigger == null || entity == null || zone == null || predicted <= 0
+            || trigger.GetDestinationZone() != zone || trigger.GetSourceZone() == zone)
+        {
+            return;
+        }
+
+        var cards = zone.GetCards();
+        if (Find(cards, entity.GetEntityId()) == null || cards.Exists(c => c != null && c.IsMagneticTarget()))
+        {
+            return;
+        }
+
+        var placed = _reconciler.PlaceDropped(Describe(cards), entity.GetEntityId(), predicted, slot);
+        if (placed != null)
+        {
+            Write(placed.Moves, cards);
+            NoDancePlugin.Log?.LogInfo(placed.LogLine());
+        }
     }
 
     /// <summary>
@@ -216,7 +244,8 @@ internal sealed class NoDanceDriver : MonoBehaviour
                 inRow,
                 change.HasDestinationZoneChange() || change.HasDestinationZone(),
                 change.HasDestinationPosition(),
-                change.GetDestinationPosition()));
+                change.GetDestinationPosition(),
+                change.GetPowerTask() != null));
         }
 
         var neutralize = ReplayedPositions.ToNeutralize(read);
@@ -227,8 +256,16 @@ internal sealed class NoDanceDriver : MonoBehaviour
 
         if (neutralize.Count > 0)
         {
+            int merged = 0;
+            foreach (int index in neutralize)
+            {
+                merged += read[index].HasPowerTask ? 0 : 1;
+            }
+
             _reconciler.Counters.Neutralized += neutralize.Count;
-            NoDancePlugin.Log?.LogInfo($"server list {list.GetId()} ({BlockType(list)}): {neutralize.Count} replayed position(s) neutralized");
+            _reconciler.Counters.MergedNeutralized += merged;
+            NoDancePlugin.Log?.LogInfo($"server list {list.GetId()} ({BlockType(list)}): {neutralize.Count - merged} replayed "
+                + $"position(s) neutralized, {merged} merged position(s) neutralized");
         }
     }
 
@@ -274,9 +311,10 @@ internal sealed class NoDanceDriver : MonoBehaviour
                 return;
             }
 
+            var zoneMgr = ZoneMgr.Get();
             var zone = PlayerRow();
             var gameState = GameState.Get();
-            if (zone == null || gameState == null)
+            if (zoneMgr == null || zone == null || gameState == null)
             {
                 return;
             }
@@ -284,7 +322,13 @@ internal sealed class NoDanceDriver : MonoBehaviour
             var cards = zone.GetCards();
             var inputManager = InputManager.Get();
             bool blocked = (inputManager != null && inputManager.GetHeldCard() != null) || gameState.MustWaitForChoices();
-            var reconciliation = _reconciler.EndOfFrame(Describe(cards), blocked);
+            var reconciliation = _reconciler.EndOfFrame(Describe(cards), blocked, zoneMgr.HasActiveServerChange());
+            if (_reconciler.LateWrites.Count > 0)
+            {
+                NoDancePlugin.Log?.LogInfo("position written by a server list after the row was reconciled: ["
+                    + string.Join(", ", _reconciler.LateWrites) + "]");
+            }
+
             if (reconciliation == null)
             {
                 return;

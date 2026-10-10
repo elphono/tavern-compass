@@ -460,13 +460,23 @@ Nomi (§ 11) : `docs/journal/2026-10-10-anti-danse.md`.
   H6 s'arrête seule.
 - **Écarts avec la recherche** (journal § 3, chacun testé) : ancrage par clé (voisine, après elle) au lieu de « + 0,5 »
   (trois cartes sortantes de suite) ; réconciliation quand une carte entre ou sort de la rangée (H5 marque au **début** de la
-  liste ; contre-exemple : deux jetons invoqués devant) ; H5 ne neutralise pas une entité qui change de zone dans la même
-  liste ; rien n'est écrit pendant un choix ouvert ; une seule DLL.
+  liste ; contre-exemple : deux jetons invoqués devant) ; H5 ne neutralise pas une entité qu'un changement du serveur fait
+  changer de zone dans la même liste ; rien n'est écrit pendant un choix ouvert ; une seule DLL.
+- **Ce que la lecture du mod de Nomi a changé** (journal § 12, règles réécrites, **aucun code de Nomi dans le dépôt**) :
+  **C1**, un défaut réel : quand une prédiction est en attente, le client fusionne la liste serveur et invente, sans tâche,
+  un changement qui nomme la zone pour chaque carte de la rangée ; H5 les prenait pour des transferts et ne neutralisait
+  plus rien. Désormais seul un changement du serveur (`ZoneChange.GetPowerTask() != null`) fait un transfert, et ceux du
+  client sont neutralisés (ligne `… k merged position(s) neutralized`). **C1b** : tant qu'une liste serveur est en cours
+  (`ZoneMgr.HasActiveServerChange()`), la rangée est sale à chaque image (`reconcile (server list active)`), et l'écrivain
+  signale `position written by a server list after the row was reconciled` (de quoi trancher C1 en jeu). **C2** : une
+  carte posée depuis la main est montrée d'emblée à la place serveur prédite (`reconcile (drop): … placed at server slot k
+  (drawn slot d)`), pas tant qu'un sbire est une cible magnétique ; la même règle pour un déplacement (C2') reste à trancher
+  après observation. **Ne jamais installer ce mod avec celui de Nomi** : mêmes méthodes patchées, sans coordination.
 
 | Projet | Cible | Rôle |
 |---|---|---|
 | `src/TavernCompass.NoDance.Core` | `netstandard2.0`, dans la solution | `BoardOrder.Target`, `RowReconciler` (sale, vol, délai, rangée qui change, compteurs), `ReplayedPositions`, `PatchTargets`, `ClientMembers`, `ClientSignature` ; sans le jeu, sans BepInEx |
-| `tests/TavernCompass.NoDance.Core.Tests` | `net8.0`, dans la solution | `ClientModel` (règles du client, cadencées par images comme le mod), trois scénarios, recherche exhaustive (1 724 / 2 072 sans le mod, 0 avec, H6 ou non), trois déplacements, gel en vol, ancrage, jetons, prédiction fausse ; signatures |
+| `tests/TavernCompass.NoDance.Core.Tests` | `net8.0`, dans la solution | `ClientModel` (règles du client, cadencées par images comme le mod, fusion des listes comprise), trois scénarios, recherche exhaustive (1 724 / 2 072 sans le mod, 0 avec, H6 ou non), trois déplacements, gel en vol, ancrage, jetons, prédiction fausse, C1, C1b, C2 ; signatures |
 | `mods/TavernCompass.NoDance` | `net48`, **hors de la solution** | le plugin (`com.tavern-compass.nodance`, « Tavern Compass — No Dance », version de `Directory.Build.props`) ; compile les sources du cœur |
 | `tools/nodance-deploy.sh` | WSL | installe BepInEx (si absent) et le mod dans le dossier du jeu |
 
@@ -493,8 +503,10 @@ tools/nodance-deploy.sh --dry-run        # puis sans --dry-run (demande y) ; --u
 - **Journal** (`BepInEx/LogOutput.log`) : `patch … : ok`, `5/5 required patches applied, 0/1 optional (game …)`, `attached to
   ZoneMgr (game n)`, `option sent: entity=… position=… (in flight)`, `option answered after … ms` / `rejected` / `flight
   timeout`, `prediction: entity=… slot=… predicted=… list=… (renumbered k)`, `server list … (PLAY): k replayed position(s)
-  neutralized`, `reconcile (raisons): shown [ids] -> [ids], k position(s) changed[, kept visual order (in flight)]`, `game
-  summary: flights=… reconciles=… order changes=… kept=… renumbered=… neutralized=… (game n)`. `order changes` et
+  neutralized, m merged position(s) neutralized`, `reconcile (raisons): shown [ids] -> [ids], k position(s) changed[, kept
+  visual order (in flight)][, placed at server slot k (drawn slot d)]`, `position written by a server list after the row
+  was reconciled: [id: a->b, …]`, `game
+  summary: flights=… reconciles=… order changes=… kept=… renumbered=… neutralized=… (merged …) drops=… late writes=… (game n)`. `order changes` et
   `neutralized` à zéro sur plusieurs parties : le mod n'a rien fait.
 - **Pas vu en jeu** : tout, à commencer par BepInEx 5.4.23.5 et HarmonyX sur ce client Unity 6 Mono. Supposé : que les
   danses vues par Ali soient celles du modèle (journal § 4, et le scénario d'Ali § 7).

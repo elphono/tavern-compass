@@ -89,6 +89,17 @@ public class BoardOrderTests
     }
 
     [Fact]
+    public void A_dropped_card_goes_before_the_server_card_at_its_slot_and_gone_cards_keep_their_anchor()
+    {
+        // Shown A N X B (N just dropped, drawn 2nd); X gone on the server behind A; the server has A 1, B 2; N's slot: 2.
+        var cards = new[] { On('A', 1, 1), new BoardCard('N', 2, 0, onServerBoard: false, 0), Gone('X', 3, 2), On('B', 4, 2) };
+        Assert.Equal(new[] { 'A', 'X', 'N', 'B' }.Select(c => (int)c), Ids(BoardOrder.TargetWithPlaced(cards, 'N', 2)));
+        Assert.Equal(new[] { 'N', 'A', 'X', 'B' }.Select(c => (int)c), Ids(BoardOrder.TargetWithPlaced(cards, 'N', 1)));
+        Assert.Equal(new[] { 'A', 'X', 'B', 'N' }.Select(c => (int)c), Ids(BoardOrder.TargetWithPlaced(cards, 'N', 3)));
+        Assert.Equal(new[] { 'A', 'N', 'X', 'B' }.Select(c => (int)c), Ids(BoardOrder.TargetWithPlaced(cards, 'N', 0)));
+    }
+
+    [Fact]
     public void Moves_name_only_the_cards_not_at_their_slot()
     {
         var target = new[] { On(1, 1, 1), On(2, 3, 2), On(3, 2, 3) };

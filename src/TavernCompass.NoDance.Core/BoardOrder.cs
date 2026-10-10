@@ -79,6 +79,36 @@ public static class BoardOrder
             .ToList();
     }
 
+    /// <summary>
+    /// The order the server will have once a card dropped from another zone (the hand) is played: the other cards in
+    /// the server's real-time order (gone ones at their anchor, as in <see cref="Target"/>), the dropped card right
+    /// before the <paramref name="serverSlot"/>-th card the server has (last if there are fewer). Without the card or a
+    /// slot, the order shown, renumbered.
+    /// </summary>
+    public static IReadOnlyList<BoardCard> TargetWithPlaced(IReadOnlyList<BoardCard> cards, int placedEntityId, int serverSlot)
+    {
+        var placed = cards.FirstOrDefault(c => c.EntityId == placedEntityId);
+        if (placed == null || serverSlot <= 0)
+        {
+            return Target(cards, keepVisualOrder: true);
+        }
+
+        var result = Target(cards.Where(c => c.EntityId != placedEntityId).ToList(), keepVisualOrder: false).ToList();
+        int insertAt = result.Count;
+        int onServer = 0;
+        for (int i = 0; i < result.Count; i++)
+        {
+            if (result[i].HasServerPlace && ++onServer == serverSlot)
+            {
+                insertAt = i;
+                break;
+            }
+        }
+
+        result.Insert(insertAt, placed);
+        return result;
+    }
+
     /// <summary>The cards whose position is not their slot (1-based) in <paramref name="target"/>.</summary>
     public static IReadOnlyList<SlotMove> Moves(IReadOnlyList<BoardCard> target)
     {

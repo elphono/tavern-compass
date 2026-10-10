@@ -62,8 +62,9 @@ public sealed class FlightEnd
 public sealed class Reconciliation
 {
     public Reconciliation(string reason, IReadOnlyList<BoardCard> shown, IReadOnlyList<BoardCard> target,
-        IReadOnlyList<SlotMove> moves, bool keptVisualOrder)
+        IReadOnlyList<SlotMove> moves, bool keptVisualOrder, string detail = "")
     {
+        Detail = detail;
         Reason = reason;
         Shown = shown;
         Target = target;
@@ -81,11 +82,15 @@ public sealed class Reconciliation
 
     public bool KeptVisualOrder { get; }
 
+    /// <summary>Appended to the log line: ", placed at server slot 3 (drawn slot 2)" for a drop.</summary>
+    public string Detail { get; }
+
     public bool OrderChanged => !BoardOrder.SameOrder(Shown, Target);
 
     public string LogLine() =>
         $"reconcile ({Reason}): shown {BoardOrder.Ids(Shown)} -> {BoardOrder.Ids(Target)}, {Moves.Count} position(s) changed"
-        + (KeptVisualOrder ? ", kept visual order (in flight)" : string.Empty);
+        + (KeptVisualOrder ? ", kept visual order (in flight)" : string.Empty)
+        + (Detail.Length == 0 ? string.Empty : ", " + Detail);
 }
 
 /// <summary>
@@ -97,6 +102,8 @@ public sealed class RowReconciler
 {
     private readonly List<string> _reasons = new();
     private int[]? _lastRow;
+    private Dictionary<int, int>? _known;
+    private bool _predicted;
 
     public RowReconciler(double flightTimeoutSeconds)
     {
@@ -174,12 +181,48 @@ public sealed class RowReconciler
         CurrentFlight != null && now - CurrentFlight.Since > FlightTimeoutSeconds ? EndFlight(FlightOutcome.Timeout, now) : null;
 
     /// <summary>
+    /// What the last <see cref="EndOfFrame"/> found changed behind the writer: positions of the row that differ from the
+    /// ones it left at the previous frame, while a server list was active and neither a real-time packet nor a
+    /// prediction of the player happened in between (from: what the writer left, to: what it found). Empty otherwise.
+    /// </summary>
+    public IReadOnlyList<SlotMove> LateWrites { get; private set; } = Array.Empty<SlotMove>();
+
+    /// <summary>
+    /// After the client's prediction of a card dropped from another zone (the hand), in the same frame: the order frozen
+    /// for the flight is the one the server will have, the card at the server's slot the client predicted, instead of
+    /// the drawn one. Null when no position has to change.
+    /// </summary>
+    public Reconciliation? PlaceDropped(IReadOnlyList<BoardCard> row, int entityId, int serverSlot, int drawnSlot)
+    {
+        _predicted = true;
+        var shown = BoardOrder.Shown(row);
+        var target = BoardOrder.TargetWithPlaced(row, entityId, serverSlot);
+        var moves = BoardOrder.Moves(target);
+        if (moves.Count == 0)
+        {
+            return null;
+        }
+
+        var reconciliation = new Reconciliation("drop", shown, target, moves, keptVisualOrder: false,
+            detail: $"placed at server slot {serverSlot} (drawn slot {drawnSlot})");
+        Counters.Reconciles++;
+        Counters.Drops++;
+        if (reconciliation.OrderChanged)
+        {
+            Counters.OrderChanges++;
+        }
+
+        return reconciliation;
+    }
+
+    /// <summary>
     /// Before the client's own prediction of a placement or a move (ZoneMgr.AddPredictedLocalZoneChange): the row's
     /// positions made 1..n again in the order shown, so that the client's arithmetic, which mixes positions and ranks,
     /// computes in one system. Never reorders.
     /// </summary>
     public IReadOnlyList<SlotMove> Renumber(IReadOnlyList<BoardCard> row)
     {
+        _predicted = true;
         var moves = BoardOrder.Moves(BoardOrder.Target(row, keepVisualOrder: true));
         if (moves.Count > 0)
         {
@@ -192,12 +235,33 @@ public sealed class RowReconciler
     /// <summary>
     /// The single writer, once per frame after everything else (LateUpdate), before the frame is drawn. A change of the
     /// cards in the row (one entered or left) marks the row dirty by itself: a task list can bring a card in or out
-    /// frames after it started, once its neighbours' replayed positions have been neutralized. Nothing is written while
-    /// <paramref name="blocked"/> (a card held by the player, a choice the client waits for): the row stays dirty.
-    /// Returns null when no position has to change.
+    /// frames after it started, once its neighbours' replayed positions have been neutralized. While a server list is
+    /// active (<paramref name="serverListActive"/>), every frame is dirty: its play can write positions frames after it
+    /// started, when the mark it left is already consumed. Nothing is written while <paramref name="blocked"/> (a card
+    /// held by the player, a choice the client waits for): the row stays dirty. Returns null when no position has to
+    /// change.
     /// </summary>
-    public Reconciliation? EndOfFrame(IReadOnlyList<BoardCard> row, bool blocked)
+    public Reconciliation? EndOfFrame(IReadOnlyList<BoardCard> row, bool blocked, bool serverListActive)
     {
+        var late = new List<SlotMove>();
+        if (!blocked && serverListActive && _known != null && !_predicted && !_reasons.Contains("packet"))
+        {
+            foreach (var card in row)
+            {
+                if (_known.TryGetValue(card.EntityId, out int left) && left != card.VisualPos)
+                {
+                    late.Add(new SlotMove(card.EntityId, left, card.VisualPos));
+                }
+            }
+        }
+
+        LateWrites = late;
+        if (late.Count > 0)
+        {
+            Counters.LateWrites++;
+        }
+
+        _predicted = false;
         var ids = row.Select(c => c.EntityId).OrderBy(id => id).ToArray();
         if (_lastRow != null && !_lastRow.SequenceEqual(ids))
         {
@@ -205,6 +269,20 @@ public sealed class RowReconciler
         }
 
         _lastRow = ids;
+        if (serverListActive)
+        {
+            MarkDirty("server list active");
+        }
+
+        var reconciliation = Reconcile(row, blocked);
+        _known = reconciliation == null
+            ? row.ToDictionary(c => c.EntityId, c => c.VisualPos)
+            : reconciliation.Target.Select((c, i) => (c.EntityId, Slot: i + 1)).ToDictionary(x => x.EntityId, x => x.Slot);
+        return reconciliation;
+    }
+
+    private Reconciliation? Reconcile(IReadOnlyList<BoardCard> row, bool blocked)
+    {
         if (!IsDirty || blocked)
         {
             return null;
@@ -264,7 +342,17 @@ public sealed class NoDanceCounters
     /// <summary>Positions replayed late by a server task list and neutralized on the player's row.</summary>
     public int Neutralized { get; set; }
 
+    /// <summary>Of those, the positions the client made up while merging a server list with a pending prediction.</summary>
+    public int MergedNeutralized { get; set; }
+
+    /// <summary>Cards dropped from the hand and shown at once at the server's slot.</summary>
+    public int Drops { get; set; }
+
+    /// <summary>Frames where a position of the row had changed behind the writer while a server list was active.</summary>
+    public int LateWrites { get; set; }
+
     public string Summary() =>
         $"game summary: flights={Flights} answered={Answered} rejected={Rejected} timeouts={Timeouts} "
-        + $"reconciles={Reconciles} order changes={OrderChanges} kept={Kept} renumbered={Renumbered} neutralized={Neutralized}";
+        + $"reconciles={Reconciles} order changes={OrderChanges} kept={Kept} renumbered={Renumbered} neutralized={Neutralized} "
+        + $"(merged {MergedNeutralized}) drops={Drops} late writes={LateWrites}";
 }

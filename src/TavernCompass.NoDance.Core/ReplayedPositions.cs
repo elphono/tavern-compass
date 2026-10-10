@@ -7,13 +7,14 @@ namespace TavernCompass.NoDance.Core;
 public readonly struct ServerChange
 {
     public ServerChange(int entityId, bool inPlayerRow, bool changesZoneOrController, bool hasDestinationPosition,
-        int destinationPosition)
+        int destinationPosition, bool hasPowerTask)
     {
         EntityId = entityId;
         InPlayerRow = inPlayerRow;
         ChangesZoneOrController = changesZoneOrController;
         HasDestinationPosition = hasDestinationPosition;
         DestinationPosition = destinationPosition;
+        HasPowerTask = hasPowerTask;
     }
 
     public int EntityId { get; }
@@ -27,6 +28,12 @@ public readonly struct ServerChange
     public bool HasDestinationPosition { get; }
 
     public int DestinationPosition { get; }
+
+    /// <summary>
+    /// The change carries a task of the server's history (ZoneChange.GetPowerTask). Without one, the client made it up
+    /// itself while merging the list with the player's pending prediction (ZoneMgr.MergeServerChangeList).
+    /// </summary>
+    public bool HasPowerTask { get; }
 }
 
 /// <summary>
@@ -38,13 +45,17 @@ public readonly struct ServerChange
 public static class ReplayedPositions
 {
     /// <summary>
-    /// Indexes of the changes to neutralize: pure position changes (no zone, no controller) of cards in the player's
-    /// row. An entity that enters, leaves or changes hands in the same list keeps all its changes: its position there
-    /// belongs to its new zone, and the client needs it.
+    /// Indexes of the changes whose position is neutralized, for cards in the player's row: the server's pure position
+    /// changes, and the changes the client made up while merging (no task: they never move a card already in the row;
+    /// the single writer arranges it). Only a change sent by the server (with its task) that names a zone or a
+    /// controller makes the entity a transfer (it enters, leaves or changes hands): all its changes are then kept, its
+    /// position there belongs to its new zone and the client needs it.
     /// </summary>
     public static IReadOnlyList<int> ToNeutralize(IReadOnlyList<ServerChange> changes)
     {
-        var transferred = new HashSet<int>(changes.Where(c => c.ChangesZoneOrController).Select(c => c.EntityId));
+        var transferred = new HashSet<int>(changes
+            .Where(c => c.ChangesZoneOrController && c.HasPowerTask)
+            .Select(c => c.EntityId));
         var result = new List<int>();
         for (int i = 0; i < changes.Count; i++)
         {
@@ -52,7 +63,6 @@ public static class ReplayedPositions
             if (change.InPlayerRow
                 && change.HasDestinationPosition
                 && change.DestinationPosition > 0
-                && !change.ChangesZoneOrController
                 && !transferred.Contains(change.EntityId))
             {
                 result.Add(i);

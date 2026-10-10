@@ -154,6 +154,65 @@ public class ClientModelScenarioTests
     }
 
     /// <summary>
+    /// C1, the defect the reading of Nomi's mod revealed. A B C D; A is sold and its task list waits; D is moved in
+    /// front. The sale's list starts while D's prediction is still pending: the client merges it (a change naming the
+    /// zone, without a task, for every card of the row), and writes the sale's places a frame after the list started.
+    /// </summary>
+    [Fact]
+    public void Sell_then_move_with_the_sale_list_merged_and_written_a_frame_later_never_shows_BDC()
+    {
+        var b = new ClientModel("ABCD", withMod: true);
+        b.Layout("start");
+        b.Grab('A');
+        b.DropOnBob();
+        b.RtLeave('A');
+        b.RtPos('B', 1);
+        b.RtPos('C', 2);
+        b.RtPos('D', 3);
+        b.EndOfPacket();
+        b.OptionsReceived();
+        Assert.Equal("BCD", b.Layout("sale answered"));
+        b.Grab('D');
+        b.DropAndPredict(1);
+        Assert.Equal("DBC", b.Layout("drop D in front"));
+        b.RtPos('D', 1);
+        b.RtPos('B', 2);
+        b.RtPos('C', 3);
+        b.EndOfPacket();
+        b.OptionsReceived();
+        Assert.Equal("DBC", b.Layout("move answered"));
+
+        b.PlayServerList("A", new[] { ('B', 1), ('C', 2), ('D', 3) });
+        Assert.Equal("DBC", b.Layout("sale's list merged, its places written a frame later"));
+        b.PlayServerList("", new[] { ('D', 1), ('B', 2), ('C', 3) }, confirmed: true);
+        Assert.Equal("DBC", b.Layout("move list played (confirmed)"));
+        Assert.DoesNotContain(b.History, h => h.Order == "BDC");
+    }
+
+    /// <summary>
+    /// C2, Nomi's "drop" idea in our terms. A T B, T summoned next to A. N is played from the hand and drawn 2nd; the
+    /// client's server slot for it is 3 (the token stays by its maker). The frozen order is the one the server will
+    /// have, from the drop on, instead of the drawn one for the whole flight.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_card_played_from_the_hand_is_shown_at_its_server_slot_from_the_drop(bool skipPerCardRealTimeWrites)
+    {
+        var b = new ClientModel("ATB", withMod: true, skipPerCardRealTimeWrites);
+        b.Layout("start");
+        b.PlayFromHand('N', drawnSlot: 2, serverSlot: 3);
+        Assert.Equal("ATNB", b.Layout("drop N, drawn 2nd, server slot 3"));
+        b.RtArrive('N', 3);
+        b.RtPos('B', 4);
+        b.EndOfPacket();
+        Assert.Equal("ATNB", b.Layout("play answered"));
+        b.OptionsReceived();
+        Assert.Equal("ATNB", b.Layout("options"));
+        Assert.Equal(new[] { 1, 2, 3, 4 }, b.Positions);
+    }
+
+    /// <summary>
     /// The prediction is wrong (the server put D second, not first): once answered, the row must take the server's
     /// order, with or without the client's card-by-card real-time writes (H6). In the search above the server always
     /// agrees with what the player meant, so it cannot tell "takes the server order" from "keeps what is shown".

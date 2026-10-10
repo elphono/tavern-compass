@@ -26,6 +26,7 @@ internal sealed class ClientModel
     private readonly bool _skipPerCardRealTimeWrites;
     private List<ModelCard> _zone;
     private ModelCard? _held;
+    private bool _serverListActive;
 
     public ClientModel(string ids, bool withMod, bool skipPerCardRealTimeWrites = false)
     {
@@ -66,7 +67,7 @@ internal sealed class ClientModel
             return;
         }
 
-        var reconciliation = _mod.EndOfFrame(Row(), blocked: _held != null);
+        var reconciliation = _mod.EndOfFrame(Row(), blocked: _held != null, serverListActive: _serverListActive);
         if (reconciliation != null)
         {
             Apply(reconciliation.Moves);
@@ -81,6 +82,13 @@ internal sealed class ClientModel
     /// <summary>The server put a new card on the board; its card is not in the row until its task list is played.</summary>
     public void RtEnter(char id, int pos) =>
         _cards[id] = new ModelCard(id, pos) { InRowYet = false };
+
+    /// <summary>The server put a card of the row on its board in real time (the answer to a play from hand).</summary>
+    public void RtArrive(char id, int pos)
+    {
+        _cards[id].RtOnBoard = true;
+        RtPos(id, pos);
+    }
 
     /// <summary>R1, unless the mod's optional H6 skips it for the player's row.</summary>
     public void RtPos(char id, int value)
@@ -150,6 +158,36 @@ internal sealed class ClientModel
         }
 
         card.Moved = true;
+        card.Predicted = slot;
+    }
+
+    /// <summary>
+    /// The client's drop of a card from the hand on the row: H2 and H4's prefix, then the client's arithmetic for a change
+    /// of zone (every card at or after the drawn slot moves one up), then H4's postfix.
+    /// </summary>
+    public void PlayFromHand(char id, int drawnSlot, int serverSlot)
+    {
+        var card = new ModelCard(id, 0) { RtOnBoard = false };
+        _cards[id] = card;
+        if (_mod != null)
+        {
+            _mod.StartFlight(card.EntityId, serverSlot, now: 0);
+            Apply(_mod.Renumber(Row()));
+        }
+
+        foreach (var other in _zone.Where(o => o.VPos >= drawnSlot))
+        {
+            other.VPos++;
+        }
+
+        card.VPos = drawnSlot;
+        card.Predicted = serverSlot;
+        _zone.Add(card);
+        var placed = _mod?.PlaceDropped(Row(), card.EntityId, serverSlot, drawnSlot);
+        if (placed != null)
+        {
+            Apply(placed.Moves);
+        }
     }
 
     /// <summary>The next options arrive (after the history of the action): the mod's listener ends the flight.</summary>
@@ -178,12 +216,20 @@ internal sealed class ClientModel
         var neutralized = new HashSet<char>();
         if (_mod != null)
         {
+            _serverListActive = true;
             if (!confirmed)
             {
-                var changes = leaving.Select(id => new ServerChange(id, InRow(id), true, false, 0))
-                    .Concat(entering.Select(e => new ServerChange(e.Id, InRow(e.Id), true, true, e.Pos)))
-                    .Concat(positions.Select(p => new ServerChange(p.Id, InRow(p.Id), false, true, p.Pos)))
+                var changes = leaving.Select(id => new ServerChange(id, InRow(id), true, false, 0, true))
+                    .Concat(entering.Select(e => new ServerChange(e.Id, InRow(e.Id), true, true, e.Pos, true)))
+                    .Concat(positions.Select(p => new ServerChange(p.Id, InRow(p.Id), false, true, p.Pos, true)))
                     .ToList();
+                // ZoneMgr.MergeServerChangeList: while a prediction of the player is pending, the client adds, for every
+                // card of the row, a change naming the zone, without a task (ignored in the shop when played).
+                if (_zone.Any(c => c.Predicted != 0))
+                {
+                    changes.AddRange(_zone.Select((c, i) => new ServerChange(c.EntityId, true, true, true, i + 1, false)));
+                }
+
                 foreach (int index in ReplayedPositions.ToNeutralize(changes))
                 {
                     neutralized.Add((char)changes[index].EntityId);
@@ -219,6 +265,7 @@ internal sealed class ClientModel
         }
 
         Frame();
+        _serverListActive = false;
     }
 
     private void ApplyPositions(IReadOnlyList<(char Id, int Pos)> positions, bool confirmed, HashSet<char> neutralized)
@@ -230,6 +277,7 @@ internal sealed class ClientModel
             if (confirmed)
             {
                 card.Moved = false;
+                card.Predicted = 0;
                 continue;
             }
 
@@ -284,5 +332,8 @@ internal sealed class ClientModel
         public bool Moved { get; set; }
 
         public bool InRowYet { get; set; } = true;
+
+        /// <summary>Card.m_predictedZonePosition: a prediction of the player not yet confirmed.</summary>
+        public int Predicted { get; set; }
     }
 }
