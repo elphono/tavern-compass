@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using BronzebeardHud.Stats;
-using Hearthstone_Deck_Tracker.Utility.Extensions;
 
 namespace BronzebeardHud.HdtPlugin;
 
@@ -55,7 +54,7 @@ internal sealed class SkipCombatPanel
             e.Handled = true;
             skip();
         };
-        OverlayExtensions.SetIsOverlayHitTestVisible(_button, true);
+        OverlayClickable.Declare(_button);
         _panel = new Border { Child = _button, Visibility = Visibility.Collapsed };
         OverlayLayer.Add(_canvas, _panel);
         _canvas.SizeChanged += OnCanvasSizeChanged;

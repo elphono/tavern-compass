@@ -127,7 +127,7 @@ internal static class CardImages
         {
             // Hover still shows the card: HDT raises its hover events on a hoverable element even when it is
             // also clickable (Windows/OverlayWindow.MouseOverDetection.cs:537-548).
-            OverlayExtensions.SetIsOverlayHitTestVisible(cell, true);
+            OverlayClickable.Declare(cell);
             cell.Cursor = System.Windows.Input.Cursors.Hand;
             cell.MouseLeftButtonUp += (_, e) =>
             {

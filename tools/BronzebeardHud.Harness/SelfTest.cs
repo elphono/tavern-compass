@@ -1410,6 +1410,27 @@ internal static class SelfTest
                 $"line rebuilt {!ReferenceEquals(before, rebuilt)}: old [{string.Join("; ", leftOld)}], new [{string.Join("; ", enteredNew)}]; popup visible {popup.IsVisible}, shown {popup.Shows - shows} more time(s); "
                 + $"HDT's list of clickables: {entries} entries before the redraw, {hdt.ClickableEntries} after, for {hdt.LiveClickables} elements still loaded");
 
+            // HDT puts a clickable in its List when it is declared and again at its Loaded, and takes it out once at its
+            // Unloaded (issue #17): an element declared before it is loaded leaves a dead entry at every redraw (measured on
+            // 2026-10-10 before the fix: 4146, 4184, 4222, 4260 entries for 29 loaded elements). Three more redraws of the
+            // same scene (two check the change, the third that the state does not trap itself): every entry must be a
+            // loaded element, listed once, and each redraw must really rebuild the line.
+            var counts = new List<(int Entries, int Loaded, bool Rebuilt)> { (hdt.ClickableEntries, hdt.LiveClickables, true) };
+            for (var redraw = 0; redraw < 3; redraw++)
+            {
+                var previous = comps.ShownLines[guide.Id];
+                window.SetPower(window.PowerScene);
+                window.UpdateLayout();
+                Headless.Pump(150);
+                counts.Add((hdt.ClickableEntries, hdt.LiveClickables, !ReferenceEquals(previous, comps.ShownLines[guide.Id])));
+            }
+
+            var dead = counts.Select(c => c.Entries - c.Loaded).ToList();
+            check("mouse: before and after three more redraws of the panel, HDT's list of clickables holds each loaded clickable once and no dead entry (an element is declared clickable once loaded)",
+                counts.All(c => c.Rebuilt && c.Loaded > 0) && dead.All(d => d == 0),
+                $"entries / loaded elements / dead entries, before and after each redraw: {string.Join(" → ", counts.Select((c, i) => $"{c.Entries}/{c.Loaded}/{dead[i]}"))}; "
+                + $"line rebuilt at each redraw {counts.All(c => c.Rebuilt)}");
+
             line = comps.ShownLines[guide.Id];
             mark = hdt.Events.Count;
             hdt.Move(outside);
@@ -1418,6 +1439,35 @@ internal static class SelfTest
             check("mouse: out of the line, the probe's MouseLeave hides the popup",
                 onLine.Count == 1 && onLine[0].Source == OverlaySource.Probe && !onLine[0].Enter && !onLine[0].CursorInside && !popup.IsVisible,
                 $"[{string.Join("; ", onLine)}]; popup visible {popup.IsVisible}");
+
+            // The same element taken off the overlay and put back three times (issue #17): declared by OverlayClickable, HDT
+            // lists it once while it is on the overlay and drops it when it leaves; one taken away before it was ever loaded
+            // (added and removed within one dispatcher turn) is never listed. Away from the cursor, which is at (1,1).
+            var entriesBefore = hdt.ClickableEntries;
+            var kept = new Border { Width = 10, Height = 10, Background = Brushes.Transparent };
+            Canvas.SetLeft(kept, 300);
+            Canvas.SetTop(kept, 5);
+            OverlayClickable.Declare(kept);
+            var listed = new List<(int On, int Off)>();
+            for (var round = 0; round < 3; round++)
+            {
+                canvas.Children.Add(kept);
+                Headless.Pump(50);
+                var on = hdt.ClickableEntries - entriesBefore;
+                canvas.Children.Remove(kept);
+                Headless.Pump(50);
+                listed.Add((on, hdt.ClickableEntries - entriesBefore));
+            }
+
+            var fleeting = new Border { Width = 10, Height = 10, Background = Brushes.Transparent };
+            OverlayClickable.Declare(fleeting);
+            canvas.Children.Add(fleeting);
+            canvas.Children.Remove(fleeting);
+            Headless.Pump(50);
+            var fleetingListed = hdt.ClickableEntries - entriesBefore;
+            check("mouse: an element declared clickable by OverlayClickable is in HDT's list once while on the overlay and not after, through three removals and re-adds; one removed before it was loaded is never in it",
+                listed.All(l => l == (1, 0)) && fleetingListed == 0 && Hearthstone_Deck_Tracker.Utility.Extensions.OverlayExtensions.GetIsOverlayHitTestVisible(kept),
+                $"entries it adds on the overlay / after its removal: {string.Join(", ", listed.Select(l => $"{l.On}/{l.Off}"))}; removed before it was loaded: {fleetingListed} entries");
         }
         finally
         {

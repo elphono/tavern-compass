@@ -2,7 +2,7 @@
 
   <!-- Simulation of the plugin's panels in a plain Windows window, so that they can be moved, resized and looked
        at without Hearthstone running. The REAL panel sources are compiled in (Compile Include, below): PanelMover,
-       CompsPanel, GuideView, GuidePopup, TavernMarkers, SkipCombatPanel, ChoiceAdvicePanel, CardImages, PreviewPlacer, OverlayLayer.
+       CompsPanel, GuideView, GuidePopup, TavernMarkers, SkipCombatPanel, ChoiceAdvicePanel, CardImages, PreviewPlacer, OverlayLayer, OverlayClickable.
        ChoiceAdvicePanel is given a stats cache whose fetcher refuses the network (NoNetwork, HarnessWindow.cs): the harness
        never polls it, and hands ChoiceAdvisor synthetic trinket stats instead.
        What they ask of HDT (OverlayExtensions, Log, Database, the asset downloaders) is answered by HdtShim.cs, so
@@ -43,6 +43,7 @@
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\CardImages.cs" Link="Plugin\CardImages.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\PreviewPlacer.cs" Link="Plugin\PreviewPlacer.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\OverlayLayer.cs" Link="Plugin\OverlayLayer.cs" />
+    <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\OverlayClickable.cs" Link="Plugin\OverlayClickable.cs" />
     <Compile Include="..\..\src\BronzebeardHud.HdtPlugin\HeroPickPanel.cs" Link="Plugin\HeroPickPanel.cs" />
     <!-- The zones a default panel must not cover, drawn under the panels: one definition, the tests' one. -->
     <Compile Include="..\..\tests\BronzebeardHud.Stats.Tests\NoGoZones.cs" Link="Plugin\NoGoZones.cs" />

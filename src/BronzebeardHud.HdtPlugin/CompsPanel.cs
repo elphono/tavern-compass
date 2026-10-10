@@ -7,7 +7,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using BronzebeardHud.Stats;
 using Hearthstone_Deck_Tracker.Hearthstone;
-using Hearthstone_Deck_Tracker.Utility.Extensions;
 
 namespace BronzebeardHud.HdtPlugin;
 
@@ -528,7 +527,7 @@ internal sealed class CompsPanel
                 _run(onClick);
             }
         };
-        OverlayExtensions.SetIsOverlayHitTestVisible(button, true);
+        OverlayClickable.Declare(button);
         return button;
     }
 
@@ -543,7 +542,7 @@ internal sealed class CompsPanel
             Cursor = System.Windows.Input.Cursors.Hand,
         };
         box.Click += (_, _) => _run(() => _toggle(guideId));
-        OverlayExtensions.SetIsOverlayHitTestVisible(box, true);
+        OverlayClickable.Declare(box);
         return box;
     }
 
@@ -627,7 +626,7 @@ internal sealed class CompsPanel
                 e.Handled = true;
                 open(guide.Id);
             };
-            OverlayExtensions.SetIsOverlayHitTestVisible(nameCell, true);
+            OverlayClickable.Declare(nameCell);
         }
 
         Grid.SetColumn(nameCell, 1);

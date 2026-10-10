@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using BronzebeardHud.Stats;
-using Hearthstone_Deck_Tracker.Utility.Extensions;
 
 namespace BronzebeardHud.HdtPlugin;
 
@@ -287,7 +286,7 @@ internal sealed class TavernMarkers
                 VerticalAlignment = VerticalAlignment.Center,
             },
         };
-        OverlayExtensions.SetIsOverlayHitTestVisible(button, true);
+        OverlayClickable.Declare(button);
         return button;
     }
 }

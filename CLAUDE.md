@@ -453,10 +453,12 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   décompilé ; les événements que WPF y ajoute (deuxième entrée sur le nom d'une ligne, sortie quand la fenêtre redevient
   transparente, curseur encore dans la ligne) suivent un modèle **déduit**, pas vu en jeu. Elle ne simule toujours pas la
   conversion écran → overlay du curseur (DPI) ni la lecture d'HDT (plateau adverse, `NEXT_OPPONENT_PLAYER_ID` : faits
-  synthétiques) : un défaut qui y vivrait ne s'y voit pas. Constat du code d'HDT, reproduit dans la simulation : un élément
-  déclaré cliquable **avant** son `Loaded` est inscrit deux fois dans la `List` des cliquables et n'en est retiré qu'une —
-  chaque redessin du panneau y laisse une entrée morte par élément cliquable (4 146 entrées pour 29 éléments vivants à la
-  fin de l'autotest) ; effet en jeu non mesuré (`docs/journal/2026-10-10-couche-overlay-simulee.md`).
+  synthétiques) : un défaut qui y vivrait ne s'y voit pas. **Un élément se déclare cliquable une fois chargé**
+  (`OverlayClickable.Declare`, à son `Loaded`) : déclaré avant, HDT l'inscrit deux fois dans sa `List` des cliquables (au
+  réglage, puis au `Loaded`) et ne l'en retire qu'une fois à l'`Unloaded`, d'où une entrée morte par élément à chaque
+  redessin (mesuré le 2026-10-10 dans la simulation, issue #17 : 4 146 → 4 260 entrées en trois redessins pour 29 éléments
+  chargés ; 29 pour 29 depuis). `OverlayClickableSourceTests` refuse `SetIsOverlayHitTestVisible` hors d'`OverlayClickable`
+  et de `PanelMover`, et l'autotest exige une liste sans entrée morte après trois redessins.
 - Le dépôt est **public** : aucune donnée réelle de Firestone ni de HSReplay n'y entre, et aucun pseudo, BattleTag ni
   identifiant de compte réel (un test refuse ceux qu'on a déjà purgés) ; les tests utilisent des données synthétiques.
 
