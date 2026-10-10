@@ -28,23 +28,9 @@ public class PowerInsetTests
         new(new CompGuideProgress(GuideTestData.Guide($"G{rank}", tier: 1, tierRank: rank, core: new[] { $"C{rank}" }), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), 3),
             rank, CompTargetTracker.Palette[rank - 1], kind);
 
-    [Fact]
-    public void CountAdjustable_OnlyWhileNothingIsTicked()
-    {
-        var guesses = new[] { Target(1, TargetKind.Probable), Target(2, TargetKind.Probable) };
-        var ticked = new[] { Target(1, TargetKind.Chosen), Target(2, TargetKind.InProgress) };
-        var inProgressOnly = new[] { Target(1, TargetKind.InProgress) }; // cannot happen without a tick, but no tick: adjustable
-
-        Assert.True(CompTargets.CountAdjustable(guesses));
-        Assert.True(CompTargets.CountAdjustable(Array.Empty<CompTarget>()));
-        Assert.False(CompTargets.CountAdjustable(ticked));
-        Assert.True(CompTargets.CountAdjustable(inProgressOnly));
-    }
-
     /// <summary>
-    /// With a guide ticked, the panel keeps the N lines − n + set, and grows to hold every target when there are more: sized on
-    /// the ticked guides alone (one line, often), it would hide every other guide, and with − and + dim the player could not
-    /// show them again to tick a second one (seen in the simulation on 2026-10-06: the second tick had no line to click).
+    /// The panel is sized for the N lines − n + set, and for every ticked guide when more are ticked (ticked while fewer were
+    /// wanted). With as many ticks as wanted it lists them alone (CompTargets.Listed); + shows the others again.
     /// </summary>
     [Theory]
     [InlineData(new TargetKind[0], 3, 3)]                                                      // nothing ticked: the number wanted
@@ -52,11 +38,11 @@ public class PowerInsetTests
     [InlineData(new[] { TargetKind.Probable, TargetKind.Probable }, 1, 1)]
     [InlineData(new[] { TargetKind.Chosen, TargetKind.InProgress }, 4, 4)]                    // ticked: still the N lines
     [InlineData(new[] { TargetKind.Chosen }, 3, 3)]
-    [InlineData(new[] { TargetKind.Chosen, TargetKind.InProgress, TargetKind.InProgress }, 2, 3)] // more targets than N: all of them
-    [InlineData(new[] { TargetKind.Chosen, TargetKind.Chosen, TargetKind.InProgress, TargetKind.InProgress }, 1, 4)]
+    [InlineData(new[] { TargetKind.Chosen, TargetKind.Chosen, TargetKind.Chosen }, 2, 3)]       // more ticked than N: all of them
+    [InlineData(new[] { TargetKind.Chosen, TargetKind.InProgress, TargetKind.InProgress }, 1, 1)] // in progress never widens it
     [InlineData(new TargetKind[0], 9, 4)]                                                      // out of range: brought inside
     [InlineData(new TargetKind[0], 0, 1)]
-    public void FitRows_TheNumberWanted_AndWithATickAtLeastEveryTarget(TargetKind[] kinds, int count, int expected)
+    public void FitRows_TheNumberWanted_OrEveryTickedGuide(TargetKind[] kinds, int count, int expected)
     {
         var targets = kinds.Select((k, i) => Target(i + 1, k)).ToList();
 

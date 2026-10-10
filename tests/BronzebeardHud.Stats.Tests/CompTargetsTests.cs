@@ -69,7 +69,7 @@ public class CompTargetsTests
     }
 
     [Fact]
-    public void TickedGuides_ComeFirst_InTheOrderTheyWereTicked_ThenOnlyTheGuidesInProgress_WhateverTheCount()
+    public void TickedGuides_ComeFirst_InTheOrderTheyWereTicked_ThenOnlyTheGuidesInProgress_UpToTheCount()
     {
         var board = CompGuideMatch.Rank(All, Board("X1", "X2", "Y1", "Z1"));
 
@@ -79,9 +79,54 @@ public class CompTargetsTests
         Assert.Equal(new[] { ("Ursa", TargetKind.Chosen), ("Wolf", TargetKind.Chosen), ("Xeno", TargetKind.InProgress) },
             chosen.Select(c => (c.Progress.Guide.Name, c.Kind)));
         Assert.Equal(0.0, chosen[0].Progress.Score); // ticked: a target whatever its score
-        // The count sets the automatic guesses, which ticking silences: a guide in progress is no guess, whatever the count.
-        Assert.Equal(new[] { "Ursa", "Wolf", "Xeno" }, CompTargets.Choose(board, new[] { U.Id, W.Id }, 1).Select(c => c.Progress.Guide.Name));
+        // The count is the most compositions wanted (Ali, 2026-10-10): the guides in progress fill what the ticks leave of it.
+        Assert.Equal(new[] { "Ursa", "Wolf" }, CompTargets.Choose(board, new[] { U.Id, W.Id }, 2).Select(c => c.Progress.Guide.Name));
+        Assert.Equal(new[] { "Ursa", "Wolf" }, CompTargets.Choose(board, new[] { U.Id, W.Id }, 1).Select(c => c.Progress.Guide.Name)); // never a tick dropped
         Assert.Equal(new[] { "Ursa", "Wolf", "Xeno" }, CompTargets.Choose(board, new[] { U.Id, W.Id }, 4).Select(c => c.Progress.Guide.Name));
+    }
+
+    /// <summary>
+    /// Ali, 2026-10-10: "quand on a sélectionné le nombre de compos qui correspond au nombre max, il faudrait automatiquement
+    /// update le panel pour ne laisser afficher plus qu'elles". As many ticks as compositions wanted: the panel lists the
+    /// ticked guides alone, in their tiers; fewer ticks, or none: every guide.
+    /// </summary>
+    [Fact]
+    public void AsManyTicksAsWanted_ThePanelListsTheTickedGuidesAlone()
+    {
+        var tracker = new CompTargetTracker();
+        var board = CompGuideMatch.Rank(All, Board("X1", "X2", "Y1"));
+        tracker.Toggle(W.Id);
+        tracker.Toggle(U.Id);
+
+        var two = CompTargets.Listed(board, tracker.Next(board, 2), 2);
+        Assert.Equal(new[] { "Ursa", "Wolf" }, two.All.Select(p => p.Guide.Name).OrderBy(n => n));
+        Assert.Equal(board.Tiers.Where(t => t.Rows.Any(r => r.Guide.Name is "Ursa" or "Wolf")).Select(t => t.Tier), two.Tiers.Select(t => t.Tier));
+        Assert.True(CompTargets.OnlyTicked(tracker.Targets, 2));
+
+        Assert.Same(board, CompTargets.Listed(board, tracker.Next(board, 3), 3)); // one more wanted: every guide again
+        Assert.False(CompTargets.OnlyTicked(tracker.Targets, 3));
+        Assert.Same(board, CompTargets.Listed(board, new CompTargetTracker().Next(board, 1), 1)); // nothing ticked
+    }
+
+    /// <summary>− works with ticks too (Ali, 2026-10-10), but never goes under the ticked guides; without a tick it is always live.</summary>
+    [Theory]
+    [InlineData(0, 3, true)]
+    [InlineData(0, 1, true)]   // no tick: a press at 1 sizes the panel again, as before
+    [InlineData(2, 3, true)]
+    [InlineData(2, 2, false)]  // two ticked, two wanted: untick to go lower
+    [InlineData(3, 2, false)]  // ticked while fewer were wanted
+    [InlineData(1, 4, true)]
+    public void Minus_WithTicks_NeverUnderTheTickedGuides(int ticked, int count, bool minus)
+    {
+        var tracker = new CompTargetTracker();
+        foreach (var guide in new[] { U, V, W, X }.Take(ticked))
+        {
+            tracker.Toggle(guide.Id);
+        }
+
+        var targets = tracker.Next(CompGuideMatch.Rank(All, Board("Y1")), count);
+
+        Assert.Equal(minus, CompTargets.CanDecrease(targets, count));
     }
 
     [Fact]
@@ -115,14 +160,15 @@ public class CompTargetsTests
     }
 
     [Fact]
-    public void WithTicks_GuidesInProgress_FillOnlyWhatFourTargetsLeave()
+    public void WithTicks_GuidesInProgress_FillOnlyWhatTheCountLeaves()
     {
-        // Xeno, Yeti and Zeal are all in progress; three ticked guides leave room for one: the most probable.
+        // Xeno, Yeti and Zeal are all in progress; three ticked guides of four wanted leave room for one: the most probable.
         var board = CompGuideMatch.Rank(All, Board("X1", "X2", "Y1", "Y2", "Z1", "Z2", "X1_G"));
 
-        var chosen = CompTargets.Choose(board, new[] { U.Id, W.Id, V.Id }, 3);
+        var chosen = CompTargets.Choose(board, new[] { U.Id, W.Id, V.Id }, 4);
 
         Assert.Equal(new[] { "Ursa", "Wolf", "Vile", "Xeno" }, chosen.Select(c => c.Progress.Guide.Name));
+        Assert.Equal(new[] { "Ursa", "Wolf", "Vile" }, CompTargets.Choose(board, new[] { U.Id, W.Id, V.Id }, 3).Select(c => c.Progress.Guide.Name));
     }
 
     [Fact]

@@ -31,8 +31,9 @@ namespace BronzebeardHud.HdtPlugin;
 /// together, from the hero selection on, in the shop and in combat, and on the screen while a choice is open (Ali, 2026-10-08: always visible). Its height
 /// (Ali, 2026-10-06: "with Move panels we set the window's default size and place; a press on + or − resizes the window to
 /// show the N best compositions"): a panel never resized by its handle is always sized to its content, N guide lines (− n +,
-/// or with a tick the targets shown: CompTargets.FitRows) and the inset; a panel resized by its handle keeps that box — its
-/// default size — until + or − is pressed in a game, then is sized to its content for the rest of the game. Sized to its
+/// or more ticked guides: CompTargets.FitRows) and the inset; a panel resized by its handle keeps that box — its
+/// default size — until + or − is pressed in a game, or as many guides are ticked as are wanted (Ali, 2026-10-10: the panel
+/// then lists them alone, CompTargets.Listed), then is sized to its content for the rest of the game. Sized to its
 /// content, it keeps the top of its box, or its bottom when the box is against the bottom, and grows up when there is no room
 /// below (PanelGrowth), never onto the game's zones. In move mode it shows its box, the one the handle edits.
 /// Nothing is shrunk: every piece is built and measured in place, then what fits is shown (CompGuideLayout:
@@ -112,6 +113,7 @@ internal sealed class CompsPanel
     // + or − was pressed in this game (outside move mode): a panel resized by its handle is sized to its content from then on,
     // until the next game or a switch of move mode. A panel never resized always is — "Reset panel positions" makes it one.
     private bool _fitted;
+    private bool _onlyTicked; // the last Show listed the ticked guides alone (CompTargets.OnlyTicked)
 
     // A press on + or − asks for one log line once the panel is resized: at the next redraw that comes with the targets the
     // new number gives (Show), or at once when the number did not change (already 1 or 4).
@@ -293,7 +295,10 @@ internal sealed class CompsPanel
     /// <summary>When false, no tick boxes (the comp-selection feature was switched off by its guard).</summary>
     public bool SelectionEnabled { get; set; } = true;
 
-    /// <param name="board">The lobby's guides ranked against the player's board and hand (CompTargets.Round: LobbyGuides.Playable).</param>
+    /// <param name="board">
+    /// The lobby's guides ranked against the player's board and hand (CompTargets.Round: LobbyGuides.Playable); listed whole,
+    /// or the ticked guides alone when as many are ticked as are wanted (CompTargets.Listed).
+    /// </param>
     /// <param name="targets">The targets and their colours (CompTargetTracker.Next).</param>
     /// <param name="held">Base card ids of the player's board and hand: the green rings.</param>
     /// <param name="source">CompGuideSources.HdtFree or HdtTier7; null when HDT shows no guides.</param>
@@ -301,8 +306,16 @@ internal sealed class CompsPanel
     /// <param name="note">A muted line under the title ("Lobby tribes unknown: every guide listed"), or null.</param>
     public void Show(CompGuideBoard board, IReadOnlyList<CompTarget> targets, IEnumerable<string> held, string? source, string? status, string? note = null)
     {
-        _board = board;
+        _board = CompTargets.Listed(board, targets, _count());
         _targets = targets;
+        var onlyTicked = CompTargets.OnlyTicked(targets, _count());
+        if (onlyTicked && !_onlyTicked && !_mover.MoveMode)
+        {
+            _fitted = true; // as on + or −: the panel shrinks to the ticked guides, whatever box the handle gave it
+            _log($"Bronzebeard HUD: ticked guides fill the {_count()} compositions wanted: only they are listed");
+        }
+
+        _onlyTicked = onlyTicked;
         _held = new HashSet<string>(held, StringComparer.Ordinal);
         _source = source;
         _status = status;
@@ -691,13 +704,12 @@ internal sealed class CompsPanel
             right.Children.Add(meta);
         }
 
-        // How many targets: − and + set it, in the inset under the frame. A tick silences the automatic guesses, which the
-        // number counts: with a guide ticked, the targets are the ticked guides and the guides in progress (CompTargets.Choose),
-        // − and + have nothing to change (dim), and the title counts what was chosen.
+        // How many compositions: − and + set it, in the inset under the frame, ticked ones included (CompTargets.Choose). With
+        // a guide ticked the title says how many of them are chosen: "2/3 chosen"; as many as wanted, the list holds them alone.
         var chosen = _targets.Count(t => t.Ticked);
-        var n = chosen > 0 ? chosen : _count();
+        var n = _count();
         var count = Text(chosen > 0
-                ? $"{n.ToString(CultureInfo.InvariantCulture)} chosen"
+                ? $"{chosen.ToString(CultureInfo.InvariantCulture)}/{Math.Max(n, chosen).ToString(CultureInfo.InvariantCulture)} chosen"
                 : $"{n.ToString(CultureInfo.InvariantCulture)} target{(n == 1 ? string.Empty : "s")}",
             PanelTypography.Small, scale, MutedBrush);
         count.TextWrapping = TextWrapping.NoWrap;
@@ -727,7 +739,7 @@ internal sealed class CompsPanel
 
     /// <summary>
     /// The power inset: the player's row and the opponent's (BoardPowerView), each drawn under its own guard, between − on the
-    /// left and + on the right, dim and without effect while a guide is ticked (CompTargets.CountAdjustable). Returns which
+    /// left and + on the right; − dim and without effect once the number wanted is the ticked guides' (CompTargets.CanDecrease). Returns which
     /// rows were drawn (a row switched off by its guard is not).
     /// </summary>
     private (bool Own, bool Opponent) BuildInset(double scale)
@@ -753,9 +765,8 @@ internal sealed class CompsPanel
         var own = AddRow(_powerRun, _power, BoardPowerView.Own);
         var opponent = AddRow(_opponentRun, _opponent, BoardPowerView.Opponent);
 
-        var adjustable = CompTargets.CountAdjustable(_targets);
-        var minus = PanelButton("−", scale, () => OnCountClicked(-1), enabled: adjustable);
-        var plus = PanelButton("+", scale, () => OnCountClicked(+1), enabled: adjustable);
+        var minus = PanelButton("−", scale, () => OnCountClicked(-1), enabled: CompTargets.CanDecrease(_targets, _count()));
+        var plus = PanelButton("+", scale, () => OnCountClicked(+1), enabled: true);
         minus.Tag = MinusTag;
         plus.Tag = PlusTag;
         minus.Margin = new Thickness(0, 0, 6 * scale, 0);

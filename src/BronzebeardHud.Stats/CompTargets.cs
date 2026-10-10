@@ -110,15 +110,16 @@ public static class CompTargets
     /// of them (<see cref="CompGuideBoard.Ranked"/>; <see cref="TargetKind.Probable"/>).</para>
     /// <para>Something ticked: the ticked guides first, in the order they were ticked (<see cref="TargetKind.Chosen"/>), then
     /// the guides in progress (<see cref="IsInProgress"/>, <see cref="TargetKind.InProgress"/>), most probable first, as many
-    /// as the four places leave, whatever <paramref name="count"/>. A tick names where the player wants to go: it silences the
-    /// guesses (a guide of one key card), so that the frames on Bob's cards and the labels of choices speak for his choice,
-    /// but never what he is already building (Ali, 2026-10-06: "when I click a checkbox it removes other compositions, I think
-    /// the ones I was already playing"). <paramref name="count"/> only sets how many guesses there are.</para>
+    /// as <paramref name="count"/> leaves (Ali, 2026-10-10: the number is the most compositions wanted, ticks included; a tick
+    /// is never dropped for it). A tick names where the player wants to go: it silences the guesses (a guide of one key card),
+    /// so that the frames on Bob's cards and the labels of choices speak for his choice, but not what he is already building
+    /// while the count leaves room (Ali, 2026-10-06: "when I click a checkbox it removes other compositions, I think the ones
+    /// I was already playing").</para>
     /// <para>Stability: at an equal score, a guide that was a target (<paramref name="previous"/>) keeps its place against one
     /// that was not; it takes a higher score to replace it.</para>
     /// </summary>
     /// <param name="ticked">Guide ids (<see cref="CompGuide.Id"/>), in the order they were ticked; an id the board does not know is skipped.</param>
-    /// <param name="count">Automatic targets wanted when nothing is ticked, 1 to <see cref="HudSettings.MaxSuggested"/> (brought inside).</param>
+    /// <param name="count">Compositions wanted, ticked ones included, 1 to <see cref="HudSettings.MaxSuggested"/> (brought inside).</param>
     /// <param name="previous">The ids of the targets of the round before; null or empty: none.</param>
     public static IReadOnlyList<ChosenGuide> Choose(CompGuideBoard board, IReadOnlyList<string> ticked, int count, IReadOnlyCollection<string>? previous = null)
     {
@@ -139,7 +140,7 @@ public static class CompTargets
             .Select(id => new ChosenGuide(byId[id], TargetKind.Chosen))
             .ToList();
         var anyTicked = chosen.Count > 0;
-        var room = anyTicked ? CompTargetTracker.MaxTicked - chosen.Count : count;
+        var room = count - chosen.Count;
         var was = new HashSet<string>(previous ?? Array.Empty<string>(), StringComparer.Ordinal);
         var taken = new HashSet<string>(chosen.Select(c => c.Progress.Guide.Id), StringComparer.Ordinal);
 
@@ -208,22 +209,51 @@ public static class CompTargets
     }
 
     /// <summary>
-    /// Whether − and + may change the number of targets: not while a guide is ticked. A tick silences the guesses, which the
-    /// number counts (<see cref="Choose"/>): with a guide ticked the targets are the ticked guides and the guides in progress,
-    /// and − n + has nothing to change (drawn dim, a click does nothing).
+    /// − is live with ticks too (Ali, 2026-10-10: "on devrait pouvoir modifier le nombre de compos max une fois qu'on a
+    /// sélectionné des compos"), but never under the ticked guides: dim once the number wanted is theirs, untick to go lower.
+    /// Without a tick it is always live (at 1 a press sizes the panel again, as + does at 4; + is never dim).
     /// </summary>
-    public static bool CountAdjustable(IReadOnlyList<CompTarget> targets) => !targets.Any(t => t.Ticked);
+    public static bool CanDecrease(IReadOnlyList<CompTarget> targets, int count)
+    {
+        var ticked = targets.Count(t => t.Ticked);
+        return ticked == 0 || count > ticked;
+    }
 
     /// <summary>
-    /// How many guide lines the panel is sized for when it fits its content (PanelGrowth): the number wanted (− n +, 1 to 4);
-    /// with a guide ticked, that number still, or every target when there are more (the ticked guides and the guides in
-    /// progress, four at most). Sized on the ticked guides alone, the panel would hide every other guide, and − and + being
-    /// dim, the player could not show them again to tick another one.
+    /// As many guides ticked as compositions wanted (or more): the panel lists them alone (<see cref="Listed"/>, Ali,
+    /// 2026-10-10); + shows the other guides again.
+    /// </summary>
+    public static bool OnlyTicked(IReadOnlyList<CompTarget> targets, int count)
+    {
+        var ticked = targets.Count(t => t.Ticked);
+        return ticked > 0 && ticked >= Math.Max(HudSettings.MinSuggested, Math.Min(HudSettings.MaxSuggested, count));
+    }
+
+    /// <summary>What the panel lists: the ticked guides alone, in their tiers, when <see cref="OnlyTicked"/>; the board otherwise.</summary>
+    public static CompGuideBoard Listed(CompGuideBoard board, IReadOnlyList<CompTarget> targets, int count)
+    {
+        if (!OnlyTicked(targets, count))
+        {
+            return board;
+        }
+
+        var ticked = new HashSet<string>(targets.Where(t => t.Ticked).Select(t => t.Guide.Id), StringComparer.Ordinal);
+        var tiers = board.Tiers
+            .Select(t => new CompGuideBoardTier(t.Tier, t.Rows.Where(p => ticked.Contains(p.Guide.Id)).ToList()))
+            .Where(t => t.Rows.Count > 0)
+            .ToList();
+        return new CompGuideBoard(tiers, board.Highlighted.Where(p => ticked.Contains(p.Guide.Id)).ToList(),
+            ranked: board.Ranked.Where(p => ticked.Contains(p.Guide.Id)).ToList());
+    }
+
+    /// <summary>
+    /// How many guide lines the panel is sized for when it fits its content (PanelGrowth): the number wanted (− n +, 1 to 4),
+    /// or every ticked guide when more are ticked (ticked while fewer were wanted).
     /// </summary>
     public static int FitRows(IReadOnlyList<CompTarget> targets, int count)
     {
         var wanted = Math.Max(HudSettings.MinSuggested, Math.Min(HudSettings.MaxSuggested, count));
-        return CountAdjustable(targets) ? wanted : Math.Max(wanted, Math.Min(CompTargetTracker.MaxTicked, targets.Count));
+        return Math.Max(wanted, targets.Count(t => t.Ticked));
     }
 
     /// <summary>The target for a guide, or null when it is not one.</summary>
@@ -331,7 +361,7 @@ public sealed class CompTargetTracker
     /// order. Colours of guides that are no longer targets are freed. Calling it again with the same board changes nothing.
     /// </summary>
     /// <param name="board">The guides ranked against the player's board and hand (<see cref="CompGuideMatch.Rank"/>).</param>
-    /// <param name="count">Automatic targets wanted (HudSettings.SuggestedCompositions, 1 to 4); ignored while a guide is ticked.</param>
+    /// <param name="count">Compositions wanted (HudSettings.SuggestedCompositions, 1 to 4), ticked ones included.</param>
     public IReadOnlyList<CompTarget> Next(CompGuideBoard board, int count)
     {
         var chosen = CompTargets.Choose(board, _ticked, count, _slots.Keys.ToList());

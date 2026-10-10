@@ -160,7 +160,8 @@ internal static class SelfTest
     /// Discover (one each: guesses). Ticking Pirate Discover makes it the first target, keeps Elemental Cycle in its colour
     /// with "in progress" under its name, and silences Beast Deathrattle; Bob's frames are then Pirate Discover's alone
     /// (2026-10-07: a guide in progress frames nothing once a guide is ticked); a second tick adds a chosen
-    /// guide; − and + are dim and do nothing; unticking everything gives back the automatic targets in the colours they had.
+    /// guide; − lowers the number to the two ticked guides, which the panel then lists alone, and is dim there, + shows the
+    /// others again (Ali, 2026-10-10); unticking everything gives back the automatic targets in the colours they had.
     /// The boxes are clicked as the mouse would (their Click event), found in the line of the guide named, never by place.
     /// </summary>
     private static void TickChecks(HarnessWindow window, Action<string, bool, string> check)
@@ -198,29 +199,36 @@ internal static class SelfTest
         check("ticking a guide: it comes first, the guide in progress stays in its colour and says so, the guess leaves; Bob's frames are the ticked guide's alone",
             clicked && one.Select(t => (t.Guide.Name, t.Kind)).SequenceEqual(new[] { ("Pirate Discover", TargetKind.Chosen), ("Elemental Cycle", TargetKind.InProgress) })
             && one.All(t => colourOf.TryGetValue(t.Guide.Name, out var c) && c == t.Colour) && caption && captions == 1
-            && frames.SequenceEqual(new[] { "Pirate Discover" }) && FindText(comps, "1 chosen") != null,
+            && frames.SequenceEqual(new[] { "Pirate Discover" }) && FindText(comps, "1/3 chosen") != null,
             $"{Kinds(one)}; \"in progress\" under Elemental Cycle: {caption} ({captions} drawn); frames for [{string.Join(", ", frames)}]; "
-            + $"title: {(FindText(comps, "1 chosen") != null ? "1 chosen" : "not 1 chosen")}");
+            + $"title: {(FindText(comps, "1/3 chosen") != null ? "1/3 chosen" : "not 1/3 chosen")}");
 
         ClickBoxOf(window, "Undead Butcher");
         window.UpdateLayout();
         var two = window.Targets.ToList();
         check("ticking a second one adds it after the first, the guide in progress still after them",
             two.Select(t => (t.Guide.Name, t.Kind)).SequenceEqual(new[] { ("Pirate Discover", TargetKind.Chosen), ("Undead Butcher", TargetKind.Chosen), ("Elemental Cycle", TargetKind.InProgress) })
-            && FindText(comps, "2 chosen") != null, Kinds(two));
+            && FindText(comps, "2/3 chosen") != null, Kinds(two));
 
-        // − and + are dim, and a click on either changes nothing. One at a time and on the count itself: the log lines of
-        // a click reach the window's list later, through the dispatcher, and − then + would cancel out.
-        var minus = FindText(comps, "−");
-        var plus = FindText(comps, "+");
+        // − with two guides ticked of three wanted: two wanted, the two ticked guides alone in the list (the guide in progress
+        // leaves), − dim there; a second − changes nothing; + gives three again and the whole list. One press at a time, on
+        // the count itself: the log lines of a click reach the window's list later, through the dispatcher.
         var wanted = window.Count;
         var clickedMinus = Click(comps, "−");
+        window.UpdateLayout();
         var afterMinus = window.Count;
+        var listedAlone = window.Comps.ShownLines.Keys.OrderBy(k => k).SequenceEqual(window.Targets.Where(t => t.Ticked).Select(t => t.Guide.Id).OrderBy(k => k));
+        var dim = FindText(comps, "−")?.Parent is Border { Opacity: < 1 } && FindText(comps, "2/2 chosen") != null;
+        Click(comps, "−");
+        window.UpdateLayout();
+        var afterSecond = window.Count;
         var clickedPlus = Click(comps, "+");
         window.UpdateLayout();
-        check("− and + are dim and do nothing while a guide is ticked", clickedMinus && clickedPlus && afterMinus == wanted && window.Count == wanted
-            && minus?.Parent is Border { Opacity: < 1 } && plus?.Parent is Border { Opacity: < 1 } && window.Targets.Count == 3,
-            $"clicked: {clickedMinus}/{clickedPlus}, count {wanted} -> {afterMinus} -> {window.Count}, opacity {(minus?.Parent as Border)?.Opacity}/{(plus?.Parent as Border)?.Opacity}, {window.Targets.Count} targets");
+        var whole = window.Comps.ShownLines.Count > 2;
+        check("− and + with two guides ticked: − to two lists them alone and is dim there, + shows the others again",
+            clickedMinus && clickedPlus && afterMinus == wanted - 1 && afterSecond == afterMinus && listedAlone && dim && window.Count == wanted && whole
+            && window.Targets.Count == 3,
+            $"count {wanted} -> {afterMinus} -> {afterSecond} -> {window.Count}, listed alone {listedAlone}, − dim and 2/2 {dim}, whole list again {whole}, {window.Targets.Count} targets");
 
         ClickBoxOf(window, "Undead Butcher");
         window.UpdateLayout();

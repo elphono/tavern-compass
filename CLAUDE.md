@@ -61,7 +61,7 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
 | Notre mod anti-danse | 2026-10-10 (Ali) : **observer d'abord** une danse réelle sans le mod (journal `[Zone]`, `tools/nodance-observe.py`) ; le mod reste **non installé** ; publication **discrète** (`README.md` et `ROADMAP.md` n'en parlent pas, l'issue #1 reste ouverte tant que rien n'est vu en jeu) |
 | Simulateur npm `simulate-bgs-battle` | usage personnel, autorisé ; inutile tant que Bob's Buddy (HDT) fait le travail |
 | MMR des adversaires | gardé tel quel. Le leaderboard EU s'arrête à 8 000 ; Ali est à ≈ 6 840 (région EU mesurée) ; plage par défaut 8 000 – 8 050 |
-| Arbitrages du 2026-10-08 | Les cibles se classent sur **plateau + main** ; une case cochée garde **N lignes, au moins toutes les cibles** ; la taille donnée par + / − **revient à celle de la poignée** à la partie suivante ; la ligne « comp ≈ » de l'encart des héros est **retirée** (17 parties en médiane) ; le bilan par adversaire est parti avec le panneau Combats (2026-09-27) ; valeur d'une carte : **moins de bruit**, le seuil de 200 parties reste (≈ une carte sur deux sans valeur, mesuré) |
+| Arbitrages du 2026-10-08 | Les cibles se classent sur **plateau + main** ; une case cochée garde **N lignes, au moins toutes les cibles** (revu le 2026-10-10 : N compte les cochées, voir « Cibles ») ; la taille donnée par + / − **revient à celle de la poignée** à la partie suivante ; la ligne « comp ≈ » de l'encart des héros est **retirée** (17 parties en médiane) ; le bilan par adversaire est parti avec le panneau Combats (2026-09-27) ; valeur d'une carte : **moins de bruit**, le seuil de 200 parties reste (≈ une carte sur deux sans valeur, mesuré) |
 | Visibilité | dépôt GitHub **public** (privé du 2026-09-26 au 2026-10-06). Le 2026-10-07 (Ali) : licence MIT, nom « Tavern Compass », historique purgé de ses données personnelles (BattleTags, pseudo d'adversaire, numéros de compte, bundle Rust), nom affiché dans HDT changé sans toucher aux noms internes |
 
 ## Façon de travailler sur ce projet
@@ -166,7 +166,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 - **Hauteur réglée par + / −** (Ali, 2026-10-06 : « avec move panel on détermine la taille et l'emplacement par défaut ; un
   appui sur les + ou − resize la fenêtre pour afficher les N meilleurs compos »). Hors mode déplacement, un panneau
   **jamais redimensionné par sa poignée** est toujours dimensionné sur son contenu : N lignes (`CompTargets.FitRows` :
-  − n + ; avec une case cochée, au moins toutes les cibles), la barre de titre et l'encart ; « Reset panel positions »
+  − n + ; plus de cases cochées que n : toutes les cochées), la barre de titre et l'encart ; « Reset panel positions »
   le remet dans ce cas. Un panneau **redimensionné par sa poignée** garde sa boîte (sa taille par défaut) jusqu'à un appui
   sur + ou − dans la partie, puis est dimensionné sur son contenu jusqu'à la partie suivante (`CompsPanel.Hide`) ou un
   changement de mode déplacement ; en mode déplacement on voit toujours la boîte que la poignée édite. Le détail d'un
@@ -211,16 +211,22 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   une ligne grise « Lobby tribes unknown: every guide listed ». Titre : « Compositions », « k of n shown »
   quand des guides manquent, la source (« HDT free » / « Tier 7 »), « Meta ↗ », « n targets » (1 à 4, 3 par défaut,
   gardé dans `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}` ; dès qu'une
-  compo est cochée il dit « k chosen ») ; une ligne dorée tant que HDT n'a pas de guides. **− et + sont dans l'encart de
+  compo est cochée il dit « k/n chosen ») ; une ligne dorée tant que HDT n'a pas de guides. **− et + sont dans l'encart de
   puissance**, sous le cadre (− à gauche, + à droite, depuis le 2026-10-06) : ils changent n et redimensionnent le panneau
-  (ci-dessus) ; grisés et sans effet dès qu'une compo est cochée (`CompTargets.CountAdjustable`).
+  (ci-dessus). Avec des cases cochées aussi (Ali, 2026-10-10 : « on devrait pouvoir modifier le nombre de compos max une fois
+  qu'on a sélectionné des compos ») : − est grisé seulement quand n égale le nombre de cochées (décocher pour descendre,
+  `CompTargets.CanDecrease`), + ne l'est jamais (à 4, un appui redimensionne le panneau sur son contenu).
 - **Cibles** (`CompTargetTracker`, `CompTargets.Choose`) : **une case cochée désigne la compo visée sans effacer ce qu'on
   construit** (Ali, 2026-10-04 : « une compo checkboxée est une compo vers laquelle on veut se diriger » ; 2026-10-06 :
   « quand je click sur une checkbox ça enlève d'autres compos […] celles que j'étais en train de jouer »). S'il y a des
   guides cochés (quatre au plus, ordre de coche) : eux d'abord (`TargetKind.Chosen`), puis les guides **en cours**
   (`InProgress` : deux cartes clés tenues, plateau + main, ou toutes celles d'un guide qui en a moins ; « in progress » sous
-  leur nom), dans la limite de quatre cibles ; les paris (une seule carte clé) se taisent, et − n + (qui compte les paris)
-  est grisé. Sur les cartes de Bob, seuls les guides cochés encadrent alors (2026-10-07, « Taverne » ci-dessous). Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
+  leur nom), **jusqu'à n** (depuis le 2026-10-10, Ali : n est le nombre de compos voulu, cochées comprises ; une cochée
+  n'est jamais retirée pour lui) ; les paris (une seule carte clé) se taisent. **Autant de cochées que n** (Ali, 2026-10-10 :
+  « quand on a sélectionné le nombre de compos qui correspond au nombre max il faudrait automatiquement update le panel pour
+  ne laisser afficher plus qu'elles ») : le panneau ne liste plus qu'elles, dans leurs tiers (`CompTargets.Listed`), et se
+  redimensionne sur elles comme après + / − (journal `ticked guides fill the n compositions wanted: only they are listed`) ;
+  + rend la liste entière. Sur les cartes de Bob, seuls les guides cochés encadrent alors (2026-10-07, « Taverne » ci-dessous). Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
   `CompGuideMatch`), jusqu'à n (− n +) ; à score égal, une cible du tour d'avant garde sa place (il faut un score plus
   haut pour la remplacer). Tout décocher rend les cibles automatiques. Une cible garde sa
   couleur tant qu'elle le reste (magenta, lime, bleu ciel, blanc), cases et couleurs sont oubliées à la partie suivante.
