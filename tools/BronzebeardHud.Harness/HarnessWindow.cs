@@ -8,6 +8,7 @@ using BronzebeardHud.Stats;
 using BronzebeardHud.Stats.Tests;
 using Hearthstone_Deck_Tracker.Hearthstone;
 using Hearthstone_Deck_Tracker.Utility.Assets;
+using Hearthstone_Deck_Tracker.Utility.Extensions;
 using Hearthstone_Deck_Tracker.Utility.Logging;
 
 namespace BronzebeardHud.Harness;
@@ -82,6 +83,13 @@ internal sealed class HarnessWindow : Window
     private bool _skipShown = true;
 
     public Canvas Overlay { get; }
+
+    /// <summary>
+    /// HDT's overlay window around the panels (HdtOverlay): it keeps the elements the panels declare clickable or hoverable
+    /// from the start, and drives the scene only while its injected mouse runs (--mouse, the self-test's "mouse" checks).
+    /// </summary>
+    public HdtOverlay Hdt { get; }
+
     public CompsPanel Comps { get; }
     public TavernMarkers Markers { get; }
     public bool MoveMode => _mover.MoveMode;
@@ -225,8 +233,9 @@ internal sealed class HarnessWindow : Window
 
     /// <summary>
     /// What the guide popup is told of the cursor when a line raises MouseLeave (is it still within the line?); null: the
-    /// real cursor (GuidePopup.IsCursorOver). The self-test sets it: a parked window never has the real cursor over it, and
-    /// "still over" is the case HDT's click-through window produces.
+    /// injected cursor while the injected mouse runs (HdtOverlay.IsCursorOver), the real one otherwise (GuidePopup.IsCursorOver).
+    /// The self-test sets it for its hand-raised events: a parked window never has the real cursor over it, and "still over"
+    /// is the case HDT's click-through window produces.
     /// </summary>
     public Func<FrameworkElement, bool>? CursorInside { get; set; }
 
@@ -280,7 +289,7 @@ internal sealed class HarnessWindow : Window
     public FrameworkElement Hover(string which)
     {
         var line = LineOf(which);
-        line.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount) { RoutedEvent = MouseEnterEvent });
+        line.RaiseEvent(new ProbeMouseEventArgs(MouseEnterEvent));
         return line;
     }
 
@@ -306,6 +315,118 @@ internal sealed class HarnessWindow : Window
 
         return line;
     }
+
+    /// <summary>
+    /// A left click where the injected cursor is (HdtOverlay.Click): to the game where the window is click-through, else to
+    /// what WPF hits. A layout file that did not exist before is removed again (a click in move mode drops a panel).
+    /// </summary>
+    public OverlayClick MouseClick()
+    {
+        OverlayClick? click = null;
+        KeepingNoLayoutFile(() => click = Hdt.Click());
+        return click!;
+    }
+
+    /// <summary>After each move of --mouse: long enough for the probe to run at least once (HdtOverlay.ProbeDelayMilliseconds).</summary>
+    public const int MouseSettleMilliseconds = 50;
+
+    /// <summary>
+    /// Runs the steps of --mouse with the injected mouse (HdtOverlay), separated by ";": a place to move to
+    /// (<see cref="MousePoint"/>), "nudge" (one pixel to the right: another move, at about the same place, which WPF sees
+    /// once the window catches the mouse), "click", "wait:ms". Each move is followed by <see cref="MouseSettleMilliseconds"/>.
+    /// The injected mouse keeps running after the last step, as the cursor would stay there.
+    /// </summary>
+    public void RunMouse(string steps)
+    {
+        Hdt.Start();
+        foreach (var step in steps.Split(';').Select(s => s.Trim()).Where(s => s.Length > 0))
+        {
+            // Lines rebuilt by the step before are loaded only once the dispatcher delivers their Loaded, and HDT's probe,
+            // as its copy, ignores an element not loaded: let it deliver, then lay out.
+            Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { }));
+            UpdateLayout();
+            if (step == "click")
+            {
+                MouseClick();
+            }
+            else if (step.StartsWith("wait:", StringComparison.Ordinal))
+            {
+                Headless.Pump(int.Parse(step.Substring("wait:".Length), CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                var to = step == "nudge"
+                    ? Hdt.Cursor is { } at ? new Point(at.X + 1, at.Y) : throw new ArgumentException("--mouse nudge: move somewhere first")
+                    : MousePoint(step);
+                Log.Info($"simulated mouse: {step} → ({to.X:0},{to.Y:0})");
+                Hdt.Move(to);
+                Headless.Pump(MouseSettleMilliseconds);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Where a step of --mouse points, on the canvas: "x,y" (pixels), "out" (a corner, on nothing), "title" (the panel's
+    /// title, "Compositions"), "line:g" (the background of guide g's line: on no element declared clickable), "name:g" (the
+    /// name of that line, declared clickable), "oval:g:k" (its k-th oval), "pin:k" (the k-th ◇ above Bob's cards, from the
+    /// left), "skip" (the Skip combat button). g is a target's rank or a guide's name, as for --hover. Throws when the
+    /// place is not drawn.
+    /// </summary>
+    public Point MousePoint(string target)
+    {
+        var parts = target.Split(':');
+        var numbers = target.Split(',');
+        if (numbers.Length == 2 && double.TryParse(numbers[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var x)
+                                && double.TryParse(numbers[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var y))
+        {
+            return new Point(x, y);
+        }
+
+        switch (parts[0])
+        {
+            case "out":
+                return new Point(1, 1);
+            case "title":
+                return Hdt.CentreOf(Descendants(Comps.Element).OfType<TextBlock>().FirstOrDefault(t => t.IsVisible && t.Text == "Compositions")
+                                    ?? throw new ArgumentException("--mouse title: the panel shows no \"Compositions\" title"));
+            case "line" when parts.Length == 2:
+                var line = LineOf(parts[1]);
+                return Hdt.BackgroundOf(line) ?? throw new ArgumentException($"--mouse {target}: the line has no place off its clickable parts (loaded {line.IsLoaded}; declared clickable at its centre: "
+                                                                              + string.Join(", ", Hdt.ClickablesAt(Hdt.CentreOf(line)).Select(HdtOverlay.Describe)) + ")");
+            case "name" when parts.Length == 2:
+                return Hdt.CentreOf(NameOf(parts[1]));
+            case "oval" when parts.Length == 3:
+                var ovals = Ovals(LineOf(parts[1]));
+                var k = int.Parse(parts[2], CultureInfo.InvariantCulture);
+                return k >= 1 && k <= ovals.Count ? Hdt.CentreOf(ovals[k - 1]) : throw new ArgumentException($"--mouse {target}: the line has {ovals.Count} ovals");
+            case "pin" when parts.Length == 2:
+                var pins = PinButtons();
+                var n = int.Parse(parts[1], CultureInfo.InvariantCulture);
+                return n >= 1 && n <= pins.Count ? Hdt.CentreOf(pins[n - 1]) : throw new ArgumentException($"--mouse {target}: {pins.Count} ◇ drawn");
+            case "skip":
+                return Hdt.CentreOf(Overlay.Children.OfType<Border>().Select(b => b.Child).OfType<Border>()
+                                        .FirstOrDefault(b => b.IsVisible && OverlayExtensions.GetIsOverlayHitTestVisible(b) && b.Child is TextBlock { Text: "Skip combat" })
+                                    ?? throw new ArgumentException("--mouse skip: the Skip combat button is not shown"));
+            default:
+                throw new ArgumentException($"--mouse: unknown step \"{target}\" (x,y, out, title, line:g, name:g, oval:g:k, pin:k, skip, nudge, click, wait:ms)");
+        }
+    }
+
+    /// <summary>The name of a guide's line: the element declared clickable in it that shows the guide's name.</summary>
+    public FrameworkElement NameOf(string which)
+    {
+        var guide = GuideOf(which) ?? throw new ArgumentException($"no guide \"{which}\"");
+        return Descendants(LineOf(which)).OfType<FrameworkElement>()
+                   .FirstOrDefault(e => OverlayExtensions.GetIsOverlayHitTestVisible(e) && Descendants(e).OfType<TextBlock>().Any(t => t.Text == guide.Name))
+               ?? throw new ArgumentException($"the line of {guide.Name} has no clickable name");
+    }
+
+    /// <summary>The ◇ (or ◆) buttons above Bob's cards, left to right, as TavernMarkers draws them.</summary>
+    public IReadOnlyList<Border> PinButtons() =>
+        Overlay.Children.OfType<Border>()
+            .Where(b => b.IsVisible && OverlayExtensions.GetIsOverlayHitTestVisible(b) && b.Child is TextBlock { Text: "◇" or "◆" })
+            .OrderBy(Canvas.GetLeft)
+            .ToList();
 
     /// <summary>The card ovals of a line of the list, left to right: what shows a card's preview on hover.</summary>
     public static IReadOnlyList<FrameworkElement> Ovals(FrameworkElement line) =>
@@ -368,6 +489,8 @@ internal sealed class HarnessWindow : Window
         Overlay = new Canvas { Width = options.Size.Width, Height = options.Size.Height, Background = new SolidColorBrush(Color.FromRgb(0x1B, 0x22, 0x30)), ClipToBounds = true };
         Overlay.SizeChanged += (_, _) => DrawScene();
 
+        // Before any panel: it keeps what they declare clickable or hoverable, from their first element on.
+        Hdt = new HdtOverlay(Overlay);
         _mover = new PanelMover(Overlay, LayoutPath);
         Comps = new CompsPanel(Overlay, _mover, ToggleGuide, () => _count, ChangeCount, () => Log.Info("Meta clicked"),
             guide => GuidePivots.For(guide, _lobby.Playable, Held()),
@@ -386,7 +509,7 @@ internal sealed class HarnessWindow : Window
                 action();
             }),
             line => Log.Info(line),
-            element => CursorInside?.Invoke(element) ?? GuidePopup.IsCursorOver(element));
+            element => CursorInside?.Invoke(element) ?? (Hdt.Running ? Hdt.IsCursorOver(element) : GuidePopup.IsCursorOver(element)));
         Comps.Bracket = (BracketChoice.Label(_bracket), NextBracket);
         ResetGuards();
         Markers = new TavernMarkers(Overlay, id => Log.Info($"pin toggled: {id}"));
@@ -396,7 +519,18 @@ internal sealed class HarnessWindow : Window
         // and its fetcher refuses the network, so that a poll added one day fails loudly instead of downloading.
         _choices = new ChoiceAdvicePanel(Overlay, new StatsCache(Path.Combine(_folder, "stats"), new NoNetwork(), () => DateTimeOffset.UtcNow));
         Overlay.SizeChanged += (_, _) => LogChoice(); // after the panel's own handler: the labels at the new size
-        _mover.ToggleMoveMode(); // move mode on from the start: the harness is for moving and resizing
+        // Move mode on from the start (the harness is for moving and resizing), once the whole window is loaded, as the
+        // player switches it on in HDT over an overlay already shown. Switched on before the panel's own Loaded (the
+        // window's comes first), the panel would be declared clickable before it, and HDT's code registers such an element
+        // twice (at the setting, then at its Loaded) in a List it removes it from once: the panel would stay clickable out
+        // of move mode (HdtOverlay reproduces that list).
+        Loaded += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+        {
+            if (!_mover.MoveMode)
+            {
+                _mover.ToggleMoveMode();
+            }
+        }));
         if (options.Choice != null)
         {
             try

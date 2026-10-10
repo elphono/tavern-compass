@@ -22,8 +22,10 @@ namespace BronzebeardHud.Harness;
 /// each of its rows lights and makes glow the lamp of its level only, grey without data (PowerChecks, OpponentChecks), + and
 /// − size the panel to N lines, the best targets first, on no zone of the game, against the bottom upwards, a handle's box
 /// kept until a press, back at the next game and at "Reset" (ResizeChecks), a row that throws is left out alone
-/// (GuardChecks), nothing was logged as a warning or an error (the log read once the dispatcher has delivered it), and the
-/// layout file is the harness's own, never the real plugin's.
+/// (GuardChecks), HDT's overlay layer reproduced on an injected mouse lets clicks through outside the elements declared
+/// clickable and drives the popup and the card previews from its probe, its second "enter" and its stray "leave" changing
+/// nothing (MouseChecks), nothing was logged as a warning or an error (the log read once the dispatcher has delivered it),
+/// and the layout file is the harness's own, never the real plugin's.
 /// </summary>
 internal static class SelfTest
 {
@@ -52,6 +54,7 @@ internal static class SelfTest
             catch (Exception e)
             {
                 Check($"{name}: ran to the end", false, $"{e.GetType().Name}: {e.Message} at {e.StackTrace?.Split('\n').FirstOrDefault(l => l.Contains("SelfTest"))?.Trim()}");
+                window.Hdt.Stop();
                 window.SetMoveMode(false);
                 window.CursorInside = null;
                 window.ShowChoice(ChoiceKind.None);
@@ -137,6 +140,7 @@ internal static class SelfTest
         Group("context line", ContextChecks);
         Group("choice cover", CoverChecks);
         Group("guard", GuardChecks);
+        Group("mouse", MouseChecks);
 
         // The log lines reach the window through Dispatcher.BeginInvoke (HarnessWindow): read before they land, the list was
         // empty and the check passed on nothing. Let the dispatcher run what is queued first, then require lines.
@@ -1225,6 +1229,219 @@ internal static class SelfTest
             $"shown before {shownBefore}, hidden by move mode {hiddenByMove}, shown in move mode {popup.IsVisible}");
 
         window.CursorInside = null;
+    }
+
+    /// <summary>
+    /// HDT's overlay layer as the harness reproduces it (HdtOverlay), driven by an injected mouse: the probe runs on its own
+    /// timer and raises MouseEnter and MouseLeave from the cursor's place alone; the window catches the mouse only over the
+    /// elements declared clickable (everywhere else a click is the game's), and WPF, there only, raises its own events. Move
+    /// mode off unless said, the Skip combat button hidden, the cursor the injected one (CursorInside null). Each check reads
+    /// what the layer raised (its list of events) as well as what the plugin did: "nothing changed" after a second "enter" or
+    /// a stray "leave" proves something only if that event was raised. Last of the groups: a click in move mode drops the
+    /// panel where it was, and "Reset" forgets that place again at the end.
+    /// </summary>
+    private static void MouseChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var canvas = window.Overlay;
+        var hdt = window.Hdt;
+        var comps = window.Comps;
+        var popup = comps.Popup;
+        window.SetMoveMode(false);
+        window.ShowSkipCombat(false);
+        window.CursorInside = null;
+        window.UpdateLayout();
+        hdt.Start();
+        try
+        {
+            var outside = new Point(1, 1);
+            hdt.Move(outside);
+            Headless.Pump(500);
+            check("mouse: HDT's probe runs on its own timer (UpdateHoverable, then Task.Delay(16))", hdt.Ticks >= 5,
+                $"{hdt.Ticks} runs in {hdt.Elapsed} ms: one every {(hdt.Ticks > 0 ? hdt.Elapsed / (double)hdt.Ticks : 0):0} ms");
+
+            // A click off move mode on the panel's title: no element declared clickable there, the window is click-through.
+            var title = window.MousePoint("title");
+            hdt.Move(title);
+            Headless.Pump(60);
+            hdt.Move(new Point(title.X + 1, title.Y));
+            Headless.Pump(60);
+            var declaredThere = hdt.ClickablesAt(hdt.Cursor!.Value);
+            var declared = declaredThere.Count;
+            FlushLog(window);
+            var logStart = window.LogLines.Count;
+            var offClick = window.MouseClick();
+            FlushLog(window);
+            var movedOff = window.LogLines.Skip(logStart).Count(l => l.Contains("panel moved"));
+            check("mouse: off move mode, a click on the panel's title goes through to the game; nothing in the overlay takes it",
+                declared == 0 && hdt.ClickThrough && offClick.ToGame && movedOff == 0,
+                $"{offClick}; {declared} element(s) declared clickable there{(declared > 0 ? " (" + string.Join(", ", declaredThere.Select(HdtOverlay.Describe)) + ")" : string.Empty)}; {movedOff} \"panel moved\" line(s)");
+
+            // In move mode PanelMover declares the whole panel clickable: the same click is the panel's (a drag, dropped in place).
+            // Its place is read in move mode, where it shows its box rather than its content.
+            window.SetMoveMode(true);
+            window.UpdateLayout();
+            Headless.Pump(60);
+            var place = new Point(Canvas.GetLeft(comps.Element), Canvas.GetTop(comps.Element));
+            hdt.Move(title);
+            Headless.Pump(60);
+            var declaredInMove = hdt.ClickablesAt(title);
+            FlushLog(window);
+            logStart = window.LogLines.Count;
+            var onClick = window.MouseClick();
+            FlushLog(window);
+            var moved = window.LogLines.Skip(logStart).Where(l => l.Contains("panel moved")).ToList();
+            var after = new Point(Canvas.GetLeft(comps.Element), Canvas.GetTop(comps.Element));
+            check("mouse: in move mode, the same click reaches the panel, declared clickable as a whole: PanelMover takes it (a drag, dropped where it was)",
+                declaredInMove.Count == 1 && ReferenceEquals(declaredInMove[0], comps.Element)
+                && !hdt.ClickThrough && !onClick.ToGame && onClick.Target != null && IsWithin(onClick.Target, comps.Element)
+                && moved.Count == 1 && moved[0].Contains($"panel moved {CompsPanel.PanelId} to (") && after == place,
+                $"{onClick}; declared clickable there: [{string.Join(", ", declaredInMove.Select(HdtOverlay.Describe))}]; "
+                + $"{string.Join(" | ", moved.Select(l => l.Substring(l.IndexOf(">>", StringComparison.Ordinal) + 3)))}; panel at ({after.X:0},{after.Y:0}), was ({place.X:0},{place.Y:0})");
+            window.SetMoveMode(false);
+            window.UpdateLayout();
+            Headless.Pump(60);
+
+            // A ◇ is declared clickable: the window catches the mouse over it alone; Bob's card under it stays the game's.
+            var pins = window.PinButtons();
+            var pin = window.MousePoint("pin:1");
+            hdt.Move(pin);
+            Headless.Pump(60);
+            hdt.Move(new Point(pin.X + 1, pin.Y));
+            Headless.Pump(60);
+            FlushLog(window);
+            logStart = window.LogLines.Count;
+            var pinClick = window.MouseClick();
+            var slot = TavernLayout.CardSlots(canvas.ActualWidth, canvas.ActualHeight, HarnessData.Shop.Count)[0];
+            var card = new Point(Math.Round(slot.Left + slot.Width / 2), Math.Round(slot.Top + slot.Height / 2));
+            hdt.Move(card);
+            Headless.Pump(60);
+            var cardClick = window.MouseClick();
+            FlushLog(window);
+            var pinned = window.LogLines.Skip(logStart).Where(l => l.Contains("pin toggled: ")).ToList();
+            check("mouse: off move mode, a click on a ◇ (declared clickable) pins its card; a click on Bob's card under it goes to the game",
+                pins.Count > 0 && !pinClick.ToGame && pinned.Count == 1 && pinned[0].EndsWith("pin toggled: " + HarnessData.Shop[0], StringComparison.Ordinal) && cardClick.ToGame,
+                $"{pins.Count} ◇; {pinClick}; {cardClick}; {pinned.Count} \"pin toggled\" line(s)");
+
+            // The popup of a target's line, as the probe and WPF drive it.
+            var target = window.Targets.First();
+            var guide = target.Guide;
+            var rank = target.Rank.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var line = comps.ShownLines[guide.Id];
+            var background = window.MousePoint("line:" + rank);
+            var name = window.MousePoint("name:" + rank);
+            hdt.Move(outside);
+            Headless.Pump(60);
+
+            var shows = popup.Shows;
+            var mark = hdt.Events.Count;
+            hdt.Move(background);
+            Headless.Pump(100);
+            var early = popup.IsVisible;
+            Headless.Pump(300);
+            var onLine = EventsOn(hdt, mark, line);
+            check("mouse: the probe enters a line from its background (the window stays click-through): one probe MouseEnter, no WPF event; no popup 100 ms later, the popup by 400 ms, shown once",
+                hdt.ClickThrough && onLine.Count == 1 && onLine[0].Source == OverlaySource.Probe && onLine[0].Enter && !early
+                && popup.IsVisible && popup.ShownGuide == guide.Id && popup.Shows == shows + 1,
+                $"\"{guide.Name}\" at ({background.X:0},{background.Y:0}): [{string.Join("; ", onLine)}]; visible after 100 ms {early}, after 400 ms {popup.IsVisible}; shown {popup.Shows - shows} time(s)");
+
+            shows = popup.Shows;
+            mark = hdt.Events.Count;
+            hdt.Move(name);
+            Headless.Pump(60); // the probe: the name is declared clickable, the window catches the mouse
+            var catches = !hdt.ClickThrough;
+            hdt.Move(new Point(name.X + 1, name.Y)); // the hand moves on: WPF sees it now, and enters the name and the line under it
+            var keptAtOnce = popup.IsVisible;
+            Headless.Pump(350);
+            onLine = EventsOn(hdt, mark, line);
+            check("mouse: onto the line's name (declared clickable), the window catches the mouse and WPF raises a second MouseEnter on the line: the popup stays, not shown again",
+                catches && onLine.Count == 1 && onLine[0].Source == OverlaySource.Wpf && onLine[0].Enter && keptAtOnce && popup.IsVisible && popup.Shows == shows,
+                $"name at ({name.X:0},{name.Y:0}), window catches the mouse {catches}: [{string.Join("; ", onLine)}]; popup visible at once {keptAtOnce}, 350 ms later {popup.IsVisible}; shown {popup.Shows - shows} more time(s)");
+
+            mark = hdt.Events.Count;
+            hdt.Move(background); // the window still catches the mouse: WPF hit-tests the background, leaves the name, keeps the line
+            Headless.Pump(60); // the probe: nothing declared clickable here, the window is click-through again
+            var through = hdt.ClickThrough;
+            hdt.Move(new Point(background.X + 1, background.Y)); // that move goes to the game: WPF loses the mouse
+            Headless.Pump(60);
+            onLine = EventsOn(hdt, mark, line);
+            check("mouse: back on the line's background, the window turns click-through and WPF's MouseLeave reaches the line with the cursor still in it: the popup stays",
+                through && onLine.Count == 1 && onLine[0].Source == OverlaySource.Wpf && !onLine[0].Enter && onLine[0].CursorInside && popup.IsVisible && popup.ShownGuide == guide.Id,
+                $"click-through {through}: [{string.Join("; ", onLine)}]; popup visible {popup.IsVisible}");
+
+            var ovals = HarnessWindow.Ovals(line);
+            var popupRect = RectOf(popup.Element);
+            var oval = ovals.Count > 0 ? hdt.CentreOf(ovals[0]) : background;
+            mark = hdt.Events.Count;
+            hdt.Move(oval);
+            Headless.Pump(60);
+            hdt.Move(new Point(oval.X + 1, oval.Y));
+            Headless.Pump(60);
+            window.UpdateLayout();
+            var preview = HdtTooltip.ShowingRect(canvas);
+            var onOval = ovals.Count > 0 ? EventsOn(hdt, mark, ovals[0]) : new List<OverlayEvent>();
+            check("mouse: on an oval of the line, HDT's tooltip shows its card (the probe enters the oval, then WPF once the window catches the mouse); the popup stays, neither covering the other",
+                ovals.Count > 0 && preview is { Width: > 0 } shown && onOval.Count(e => e.Source == OverlaySource.Probe && e.Enter) == 1
+                && onOval.Count(e => e.Source == OverlaySource.Wpf && e.Enter) == 1 && popup.IsVisible && !Overlap(shown, popupRect),
+                $"{ovals.Count} ovals: [{string.Join("; ", onOval)}]; card {(preview is { } q ? Describe(q) : "none")}, popup {Describe(popupRect)} visible {popup.IsVisible}");
+
+            mark = hdt.Events.Count;
+            hdt.Move(background);
+            Headless.Pump(60);
+            hdt.Move(new Point(background.X + 1, background.Y));
+            Headless.Pump(60);
+            onOval = ovals.Count > 0 ? EventsOn(hdt, mark, ovals[0]) : new List<OverlayEvent>();
+            check("mouse: off the oval, the probe's MouseLeave takes the card away; the popup stays",
+                HdtTooltip.Showing(canvas) == null && onOval.Any(e => e.Source == OverlaySource.Probe && !e.Enter) && popup.IsVisible,
+                $"[{string.Join("; ", onOval)}]; card still shown {HdtTooltip.Showing(canvas) != null}, popup visible {popup.IsVisible}");
+
+            // A game update redraws the panel under a still cursor: new lines, the old ones gone.
+            var before = comps.ShownLines[guide.Id];
+            shows = popup.Shows;
+            mark = hdt.Events.Count;
+            var entries = hdt.ClickableEntries;
+            window.SetPower(window.PowerScene);
+            window.UpdateLayout();
+            Headless.Pump(150);
+            var rebuilt = comps.ShownLines[guide.Id];
+            var leftOld = EventsOn(hdt, mark, before).Where(e => e.Source == OverlaySource.Probe && !e.Enter).ToList();
+            var enteredNew = EventsOn(hdt, mark, rebuilt).Where(e => e.Source == OverlaySource.Probe && e.Enter).ToList();
+            check("mouse: the panel redrawn under a still cursor, the probe leaves the old line and enters the new one: the popup stays, not shown again",
+                !ReferenceEquals(before, rebuilt) && leftOld.Count == 1 && enteredNew.Count == 1 && popup.IsVisible && popup.Shows == shows,
+                $"line rebuilt {!ReferenceEquals(before, rebuilt)}: old [{string.Join("; ", leftOld)}], new [{string.Join("; ", enteredNew)}]; popup visible {popup.IsVisible}, shown {popup.Shows - shows} more time(s); "
+                + $"HDT's list of clickables: {entries} entries before the redraw, {hdt.ClickableEntries} after, for {hdt.LiveClickables} elements still loaded");
+
+            line = comps.ShownLines[guide.Id];
+            mark = hdt.Events.Count;
+            hdt.Move(outside);
+            Headless.Pump(80);
+            onLine = EventsOn(hdt, mark, line);
+            check("mouse: out of the line, the probe's MouseLeave hides the popup",
+                onLine.Count == 1 && onLine[0].Source == OverlaySource.Probe && !onLine[0].Enter && !onLine[0].CursorInside && !popup.IsVisible,
+                $"[{string.Join("; ", onLine)}]; popup visible {popup.IsVisible}");
+        }
+        finally
+        {
+            hdt.Stop();
+            window.ResetLayout();
+            window.UpdateLayout();
+        }
+    }
+
+    /// <summary>The events the layer raised on <paramref name="element"/> since the <paramref name="from"/>-th.</summary>
+    private static List<OverlayEvent> EventsOn(HdtOverlay hdt, int from, FrameworkElement element) =>
+        hdt.Events.Skip(from).Where(e => ReferenceEquals(e.Element, element)).ToList();
+
+    private static bool IsWithin(DependencyObject element, DependencyObject ancestor)
+    {
+        for (DependencyObject? node = element; node != null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (ReferenceEquals(node, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>The sections a guide's detail has: how to play when it has a text, core cards, then each list it has.</summary>

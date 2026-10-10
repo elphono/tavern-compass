@@ -9,20 +9,45 @@ using System.Windows.Media.Imaging;
 namespace Hearthstone_Deck_Tracker.Utility.Extensions
 {
     /// <summary>
-    /// HDT's attached properties that let clicks and hover through its click-through overlay window. In a plain window
-    /// the mouse reaches every element WPF hit-tests, so the first two do nothing. The tooltip is drawn as HDT draws it
-    /// (<see cref="BronzebeardHud.Harness.HdtTooltip"/>): on the overlay canvas, in its one slot, where PreviewPlacer's
-    /// placement and offsets put it, so that it shows in a capture and its place can be checked.
+    /// HDT's attached properties that let clicks and hover through its click-through overlay window, registered as HDT
+    /// registers them (Utility/Extensions/OverlayExtensions.cs, HDT 1.58.9 decompiled, lines 14-146): setting one raises
+    /// <see cref="OnRegisterHitTestVisible"/> or <see cref="OnRegisterHoverVisible"/> when its value changes, and the
+    /// element is registered again at its Loaded and unregistered at its Unloaded while the value is true. HDT's overlay
+    /// window keeps the lists (OverlayWindow ctor, lines 4280-4301); the simulation's one is
+    /// <see cref="BronzebeardHud.Harness.HdtOverlay"/>, which only acts on them while its injected mouse runs. Without it,
+    /// the plain window lets the mouse reach every element WPF hit-tests, as before.
+    ///
+    /// The tooltip is drawn as HDT draws it (<see cref="BronzebeardHud.Harness.HdtTooltip"/>): on the overlay canvas, in its
+    /// one slot, where PreviewPlacer's placement and offsets put it, so that it shows in a capture and its place can be checked.
     /// </summary>
     public static class OverlayExtensions
     {
-        public static void SetIsOverlayHitTestVisible(UIElement element, bool value)
-        {
-        }
+        public static readonly DependencyProperty IsOverlayHitTestVisibleProperty = DependencyProperty.RegisterAttached(
+            "IsOverlayHitTestVisible", typeof(bool), typeof(OverlayExtensions), new FrameworkPropertyMetadata(false, OnHitTestVisibleChanged));
 
-        public static void SetIsOverlayHoverVisible(UIElement element, bool value)
-        {
-        }
+        public static readonly DependencyProperty IsOverlayHoverVisibleProperty = DependencyProperty.RegisterAttached(
+            "IsOverlayHoverVisible", typeof(bool), typeof(OverlayExtensions), new FrameworkPropertyMetadata(false, OnHoverVisibleChanged));
+
+        /// <summary>An element declared clickable (true) or no longer (false), as HDT raises it.</summary>
+        public static event Action<FrameworkElement, bool>? OnRegisterHitTestVisible;
+
+        /// <summary>An element declared hoverable (true) or no longer (false), as HDT raises it.</summary>
+        public static event Action<FrameworkElement, bool>? OnRegisterHoverVisible;
+
+        /// <summary>
+        /// While true (the injected mouse runs, <see cref="BronzebeardHud.Harness.HdtOverlay"/>), the tooltip of a hoverable
+        /// element answers HDT's probe only, as HDT's ShowTooltip and HideTooltip do (lines 222-238: a WPF MouseEnter or
+        /// MouseLeave on an element declared hoverable is ignored). False: every MouseEnter, as the plain window had it.
+        /// </summary>
+        internal static bool ProbeOnlyOnHoverables { get; set; }
+
+        public static bool GetIsOverlayHitTestVisible(DependencyObject element) => (bool)element.GetValue(IsOverlayHitTestVisibleProperty);
+
+        public static void SetIsOverlayHitTestVisible(DependencyObject element, bool value) => element.SetValue(IsOverlayHitTestVisibleProperty, value);
+
+        public static bool GetIsOverlayHoverVisible(DependencyObject element) => (bool)element.GetValue(IsOverlayHoverVisibleProperty);
+
+        public static void SetIsOverlayHoverVisible(DependencyObject element, bool value) => element.SetValue(IsOverlayHoverVisibleProperty, value);
 
         /// <summary>
         /// Shown on the element's MouseEnter, hidden on its MouseLeave, as HDT's ToolTip property does
@@ -31,8 +56,84 @@ namespace Hearthstone_Deck_Tracker.Utility.Extensions
         /// </summary>
         public static void SetToolTip(FrameworkElement element, UIElement tip)
         {
-            element.MouseEnter += (_, _) => BronzebeardHud.Harness.HdtTooltip.Show(element, (FrameworkElement)tip);
-            element.MouseLeave += (_, _) => BronzebeardHud.Harness.HdtTooltip.Hide(element);
+            element.MouseEnter += (_, e) =>
+            {
+                if (Answers(element, e))
+                {
+                    BronzebeardHud.Harness.HdtTooltip.Show(element, (FrameworkElement)tip);
+                }
+            };
+            element.MouseLeave += (_, e) =>
+            {
+                if (Answers(element, e))
+                {
+                    BronzebeardHud.Harness.HdtTooltip.Hide(element);
+                }
+            };
+        }
+
+        private static bool Answers(FrameworkElement element, System.Windows.Input.MouseEventArgs e) =>
+            !ProbeOnlyOnHoverables || !GetIsOverlayHoverVisible(element) || e is BronzebeardHud.Harness.ProbeMouseEventArgs;
+
+        private static void OnHitTestVisibleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is FrameworkElement element)
+            {
+                Register(element, (bool)e.NewValue, HitTestLoaded, HitTestUnloaded, (x, on) => OnRegisterHitTestVisible?.Invoke(x, on));
+            }
+        }
+
+        private static void OnHoverVisibleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is FrameworkElement element)
+            {
+                Register(element, (bool)e.NewValue, HoverLoaded, HoverUnloaded, (x, on) => OnRegisterHoverVisible?.Invoke(x, on));
+            }
+        }
+
+        private static void Register(FrameworkElement element, bool on, RoutedEventHandler loaded, RoutedEventHandler unloaded, Action<FrameworkElement, bool> raise)
+        {
+            element.Loaded -= loaded;
+            element.Unloaded -= unloaded;
+            if (on)
+            {
+                element.Loaded += loaded;
+                element.Unloaded += unloaded;
+            }
+
+            raise(element, on);
+        }
+
+        private static void HitTestLoaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && GetIsOverlayHitTestVisible(element))
+            {
+                OnRegisterHitTestVisible?.Invoke(element, true);
+            }
+        }
+
+        private static void HitTestUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && GetIsOverlayHitTestVisible(element))
+            {
+                OnRegisterHitTestVisible?.Invoke(element, false);
+            }
+        }
+
+        private static void HoverLoaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && GetIsOverlayHoverVisible(element))
+            {
+                OnRegisterHoverVisible?.Invoke(element, true);
+            }
+        }
+
+        private static void HoverUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && GetIsOverlayHoverVisible(element))
+            {
+                OnRegisterHoverVisible?.Invoke(element, false);
+            }
         }
     }
 }

@@ -18,6 +18,8 @@ namespace BronzebeardHud.Harness;
 /// line (move mode off) so that its popup shows in the screenshot, <c>--hover-card k</c> also hovers the k-th oval of that
 /// line (its card preview), <c>--no-skip</c> hides the Skip combat button, as in the tavern, and <c>--heroes</c> shows the
 /// hero selection's badges (HarnessData.HeroRows: a consensus, a contest, one source, no data) over the scene.
+/// <c>--mouse steps</c> drives the scene through HDT's overlay layer as the harness reproduces it (HdtOverlay: the probe on
+/// an injected cursor, click-through outside the elements declared clickable), steps separated by ";" (HarnessWindow.RunMouse).
 /// </summary>
 internal sealed class Options
 {
@@ -65,6 +67,12 @@ internal sealed class Options
 
     /// <summary>The Skip combat button hidden, as in the tavern (it shows in combat only in the plugin).</summary>
     public bool NoSkip { get; private set; }
+
+    /// <summary>
+    /// Steps of the injected mouse, run before the screenshot (HarnessWindow.RunMouse): "line:1;wait:300" hovers the first
+    /// target's line through HDT's probe, "name:1;nudge;click" clicks its name; null: no injected mouse.
+    /// </summary>
+    public string? Mouse { get; private set; }
 
     /// <summary>Invented card stats at turn 6 (HarnessData.CardStats): the values on Bob's cards and in place of a choice's "—".</summary>
     public bool CardValues { get; private set; }
@@ -131,6 +139,9 @@ internal sealed class Options
                     break;
                 case "--no-skip":
                     options.NoSkip = true;
+                    break;
+                case "--mouse" when i + 1 < args.Length:
+                    options.Mouse = args[++i];
                     break;
                 case "--heroes":
                     options.Heroes = true;
@@ -235,6 +246,12 @@ internal static class Headless
                     window.Hover(options.Hover);
                 }
 
+                if (options.Mouse != null)
+                {
+                    window.UpdateLayout();
+                    window.RunMouse(options.Mouse);
+                }
+
                 if (options.Heroes)
                 {
                     new BronzebeardHud.HdtPlugin.HeroPickPanel(window.Overlay).Show(HarnessData.HeroRows(), BronzebeardHud.Stats.PatchNotes.Banner(HarnessData.Nomi));
@@ -250,7 +267,7 @@ internal static class Headless
                         throw new ArgumentException($"--hover-card {options.HoverCard}: the line has {ovals.Count} ovals");
                     }
 
-                    ovals[options.HoverCard - 1].RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount) { RoutedEvent = UIElement.MouseEnterEvent });
+                    ovals[options.HoverCard - 1].RaiseEvent(new ProbeMouseEventArgs(UIElement.MouseEnterEvent)); // as HDT's probe raises it
                     Pump(Math.Min(options.Wait, 5000)); // the whole card's picture
                 }
 
