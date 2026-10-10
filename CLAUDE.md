@@ -66,9 +66,13 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
 
 ## Façon de travailler sur ce projet
 
-- Ali teste en partie sous Windows ; la session **déploie elle-même** les DLL après chaque livraison
-  (build Release depuis `main`, idéalement avec `HdtInstallDir`, copie, comparaison des SHA-1), puis
-  Ali relance HDT. HDT ne recharge les plugins qu'à son démarrage (ou décocher / recocher le plugin).
+- Ali teste en partie sous Windows ; la session **déploie elle-même** les DLL après chaque livraison, depuis `main`, par
+  `tools/deploy.sh` (build Release en `-warnaserror` jugé sur son code de sortie, copie des deux DLL, comparaison des
+  SHA-1 ; `--dry-run` montre la cible sans rien écrire), puis Ali relance HDT. **Toujours contre la dernière version
+  d'HDT installée** (Ali, 2026-10-10 : « toujours la dernière version ») : `tools/deploy.sh` la détecte seul, le dossier
+  `app-*` le plus haut par `sort -V` (`tools/hdt-install.sh`, l'auto-updater garde l'ancienne à côté) ; `--hdt-dir` force
+  une autre version, aucune n'est écrite dans un script. HDT ne recharge les plugins qu'à son démarrage (ou décocher /
+  recocher le plugin) ; s'il tourne, le script le dit et copie une fois, sans insister.
 - Diagnostic : le journal d'HDT (`/mnt/c/Users/elphono/AppData/Roaming/HearthstoneDeckTracker/Logs/hdt_log.txt`)
   porte une ligne `Bronzebeard HUD: …` par tour et par fonctionnalité ; une fonctionnalité qui lève
   est coupée seule par `FeatureGuard` et le dit une fois. Lire cette ligne **avant** de supposer une cause.
@@ -82,7 +86,7 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
   stats réel (2026-10-08 : un `.gz`, un `.json` de plus de 100 Ko, ou portant un champ propre aux serveurs de Firestone ou de
   nomi.gg).
 - **Release** (2026-10-08, issue #13) : la version vit dans `Directory.Build.props` (`<Version>`, que le plugin lit dans son
-  assembly) ; `tools/release.sh <app-version HDT installé>` refuse un arbre sale ou un tag existant, refait les contrôles de
+  assembly) ; `tools/release.sh [dossier app-<version> d'HDT]` (par défaut la dernière version installée) refuse un arbre sale ou un tag existant, refait les contrôles de
   la CI, construit contre l'HDT installé et écrit `out/TavernCompass-v<version>-hdt-<hdt>.zip` ; la release GitHub se crée
   ensuite (la commande est imprimée, en brouillon). Monter `<Version>` avant la suivante.
 - **Historique réécrit le 2026-10-07** (purge des données personnelles, voir « Décisions ») : les hashes de commit cités
@@ -113,13 +117,15 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
 
 - `lib/` est ignoré par git. La version d'HDT contre laquelle on compile est `HdtVersion`, dans le
   `.csproj` du plugin ; la cible `FetchHdtAssemblies` télécharge la release GitHub correspondante.
-- GitHub s'arrête à la 1.55.6 : les versions suivantes ne sortent que par l'auto-updater d'HDT. Pour
-  compiler contre l'HDT réellement installé (recommandé avant un déploiement) :
-  `dotnet build src/BronzebeardHud.HdtPlugin -c Release -p:HdtInstallDir=/mnt/c/Users/<user>/AppData/Local/HearthstoneDeckTracker/app-<version>/`.
-  Mesuré le 2026-09-26 : le plugin compile sans erreur ni avertissement contre la 1.58.3.
-- Déploiement (Windows) : copier `BronzebeardHud.HdtPlugin.dll` et `BronzebeardHud.Stats.dll` dans
-  `%AppData%\HearthstoneDeckTracker\Plugins\BronzebeardHud\`, **sans** `Newtonsoft.Json.dll` : HDT
-  charge la sienne, dans la même version (13.0.3).
+- GitHub s'arrête à la 1.55.6 : les versions suivantes ne sortent que par l'auto-updater d'HDT (`HdtVersion` reste donc à
+  1.55.6, pour la CI et le premier build). Les builds de déploiement et de release compilent contre **la dernière version
+  d'HDT installée** (Ali, 2026-10-10 : « toujours la dernière version » ; `tools/deploy.sh` et `tools/release.sh` la
+  détectent, le plus haut `%LocalAppData%\HearthstoneDeckTracker\app-*` par `sort -V`), par
+  `-p:HdtInstallDir=<ce dossier app-<version>>/`. Mesuré : le plugin compile sans erreur ni avertissement contre la 1.58.3
+  (2026-09-26) et contre la 1.58.10 (2026-10-10, `-warnaserror --no-incremental`).
+- Déploiement (Windows) : `tools/deploy.sh` copie `BronzebeardHud.HdtPlugin.dll` et `BronzebeardHud.Stats.dll` dans
+  `%AppData%\HearthstoneDeckTracker\Plugins\BronzebeardHud\` (déduit du profil Windows qui porte l'installation d'HDT,
+  `--plugins-dir` pour un autre), **sans** `Newtonsoft.Json.dll` : HDT charge la sienne, dans la même version (13.0.3).
 - Données : `%LocalAppData%\BronzebeardHud\stats\`, qui contient le cache Firestone (héros et
   trinkets : 24 h ; compositions : 7 jours). **Au démarrage du plugin**, chaque fichier est redemandé au
   serveur quel que soit son âge, en requête conditionnelle (ETag dans `*.etag` : `304` s'il n'a pas changé) ;

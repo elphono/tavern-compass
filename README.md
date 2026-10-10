@@ -31,7 +31,7 @@ stand for the parts of the game screen the panels keep clear of.*
 
 ## Status
 
-Early (v0.3), one maintainer. It is developed and played against **HDT 1.58.9**. The Compositions panel has been used
+Early (v0.3), one maintainer. It is built against **the newest HDT installed** (1.58.10 since 2026-10-10; the live games so far ran on 1.58.9). The Compositions panel has been used
 in live games; the lobby filter, the power inset and the `−` / `+` resizing (October 2026), among others, have so far
 only run in the simulation. The list is in the [roadmap](ROADMAP.md), under *To verify in a live game*.
 
@@ -52,11 +52,14 @@ to `%AppData%\HearthstoneDeckTracker\Plugins\BronzebeardHud\`. **Do not** copy `
 its own, in the same version. Restart HDT and enable the plugin in *Options → Plugins*.
 
 The default build compiles against HDT 1.55.6, the last release published on GitHub. To compile against the HDT you
-actually run (recommended), point at its folder:
+actually run (recommended), point at its newest `app-<version>` folder:
 
 ```bash
-dotnet build src/BronzebeardHud.HdtPlugin -c Release -p:HdtInstallDir=/path/to/HearthstoneDeckTracker/app-1.58.9/
+dotnet build src/BronzebeardHud.HdtPlugin -c Release -p:HdtInstallDir=/path/to/HearthstoneDeckTracker/app-<version>/
 ```
+
+From WSL, `tools/deploy.sh` finds that folder by itself (highest `app-*` version), builds, copies the two DLLs into HDT's
+plugin folder and checks their SHA-1; `--dry-run` only shows what it would do.
 
 ## Data and privacy
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Builds a release zip of the plugin against the HDT actually installed (GitHub only hosts HDT up to 1.55.6).
-#   tools/release.sh /mnt/c/Users/<user>/AppData/Local/HearthstoneDeckTracker/app-<version>/
+#   tools/release.sh [/mnt/c/Users/<user>/AppData/Local/HearthstoneDeckTracker/app-<version>/]
+# Without an argument it builds against the newest HDT installed (highest app-<version>/ by `sort -V`,
+# tools/hdt-install.sh); the argument forces another install.
 # Refuses a dirty tree or an existing tag, runs the same checks as the CI, and writes
 # out/TavernCompass-v<Version>-hdt-<hdt version>.zip (BronzebeardHud/ with the two DLLs and INSTALL.txt).
 # It publishes nothing: the GitHub release is created afterwards (see the last line it prints).
@@ -8,9 +10,12 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo"
 
-hdt="${1:?usage: tools/release.sh <HDT install dir, app-<version>/>}"
+# shellcheck source=tools/hdt-install.sh
+. "$repo/tools/hdt-install.sh"
+hdt="${1:-$(hdt_latest_app_dir)}"
 [ -f "$hdt/HearthstoneDeckTracker.exe" ] || { echo "No HearthstoneDeckTracker.exe in $hdt" >&2; exit 1; }
-hdt_version="$(basename "${hdt%/}")"; hdt_version="${hdt_version#app-}"
+hdt_version="$(hdt_version_of "$hdt")"
+echo "HDT target: $hdt_version ($hdt)"
 
 version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)"
 [ -n "$version" ] || { echo "No <Version> in Directory.Build.props" >&2; exit 1; }
