@@ -539,6 +539,13 @@ tools/nodance-deploy.sh --dry-run        # puis sans --dry-run (demande y) ; --u
   les SHA-1 ; imprime le retour arrière. `--uninstall` retire la DLL, `--purge` aussi BepInEx (`winhttp.dll`,
   `doorstop_config.ini`, `.doorstop_version`, `changelog.txt` s'ils sont ceux de l'archive, et `BepInEx/`). Exercé sur un faux
   dossier de jeu ; jamais lancé sur le vrai.
+- **Anti-danse (mod BepInEx, issue #1, 2026-10-10)** : le `mscorlib` d'Hearthstone est dépouillé : BepInEx ne démarre
+  qu'avec les bibliothèques complètes de la version d'Unity du jeu, dans `BepInEx/unstripped_corlib`.
+  `tools/nodance-corlibs.sh` les tire de l'éditeur Linux officiel (profil `unityjit-win32` ; celles de unity.bepinex.dev
+  sont Unix), puis `tools/nodance-deploy.sh` les installe (sauvegarde datée, `--restore`). À refaire après toute mise à
+  jour du jeu qui change sa version d'Unity ; rien ne le détecte automatiquement
+  (`docs/journal/2026-10-10-bepinex-hearthstone.md`). Mesuré le 2026-10-10 : `5/5 required patches applied` dans
+  `BepInEx/LogOutput.log`.
 - **Journal** (`BepInEx/LogOutput.log`) : `patch … : ok`, `5/5 required patches applied, 0/1 optional (game …)`, `attached to
   ZoneMgr (game n)`, `option sent: entity=… position=… (in flight)`, `option answered after … ms` / `rejected` / `flight
   timeout`, `prediction: entity=… slot=… predicted=… list=… (renumbered k)`, `server list … (PLAY): k replayed position(s)
