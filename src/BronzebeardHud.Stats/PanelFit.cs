@@ -36,11 +36,23 @@ public static class PanelTypography
     public const double RoundButton = 14;
     public const double SkipCombat = 15;
 
-    /// <summary>A hero badge's tier letter, and its "no data".</summary>
+    /// <summary>A hero badge's tier letter, in its shield (<see cref="HeroNote"/>), and its "no data".</summary>
     public const double HeroTier = 22;
     public const double HeroNoData = 14;
 
-    public static readonly IReadOnlyList<double> All = new[] { PanelTitle, CompositionName, Button, Body, Small, Badge, Marker, RoundButton, SkipCombat, HeroTier, HeroNoData };
+    /// <summary>
+    /// The note of a hero badge, its average placement drawn large like the armour on the game's hero portraits
+    /// (<see cref="HeroNote.Figure"/>): twice <see cref="Small"/>, the size of the lines under it.
+    /// </summary>
+    public const double HeroNote = 24;
+
+    /// <summary>
+    /// The note of a trinket's label, its placement in its band's colour (<see cref="TrinketFigure"/>): the largest a
+    /// one-line label holds (<see cref="ChoiceLayout.Labels"/>: 21.9 px inside at 1080p), 1.67 × <see cref="Small"/>.
+    /// </summary>
+    public const double ChoiceNote = 20;
+
+    public static readonly IReadOnlyList<double> All = new[] { PanelTitle, CompositionName, Button, Body, Small, Badge, Marker, RoundButton, SkipCombat, HeroTier, HeroNoData, HeroNote, ChoiceNote };
 
     /// <summary>A size in overlay pixels for a window <paramref name="height"/> tall.</summary>
     public static double Px(double size, double height) => size * TavernLayout.Scale(height);

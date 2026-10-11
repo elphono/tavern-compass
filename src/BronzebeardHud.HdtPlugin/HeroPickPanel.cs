@@ -1,9 +1,10 @@
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
+using Path = System.Windows.Shapes.Path;
 using BronzebeardHud.Stats;
 
 namespace BronzebeardHud.HdtPlugin;
@@ -12,13 +13,29 @@ namespace BronzebeardHud.HdtPlugin;
 /// One badge per offered hero, under the game's reroll button below that hero's portrait, plus a
 /// status line under the row. Positions come from <see cref="HeroPickLayout"/> and are recomputed
 /// whenever the overlay canvas changes size. Built in code rather than XAML so it compiles under WSL.
+/// Each badge draws the note <see cref="HeroNote.For"/> gives (Ali, 2026-10-11, the game's hero choice as the model): the tier
+/// letter in a shield of its colour, the figure large and outlined like the armour on a hero's portrait, then the small lines.
 /// </summary>
 internal sealed class HeroPickPanel
 {
+    /// <summary>Tags of a badge's pieces, for the simulation's self-test.</summary>
+    public const string ShieldTag = "hero-shield";
+    public const string FigureTag = "hero-figure";
+    public const string CaptionTag = "hero-caption";
+    public const string DetailTag = "hero-detail";
+
+    /// <summary>A heater shield, drawn in a box ShieldWidth × HeadHeight (design pixels); stretched to the badge's scale.</summary>
+    private static readonly Geometry ShieldShape = Freeze(Geometry.Parse("M 0,5 Q 17,-1 34,5 L 34,25 C 34,36 26,41 17,45 C 8,41 0,36 0,25 Z"));
+
+    /// <summary>The badge's plate: the game's dark violet, a touch lighter at the top.</summary>
+    private static readonly Brush Plate = Freeze(new LinearGradientBrush(Color.FromArgb(0xEE, 0x2C, 0x22, 0x42), Color.FromArgb(0xEE, 0x10, 0x0D, 0x1A), 90));
+
+    /// <summary>Silver, as the armour's shield: the rim of a badge and of a tier's shield.</summary>
+    private static readonly Brush Silver = Freeze(new LinearGradientBrush(Color.FromRgb(0xF0, 0xF3, 0xF8), Color.FromRgb(0x7E, 0x84, 0x92), 90));
+
     private readonly Canvas _canvas;
     private readonly List<Border> _badges = new();
     private readonly TextBlock _status = new() { Foreground = Brushes.Gold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, IsHitTestVisible = false };
-    private IReadOnlyList<HeroPickRow> _rows = new List<HeroPickRow>();
     private bool _visible;
 
     public HeroPickPanel(Canvas canvas)
@@ -29,9 +46,11 @@ internal sealed class HeroPickPanel
         _canvas.SizeChanged += OnCanvasSizeChanged;
     }
 
+    /// <summary>The badges on the canvas, left to right, for the simulation's self-test.</summary>
+    public IReadOnlyList<Border> Badges => _badges;
+
     public void Show(IReadOnlyList<HeroPickRow> rows, string? status)
     {
-        _rows = rows;
         foreach (var badge in _badges)
         {
             _canvas.Children.Remove(badge);
@@ -42,11 +61,10 @@ internal sealed class HeroPickPanel
         {
             var badge = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x14, 0x14, 0x1E)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x48, 0x0F)),
+                Background = Plate,
                 CornerRadius = new CornerRadius(6),
                 IsHitTestVisible = false,
-                Tag = row,
+                Tag = HeroNote.For(row),
             };
             _badges.Add(badge);
             OverlayLayer.Add(_canvas, badge);
@@ -102,12 +120,14 @@ internal sealed class HeroPickPanel
         {
             var badge = _badges[i];
             var rect = rects[i];
+            var note = (HeroNote)badge.Tag;
             badge.Width = rect.Width;
             badge.Height = rect.Height;
             badge.BorderThickness = new Thickness(HeroPickLayout.BadgeBorder * scale);
+            badge.BorderBrush = note.RimColour == HeroNote.Rim ? Silver : HexBrush.Of(note.RimColour);
+            badge.CornerRadius = new CornerRadius(6 * scale);
             badge.Padding = new Thickness(HeroPickLayout.BadgePaddingX * scale, HeroPickLayout.BadgePaddingY * scale, HeroPickLayout.BadgePaddingX * scale, HeroPickLayout.BadgePaddingY * scale);
-            var row = (HeroPickRow)badge.Tag;
-            badge.Child = BuildContent(row, scale);
+            badge.Child = BuildContent(note, scale);
             Canvas.SetLeft(badge, rect.Left);
             Canvas.SetTop(badge, rect.Top);
             badge.Visibility = Visibility.Visible;
@@ -128,98 +148,119 @@ internal sealed class HeroPickPanel
     }
 
     /// <summary>
-    /// The badge's lines at their own size (<see cref="PanelTypography"/>, 12 px at least in 1080p): the consolidated
-    /// line, its sources and the odds; without one, a line per source (two at most) and the odds under the first. What
-    /// does not fit the badge is left out (<see cref="HeroPickLayout.ItemsThatFit"/>), never shrunk.
+    /// The note's head — the shield, then the figure (<see cref="PanelTypography.HeroNote"/>) over its caption — and the small
+    /// lines under it (<see cref="PanelTypography.Small"/>), each at its own size; what does not fit the badge is left out
+    /// (<see cref="HeroPickLayout.ItemsThatFit"/>), never shrunk.
     /// </summary>
-    private static UIElement BuildContent(HeroPickRow row, double scale)
+    private static UIElement BuildContent(HeroNote note, double scale)
     {
-        var items = new List<(double Height, UIElement[] Lines)>();
-        if (!row.HasData)
+        var column = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(HeroPickLayout.ShieldGap * scale, 0, 0, 0) };
+        if (note.Figure != null)
         {
-            items.Add((HeroPickLayout.NoDataLine, new UIElement[] { Line("no data", PanelTypography.HeroNoData, HeroPickLayout.NoDataLine, scale, Brushes.LightGray) }));
-        }
-        else if (row.Consensus is { } consensus)
-        {
-            // Component 3: one consolidated line and its sample (the pick rate goes to HDT's log), its sources under it,
-            // then the first source's top-4 and first-place shares.
-            var line = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Height = HeroPickLayout.SourceLine * scale };
-            var tier = row.Figures[0].Tier;
-            line.Children.Add(Line(tier ?? "–", PanelTypography.HeroTier, HeroPickLayout.SourceLine, scale, TierBrush(tier), FontWeights.Bold));
-            var figure = Line(" " + consensus.Figure, PanelTypography.Body, HeroPickLayout.BodyLine, scale, consensus.Contested ? ContestedBrush : Brushes.White);
-            figure.VerticalAlignment = VerticalAlignment.Center;
-            line.Children.Add(figure);
-            items.Add((HeroPickLayout.SourceLine, new UIElement[] { line }));
-            items.Add((HeroPickLayout.BodyLine, new UIElement[] { Line(consensus.Sources, PanelTypography.Small, HeroPickLayout.BodyLine, scale, Brushes.LightGray) }));
-            if (row.Figures[0].OddsText is { } odds)
-            {
-                items.Add((HeroPickLayout.BodyLine, new UIElement[] { Line(odds, PanelTypography.Body, HeroPickLayout.BodyLine, scale, Brushes.LightGray) }));
-            }
+            column.Children.Add(Outlined(Line(note.Figure, PanelTypography.HeroNote, HeroPickLayout.NoteLine, scale, HexBrush.Of(note.FigureColour), FontWeights.ExtraBold, FigureTag), scale));
+            column.Children.Add(Line(note.Caption, PanelTypography.Small, HeroPickLayout.DetailLine, scale, HexBrush.Of(note.CaptionColour), FontWeights.SemiBold, CaptionTag));
         }
         else
         {
-            // One compact line per source, and under the first source its top-4 and first-place shares: MMR is
-            // won in the top 4.
-            foreach (var (figures, index) in row.Figures.Take(2).Select((f, i) => (f, i)))
-            {
-                var line = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Height = HeroPickLayout.SourceLine * scale };
-                line.Children.Add(Line(figures.Tier ?? "–", PanelTypography.HeroTier, HeroPickLayout.SourceLine, scale, TierBrush(figures.Tier), FontWeights.Bold));
-                var detail = figures.AveragePlacement.ToString("0.00", CultureInfo.InvariantCulture);
-                if (figures.PickRate is { } pickRate)
-                {
-                    detail += $" · {(pickRate * 100).ToString("0", CultureInfo.InvariantCulture)}%";
-                }
+            column.Children.Add(Line(note.Caption, PanelTypography.HeroNoData, HeroPickLayout.NoDataLine, scale, HexBrush.Of(note.CaptionColour), FontWeights.SemiBold, CaptionTag));
+        }
 
-                var bracket = figures.MmrPercentile is { } percentile && percentile < MmrBracket.EveryPlayer ? $" {percentile}%" : string.Empty;
-                var label = Line($" {detail} {SourceLabel(figures.Source)}{bracket}", PanelTypography.Body, HeroPickLayout.BodyLine, scale, Brushes.White);
-                label.VerticalAlignment = VerticalAlignment.Center;
-                line.Children.Add(label);
-                items.Add((HeroPickLayout.SourceLine, new UIElement[] { line }));
-                if (index == 0 && figures.OddsText is { } odds)
-                {
-                    items.Add((HeroPickLayout.BodyLine, new UIElement[] { Line(odds, PanelTypography.Body, HeroPickLayout.BodyLine, scale, Brushes.LightGray) }));
-                }
-            }
+        var head = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Height = HeroPickLayout.HeadHeight * scale };
+        head.Children.Add(Shield(note, scale));
+        head.Children.Add(column);
+
+        var items = new List<(double Height, UIElement Line)> { (HeroPickLayout.HeadHeight, head) };
+        foreach (var detail in note.Details)
+        {
+            items.Add((HeroPickLayout.DetailLine, Detail(detail, scale)));
         }
 
         var lines = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
         foreach (var index in HeroPickLayout.ItemsThatFit(items.Select(i => i.Height).ToList(), HeroPickLayout.ContentHeight))
         {
-            foreach (var line in items[index].Lines)
-            {
-                lines.Children.Add(line);
-            }
+            lines.Children.Add(items[index].Line);
         }
 
         return lines;
     }
 
-    /// <summary>One line of text, exactly <paramref name="lineHeight"/> design pixels tall, centred.</summary>
-    private static TextBlock Line(string text, double size, double lineHeight, double scale, Brush brush, FontWeight? weight = null) => new()
+    /// <summary>The tier letter in a shield of its colour, lit from above, rimmed in silver.</summary>
+    private static FrameworkElement Shield(HeroNote note, double scale)
+    {
+        var width = HeroPickLayout.ShieldWidth * scale;
+        var height = HeroPickLayout.HeadHeight * scale;
+        var colour = (Color)ColorConverter.ConvertFromString(note.TierFill);
+        var shield = new Grid { Width = width, Height = height, VerticalAlignment = VerticalAlignment.Center, Tag = ShieldTag };
+        shield.Children.Add(new Path
+        {
+            Data = ShieldShape,
+            Stretch = Stretch.Fill,
+            Width = width,
+            Height = height,
+            Fill = new LinearGradientBrush(Mix(colour, Colors.White, 0.3), Mix(colour, Colors.Black, 0.45), 90),
+            Stroke = Silver,
+            StrokeThickness = 2 * scale,
+            Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 4 * scale, ShadowDepth = 1 * scale, Opacity = 0.7 },
+        });
+        // A line shorter than the shield puts the letter in the shield's wide part, above its point.
+        var letter = Outlined(Line(note.Tier, PanelTypography.HeroTier, HeroPickLayout.HeadHeight - 12, scale, Brushes.White, FontWeights.Black, null), scale);
+        letter.VerticalAlignment = VerticalAlignment.Top;
+        shield.Children.Add(letter);
+        return shield;
+    }
+
+    /// <summary>A small line; a second source's carries its tier in a chip of its colour before the text.</summary>
+    private static UIElement Detail(HeroNoteLine detail, double scale)
+    {
+        var text = Line(detail.Text, PanelTypography.Small, HeroPickLayout.DetailLine, scale, HexBrush.Of(detail.Colour), FontWeights.Normal, DetailTag);
+        if (detail.Tier == null)
+        {
+            return text;
+        }
+
+        var line = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Height = HeroPickLayout.DetailLine * scale };
+        line.Children.Add(new Border
+        {
+            Background = HexBrush.Of(HeroNote.TierColour(detail.Tier)),
+            CornerRadius = new CornerRadius(3 * scale),
+            Padding = new Thickness(4 * scale, 0, 4 * scale, 0),
+            Margin = new Thickness(0, 0, 4 * scale, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = Line(detail.Tier, PanelTypography.Small, HeroPickLayout.DetailLine - 1, scale, Brushes.Black, FontWeights.Bold, DetailTag),
+        });
+        line.Children.Add(text);
+        return line;
+    }
+
+    /// <summary>One line of text, exactly <paramref name="lineHeight"/> design pixels tall, centred; never wrapped.</summary>
+    private static TextBlock Line(string text, double size, double lineHeight, double scale, Brush brush, FontWeight weight, string? tag) => new()
     {
         Text = text,
+        Tag = tag,
         FontSize = size * scale,
         LineHeight = lineHeight * scale,
         LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
         Foreground = brush,
-        FontWeight = weight ?? FontWeights.Normal,
+        FontWeight = weight,
         HorizontalAlignment = HorizontalAlignment.Center,
         TextAlignment = TextAlignment.Center,
+        TextWrapping = TextWrapping.NoWrap,
         IsHitTestVisible = false,
     };
 
-    /// <summary>Amber: two sources disagree, and neither figure is the hero's.</summary>
-    private static readonly Brush ContestedBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x3B));
-
-    private static string SourceLabel(string source) => StatsSources.Label(source);
-
-    private static Brush TierBrush(string? tier) => tier switch
+    /// <summary>A dark outline around the glyphs, as the game draws its white numbers: readable on any colour.</summary>
+    private static TextBlock Outlined(TextBlock text, double scale)
     {
-        "S" => new SolidColorBrush(Color.FromRgb(0xFF, 0x4D, 0x4D)),
-        "A" => new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x1C)),
-        "B" => new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x3D)),
-        "C" => new SolidColorBrush(Color.FromRgb(0x7C, 0xD9, 0x5C)),
-        "D" => new SolidColorBrush(Color.FromRgb(0x4D, 0xA6, 0xFF)),
-        _ => Brushes.LightGray,
-    };
+        text.Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 3 * scale, ShadowDepth = 0, Opacity = 1 };
+        return text;
+    }
+
+    private static Color Mix(Color from, Color to, double amount) => Color.FromRgb(
+        (byte)(from.R + (to.R - from.R) * amount), (byte)(from.G + (to.G - from.G) * amount), (byte)(from.B + (to.B - from.B) * amount));
+
+    private static T Freeze<T>(T freezable) where T : Freezable
+    {
+        freezable.Freeze();
+        return freezable;
+    }
 }

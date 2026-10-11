@@ -1457,7 +1457,8 @@ public sealed class Plugin : IPlugin
             _choices.TrinketStat, _stats.Bracket, _bridge, id => CardNote(id, turn), id => _statsView?.Find("trinket", id, "placement", "games"));
         if (advice.HasMarkers)
         {
-            _choices.Show(advice);
+            // A trinket's placement is graded against the trinkets of the same bracket (PlacementGrade).
+            _choices.Show(advice, kind == ChoiceKind.Trinket ? TrinketReference.Of(_choices.TrinketFile?.Trinkets, _stats.Bracket) : null);
         }
         else
         {

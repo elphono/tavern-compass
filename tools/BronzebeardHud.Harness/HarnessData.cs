@@ -308,18 +308,33 @@ internal static class HarnessData
     /// </summary>
     /// <summary>
     /// Four offered heroes, invented, for the hero badges (component 3): a consensus of two sources (one recentred), a
-    /// contest, one source alone, and a hero no source knows.
+    /// contest, one source alone, and a hero no source knows. Their tiers are given (A, B, D): four heroes are too few for
+    /// HeroTiers to compute one (it wants 20), and a real file has them. <paramref name="consolidated"/> false: no
+    /// consolidated view, as when its guard has fallen — each badge then shows its sources apart, a second one invented
+    /// (an HSReplay file of the top 10%) for the first two heroes.
     /// </summary>
-    public static IReadOnlyList<HeroPickRow> HeroRows()
+    public static IReadOnlyList<HeroPickRow> HeroRows(bool consolidated = true)
     {
         var odds = new[] { 14.0, 13.0, 13.0, 12.0, 12.0, 12.0, 12.0, 12.0 };
         var firestone = new HeroStatsFile(StatsSources.Firestone, new[]
         {
-            new HeroStat("HARNESS_HERO_A", 3.42, 4051, pickRate: 0.18, placementDistribution: odds),
-            new HeroStat("HARNESS_HERO_B", 3.80, 12480, pickRate: 0.09, placementDistribution: odds),
-            new HeroStat("HARNESS_HERO_C", 4.61, 880, pickRate: 0.04, placementDistribution: odds),
+            new HeroStat("HARNESS_HERO_A", 3.42, 4051, pickRate: 0.18, tier: "A", placementDistribution: odds),
+            new HeroStat("HARNESS_HERO_B", 3.80, 12480, pickRate: 0.09, tier: "B", placementDistribution: odds),
+            new HeroStat("HARNESS_HERO_C", 4.61, 880, pickRate: 0.04, tier: "D", placementDistribution: odds),
             new HeroStat("HARNESS_HERO_E", 4.10, 3000),
         }, mmrPercentile: 25, timePeriod: "last-patch");
+        if (!consolidated)
+        {
+            var hsreplay = new HeroStatsFile(StatsSources.HsReplayManual, new[]
+            {
+                new HeroStat("HARNESS_HERO_A", 3.30, 900, pickRate: 0.21, tier: "S"),
+                new HeroStat("HARNESS_HERO_B", 4.05, 700, pickRate: 0.11, tier: "C"),
+            }, mmrPercentile: 10, timePeriod: "last-patch");
+            var heroes = new[] { "HARNESS_HERO_A", "HARNESS_HERO_B", "HARNESS_HERO_C", "HARNESS_HERO_D" }
+                .Select((id, i) => new OfferedHero(entityId: 90 + i, cardId: id, baseCardId: id, position: i + 1)).ToList();
+            return HeroPickAdvisor.BuildRows(heroes, new[] { firestone, hsreplay });
+        }
+
         var nomi = new SourceSnapshot(new StatProvenance(StatsSources.NomiGg, null, null, null, "since 2026-10-02", null, null), new[]
         {
             new StatRecord("hero", "HARNESS_HERO_A", "placement", 3.10, 51, "games"),
@@ -388,6 +403,14 @@ internal static class HarnessData
 
     /// <summary>The trinket stats ChoiceAdvisor asks for, as the plugin hands it the panel's cache (ChoiceAdvicePanel.TrinketStat).</summary>
     public static TrinketStat? TrinketStat(string cardId) => TrinketStats.TryGetValue(cardId, out var stat) ? stat : null;
+
+    /// <summary>
+    /// The synthetic trinkets as the bracket's trinkets, for the grades (PlacementGrade), as the plugin passes its whole file:
+    /// at the top 25%, their mean is (3.71 × 5400 + 3.95 × 4100 + 4.28 × 2600 + 3.66 × 7300) / 19400 = 3.82, so that the four
+    /// labels show every case — the Pirate trinket adjusted to ≈3.41 good, the Mech one contested, the Elemental one at 4.28
+    /// bad, the last at 3.66 average (0.16 under the mean, inside the 0.2 band).
+    /// </summary>
+    public static TrinketReference TrinketGrades { get; } = TrinketReference.Of(TrinketStats.Values, Bracket)!;
 
     /// <summary>
     /// The hero the harness plays, for the hero piece of a guide's context line (HeroCompAffinity on <see cref="FirestoneComps"/>).

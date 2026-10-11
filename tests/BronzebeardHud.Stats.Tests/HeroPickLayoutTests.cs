@@ -177,19 +177,22 @@ public class HeroPickLayoutTests
     }
 
     [Fact]
-    public void Badge_HoldsTwoSourcesAndTheOdds_AtTheirOwnSize()
+    public void Badge_HoldsTheNoteAndTwoSmallLines_AtTheirOwnSize()
     {
-        var items = new[] { HeroPickLayout.SourceLine, HeroPickLayout.BodyLine, HeroPickLayout.SourceLine };
+        // The note's head (shield, figure, caption), then the sources and the odds, or the odds and a second source.
+        var items = new[] { HeroPickLayout.HeadHeight, HeroPickLayout.DetailLine, HeroPickLayout.DetailLine };
 
         Assert.Equal(new[] { 0, 1, 2 }, HeroPickLayout.ItemsThatFit(items, HeroPickLayout.ContentHeight));
+        Assert.True(HeroPickLayout.NoteWidth > 0);
     }
 
     [Fact]
     public void Badge_EveryLineIsTallerThanItsFont()
     {
-        Assert.True(HeroPickLayout.SourceLine >= 1.25 * PanelTypography.HeroTier);
-        Assert.True(HeroPickLayout.BodyLine >= 1.25 * PanelTypography.Body);
+        Assert.True(HeroPickLayout.NoteLine >= 1.25 * PanelTypography.HeroNote);
+        Assert.True(HeroPickLayout.DetailLine >= 1.25 * PanelTypography.Small);
         Assert.True(HeroPickLayout.NoDataLine >= 1.25 * PanelTypography.HeroNoData);
+        Assert.True(HeroPickLayout.HeadHeight >= 1.25 * PanelTypography.HeroTier); // the shield's letter
     }
 
     [Fact]

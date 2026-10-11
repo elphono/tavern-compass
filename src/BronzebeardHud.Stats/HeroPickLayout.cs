@@ -58,8 +58,8 @@ public static class HeroPickLayout
     public const double BadgeTop = 0.725;
 
     /// <summary>
-    /// Badge size, as fractions of the overlay height: the width of before; the height holds a source line,
-    /// the odds line and the comp line on two lines at their own size (<see cref="ContentHeight"/>), nothing shrunk.
+    /// Badge size, as fractions of the overlay height: the width of before; the height holds the note (a shield and the
+    /// figure, its caption under it) and two small lines at their own size (<see cref="ContentHeight"/>), nothing shrunk.
     /// </summary>
     public const double BadgeWidth = 0.17;
     public const double BadgeHeight = 0.08;
@@ -133,12 +133,21 @@ public static class HeroPickLayout
     public const double BadgePaddingY = 2;
 
     /// <summary>
-    /// Line heights inside a badge, in design pixels (× scale): a source line (its <see cref="PanelTypography.HeroTier"/>
-    /// tier letter), a <see cref="PanelTypography.Body"/> line, "no data".
+    /// Line heights inside a badge, in design pixels (× scale), each at least 1.25 × its font: the note's figure
+    /// (<see cref="PanelTypography.HeroNote"/>), a small line (<see cref="PanelTypography.Small"/>: the caption under the
+    /// figure, the sources, the odds), "no data" (<see cref="PanelTypography.HeroNoData"/>).
     /// </summary>
-    public const double SourceLine = 28;
-    public const double BodyLine = 17;
+    public const double NoteLine = 30;
+    public const double DetailLine = 15;
     public const double NoDataLine = 18;
+
+    /// <summary>The note's head: the shield, as tall as the figure and its caption, then the figure and the caption.</summary>
+    public const double ShieldWidth = 34;
+    public const double ShieldGap = 6;
+    public static double HeadHeight => NoteLine + DetailLine;
+
+    /// <summary>Width left to the figure and its caption, right of the shield, in design pixels.</summary>
+    public static double NoteWidth => ContentWidth - ShieldWidth - ShieldGap;
 
     /// <summary>Room for the lines inside a badge, in design pixels.</summary>
     public static double ContentHeight => BadgeHeight * DesignHeight - 2 * (BadgeBorder + BadgePaddingY);

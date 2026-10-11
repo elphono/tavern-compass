@@ -32,8 +32,8 @@ internal static class SelfTest
     /// <summary>PanelMover's colour in move mode: its frames are told apart from the dotted frames on Bob's cards by it.</summary>
     private static readonly Color MoverColour = Color.FromRgb(0x00, 0xE5, 0xFF);
 
-    /// <summary>ChoiceAdvicePanel's background for a label that names no target (a pivot, another guide, "—").</summary>
-    private static readonly Color NeutralLabel = Color.FromArgb(0xE6, 0x3A, 0x3A, 0x44);
+    /// <summary>ChoiceAdvicePanel's rim for a label that names no target (a pivot, another guide, "—"), written out here.</summary>
+    private static readonly Color NeutralLabel = Color.FromRgb(0x6E, 0x68, 0x84);
 
     /// <summary>GuideView.MutedBrush: the context line's colour.</summary>
     private static readonly Color Muted = Color.FromRgb(0xC8, 0xCD, 0xD8);
@@ -136,6 +136,7 @@ internal static class SelfTest
         Group("resize", ResizeChecks);
 
         Group("choices", ChoiceChecks);
+        Group("hero badges", HeroChecks);
         Group("hover", HoverChecks);
         Group("context line", ContextChecks);
         Group("choice cover", CoverChecks);
@@ -655,9 +656,12 @@ internal static class SelfTest
     /// <summary>
     /// The labels of ChoiceAdvicePanel above each choice (discover, Dark Gift, trinket), on the scene's automatic targets:
     /// one per option, where ChoiceLayout.Labels puts it; none of their texts under the floor or cut; a "★ core T" or
-    /// "+ T" label in the colour of the target T it names (read from the text, not from the advice); every trinket with
-    /// its placement, one adjusted for a target's tribe; an option that serves nothing says "—", never "no target comp";
-    /// closing the choice takes its labels away.
+    /// "+ T" label rimmed in the colour of the target T it names, its name in that colour (read from the text, not from the
+    /// advice), each role's pill in its colour (RolePills); every trinket's figure in its band's colour, one adjusted for a
+    /// target's tribe, one contested (TrinketNotes); an option that serves nothing says "—", never "no target comp"; a
+    /// target's core card, once Undead Butcher is ticked, says "★ core" on a gold pill (no option of the scene is one
+    /// otherwise: CoreLabel); closing the choice takes its labels away. Since the notes of 2026-10-11 a label's lines are read
+    /// as drawn, each line's pieces joined by spaces (LabelLines), and its colour on its rim, no longer on its background.
     /// </summary>
     private static void ChoiceChecks(HarnessWindow window, Action<string, bool, string> check)
     {
@@ -677,7 +681,7 @@ internal static class SelfTest
             var labels = rects.Select(r => canvas.Children.OfType<Border>().FirstOrDefault(b => !Equals(b.Tag, "choice") && b.IsVisible && b.Child is StackPanel
                 && Math.Abs(Canvas.GetLeft(b) - r.Left) < 0.5 && Math.Abs(Canvas.GetTop(b) - r.Top) < 0.5
                 && Math.Abs(b.ActualWidth - r.Width) < 0.5 && Math.Abs(b.ActualHeight - r.Height) < 0.5)).ToList();
-            var said = labels.Select(l => l == null ? new List<string>() : Texts(l).Where(t => t.IsVisible).Select(Content).ToList()).ToList();
+            var said = labels.Select(l => l == null ? new List<string>() : LabelLines(l)).ToList();
             drawnRects.AddRange(rects.Select(r => new Rect(r.Left, r.Top, r.Width, r.Height)));
             check($"{name}: one label per option, where ChoiceLayout puts it", options.Count > 0 && labels.All(l => l != null) && said.All(s => s.Count > 0),
                 $"{labels.Count(l => l != null)} labels for {options.Count} options: " + string.Join("; ", said.Select((s, i) => $"#{i} {string.Join(" / ", s)}")));
@@ -695,17 +699,12 @@ internal static class SelfTest
 
             if (kind == ChoiceKind.Trinket)
             {
-                var adjusted = said.Where(s => s.Any(line => line.StartsWith("≈ ", StringComparison.Ordinal) && targets.Any(t => line.Contains(t.Guide.Name)))).Count();
-                // A trinket nomi.gg contests shows both figures in place of its placement (component 9, HarnessData.TrinketView).
-                var contested = said.Count(s => s.Count == 2 && s[0].EndsWith(" contested", StringComparison.Ordinal) && s[1] == "nomi.gg ↔ FS");
-                check($"{name}: every trinket shows its placement or a contest, one adjusted for a target's tribe, one contested",
-                    said.Count > 0 && said.All(s => s.Count > 0 && (s[0].StartsWith("avg ", StringComparison.Ordinal) || s[0].EndsWith(" contested", StringComparison.Ordinal)))
-                    && adjusted >= 1 && contested == 1,
-                    $"{adjusted} adjusted: " + string.Join("; ", said.Select((s, i) => $"#{i} {string.Join(" / ", s)}")));
+                TrinketNotes(labels, targets, check);
             }
             else
             {
-                // The target is read from the label's text, the colour from what is drawn: neither from the advice.
+                // The target is read from the label's text, the colour from what is drawn (the rim, and the name's ink): neither
+                // from the advice.
                 var coloured = new List<string>();
                 var wrong = new List<string>();
                 for (var i = 0; i < labels.Count; i++)
@@ -717,8 +716,8 @@ internal static class SelfTest
                     }
 
                     var named = targets.Where(t => first.Contains(t.Guide.Name)).ToList();
-                    var drawn = (labels[i]?.Background as SolidColorBrush)?.Color;
-                    var line = $"#{i} \"{first}\" drawn {drawn}";
+                    var drawn = (labels[i]?.BorderBrush as SolidColorBrush)?.Color;
+                    var line = $"#{i} \"{first}\" rim {drawn}";
                     if (named.Count != 1)
                     {
                         wrong.Add(line + $": names {named.Count} targets");
@@ -726,11 +725,13 @@ internal static class SelfTest
                     }
 
                     var expected = (Color)ColorConverter.ConvertFromString(named[0].Colour);
-                    (drawn == expected ? coloured : wrong).Add(line + $", {named[0].Guide.Name} is {expected}");
+                    var ink = Texts(labels[i]!).Where(t => t.IsVisible && Content(t) == named[0].Guide.Name).Select(t => (t.Foreground as SolidColorBrush)?.Color).ToList();
+                    (drawn == expected && ink.Count == 1 && ink[0] == expected ? coloured : wrong).Add(line + $", name in {string.Join(",", ink)}, {named[0].Guide.Name} is {expected}");
                 }
 
-                check($"{name}: a \"★ core T\" or \"+ T\" label is in the colour of T", coloured.Count >= 1 && wrong.Count == 0,
+                check($"{name}: a \"★ core T\" or \"+ T\" label is in the colour of T (its rim and its name)", coloured.Count >= 1 && wrong.Count == 0,
                     string.Join("; ", wrong.Concat(coloured)));
+                RolePills(name, labels, check);
             }
 
             if (kind == ChoiceKind.Discover)
@@ -759,6 +760,10 @@ internal static class SelfTest
 
         check("an option that serves nothing says \"—\", never \"no target comp\"",
             unrelated.Count >= 1 && unrelated.All(u => u.EndsWith(": —", StringComparison.Ordinal)), string.Join("; ", unrelated));
+
+        CoreLabel(window, check);
+        drawnRects.AddRange(ChoiceLayout.Labels(ChoiceKind.DarkGift, window.ChoiceOptions.Count, canvas.ActualWidth, canvas.ActualHeight,
+            window.Choices.LastLines.Select(l => l.Count).DefaultIfEmpty(1).Max()).Select(RectOf));
 
         window.ShowChoice(ChoiceKind.None);
         window.UpdateLayout();
@@ -835,9 +840,10 @@ internal static class SelfTest
     }
 
     /// <summary>
-    /// (b) In a discover, the three labels the bridge opens, read from what is drawn (text and background), never from the
-    /// advice: "+ T k/n boards" (a card no list of T names, on T's comp's boards) in the colour of T, a role followed by
-    /// "· k/n boards", and "pivot → G (X)" on the neutral background. Their sizes and cuts: the check before, on every label.
+    /// (b) In a discover, the three labels the bridge opens, read from what is drawn (text and rim), never from the advice:
+    /// "+ T k/n boards" (a card no list of T names, on T's comp's boards) rimmed in the colour of T, a role followed by
+    /// "· k/n boards", and "pivot → G X" (the tier in its chip) with the neutral rim. Their sizes and cuts: the check before,
+    /// on every label. (Before the notes of 2026-10-11, the colour was the label's background and the tier "(X)" text.)
     /// </summary>
     private static void BridgeLabels(IReadOnlyList<Border?> labels, IReadOnlyList<List<string>> said, IReadOnlyList<CompTarget> targets, Action<string, bool, string> check)
     {
@@ -847,7 +853,7 @@ internal static class SelfTest
         var wrong = new List<string>();
         for (var i = 0; i < labels.Count && i < said.Count; i++)
         {
-            var drawn = (labels[i]?.Background as SolidColorBrush)?.Color;
+            var drawn = (labels[i]?.BorderBrush as SolidColorBrush)?.Color;
             foreach (var line in said[i])
             {
                 var what = $"#{i} \"{line}\" on {drawn}";
@@ -861,17 +867,245 @@ internal static class SelfTest
                 {
                     suffixed.Add(what);
                 }
-                else if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^pivot → .+ \([SABCD]\)$"))
+                else if (System.Text.RegularExpressions.Regex.IsMatch(line, @"^pivot → .+ [SABCD]$"))
                 {
                     (drawn == NeutralLabel && line == said[i][0] ? pivots : wrong).Add(what);
                 }
             }
         }
 
-        check("choice discover: the bridge's labels: \"+ T k/n boards\" in T's colour, a role \"· k/n boards\", \"pivot → G (X)\" neutral",
+        check("choice discover: the bridge's labels: \"+ T k/n boards\" in T's colour, a role \"· k/n boards\", \"pivot → G X\" neutral",
             topBoards.Count >= 1 && suffixed.Count >= 1 && pivots.Count >= 1 && wrong.Count == 0,
             $"top boards: {string.Join("; ", topBoards)} | suffix: {string.Join("; ", suffixed)} | pivot: {string.Join("; ", pivots)}"
             + (wrong.Count > 0 ? " | WRONG: " + string.Join("; ", wrong) : string.Empty));
+    }
+
+    /// <summary>
+    /// (Notes of 2026-10-11) A target's core card: no option of the scene's choices is one, so Undead Butcher is ticked (a
+    /// target then) and the Dark Gift opened, whose second option is one of its core cards; its label must say "★ core
+    /// Undead Butcher k/n→k+1/n" on a gold pill, the name and the rim in its colour. Unticked after, as it was.
+    /// </summary>
+    private static void CoreLabel(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var canvas = window.Overlay;
+        window.Tick("Undead Butcher");
+        try
+        {
+            window.ShowChoice(ChoiceKind.DarkGift);
+            window.UpdateLayout();
+            var target = window.Targets.FirstOrDefault(t => t.Guide.Name == "Undead Butcher");
+            var rects = ChoiceLayout.Labels(ChoiceKind.DarkGift, window.ChoiceOptions.Count, canvas.ActualWidth, canvas.ActualHeight,
+                window.Choices.LastLines.Select(l => l.Count).DefaultIfEmpty(1).Max());
+            var label = rects.Select(r => canvas.Children.OfType<Border>().FirstOrDefault(b => !Equals(b.Tag, "choice") && b.IsVisible && b.Child is StackPanel
+                && Math.Abs(Canvas.GetLeft(b) - r.Left) < 0.5 && Math.Abs(Canvas.GetTop(b) - r.Top) < 0.5))
+                .FirstOrDefault(b => b != null && LabelLines(b).Any(l => l.StartsWith("★ core Undead Butcher ", StringComparison.Ordinal)));
+            var colour = target == null ? (Color?)null : (Color)ColorConverter.ConvertFromString(target.Colour);
+            var pill = label == null ? null : Tagged(label, ChoiceAdvicePanel.PillTag).OfType<Border>().FirstOrDefault();
+            var name = label == null ? null : Texts(label).FirstOrDefault(t => Content(t) == "Undead Butcher");
+            var line = label == null ? "none" : string.Join(" / ", LabelLines(label));
+            check("choice dark-gift, Undead Butcher ticked: \"★ core T k/n→k+1/n\" on a gold pill, the name and the rim in T's colour",
+                target != null && label != null && System.Text.RegularExpressions.Regex.IsMatch(line, @"^★ core Undead Butcher \d+/\d+→\d+/\d+$")
+                && (pill?.Background as SolidColorBrush)?.Color == (Color)ColorConverter.ConvertFromString("#FFC93C")
+                && (name?.Foreground as SolidColorBrush)?.Color == colour && (label.BorderBrush as SolidColorBrush)?.Color == colour,
+                $"\"{line}\" pill {(pill?.Background as SolidColorBrush)?.Color} name {(name?.Foreground as SolidColorBrush)?.Color} rim {(label?.BorderBrush as SolidColorBrush)?.Color}, "
+                + $"Undead Butcher {(target == null ? "no target" : "is " + target.Colour)}");
+        }
+        finally
+        {
+            window.Tick("Undead Butcher");
+            window.UpdateLayout();
+        }
+    }
+
+    /// <summary>The lines of a choice's label as drawn: each line's visible pieces (pill, name, tier chip, count, suffix) joined by spaces.</summary>
+    private static List<string> LabelLines(Border label) =>
+        Tagged(label, ChoiceAdvicePanel.LineTag).Select(line => string.Join(" ", Texts(line).Where(t => t.IsVisible).Select(Content))).ToList();
+
+    /// <summary>
+    /// (Notes of 2026-10-11) Each line's pill, read on what is drawn: its text says the role, its fill must be that role's, from a
+    /// table written here — "★ core" gold, "+" silver, "pivot →" lavender, "t6 ▲" green and "t6 ▼" red, "core" (another guide)
+    /// an outline only — and no filled pill takes a target's colour.
+    /// </summary>
+    private static void RolePills(string name, IReadOnlyList<Border?> labels, Action<string, bool, string> check)
+    {
+        var fills = new Dictionary<string, string?> { ["★ core"] = "#FFC93C", ["+"] = "#D5DBE6", ["pivot →"] = "#B69CFF", ["core"] = null };
+        var seen = new List<string>();
+        var wrong = new List<string>();
+        foreach (var pill in labels.Where(l => l != null).SelectMany(l => Tagged(l!, ChoiceAdvicePanel.PillTag)).OfType<Border>())
+        {
+            var text = string.Concat(Texts(pill).Select(Content));
+            var fill = (pill.Background as SolidColorBrush)?.Color;
+            var expected = text.StartsWith("t", StringComparison.Ordinal) ? (text.EndsWith("▲", StringComparison.Ordinal) ? "#3DDC84" : "#FF6B6B")
+                : fills.TryGetValue(text, out var f) ? f : "?";
+            var ok = expected == null ? fill == Colors.Transparent : expected != "?" && fill == (Color)ColorConverter.ConvertFromString(expected);
+            ok &= fill == null || !CompTargetTracker.Palette.Any(p => (Color)ColorConverter.ConvertFromString(p) == fill);
+            (ok ? seen : wrong).Add($"\"{text}\" {fill}");
+        }
+
+        check($"{name}: each role's pill in its own colour", seen.Count >= 1 && wrong.Count == 0,
+            string.Join("; ", seen) + (wrong.Count > 0 ? " | WRONG: " + string.Join("; ", wrong) : string.Empty));
+    }
+
+    /// <summary>
+    /// (Notes of 2026-10-11) The trinkets' labels, read from what is drawn: each shows its figure, drawn at least 1.6 × its
+    /// small lines; the bands come from the harness's synthetic stats, computed here by hand — their mean at the harness's
+    /// bracket weighed by games (3.82), ± 0.2 (every one has more than 529 games: the noise is under the band) — and each
+    /// figure's ink is its band's colour: the Pirate trinket, adjusted to ≈3.41 for its target ("≈ T" in T's colour), good; the
+    /// Elemental one, 4.28, bad; the last, 3.66, average; the Mech one contested, amber, both figures, "contested" and its two
+    /// sources. All three bands and the contest must show.
+    /// </summary>
+    private static void TrinketNotes(IReadOnlyList<Border?> labels, IReadOnlyList<CompTarget> targets, Action<string, bool, string> check)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var stats = HarnessData.Choice(ChoiceKind.Trinket).Select(o => HarnessData.TrinketStat(o.CardId)!).ToList();
+        var mean = stats.Sum(s => s.PlacementFor(HarnessData.Bracket) * s.DataPoints) / stats.Sum(s => (double)s.DataPoints);
+        var said = new List<string>();
+        var wrong = new List<string>();
+        var bands = new HashSet<string>();
+        var (contested, adjusted) = (0, 0);
+        for (var i = 0; i < labels.Count; i++)
+        {
+            if (labels[i] is not { } label || Tagged(label, ChoiceAdvicePanel.FigureTag).OfType<TextBlock>().SingleOrDefault() is not { } figure)
+            {
+                wrong.Add($"#{i}: no figure");
+                continue;
+            }
+
+            var small = Texts(label).Where(t => t.IsVisible && !ReferenceEquals(t, figure)).ToList();
+            var text = Content(figure);
+            var ink = (figure.Foreground as SolidColorBrush)?.Color;
+            var what = $"#{i} \"{text}\" {ink} [{string.Join(" / ", small.Select(Content))}]";
+            var ok = small.Count > 0 && small.All(t => figure.FontSize >= 1.6 * t.FontSize - 1e-6);
+            string expected;
+            if (text.Contains("↔"))
+            {
+                contested++;
+                expected = "#FFB03B";
+                ok &= small.Select(Content).SequenceEqual(new[] { "contested", "nomi.gg ↔ FS" });
+            }
+            else
+            {
+                var shown = double.Parse(text.TrimStart('≈'), inv);
+                if (text.StartsWith("≈", StringComparison.Ordinal))
+                {
+                    adjusted++;
+                    ok &= small.Any(t => targets.Any(target => Content(t) == "≈ " + target.Guide.Name
+                        && (t.Foreground as SolidColorBrush)?.Color == (Color)ColorConverter.ConvertFromString(target.Colour)));
+                }
+
+                var gap = Math.Round(shown - mean, 2);
+                var band = gap <= -0.2 ? "good" : gap >= 0.2 ? "bad" : "average";
+                bands.Add(band);
+                expected = band == "good" ? "#3DDC84" : band == "bad" ? "#FF5C5C" : "#FFFFFF";
+                what += $" {band}";
+            }
+
+            ok &= ink == (Color)ColorConverter.ConvertFromString(expected);
+            (ok ? said : wrong).Add(what + $", expected {expected}");
+        }
+
+        check("choice trinket: each figure large and in its band's colour (the bracket's mean ± 0.2, computed here), good, average and bad all shown, one adjusted, one contested in amber",
+            labels.Count == 4 && wrong.Count == 0 && bands.SetEquals(new[] { "good", "average", "bad" }) && contested == 1 && adjusted == 1,
+            $"mean {mean.ToString("0.00", inv)}: " + string.Join("; ", said) + (wrong.Count > 0 ? " | WRONG: " + string.Join("; ", wrong) : string.Empty));
+    }
+
+    /// <summary>
+    /// (Notes of 2026-10-11) The hero badges, on the harness's invented heroes (HarnessData.HeroRows), with the consolidated
+    /// view and without: one badge per hero where HeroPickLayout puts it; no text under 12 px, none cut; each a shield with
+    /// its tier letter (the data's), and a figure drawn at least 1.6 × its small lines; the contest's figure amber with both
+    /// figures, "contested" under it and an amber rim; a consensus white, nomi.gg named on screen; "no data" for the hero no
+    /// source knows; without the view, each second source on a line of its own with its tier in a chip.
+    /// </summary>
+    private static void HeroChecks(HarnessWindow window, Action<string, bool, string> check)
+    {
+        var canvas = window.Overlay;
+        var scale = TavernLayout.Scale(canvas.ActualHeight);
+        foreach (var consolidated in new[] { true, false })
+        {
+            var name = consolidated ? "hero badges" : "hero badges by source";
+            var rows = HarnessData.HeroRows(consolidated);
+            var panel = new HeroPickPanel(canvas);
+            try
+            {
+                panel.Show(rows, null);
+                window.UpdateLayout();
+                var rects = HeroPickLayout.Compute(canvas.ActualWidth, canvas.ActualHeight, rows.Count);
+                var placed = panel.Badges.Zip(rects, (b, r) => b.IsVisible && Math.Abs(Canvas.GetLeft(b) - r.Left) < 0.5 && Math.Abs(Canvas.GetTop(b) - r.Top) < 0.5
+                    && Math.Abs(b.ActualWidth - r.Width) < 0.5 && Math.Abs(b.ActualHeight - r.Height) < 0.5).Count(x => x);
+                check($"{name}: one badge per hero, where HeroPickLayout puts it", rows.Count == 4 && panel.Badges.Count == 4 && placed == 4, $"{placed} of {panel.Badges.Count} placed");
+
+                var problems = new List<string>();
+                var counted = 0;
+                foreach (var badge in panel.Badges)
+                {
+                    var (n, found) = TextProblems(badge, scale);
+                    counted += n;
+                    problems.AddRange(found);
+                }
+
+                check($"{name}: no text under 12 px, none cut", counted > 0 && problems.Count == 0, $"{counted} texts checked" + Problems(problems));
+
+                var said = new List<string>();
+                var wrong = new List<string>();
+                for (var i = 0; i < rows.Count; i++)
+                {
+                    var badge = panel.Badges[i];
+                    var shield = Tagged(badge, HeroPickPanel.ShieldTag).SingleOrDefault();
+                    var letter = shield == null ? "?" : string.Concat(Texts(shield).Select(Content));
+                    var figure = Tagged(badge, HeroPickPanel.FigureTag).OfType<TextBlock>().SingleOrDefault();
+                    var caption = Tagged(badge, HeroPickPanel.CaptionTag).OfType<TextBlock>().Single();
+                    var details = Tagged(badge, HeroPickPanel.DetailTag).OfType<TextBlock>().Where(t => t.IsVisible).ToList();
+                    var secondary = details.Append(caption).Max(t => t.FontSize);
+                    var rim = (badge.BorderBrush as SolidColorBrush)?.Color;
+                    var what = $"#{i} [{letter}] \"{(figure == null ? "-" : Content(figure))}\" {(figure?.Foreground as SolidColorBrush)?.Color} / \"{Content(caption)}\" / "
+                               + $"{string.Join(" / ", details.Select(Content))} rim {rim?.ToString() ?? "silver"}";
+                    var expectedLetter = rows[i].HasData ? rows[i].Figures[0].Tier ?? "–" : "–";
+                    var ok = letter == expectedLetter;
+                    if (!rows[i].HasData)
+                    {
+                        ok &= figure == null && Content(caption) == "no data";
+                    }
+                    else if (figure == null)
+                    {
+                        ok = false;
+                    }
+                    else
+                    {
+                        var ink = (figure.Foreground as SolidColorBrush)?.Color;
+                        ok &= figure.FontSize >= 1.6 * secondary - 1e-6;
+                        if (rows[i].Consensus is { Contested: true })
+                        {
+                            var amber = (Color)ColorConverter.ConvertFromString("#FFB03B");
+                            ok &= Content(figure).Contains("↔") && ink == amber && Content(caption) == "contested" && rim == amber;
+                        }
+                        else
+                        {
+                            ok &= ink == Colors.White && !Content(figure).Contains("↔");
+                        }
+
+                        if (consolidated && rows[i].Consensus?.Sources.Contains("nomi.gg") == true)
+                        {
+                            ok &= details.Any(t => Content(t).Contains("nomi.gg"));
+                        }
+
+                        if (!consolidated && rows[i].Figures.Count > 1)
+                        {
+                            ok &= details.Any(t => Content(t) == rows[i].Figures[1].Tier) && details.Any(t => Content(t).Contains("HSR"));
+                        }
+                    }
+
+                    (ok ? said : wrong).Add(what);
+                }
+
+                check($"{name}: a shield with the tier, the figure large (white, or amber with both figures when contested), nomi.gg named, \"no data\", a second source's tier chip",
+                    wrong.Count == 0, string.Join("; ", said) + (wrong.Count > 0 ? " | WRONG: " + string.Join("; ", wrong) : string.Empty));
+            }
+            finally
+            {
+                panel.Detach();
+                window.UpdateLayout();
+            }
+        }
     }
 
     /// <summary>

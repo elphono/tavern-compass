@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notes héros et choix</title>
+<meta name="description" content="Note de conception du 2026-10-11 : l'encart des héros proposés et les étiquettes des choix (découverte, Dark Gift, trinkets) redessinés en notes, sur le modèle de l'écran de choix du héros du jeu — avant / après, anatomie, échelle des trinkets, pastilles de rôle, corps mesurés, preuves, ce qui n'est pas vu en jeu.">
+<style>
+  :root {
+    --bg: #f7f7f4; --surface: #ffffff; --text: #1d1f24; --muted: #555b67; --border: #d6d9df; --soft: #eef0f3;
+    --plate: #241c33; --plate-text: #ffffff; --plate-muted: #c8cdd8;
+    --good: #15803d; --bad: #c81e1e; --amber: #b86a00; --accent: #6d28d9;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
+      --plate: #241c33; --plate-text: #ffffff; --plate-muted: #c8cdd8;
+      --good: #3ddc84; --bad: #ff5c5c; --amber: #ffb03b; --accent: #b69cff;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
+    --plate: #241c33; --plate-text: #ffffff; --plate-muted: #c8cdd8;
+    --good: #3ddc84; --bad: #ff5c5c; --amber: #ffb03b; --accent: #b69cff;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; overflow-wrap: break-word; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 8px 0 4px; }
+  h2 { font-size: 22px; line-height: 1.25; margin: 44px 0 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  h3 { font-size: 18px; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 15px; margin: 0 0 20px; }
+  code { font: max(14px, 0.92em) ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+  .lead { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 16px; font-size: 17px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 16px 0 0; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .tile b { display: block; font-size: 26px; line-height: 1.1; }
+  .tile span { color: var(--muted); font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--surface); border: 1px solid var(--border); }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--soft); font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 15px; margin-top: 6px; }
+  img { max-width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: 6px; background: #1c2230; }
+  .pair { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .pair .tag { font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+  .pair .tag.after { color: var(--accent); }
+  svg { display: block; width: 100%; height: auto; }
+  .figscroll { overflow-x: auto; }
+  .figscroll svg { min-width: 720px; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  svg .sub { fill: var(--muted); }
+  svg .line { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+  .pill { display: inline-block; border-radius: 9px; padding: 0 7px; font-size: 13px; font-weight: 700; line-height: 18px; color: #16131f; white-space: nowrap; }
+  .chip { display: inline-block; border-radius: 3px; padding: 0 5px; font-size: 13px; font-weight: 700; line-height: 18px; color: #fff; }
+  .plate { display: inline-block; background: var(--plate); color: var(--plate-text); border-radius: 5px; padding: 2px 8px; border: 1.5px solid #6e6884; white-space: nowrap; font-size: 14px; font-weight: 700; }
+  .plate small { color: var(--plate-muted); font-weight: 400; font-size: 13px; }
+  ul.plain { padding-left: 20px; }
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  pre { background: var(--soft); padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.45; }
+  .ok { color: var(--good); font-weight: 700; }
+  .ko { color: var(--bad); font-weight: 700; }
+  .eq { color: var(--muted); font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+<h1>Les notes des héros et des choix</h1>
+<p class="meta">Note de conception, 2026-10-11 · Tavern Compass · données de la simulation, toutes inventées</p>
+
+<p class="lead">Ali : « l'écran de sélection des personnages (et les indications de trinkets/découvertes etc.) offrent de bonnes
+informations mais celles-ci ne sont ni sexy, ni ergonomiques. Regarde celle de [l'écran de choix du héros du jeu]. Les couleurs,
+les notes, c'est meilleur. Refonte. » — Le jeu montre l'armure d'un héros en <b>gros chiffre blanc cerné de noir dans un blason
+d'argent</b>. Les encarts et les étiquettes font désormais pareil : <b>une note qui se lit d'un coup d'œil</b>, grosse et colorée,
+puis le détail en petit. Les boîtes ne bougent pas, rien n'est perdu, rien n'est calculé autrement : seul le dessin change.</p>
+
+<div class="tiles">
+  <div class="tile"><b>24 px</b><span>la place d'un héros, deux fois les lignes de dessous (12 px)</span></div>
+  <div class="tile"><b>20 px</b><span>la place d'un trinket, 1,67 × ses lignes : ce que tient une étiquette d'une ligne</span></div>
+  <div class="tile"><b>3 bandes</b><span>trinket bon, moyen, mauvais contre la moyenne de ta tranche, et l'ambre du désaccord</span></div>
+  <div class="tile"><b>0 boîte</b><span>déplacée ou agrandie : <code>HeroPickLayout</code> et <code>ChoiceLayout</code> intacts</span></div>
+</div>
+
+<h2>1. Avant, après</h2>
+<p>Captures de la simulation (<code>tools/BronzebeardHud.Harness</code>, 1920 × 1080), agrandies deux fois sur la zone concernée.
+Les captures entières sont dans <code>img/2026-10-11-notes/</code>.</p>
+
+<h3>Héros proposés</h3>
+<div class="pair">
+  <div class="tag">avant</div>
+  <img src="img/2026-10-11-notes/avant-heros-zoom.png" alt="Avant : trois lignes grises par encart, un tiret à la place de la lettre de tier, le désaccord en petit texte ambre">
+  <div class="tag after">après</div>
+  <img src="img/2026-10-11-notes/apres-heros-zoom.png" alt="Après : un blason de la couleur du tier, la place en gros chiffre blanc, l'effectif dessous, sources et top 4 en petit ; le désaccord en ambre avec un liseré ambre ; no data dans un blason gris">
+</div>
+<p>Avant, la lettre de tier était un tiret : quatre héros inventés, c'est trop peu pour que <code>HeroTiers</code> en calcule une
+(il en veut 20) ; la simulation leur donne maintenant les tiers A, B, D, comme un vrai fichier. Le quatrième encart passe sous le
+panneau « Compositions » à sa place par défaut — c'était déjà le cas, et c'est à la disposition du joueur de l'éviter.</p>
+<figure>
+  <img src="img/2026-10-11-notes/apres-heros-par-source-zoom.png" alt="Sans vue consolidée : la première source fait la note, la seconde a sa ligne avec son tier dans une pastille">
+  <figcaption>Sans vue consolidée (garde-fou tombé, ou moins de 10 parties partout) : la première source fait la note, la seconde a sa
+  ligne, son tier dans une pastille (<code>--heroes-sources</code>, sources inventées).</figcaption>
+</figure>
+
+<h3>Trinkets</h3>
+<div class="pair">
+  <div class="tag">avant</div>
+  <img src="img/2026-10-11-notes/avant-trinkets-zoom.png" alt="Avant : quatre étiquettes sombres, texte gras blanc, la même couleur pour tous">
+  <div class="tag after">après</div>
+  <img src="img/2026-10-11-notes/apres-trinkets-zoom.png" alt="Après : ≈3.41 en vert, 3.3 ↔ 4.1 en ambre avec contested, 4.28 en rouge, 3.66 en blanc">
+</div>
+
+<h3>Découverte et Dark Gift</h3>
+<div class="pair">
+  <div class="tag">avant</div>
+  <img src="img/2026-10-11-notes/avant-decouverte-zoom.png" alt="Avant : étiquettes pleines de la couleur de la cible, texte noir">
+  <div class="tag after">après</div>
+  <img src="img/2026-10-11-notes/apres-decouverte-zoom.png" alt="Après : pastille + argent, nom dans la couleur de la cible ; pastille pivot lavande et tier A dans sa pastille">
+  <div class="tag">avant</div>
+  <img src="img/2026-10-11-notes/avant-dark-gift-zoom.png" alt="Avant : + Mech Divine Shield sur fond bleu, core Undead Butcher (S) sur fond gris">
+  <div class="tag after">après</div>
+  <img src="img/2026-10-11-notes/apres-dark-gift-zoom.png" alt="Après : pastille +, nom bleu ; pastilles core en contour, tiers S et B dans leurs couleurs ; tiret gris">
+  <div class="tag after">après, Undead Butcher coché et stats de cartes</div>
+  <img src="img/2026-10-11-notes/apres-dark-gift-coeur-zoom.png" alt="Après : pastille or ★ core, Undead Butcher en bleu, 0/3→1/3 ; pastille verte t6 ▲, 3.5 vs 4.0">
+</div>
+<p>La dernière capture montre la pastille or « ★ core » et la pastille verte « t6 ▲ », qu'aucun choix de la scène par défaut ne
+fait voir : <code>--choice dark-gift --play --card-values --tick '"Undead Butcher"'</code>.</p>
+
+<h2>2. La note d'un héros</h2>
+<div class="figscroll"><svg viewBox="0 0 900 250" role="img" aria-label="Anatomie de l'encart d'un héros : blason du tier, place en gros, effectif, sources, top 4">
+  <rect x="250" y="40" width="370" height="174" rx="12" fill="#241c33" stroke="#c9ced8" stroke-width="4"/>
+  <path d="M 300,62 Q 336,50 372,62 L 372,104 C 372,128 355,139 336,148 C 317,139 300,128 300,104 Z" fill="#ff9f1c" stroke="#e8ebf1" stroke-width="3"/>
+  <text x="336" y="112" text-anchor="middle" font-size="40" font-weight="900" style="fill:#fff">A</text>
+  <text x="392" y="103" font-size="50" font-weight="800" style="fill:#fff">3.42</text>
+  <text x="396" y="134" font-size="22" style="fill:#c8cdd8">4,102 games</text>
+  <text x="435" y="170" text-anchor="middle" font-size="22" style="fill:#c8cdd8">FS 25% + nomi.gg</text>
+  <text x="435" y="200" text-anchor="middle" font-size="22" style="fill:#c8cdd8">top 4 52% · 1st 14%</text>
+  <path class="line" d="M 300,96 L 190,70"/><text x="16" y="60" font-size="15" font-weight="700">blason du tier</text><text x="16" y="80" font-size="14" class="sub">couleur du tier, lettre 22 px</text>
+  <path class="line" d="M 530,82 L 660,52"/><text x="664" y="48" font-size="15" font-weight="700">la note : la place</text><text x="664" y="68" font-size="14" class="sub">24 px, blanche, cernée de noir</text>
+  <path class="line" d="M 540,128 L 660,108"/><text x="664" y="104" font-size="15" font-weight="700">son effectif</text><text x="664" y="124" font-size="14" class="sub">12 px</text>
+  <path class="line" d="M 540,165 L 660,160"/><text x="664" y="156" font-size="15" font-weight="700">les sources</text><text x="664" y="176" font-size="14" class="sub">12 px — le crédit nomi.gg reste</text>
+  <path class="line" d="M 560,198 L 660,210"/><text x="664" y="206" font-size="15" font-weight="700">top 4 et 1er</text><text x="664" y="226" font-size="14" class="sub">12 px, de la première source</text>
+  <path class="line" d="M 250,200 L 190,214"/><text x="16" y="210" font-size="15" font-weight="700">liseré argent</text><text x="16" y="230" font-size="14" class="sub">ambre quand les sources divergent</text>
+</svg></div>
+<div class="scroll"><table>
+  <thead><tr><th>Cas</th><th>Note (gros)</th><th>Dessous (12 px)</th><th>Comment le reconnaître d'un coup d'œil</th></tr></thead>
+  <tbody>
+    <tr><td>Consensus (ou une source seule)</td><td>blason + « 3.42 » blanc</td><td>« 4,102 games », sources, top 4 / 1er</td><td>chiffre blanc, liseré argent</td></tr>
+    <tr><td>Désaccord des sources</td><td>blason + « 2.7↔3.8 » ambre</td><td>« contested », les deux sources dans l'ordre des chiffres</td><td>deux chiffres, tout l'encart cerclé d'ambre ; jamais leur moyenne</td></tr>
+    <tr><td>Sans vue consolidée</td><td>blason + place de la 1re source</td><td>« 18% pick · FS 25% », top 4, la 2e source avec sa pastille de tier</td><td>même langage, une ligne par source en plus</td></tr>
+    <tr><td>Aucune source</td><td>blason gris « – »</td><td>« no data » (14 px)</td><td>gris partout</td></tr>
+  </tbody>
+</table></div>
+<p>« 2.7↔3.8 » perd ses espaces : l'estimation de largeur commune aux étiquettes (<code>MarkerText</code>, 0,62 em par caractère,
+généreuse) ne lui donne que 8 caractères à 24 px. Le dessin à l'écran en aurait tenu 9 ; je garde l'estimation prudente plutôt qu'un
+cas à part.</p>
+
+<h2>3. L'échelle des trinkets</h2>
+<p>Une borne fixe (« ≤ 3,8 bon ») ne vaut rien : la place moyenne des trinkets dépend de la tranche, parce qu'un trinket est
+pris par un joueur qui place comme les joueurs de sa tranche. Mesuré sur le fichier de Firestone du 2026-10-11 (238 trinkets),
+la moyenne pondérée par les parties va de <b>3,47</b> (top 1 %) à <b>4,04</b> (top 25 %). La note se compare donc à la moyenne
+des trinkets <b>de ta tranche</b> (<code>TrinketReference.Of</code>) : à 0,2 place au moins dessous, bonne ; à 0,2 au moins
+dessus, mauvaise ; entre, moyenne (<code>PlacementGrade.Of</code>). La bande s'élargit au bruit, 2 × 2,3 / √parties, sous 529
+parties (4 trinkets sur 238 ce jour-là) ; un désaccord des sources reste ambre et n'est jamais noté.</p>
+<div class="figscroll"><svg viewBox="0 0 900 230" role="img" aria-label="Échelle des trinkets : vert sous la moyenne moins 0,2, blanc entre, rouge au-dessus de la moyenne plus 0,2 ; les quatre trinkets de la simulation placés dessus">
+  <rect x="60" y="70" width="290" height="44" fill="#3ddc84"/>
+  <rect x="350" y="70" width="160" height="44" fill="#ffffff" stroke="#9aa0aa"/>
+  <rect x="510" y="70" width="330" height="44" fill="#ff5c5c"/>
+  <line x1="430" y1="58" x2="430" y2="126" stroke="currentColor" stroke-width="2" style="stroke:var(--text)"/>
+  <text x="430" y="50" text-anchor="middle" font-size="15" font-weight="700">moyenne de la tranche (simulation : 3,82)</text>
+  <text x="350" y="146" text-anchor="middle" font-size="14" class="sub">− 0,2</text>
+  <text x="510" y="146" text-anchor="middle" font-size="14" class="sub">+ 0,2</text>
+  <text x="205" y="98" text-anchor="middle" font-size="17" font-weight="800" style="fill:#0d2b18">bonne</text>
+  <text x="430" y="98" text-anchor="middle" font-size="17" font-weight="800" style="fill:#1d1f24">moyenne</text>
+  <text x="675" y="98" text-anchor="middle" font-size="17" font-weight="800" style="fill:#3a0b0b">mauvaise</text>
+  <text x="60" y="146" font-size="14" class="sub">mieux placé</text>
+  <text x="840" y="146" text-anchor="end" font-size="14" class="sub">moins bien placé</text>
+  <circle cx="266" cy="176" r="7" fill="#3ddc84"/><text x="254" y="181" text-anchor="end" font-size="14">≈3.41 (ajustée pour Pirate Discover)</text>
+  <circle cx="366" cy="176" r="7" fill="#ffffff" stroke="#555b67"/><text x="378" y="181" font-size="14">3.66</text>
+  <circle cx="614" cy="176" r="7" fill="#ff5c5c"/><text x="626" y="181" font-size="14">4.28</text>
+  <circle cx="60" cy="214" r="7" fill="#ffb03b"/><text x="72" y="219" font-size="14">3.3 ↔ 4.1 : désaccord, ambre, hors échelle (Mech, nomi.gg contre Firestone)</text>
+</svg></div>
+<div class="scroll"><table>
+  <thead><tr><th>Tranche</th><th>Moyenne</th><th>Bonnes</th><th>Moyennes</th><th>Mauvaises</th></tr></thead>
+  <tbody>
+    <tr><td>tous</td><td>3,86</td><td>51</td><td>136</td><td>51</td></tr>
+    <tr><td>top 50 %</td><td>4,01</td><td>47</td><td>141</td><td>50</td></tr>
+    <tr><td>top 25 %</td><td>4,04</td><td>47</td><td>141</td><td>50</td></tr>
+    <tr><td>top 10 %</td><td>4,01</td><td>51</td><td>136</td><td>51</td></tr>
+    <tr><td>top 1 %</td><td>3,47</td><td>73</td><td>91</td><td>74</td></tr>
+  </tbody>
+</table></div>
+<p>Environ un trinket sur cinq de chaque côté, quelle que soit la tranche (± 0,15 en peignait la moitié, ± 0,25 un quart) ; au
+top 1 %, moins de parties et plus d'écart. Mesure faite sur le cache local de Firestone, rien de ce fichier n'entre dans le dépôt.
+La place ajustée à une cible (« ≈3.41 ») est notée sur elle-même : c'est le chiffre affiché.</p>
+
+<h2>4. Les pastilles de rôle</h2>
+<p>Chaque ligne d'une étiquette de découverte ou de Dark Gift commence par une pastille qui dit le rôle sans qu'on lise :</p>
+<div class="scroll"><table>
+  <thead><tr><th>Pastille</th><th>Ce qu'elle dit</th><th>Exemple, tel que dessiné</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill" style="background:#ffc93c">★ core</span></td><td>une carte clé d'une cible</td><td><span class="plate" style="border-color:#2ea8ff"><span class="pill" style="background:#ffc93c">★ core</span> <span style="color:#2ea8ff">Undead Butcher</span> 0/3→1/3</span></td></tr>
+    <tr><td><span class="pill" style="background:#d5dbe6">+</span></td><td>un enabler ou un add-on d'une cible, ou une carte de ses plateaux finaux</td><td><span class="plate" style="border-color:#ff2bd6"><span class="pill" style="background:#d5dbe6">+</span> <span style="color:#ff2bd6">Pirate Discover</span> <small>· 3/5 boards</small></span></td></tr>
+    <tr><td><span class="pill" style="background:#b69cff">pivot →</span></td><td>une carte clé d'un guide vers lequel une cible peut pivoter</td><td><span class="plate"><span class="pill" style="background:#b69cff">pivot →</span> Beast Pack <span class="chip" style="background:#6ba036">A</span></span></td></tr>
+    <tr><td><span class="pill" style="background:transparent;border:1px solid #9aa0aa;color:#9aa0aa">core</span></td><td>une carte clé d'un autre guide du lobby</td><td><span class="plate"><span class="pill" style="background:transparent;border:1px solid #9aa0aa;color:#9aa0aa">core</span> Undead Butcher <span class="chip" style="background:#408abf">S</span></span></td></tr>
+    <tr><td><span class="pill" style="background:#3ddc84">t6 ▲</span> <span class="pill" style="background:#ff6b6b">t6 ▼</span></td><td>card-stats : mieux ou moins bien que les cartes jouées à ce tour</td><td><span class="plate"><span class="pill" style="background:#3ddc84">t6 ▲</span> 3.5 <small>vs 4.0</small></span></td></tr>
+    <tr><td>aucune</td><td>rien pour aucun guide</td><td><span class="plate"><small>—</small></span></td></tr>
+  </tbody>
+</table></div>
+<p>La couleur d'une cible reste son identité, celle de sa ligne dans le panneau et des cadres sur les cartes de Bob : elle passe du
+fond de l'étiquette au <b>liseré</b>, à une <b>teinte</b> du haut de la plaque et au <b>nom</b>. Aucune pastille ne prend une couleur
+de cible (vérifié par un test et par l'autotest).</p>
+
+<h2>5. Corps de texte mesurés</h2>
+<div class="scroll"><table>
+  <thead><tr><th>Texte</th><th>Taille en 1080p</th><th>Rapport à ses lignes</th></tr></thead>
+  <tbody>
+    <tr><td>Place d'un héros (<code>PanelTypography.HeroNote</code>)</td><td>24 px, extra-gras</td><td>2,0 × (lignes de 12 px)</td></tr>
+    <tr><td>Lettre du tier dans son blason (<code>HeroTier</code>)</td><td>22 px, noir</td><td>—</td></tr>
+    <tr><td>Effectif, sources, top 4 / 1er, « contested »</td><td>12 px (le plancher)</td><td>—</td></tr>
+    <tr><td>« no data » d'un héros</td><td>14 px</td><td>—</td></tr>
+    <tr><td>Place d'un trinket (<code>PanelTypography.ChoiceNote</code>)</td><td>20 px, extra-gras</td><td>1,67 × (lignes de 12 px)</td></tr>
+    <tr><td>Nom du guide, compte d'une étiquette de choix</td><td>13 px, gras (comme avant)</td><td>—</td></tr>
+    <tr><td>Pastilles, tier, suffixes</td><td>12 px</td><td>—</td></tr>
+  </tbody>
+</table></div>
+<p>20 px pour un trinket : c'est le plus grand que tient une étiquette d'une ligne (21,9 px dedans, liseré ôté), et
+<code>ChoiceLayout</code> ne grandit pas. L'autotest mesure ce qui est dessiné : chaque place ≥ 1,6 × les lignes qui l'entourent,
+aucun texte sous 12 px, aucun coupé (l'encre de chaque texte dans chaque découpe de ses parents).</p>
+
+<h2>6. Ce qui n'est pas vu en jeu</h2>
+<ul class="plain">
+  <li><b>Tout le rendu</b> n'est vu que dans la simulation : le blason, le cerne noir des chiffres (un <code>DropShadowEffect</code>),
+  les plaques teintées, sur la vraie couche d'HDT et par-dessus le vrai jeu.</li>
+  <li>Les bandes des trinkets avec le <b>vrai fichier</b> de Firestone chargé : la moyenne de référence est calculée sur lui, au
+  premier choix de trinket d'une partie.</li>
+  <li>Un <b>désaccord</b> réel (héros ou trinket) : seules les données inventées en ont montré.</li>
+  <li>Les étiquettes de découverte et de Dark Gift avec des noms de guides longs : l'estimation les abrège avant de les couper
+  (« ★ core U. Butcher 2/3→3/3 · 4/5 boards »), testé, pas vu.</li>
+</ul>
+
+<h2>7. Preuves</h2>
+<details>
+  <summary>Les fonctions pures et leurs tests</summary>
+  <p><code>HeroNote.For</code>, <code>PlacementGrade.Of</code>, <code>TrinketReference.Of</code>, <code>ChoiceNote.For</code> dans
+  <code>BronzebeardHud.Stats</code> ; le WPF (<code>HeroPickPanel</code>, <code>ChoiceAdvicePanel</code>) ne fait que dessiner ce
+  qu'elles rendent. <code>ChoiceAdvisor.Lines</code> écrit toujours le journal <code>choice kind=…</code>, mot pour mot, et un test
+  exige que chaque ligne dessinée dise la même chose quand la place le permet. Tests : <code>HeroNoteTests</code>,
+  <code>PlacementGradeTests</code>, <code>ChoiceNoteTests</code>.</p>
+</details>
+<details>
+  <summary>Mutations : chacune lancée contre la suite entière, sur une copie</summary>
+  <p>50 mutations tombées sur 52 ; les survivantes sont des mutants équivalents, expliqués. Chaque mutation est appliquée sur une copie de l'arbre, la suite entière lancée (<code>dotnet test</code> sur la solution, ou l'autotest de la simulation pour le dessin), puis le fichier restauré ; la suite repasse au vert avant et après la campagne.</p>
+<h3>Règles nommées (suite xUnit)</h3>
+<div class="scroll"><table>
+<thead><tr><th>Mutation</th><th>Verdict</th><th>Tombé par</th></tr></thead><tbody>
+<tr><td>M1 bound &lt;= -&gt; &lt; (good)</td><td><span class="ok">tombée</span></td><td><code>AgainstTheBracketsMean_TheBandSplitsGoodAverageBad</code>, <code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code></td></tr>
+<tr><td>M2 bound &gt;= -&gt; &gt; (bad)</td><td><span class="ok">tombée</span></td><td><code>AgainstTheBracketsMean_TheBandSplitsGoodAverageBad</code>, <code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code>, <code>Trinket_TheSmallLines_SayWhatTheLinesOfBeforeSaid</code></td></tr>
+<tr><td>M3 band inverted (good&lt;-&gt;bad)</td><td><span class="ok">tombée</span></td><td><code>AgainstTheBracketsMean_TheBandSplitsGoodAverageBad</code>, <code>TheMeanMovesWithTheBracket_SoDoesTheBand</code>, <code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code>, <code>Trinket_TheSmallLines_SayWhatTheLinesOfBeforeSaid</code>, <code>UnderTheNoise_NothingIsCalledGoodOrBad</code></td></tr>
+<tr><td>M4 noise ignored (Max -&gt; Min)</td><td><span class="ok">tombée</span></td><td><code>AgainstTheBracketsMean_TheBandSplitsGoodAverageBad</code>, <code>TheMeanMovesWithTheBracket_SoDoesTheBand</code>, <code>UnderTheNoise_NothingIsCalledGoodOrBad</code></td></tr>
+<tr><td>M5 unknown games graded (&lt;= 0 -&gt; &lt; 0)</td><td><span class="ok">tombée</span></td><td><code>UnderTheNoise_NothingIsCalledGoodOrBad</code></td></tr>
+<tr><td>M6 colours: good painted bad</td><td><span class="ok">tombée</span></td><td><code>Colours_GreenWhiteRed_GreyUngraded_AllDistinct</code>, <code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code>, <code>Trinket_TheSmallLines_SayWhatTheLinesOfBeforeSaid</code></td></tr>
+<tr><td>M7 reference ignores the bracket</td><td><span class="ok">tombée</span></td><td><code>Reference_TheBracketsMeanWeighedByGames_EveryPlayerWhenTheBracketIsMissing</code></td></tr>
+<tr><td>M8 trinket contested -&gt; consensus (colour)</td><td><span class="ok">tombée</span></td><td><code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code>, <code>Trinket_TheSmallLines_SayWhatTheLinesOfBeforeSaid</code></td></tr>
+<tr><td>M9 trinket contested -&gt; consensus (branch)</td><td><span class="ok">tombée</span></td><td><code>Trinket_NarrowerLabels_ShortenTheSmallLines_NeverCutThem</code>, <code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code>, <code>Trinket_TheSmallLines_SayWhatTheLinesOfBeforeSaid</code>, <code>Trinket_WithoutAReference_ShownUngraded</code></td></tr>
+<tr><td>M10 trinket graded on raw, not shown figure</td><td><span class="ok">tombée</span></td><td><code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code></td></tr>
+<tr><td>M11 trinket rim ignores no-stats</td><td><span class="ok">tombée</span></td><td><code>Trinket_TheSmallLines_SayWhatTheLinesOfBeforeSaid</code></td></tr>
+<tr><td>M12 detail room: gap added not taken</td><td><span class="ok">tombée</span></td><td><code>Trinket_NarrowerLabels_ShortenTheSmallLines_NeverCutThem</code></td></tr>
+<tr><td>M13 pill padding not counted</td><td><span class="ok">tombée</span></td><td><code>ACardsValue_TheComparisonFirst_ThenTheFigureAlone_ThenNothing</code>, <code>AtTheGamesWidths_EveryLineFits_TheNameShortensFirst</code></td></tr>
+<tr><td>M14 fit bound &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>AtTheGamesWidths_EveryLineFits_TheNameShortensFirst</code></td></tr>
+<tr><td>M15 more lines: &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>WhereThereIsRoom_EveryLineSaysWhatTheLineOfBeforeSaid_ThatTheLogStillWrites</code></td></tr>
+<tr><td>M16 pivot pill silver</td><td><span class="ok">tombée</span></td><td><code>EachRole_ItsPill_ReadWithoutReadingTheText</code></td></tr>
+<tr><td>M17 card value verdict swapped</td><td><span class="ok">tombée</span></td><td><code>EachRole_ItsPill_ReadWithoutReadingTheText</code></td></tr>
+<tr><td>M18 label rim never the target&#x27;s</td><td><span class="ok">tombée</span></td><td><code>TheNameInItsTargetsColour_AGuideThatIsNoTargetInWhite_TheRimFollows</code></td></tr>
+<tr><td>M19 hero contested -&gt; consensus</td><td><span class="ok">tombée</span></td><td><code>Contested_BothFiguresInAmber_TheWordUnder_AnAmberRim_NeverTheMean</code>, <code>TheNoteDominates_AndEveryTextFitsItsPlace</code></td></tr>
+<tr><td>M20 hero tier colours A&lt;-&gt;B</td><td><span class="ok">tombée</span></td><td><code>Consensus_TheTierInItsShield_TheFigureLargeAndWhite_ItsSampleUnder_ThenSourcesAndOdds</code>, <code>Contested_BothFiguresInAmber_TheWordUnder_AnAmberRim_NeverTheMean</code>, <code>Tiers_EachItsColour_EAndNoneGrey</code></td></tr>
+<tr><td>M21 hero second source dropped</td><td><span class="ok">tombée</span></td><td><code>WithoutAConsolidatedLine_TheFirstSourceIsTheNote_ASecondSourceASmallLineWithItsTier</code></td></tr>
+<tr><td>M22 hero contested figure keeps spaces</td><td><span class="ok">tombée</span></td><td><code>Contested_BothFiguresInAmber_TheWordUnder_AnAmberRim_NeverTheMean</code>, <code>TheNoteDominates_AndEveryTextFitsItsPlace</code></td></tr>
+<tr><td>M23 hero note smaller than 1.6x</td><td><span class="ok">tombée</span></td><td><code>Contested_BothFiguresInAmber_TheWordUnder_AnAmberRim_NeverTheMean</code>, <code>TheNoteDominates_AndEveryTextFitsItsPlace</code></td></tr>
+<tr><td>M24 trinket note smaller than 1.6x</td><td><span class="ok">tombée</span></td><td><code>TheTrinketsNote_IsLargeYetHoldsInAOneLineLabel</code>, <code>Trinket_NarrowerLabels_ShortenTheSmallLines_NeverCutThem</code></td></tr>
+</tbody></table></div>
+<h3>Motif : chaque comparaison des trois fichiers, &lt; ↔ &lt;= et &gt; ↔ &gt;= (suite xUnit)</h3>
+<div class="scroll"><table>
+<thead><tr><th>Mutation</th><th>Verdict</th><th>Tombé par</th></tr></thead><tbody>
+<tr><td>HeroNote.cs:120 &lt;= -&gt; &lt;</td><td><span class="eq">survit</span></td><td>équivalent : la note d&#x27;un désaccord a toujours 9 caractères (« x.x ↔ y.y »), jamais 8, la borne n&#x27;est jamais atteinte</td></tr>
+<tr><td>HeroNote.cs:169 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>WithoutAConsolidatedLine_TheFirstSourceIsTheNote_ASecondSourceASmallLineWithItsTier</code></td></tr>
+<tr><td>ChoiceNote.cs:213 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>LinesWithoutAPill_CountNoPadding_AndMoreShortensWhereItMust</code></td></tr>
+<tr><td>ChoiceNote.cs:234 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>AtTheGamesWidths_EveryLineFits_TheNameShortensFirst</code></td></tr>
+<tr><td>ChoiceNote.cs:252 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>ACardsValue_TheComparisonFirst_ThenTheFigureAlone_ThenNothing</code></td></tr>
+<tr><td>ChoiceNote.cs:252 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>ACardsValue_TheComparisonFirst_ThenTheFigureAlone_ThenNothing</code></td></tr>
+<tr><td>ChoiceNote.cs:274 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>Trinket_NarrowerLabels_ShortenTheSmallLines_NeverCutThem</code></td></tr>
+<tr><td>ChoiceNote.cs:295 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>Trinket_AConsensusOfFirestoneAlone_NamesNoOtherSource</code>, <code>Trinket_NarrowerLabels_ShortenTheSmallLines_NeverCutThem</code>, <code>Trinket_TheSmallLines_SayWhatTheLinesOfBeforeSaid</code></td></tr>
+<tr><td>ChoiceNote.cs:300 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>Trinket_NarrowerLabels_ShortenTheSmallLines_NeverCutThem</code></td></tr>
+<tr><td>PlacementGrade.cs:89 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>UnderTheNoise_NothingIsCalledGoodOrBad</code></td></tr>
+<tr><td>PlacementGrade.cs:96 &lt;= -&gt; &lt;</td><td><span class="ok">tombée</span></td><td><code>AgainstTheBracketsMean_TheBandSplitsGoodAverageBad</code>, <code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code></td></tr>
+<tr><td>PlacementGrade.cs:97 &gt;= -&gt; &gt;</td><td><span class="ok">tombée</span></td><td><code>AgainstTheBracketsMean_TheBandSplitsGoodAverageBad</code>, <code>Trinket_ThePlacementLarge_InTheColourOfItsBand_AmongTheBracketsTrinkets</code>, <code>Trinket_TheSmallLines_SayWhatTheLinesOfBeforeSaid</code></td></tr>
+<tr><td>HeroNote.cs:135 &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>WithoutAConsolidatedLine_TheFirstSourceIsTheNote_ASecondSourceASmallLineWithItsTier</code></td></tr>
+<tr><td>ChoiceNote.cs:82 &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>ACardsValue_TheComparisonFirst_ThenTheFigureAlone_ThenNothing</code>, <code>AHeldCoreCardAgain_IsACopy_NotAStep</code>, <code>AtTheGamesWidths_EveryLineFits_TheNameShortensFirst</code>, <code>LinesWithoutAPill_CountNoPadding_AndMoreShortensWhereItMust</code>, <code>WhereThereIsRoom_EveryLineSaysWhatTheLineOfBeforeSaid_ThatTheLogStillWrites</code></td></tr>
+<tr><td>ChoiceNote.cs:85 &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>LinesWithoutAPill_CountNoPadding_AndMoreShortensWhereItMust</code></td></tr>
+<tr><td>ChoiceNote.cs:188 &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>AHeldCoreCardAgain_IsACopy_NotAStep</code></td></tr>
+<tr><td>ChoiceNote.cs:207 &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>WhereThereIsRoom_EveryLineSaysWhatTheLineOfBeforeSaid_ThatTheLogStillWrites</code></td></tr>
+<tr><td>ChoiceNote.cs:279 &gt; -&gt; &gt;=</td><td><span class="eq">survit</span></td><td>équivalent : une cible ne justifie un trinket que si l&#x27;ajustement est positif (TrinketAffinity.Adjust)</td></tr>
+<tr><td>ChoiceNote.cs:296 &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>Trinket_AConsensusOfFirestoneAlone_NamesNoOtherSource</code></td></tr>
+<tr><td>ChoiceNote.cs:296 &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>Trinket_NarrowerLabels_ShortenTheSmallLines_NeverCutThem</code></td></tr>
+<tr><td>PlacementGrade.cs:48 &gt; -&gt; &gt;=</td><td><span class="ok">tombée</span></td><td><code>Reference_TheBracketsMeanWeighedByGames_EveryPlayerWhenTheBracketIsMissing</code></td></tr>
+<tr><td>HeroNote.cs:152 &lt; -&gt; &lt;=</td><td><span class="ok">tombée</span></td><td><code>WithoutAConsolidatedLine_TheFirstSourceIsTheNote_ASecondSourceASmallLineWithItsTier</code></td></tr>
+</tbody></table></div>
+<h3>Le dessin (autotest de la simulation)</h3>
+<div class="scroll"><table>
+<thead><tr><th>Mutation</th><th>Verdict</th><th>Tombé par</th></tr></thead><tbody>
+<tr><td>W1 trinket figure always white</td><td><span class="ok">tombée</span></td><td><code>choice trinket: each figure large and in its band&#x27;s colour (the bracket&#x27;s mean ± 0.2, co…</code></td></tr>
+<tr><td>W2 hero figure always white</td><td><span class="ok">tombée</span></td><td><code>hero badges: a shield with the tier, the figure large (white, or amber with both figures…</code></td></tr>
+<tr><td>W3 label rim always neutral</td><td><span class="ok">tombée</span></td><td><code>choice discover: a &quot;★ core T&quot; or &quot;+ T&quot; label is in the colour of T (its rim and its name…</code>, <code>choice discover: the bridge&#x27;s labels: &quot;+ T k/n boards&quot; in T&#x27;s colour, a role &quot;· k/n boar…</code>, <code>choice dark-gift: a &quot;★ core T&quot; or &quot;+ T&quot; label is in the colour of T (its rim and its nam…</code>, <code>choice dark-gift, Undead Butcher ticked: &quot;★ core T k/n→k+1/n&quot; on a gold pill, the name a…</code></td></tr>
+<tr><td>W4 hero figure at the small size</td><td><span class="ok">tombée</span></td><td><code>hero badges: a shield with the tier, the figure large (white, or amber with both figures…</code>, <code>hero badges by source: a shield with the tier, the figure large (white, or amber with bo…</code></td></tr>
+<tr><td>W5 pill fill ignored</td><td><span class="ok">tombée</span></td><td><code>choice discover: each role&#x27;s pill in its own colour:  | WRONG: &quot;+&quot; #00FFFFFF; &quot;+&quot; #00FFF…</code>, <code>choice dark-gift: each role&#x27;s pill in its own colour: &quot;core&quot; #00FFFFFF; &quot;core&quot; #00FFFFFF…</code>, <code>choice dark-gift, Undead Butcher ticked: &quot;★ core T k/n→k+1/n&quot; on a gold pill, the name a…</code></td></tr>
+<tr><td>W6 contested hero rim silver</td><td><span class="ok">tombée</span></td><td><code>hero badges: a shield with the tier, the figure large (white, or amber with both figures…</code></td></tr>
+</tbody></table></div>
+</details>
+<details>
+  <summary>Autotest de la simulation (extraits)</summary>
+  <pre>PASS  choice discover: one label per option, where ChoiceLayout puts it: 3 labels for 3 options: #0 + Pirate Discover · 3/5 boards; #1 + Mech Magnet 3/5 boards; #2 pivot → Beast Pack A
+PASS  choice discover: no text under 12 px, none cut: 9 texts checked
+PASS  choice discover: a &quot;★ core T&quot; or &quot;+ T&quot; label is in the colour of T (its rim and its name): #0 &quot;+ Pirate Discover · 3/5 boards&quot; rim #FFFF2BD6, name in #FFFF2BD6, Pirate Discover is #FFFF2BD6; #1 &quot;+ Mech Magnet 3/5 boards&quot; rim #FFB8FF1F, name in #FFB8FF1F, Mech Magnet is #FFB8FF1F
+PASS  choice discover: each role&#x27;s pill in its own colour: &quot;+&quot; #FFD5DBE6; &quot;+&quot; #FFD5DBE6; &quot;pivot →&quot; #FFB69CFF
+PASS  choice discover: the bridge&#x27;s labels: &quot;+ T k/n boards&quot; in T&#x27;s colour, a role &quot;· k/n boards&quot;, &quot;pivot → G X&quot; neutral: top boards: #1 &quot;+ Mech Magnet 3/5 boards&quot; on #FFB8FF1F, Mech Magnet is #B8FF1F | suffix: #0 &quot;+ Pirate Discover · 3/5 boards&quot; on #FFFF2BD6 | pivot: #2 &quot;pivot → Beast Pack A&quot; on #FF6E6884
+PASS  choice dark-gift: one label per option, where ChoiceLayout puts it: 3 labels for 3 options: #0 + Mech Divine Shield; #1 core Undead Butcher S / core Undead Attack B; #2 —
+PASS  choice dark-gift: no text under 12 px, none cut: 9 texts checked
+PASS  choice dark-gift: a &quot;★ core T&quot; or &quot;+ T&quot; label is in the colour of T (its rim and its name): #0 &quot;+ Mech Divine Shield&quot; rim #FF2EA8FF, name in #FF2EA8FF, Mech Divine Shield is #FF2EA8FF
+PASS  choice dark-gift: each role&#x27;s pill in its own colour: &quot;+&quot; #FFD5DBE6; &quot;core&quot; #00FFFFFF; &quot;core&quot; #00FFFFFF
+PASS  choice trinket: one label per option, where ChoiceLayout puts it: 4 labels for 4 options: #0 ≈3.41 avg 3.71 ≈ Pirate Discover; #1 3.3 ↔ 4.1 contested nomi.gg ↔ FS; #2 4.28 avg place; #3 3.66 avg place · 44% picked
+PASS  choice trinket: no text under 12 px, none cut: 10 texts checked
+PASS  choice trinket: each figure large and in its band&#x27;s colour (the bracket&#x27;s mean ± 0.2, computed here), good, average and bad all shown, one adjusted, one contested in amber: mean 3.82: #0 &quot;≈3.41&quot; #FF3DDC84 [avg 3.71 / ≈ Pirate Discover] good, expected #3DDC84; #1 &quot;3.3 ↔ 4.1&quot; #FFFFB03B [contested / nomi.gg ↔ FS], expected #FFB03B; #2 &quot;4.28&quot; #FFFF5C5C [avg place] bad, expected #FF5C5C; #3 &quot;3.66&quot; #FFFFFFFF [avg place · 44% picked] average, expected #FFFFFF
+PASS  choice dark-gift, Undead Butcher ticked: &quot;★ core T k/n→k+1/n&quot; on a gold pill, the name and the rim in T&#x27;s colour: &quot;★ core Undead Butcher 0/3→1/3&quot; pill #FFFFC93C name #FF2EA8FF rim #FF2EA8FF, Undead Butcher is #2EA8FF
+PASS  hero badges: one badge per hero, where HeroPickLayout puts it: 4 of 4 placed
+PASS  hero badges: no text under 12 px, none cut: 17 texts checked
+PASS  hero badges: a shield with the tier, the figure large (white, or amber with both figures when contested), nomi.gg named, &quot;no data&quot;, a second source&#x27;s tier chip: #0 [A] &quot;3.42&quot; #FFFFFFFF / &quot;4,102 games&quot; / FS 25% + nomi.gg / top 4 52% · 1st 14% rim silver; #1 [B] &quot;2.7↔3.8&quot; #FFFFB03B / &quot;contested&quot; / nomi.gg ↔ FS 25% / top 4 52% · 1st 14% rim #FFFFB03B; #2 [D] &quot;4.58&quot; #FFFFFFFF / &quot;880 games&quot; / FS 25% / top 4 52% · 1st 14% rim silver; #3 [–] &quot;-&quot;  / &quot;no data&quot; /  rim silver
+PASS  hero badges by source: one badge per hero, where HeroPickLayout puts it: 4 of 4 placed
+PASS  hero badges by source: no text under 12 px, none cut: 18 texts checked
+PASS  hero badges by source: a shield with the tier, the figure large (white, or amber with both figures when contested), nomi.gg named, &quot;no data&quot;, a second source&#x27;s tier chip: #0 [A] &quot;3.42&quot; #FFFFFFFF / &quot;18% pick · FS 25%&quot; / top 4 52% · 1st 14% / S / 3.30 · 21% · HSR 10% rim silver; #1 [B] &quot;3.80&quot; #FFFFFFFF / &quot;9% pick · FS 25%&quot; / top 4 52% · 1st 14% / C / 4.05 · 11% · HSR 10% rim silver; #2 [D] &quot;4.61&quot; #FFFFFFFF / &quot;4% pick · FS 25%&quot; / top 4 52% · 1st 14% rim silver; #3 [–] &quot;-&quot;  / &quot;no data&quot; /  rim silver
+PASS  choice open: Bob&#x27;s frames, labels and ◇ leave the screen; the panel and its power inset stay, the same elements: before: 19 marker elements (7 ◇), panel shown, inset True, popup True; Dark Gift open: 0 marker elements, panel kept True, inset True; discover after it: 0, panel kept True; panel at (1181,682 488x339) covers, discover: option 1: 0, option 2: 0, option 3: 302x53 px; Dark Gift: option 1: 0, option 2: 0, option 3: 359x172 px
+PASS  choice closed: the same targets, frames, labels and ◇ as before, the panel and its inset back as they were (the same elements): 19 marker elements, identical True; targets [Pirate Discover #FF2BD6; Mech Magnet #B8FF1F; Mech Divine Shield #2EA8FF]; panel (1181,682 488x339) visible True, same content True
+ALL PASSED</pre>
+</details>
+</main>
+</body>
+</html>

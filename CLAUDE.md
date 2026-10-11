@@ -198,15 +198,28 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   trois héros : 0,835 → 0,915 H). Cotes mesurées sur la capture Hearthstone d'Ali du 2026-09-26 18:29:44
   (2291 × 1360), fixées par `HeroPickLayoutTests` ; l'encart d'origine, centré à 0,667 H, cachait le reroll.
   **Contenu** (2026-10-10, composant 3, issue #11) : une ligne consolidée (`HeroConsensus.For`, vue de la tranche du
-  joueur : fichiers de héros du lobby et nomi.gg) — tier, « 3.41 · 4,102 games » (l'effectif remplace le taux de choix, décision 7),
-  ou « 2.7 ↔ 3.8 contested » en ambre (décision 6, jamais la moyenne des deux) — puis ses sources (« FS 25% + nomi.gg », le crédit
-  de nomi.gg à l'écran), puis top 4 / 1er de la première source. Sans vue, ou sous 10 parties partout, les lignes par source
-  d'avant. Le « pourquoi » (composant 8) va au journal : `hero pick why=[H consensus 3.41 (4102 games) ← FS 25% 3.42 (4051) ·
-  nomi.gg 3.10+0.30 (51, ×0.5) · pick 18%; …]`. Simulation : `--screenshot --heroes --play`.
+  joueur : fichiers de héros du lobby et nomi.gg) — tier, la place et son effectif (l'effectif remplace le taux de choix,
+  décision 7), ou les deux chiffres d'un désaccord en ambre (décision 6, jamais la moyenne des deux) — puis ses sources
+  (« FS 25% + nomi.gg », le crédit de nomi.gg à l'écran), puis top 4 / 1er de la première source. **Dessiné en note depuis le
+  2026-10-11** (Ali : « ni sexy, ni ergonomique […] les couleurs, les notes, c'est meilleur », l'écran de choix du héros du jeu
+  pour modèle ; note `docs/plans/2026-10-11-notes-heros-choix.html`) : `HeroNote.For` (fonction pure, testée, éprouvée par
+  mutation) rend ce que `HeroPickPanel` dessine — la lettre de tier dans un blason de sa couleur (`HeroNote.TierColour` : S
+  rouge, A orange, B jaune, C vert, D bleu, E et inconnu gris), la place en gros chiffre blanc cerné de noir comme l'armure du
+  jeu (`PanelTypography.HeroNote`, 24 px en 1080p, deux fois les lignes de dessous), l'effectif dessous (« 4,102 games »), puis
+  en 12 px les sources et top 4 / 1er. Un désaccord : « 2.7↔3.8 » en ambre (sans espaces : l'estimation généreuse de
+  `MarkerText` ne lui donne que 8 caractères), « contested » dessous, le liseré de l'encart ambre. Sans vue, ou sous 10
+  parties partout, la première source fait la note (« 18% pick · FS 25% » dessous) et une seconde source a sa ligne, son tier
+  dans une pastille (« [S] 3.30 · 21% · HSR 10% »). Aucune source : blason gris « – » et « no data ». Une forme trop large
+  pour sa place cède à une plus courte, jamais coupée ; la boîte ne bouge pas. Le « pourquoi » (composant 8) va au journal :
+  `hero pick why=[H consensus 3.41 (4102 games) ← FS 25% 3.42 (4051) · nomi.gg 3.10+0.30 (51, ×0.5) · pick 18%; …]`.
+  Simulation : `--screenshot --heroes --play` (tiers A, B, D donnés aux héros inventés), `--heroes-sources` sans vue ;
+  l'autotest les vérifie (groupe « hero badges » : places, textes ≥ 12 px non coupés, blason, note ≥ 1,6 × les lignes,
+  ambre du désaccord, nomi.gg à l'écran, pastille de la seconde source).
 - Aucun texte du plugin sous 12 px en 1080p (`PanelTypography`) et aucun `Viewbox` : ce qui ne tient pas est
   omis, jamais rétréci (MMR des
   adversaires : le rang disparaît, la cote reste). Un test lit les sources du plugin et y refuse `Viewbox` et
-  `FontSize = <nombre>`.
+  `FontSize = <nombre>`. Les notes (2026-10-11) : 24 px pour la place d'un héros, 20 px pour celle d'un trinket (ce que tient
+  une étiquette d'une ligne), toutes deux ≥ 1,6 × les 12 px des lignes qui les accompagnent (testé).
 - **Panneau « Compositions »** (`CompsPanel`, un seul panneau depuis le 2026-10-04 à la place de « Target compositions »
   et « HDT comp guides » : `docs/journal/2026-10-04-panneau-unique.md`), **dès la sélection du héros** (Ali, 2026-10-08 : « ça aide d'avoir les
   compos » ; aucune carte tenue, la liste du lobby par tier et les cases à cocher, qui restent cochées en taverne ; à la
@@ -326,7 +339,14 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   compo pontée de la cible a des plateaux finaux) ; sinon une carte qu'aucune liste de la cible ne nomme mais sur ≥ 2
   plateaux de sa compo pontée (« + Nom 3/5 boards », dans sa couleur) ; sinon une carte clé d'un guide vers lequel une
   cible peut pivoter (« pivot → Nom (S) », neutre) ; sinon le guide jouable dans le lobby dont elle est carte clé
-  (« core Nom (S) », neutre) ; sinon « — ». **Trinkets** (2026-10-10, composant 9, issue #11) : la place Firestone de la tranche (« avg 3.80 · 41% »), et sur une seconde ligne une autre source d'accord, recentrée (« nomi.gg 3.75 (55) », le crédit à l'écran ; pas de place quand la ligne « ≈ cible » est là) ; deux sources en désaccord : « 3.3 ↔ 4.1 contested » et leurs sources, à la place de la place (`TrinketNote.Consolidated`, vue de `UpdateStatsView`). nomi.gg ne publie que ses trinkets gagnants et perdants : les autres gardent l'étiquette d'avant. Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est
+  (« core Nom (S) », neutre) ; sinon « — ». **Dessin en note** (2026-10-11, `ChoiceNote.For`, fonction pure testée et
+  éprouvée par mutation ; `ChoiceAdvicePanel` dessine) : une plaque sombre teintée et cerclée de la couleur de la cible
+  (neutre sinon) ; chaque ligne commence par une pastille de rôle qui se lit sans lire le texte — « ★ core » or, « + » argent
+  (enabler, add-on ou plateaux), « pivot → » lavande, « core » d'un autre guide en simple contour, « t6 ▲ » vert / « t6 ▼ »
+  rouge — puis le nom du guide dans la couleur de sa cible (blanc s'il n'en est pas une), le compte en blanc, le suffixe en
+  gris, le tier d'un guide dans une pastille aux couleurs de HDT ; « — » seul, gris. Mêmes faits, même ordre que
+  `ChoiceAdvisor.Lines`, qui écrit toujours le journal `choice kind=…` et dimensionne les étiquettes (`ChoiceLayout`
+  inchangé). **Trinkets** (2026-10-10, composant 9, issue #11) : la place Firestone de la tranche, et sur une seconde ligne une autre source d'accord, recentrée (« nomi.gg 3.75 (55) », le crédit à l'écran ; pas de place quand la ligne « ≈ cible » est là) ; deux sources en désaccord : les deux chiffres et « contested », et leurs sources, à la place de la place (`TrinketNote.Consolidated`, vue de `UpdateStatsView`). nomi.gg ne publie que ses trinkets gagnants et perdants : les autres gardent l'étiquette d'avant. **Depuis le 2026-10-11**, la place en gros chiffre (`PanelTypography.ChoiceNote`, 20 px) coloré par sa **bande** (`PlacementGrade.Of`) : bonne (vert) à 0,2 place au moins sous la moyenne des trinkets de la tranche du joueur (`TrinketReference.Of`, pondérée par les parties, sur le fichier de Firestone entier), mauvaise (rouge) à 0,2 au-dessus, moyenne (blanc) entre ; la bande s'élargit au bruit (2 × 2,3 / √parties, sous 529 parties). Une borne fixe ne vaut rien : la moyenne va de 3,47 (top 1 %) à 4,04 (top 25 %) ; ± 0,2 donne, mesuré le 2026-10-11 sur 238 trinkets au top 25 %, 47 bonnes, 141 moyennes, 50 mauvaises. Une place ajustée (« ≈3.41 ») est notée sur elle-même ; un désaccord est ambre, jamais noté. À côté, en 12 px : « avg place · 41% picked », la source d'accord ; ou « avg 3.71 » et « ≈ Cible » dans sa couleur ; ou « contested » et les sources. Le liseré prend la couleur de la bande. Simulation : les quatre trinkets montrent bonne, ambre, mauvaise, moyenne (moyenne synthétique 3,82, `HarnessData.TrinketGrades`) ; l'autotest recalcule les bandes à la main. Les tribus du lobby sont lues par valeur (`GuideTribes.NameOrEnum` : 20 est
   à la fois BEAST et PET). **Pendant un choix** ouvert en taverne (toute sorte que `ChoiceClassifier` distingue de
   `None`, y compris sans disposition connue), cadres, étiquettes et ◇ des cartes de Bob sont retirés de l'écran
   (`ChoiceCover`, `TavernMarkers.Suspend`), puis remis tels quels à sa fermeture, sans recalcul : les ◇ tombaient dans les
@@ -564,6 +584,7 @@ tools/nodance-deploy.sh --dry-run        # puis sans --dry-run (demande y) ; --u
 | `README.md`, `ROADMAP.md` | la vitrine publique (anglais) : ce que fait le plugin, comment l'installer, où en est le projet |
 | `docs/plans/` | 2026-09-26 : étude de stack, spec et plan du plugin HDT |
 | `docs/plans/2026-10-04-panneau-unique-ergonomie.html` | note de conception HTML pour Ali (images dans `img/2026-10-04-panneau-unique/`, `img/2026-10-06-tribus-cases-puissance/` et `img/2026-10-06-encart-puissance/`) : les 7 demandes du panneau unique → décisions, avant / après, flux des cibles, ce qui n'a pas été vu, ce qui reste à décider ; § 11 : tribus du lobby, cases à cocher, puissance du board (2026-10-06) ; § 12 : encart de puissance, + / − qui redimensionnent, jauge de l'adversaire (2026-10-06, soir) |
+| `docs/plans/2026-10-11-notes-heros-choix.html` | note de conception HTML pour Ali (2026-10-11), images dans `img/2026-10-11-notes/` : la refonte en notes de l'encart des héros et des étiquettes des choix — avant / après côte à côte (simulation), anatomie de la note, échelle des trinkets dessinée et mesurée, pastilles de rôle, corps de texte mesurés, mutations, ce qui n'est pas vu en jeu |
 | `docs/plans/2026-10-08-stats-multi-sources.html` | note de conception HTML pour Ali (2026-10-08), sans implémentation : intégrer plusieurs sources de stats (Firestone dont card-stats, nomi.gg, HDT, HSReplay) — droits de chaque source, format commun qui garde la provenance (source, patch, tranche, fenêtre, effectif), consolidation qui dit « contesté » au lieu de choisir, mise à jour par source, nouveaux composants d'interface, ce que fait Nomi's Kitchen ; architecture (une classe par source, une fonction pure de consolidation) et séquence type ; décisions d'Ali rendues le 2026-10-08 (l'anti-danse du board, étudiée : un correctif Harmony dans le client, obfusqué) et ce qui n'est pas établi |
 | `docs/reference/` | recherche HDT / Tier7 |
 | `docs/journal/` | ce qui s'est décidé, séance par séance |

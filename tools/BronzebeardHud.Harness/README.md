@@ -22,6 +22,9 @@ redimensionner et les regarder **sans lancer une partie** ni HDT.
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --play --no-skip --mouse 'line:1;wait:300'   # la même chose par la couche d'HDT reproduite : souris injectée, sonde de survol
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --play --mouse 'line:1;wait:300;oval:1:2;nudge;wait:200'   # puis le 2e ovale : l'aperçu de sa carte, par la sonde
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --mouse 'pin:1;nudge;click'   # un clic sur le 1er ◇ : la fenêtre le prend (◇ déclaré cliquable)
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --heroes --play   # les encarts des héros proposés (notes : blason, place, lignes) : consensus, désaccord, une source, aucune
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --heroes-sources --play   # les mêmes sans vue consolidée : une note par première source, la seconde sur sa ligne
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice dark-gift --play --card-values --tick '"Undead Butcher"'   # « ★ core », « core » et « t6 ▲ » (un nom à espaces passe entre guillemets doubles)
 ```
 
 `--card-values` donne des stats de cartes inventées au tour 6 (`HarnessData.CardStats`), d'où aussi la section « EARLY » des
@@ -62,7 +65,8 @@ Un panneau en bas de l'écran : `--layout 'C:\temp\BronzebeardHarness-ci\layout-
 | none | en combat, un héros sans courbe : « no curve for … » |
 | next | en taverne, tour 9 : le dernier plateau vu du prochain adversaire, 70 au tour 5, contre 50 (au tour 9, 250 : il lirait « behind ») |
 | unseen | en taverne : un prochain adversaire jamais affronté, « not fought yet » |
-Un nom de guide avec des espaces ne passe pas par `launch.sh` (PowerShell le coupe) : donner le rang de la cible.
+Un nom de guide avec des espaces ne passe pas tel quel par `launch.sh` (PowerShell le coupe) : donner le rang de la cible,
+ou le nom entre guillemets doubles dans des simples (`--tick '"Undead Butcher"'`, vu le 2026-10-11).
 
 | Scénario | Plateau, main | Lobby | Cibles (3 voulues) |
 |---|---|---|---|
@@ -188,8 +192,16 @@ et pointillés, tels que `TavernHighlights` les demande ; un clic sur le nom d'u
 guides » rend la liste ; les sections du détail dans l'ordre de HDT et « k of n sections » quand il en manque ; **aucun
 texte du panneau sous 12 px × échelle, aucun texte coupé** (liste et détail : l'encre de chaque texte, pas sa boîte, doit
 tenir dans chaque découpe de ses parents) ; pour chaque choix (découverte, Dark Gift, trinket), une étiquette par option à
-sa place, mêmes contrôles de texte, « ★ core T » ou « + T » dans la couleur de T (lue sur le texte et sur le fond dessiné),
-chaque trinket avec sa place moyenne, une option sans rapport qui dit « — » ; le **survol d'une ligne** (mode déplacement
+sa place, mêmes contrôles de texte, « ★ core T » ou « + T » cerclé de la couleur de T, son nom dans cette couleur (lus sur
+le texte et sur le liseré dessinés ; une ligne d'étiquette se lit depuis le 2026-10-11 comme ses morceaux joints par des
+espaces : pastille, nom, tier, compte, suffixe), chaque pastille de rôle dans sa couleur (table écrite dans l'autotest),
+« ★ core Undead Butcher k/n→k+1/n » sur pastille or une fois Undead Butcher coché (aucune option de la scène n'est sinon une
+carte clé de cible), chaque trinket avec sa place en gros (≥ 1,6 × ses lignes) dans la couleur de sa bande, recalculée à la
+main sur les stats inventées (moyenne 3,82, ± 0,2) — bonne, moyenne et mauvaise toutes présentes, une ajustée, une
+contestée en ambre —, une option sans rapport qui dit « — » ; **les encarts des héros** (`--heroes`, avec et sans vue
+consolidée) : à leur place, textes ≥ 12 px non coupés, un blason portant le tier des données, la place ≥ 1,6 × les lignes
+dessous, blanche, ou ambre avec les deux chiffres, « contested » et un liseré ambre, nomi.gg nommé, « no data », la pastille
+de tier d'une seconde source ; le **survol d'une ligne** (mode déplacement
 off, `MouseEnter` et `MouseLeave` levés sur la ligne, le vrai délai de 250 ms laissé passer) : quittée avant 250 ms, pas
 de popup ; deux `MouseEnter`, un seul affichage ; le popup dans l'overlay, hors des `NoGoZones`, du panneau et de Skip
 combat ; ses textes (mêmes contrôles) ; ses sections dans l'ordre de HDT, les six d'un guide qui les a ; une ligne de
@@ -205,7 +217,7 @@ deuxième entrée sur la ligne : rien ne change ; revenu sur le fond, la sortie 
 un ovale montre sa carte par la sonde, le quitter la retire ; le panneau redessiné sous le curseur immobile : la sonde quitte
 l'ancienne ligne et entre dans la nouvelle, rien ne change ; sortie réelle : le popup se cache. Chaque contrôle exige aussi que
 l'événement en cause ait été levé (journal des événements de `HdtOverlay`) ; en découverte, « + T k/n boards »
-dans la couleur de T, un rôle suivi de « · k/n boards », « pivot → G (X) » sur fond neutre, lus sur ce qui est dessiné ; sur une carte
+dans la couleur de T, un rôle suivi de « · k/n boards », « pivot → G X » (le tier dans sa pastille) cerclé de neutre, lus sur ce qui est dessiné ; sur une carte
 de Bob, un cadre pointillé « + T 3/5 » dans la couleur de T et la ligne `tavern highlights=[…:boards 3/5:…]` ; la ligne de contexte
 sous l'en-tête du détail et du popup d'un guide ponté (texte attendu calculé à la main, 12 px, gris), absente pour le non ponté ;
 **un choix ouvert** (Dark Gift puis découverte) retire cadres, étiquettes, ◇, panneau, encart et popup, aucun popup au survol pendant ce

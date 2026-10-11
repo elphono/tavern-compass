@@ -692,7 +692,8 @@ internal sealed class HarnessWindow : Window
         Choice = advice;
         if (advice.HasMarkers)
         {
-            _choices.Show(advice);
+            // Plugin.UpdateChoice: a trinket graded against the trinkets of the bracket, here the synthetic ones.
+            _choices.Show(advice, _choiceKind == ChoiceKind.Trinket ? HarnessData.TrinketGrades : null);
         }
         else
         {

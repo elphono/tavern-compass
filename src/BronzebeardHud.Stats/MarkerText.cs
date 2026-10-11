@@ -80,7 +80,8 @@ public static class MarkerText
     private static string Join(params string[] parts) => string.Join(" ", parts.Where(p => p.Length > 0));
 
     /// <summary>The name, then initials for every word but the last ("U. Butcher"), then initials only ("UB").</summary>
-    private static IReadOnlyList<string> NameForms(string compositionName)
+    /// <summary>A name, then shorter forms of it: "Mech Divine Shield", "M. D. Shield", "MDS".</summary>
+    public static IReadOnlyList<string> NameForms(string compositionName)
     {
         var words = compositionName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
         var forms = new List<string> { compositionName };

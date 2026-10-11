@@ -17,7 +17,8 @@ namespace BronzebeardHud.Harness;
 /// detail before the screenshot (a, b, x: a target's rank, "1", or a guide's name). <c>--hover x</c> hovers a guide's
 /// line (move mode off) so that its popup shows in the screenshot, <c>--hover-card k</c> also hovers the k-th oval of that
 /// line (its card preview), <c>--no-skip</c> hides the Skip combat button, as in the tavern, and <c>--heroes</c> shows the
-/// hero selection's badges (HarnessData.HeroRows: a consensus, a contest, one source, no data) over the scene.
+/// hero selection's badges (HarnessData.HeroRows: a consensus, a contest, one source, no data) over the scene;
+/// <c>--heroes-sources</c> the same heroes without a consolidated view, each source apart (two for the first two heroes).
 /// <c>--mouse steps</c> drives the scene through HDT's overlay layer as the harness reproduces it (HdtOverlay: the probe on
 /// an injected cursor, click-through outside the elements declared clickable), steps separated by ";" (HarnessWindow.RunMouse).
 /// </summary>
@@ -79,6 +80,9 @@ internal sealed class Options
 
     /// <summary>The hero badges of the hero selection over the scene (component 3), from invented figures.</summary>
     public bool Heroes { get; private set; }
+
+    /// <summary>The hero badges without a consolidated view: <c>--heroes-sources</c>.</summary>
+    public bool HeroesBySource { get; private set; }
 
     /// <summary>Milliseconds the screenshot waits for card names and pictures, which arrive asynchronously.</summary>
     public int Wait { get; private set; } = 8000;
@@ -145,6 +149,10 @@ internal sealed class Options
                     break;
                 case "--heroes":
                     options.Heroes = true;
+                    break;
+                case "--heroes-sources":
+                    options.Heroes = true;
+                    options.HeroesBySource = true;
                     break;
                 case "--card-values":
                     options.CardValues = true;
@@ -254,7 +262,7 @@ internal static class Headless
 
                 if (options.Heroes)
                 {
-                    new BronzebeardHud.HdtPlugin.HeroPickPanel(window.Overlay).Show(HarnessData.HeroRows(), BronzebeardHud.Stats.PatchNotes.Banner(HarnessData.Nomi));
+                    new BronzebeardHud.HdtPlugin.HeroPickPanel(window.Overlay).Show(HarnessData.HeroRows(!options.HeroesBySource), BronzebeardHud.Stats.PatchNotes.Banner(HarnessData.Nomi));
                 }
 
                 Pump(options.Wait);
