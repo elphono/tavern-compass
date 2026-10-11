@@ -33,6 +33,8 @@ Le plan `docs/plans/2026-09-26-parite-tier7-plan.md` fait foi ; l'historique des
 | 5 | top 4 des héros, plateau vs courbe du héros, compo par héros, bilan par adversaire | ✓ | ✗ |
 | 6 | affinité compo ↔ héros, nombre de compos réglable, épinglage au clic, pivots, « comment les tops le jouent », bouton Meta | ✓ | ✗ |
 
+**Reprendre sur une autre machine** : `docs/journal/2026-10-11-reprise.md` (ce que git ne porte pas, décisions en attente).
+
 Ce qui reste ouvert **vit dans les issues GitHub** (depuis le 2026-10-08, à la demande d'Ali), rangées par milestone :
 c'est le siège unique du travail en cours, ne pas le recopier ici. `gh issue list -R elphono/tavern-compass` ; une issue se
 ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps quand un point est vu en jeu.
