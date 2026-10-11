@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Force relative du plateau</title>
+<meta name="description" content="Étude de faisabilité du 2026-10-11, sans implémentation : peut-on implémenter les règles du jeu pour mieux évaluer la force relative du plateau (synergies, mots-clés, trinkets, pouvoir héroïque, dons sombres) ? Ce que la jauge lit aujourd'hui, la taille des règles, les simulateurs existants (Bob's Buddy, Firestone), les estimations sans règles, la fraîcheur mesurée des plateaux adverses, le chemin recommandé, ce qui n'est pas établi et les décisions d'Ali.">
+<style>
+  :root {
+    --bg: #f7f7f4; --surface: #ffffff; --text: #1d1f24; --muted: #555b67; --border: #d6d9df; --soft: #eef0f3;
+    --good: #15803d; --bad: #c81e1e; --amber: #b86a00; --accent: #6d28d9; --hdt: #1d4ed8; --teal: #0f766e;
+    --f1: #4f46e5; --f2: #b86a00; --f3: #0f766e; --f4: #be185d; --f5: #7b8190;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
+      --good: #3ddc84; --bad: #ff5c5c; --amber: #ffb03b; --accent: #b69cff; --hdt: #60a5fa; --teal: #2dd4bf;
+      --f1: #818cf8; --f2: #ffb03b; --f3: #2dd4bf; --f4: #f472b6; --f5: #8b92a1;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161b; --surface: #1c1f26; --text: #e8eaee; --muted: #a9b0bd; --border: #363b46; --soft: #242832;
+    --good: #3ddc84; --bad: #ff5c5c; --amber: #ffb03b; --accent: #b69cff; --hdt: #60a5fa; --teal: #2dd4bf;
+    --f1: #818cf8; --f2: #ffb03b; --f3: #2dd4bf; --f4: #f472b6; --f5: #8b92a1;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; overflow-wrap: break-word; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 8px 0 4px; }
+  h2 { font-size: 22px; line-height: 1.25; margin: 44px 0 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  h3 { font-size: 18px; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  .meta { color: var(--muted); font-size: 15px; margin: 0 0 20px; }
+  code { font: max(14px, 0.92em) ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+  .lead { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 16px; font-size: 17px; }
+  .answer { background: var(--surface); border: 2px solid var(--accent); border-radius: 10px; padding: 14px 16px; margin: 16px 0; font-size: 18px; line-height: 1.45; }
+  .answer b { color: var(--accent); }
+  .reco { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--good); border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
+  .reco ol { margin: 6px 0 6px; padding-left: 22px; }
+  .reco li { margin: 4px 0; }
+  .reco .no { color: var(--muted); margin: 8px 0 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0 0; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .tile b { display: block; font-size: 26px; line-height: 1.1; }
+  .tile span { color: var(--muted); font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; background: var(--surface); border: 1px solid var(--border); }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--soft); font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  .scroll table { min-width: 640px; }
+  figure { margin: 18px 0; }
+  figcaption { color: var(--muted); font-size: 15px; margin-top: 6px; }
+  svg { display: block; width: 100%; height: auto; }
+  .figscroll { overflow-x: auto; }
+  .figscroll svg { min-width: 880px; }
+  svg text { fill: var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  svg .sub { fill: var(--muted); }
+  svg .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  svg .line { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+  svg .grid { stroke: var(--border); stroke-width: 1; }
+  ul.plain { padding-left: 20px; }
+  ul.plain li { margin: 4px 0; }
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin: 12px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  pre { background: var(--soft); padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.45; }
+  .ok { color: var(--good); font-weight: 700; }
+  .ko { color: var(--bad); font-weight: 700; }
+  .warn { color: var(--amber); font-weight: 700; }
+  .eq { color: var(--muted); font-weight: 700; }
+  .dec { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+  .dec h3 { margin: 2px 0 6px; font-size: 17px; }
+  .dec ol { margin: 4px 0; padding-left: 22px; }
+  .dec li { margin: 3px 0; }
+  .dec li:first-child { font-weight: 600; }
+  .dec li:first-child::after { content: "  ← recommandé"; color: var(--good); font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+<h1>La force relative du plateau : faisabilité</h1>
+<p class="meta">Étude de faisabilité, 2026-10-11 · Tavern Compass · sans implémentation, sans prototype · les estimations en jours sont des jugements, les autres chiffres des mesures (HDT 1.58.10 décompilé, npm, HearthDb, journal d'HDT en agrégats)</p>
+
+<p class="lead">Ali : « l'IHM d'évaluation de la puissance de notre board est vraiment bien, mais on peut aller plus loin pour évaluer notre
+force relative. pour ça il faudrait que le plugin puisse comprendre et calculer les synergies de notre board (puissance et mots clés des
+cartes) / trinket / hero power / sombre don etc. Est ce que tu penses que c'est possible d'implémenter toutes les règles du jeu pour
+améliorer l'évaluation de notre force ? »</p>
+
+<div class="answer"><b>Toutes les règles nous-mêmes : non.</b> On peut en revanche <b>comprendre les synergies</b> en appelant le
+simulateur que HDT livre déjà, Bob's Buddy, si HearthSim l'accepte. Il faut alors le faire jouer contre les plateaux rencontrés au même
+tour, parce que celui du prochain adversaire a en médiane six tours de retard.</div>
+
+<div class="reco">
+<b>Recommandation, dans l'ordre</b>
+<ol>
+  <li><b>Ali écrit à HearthSim</b>, l'éditeur d'HDT. Il demande l'accord pour qu'un plugin public appelle <code>BobsBuddy.dll</code>
+  depuis l'installation d'HDT, et propose qu'HDT expose dans son API le résultat de Bob's Buddy et la conversion des entités. Coût : un
+  message.</li>
+  <li><b>En parallèle, sans rien demander à personne</b> : le plugin garde en local les plateaux adverses qu'HDT fige à chaque combat.
+  C'est une <b>référence fraîche</b>, qui donne par exemple « ton plateau bat 17 des 23 plateaux rencontrés au tour 8 » (chiffres
+  inventés). Coût : 1 à 2 jours.</li>
+  <li><b>Si HearthSim accepte</b> : en taverne, Bob's Buddy fait jouer notre plateau complet (mots-clés, enchantements, trinkets, pouvoir,
+  dons sombres) contre ces plateaux du même tour, et l'encart affiche par exemple « 64 % de victoires » (chiffre inventé). Coût : 5 à 8 jours, puis un suivi à
+  chaque version d'HDT.</li>
+</ol>
+<p class="no">À écarter : écrire les règles nous-mêmes (30 à 40 jours, puis un suivi sans fin) ; lire Bob's Buddy par réflexion (HDT
+l'affiche déjà, et seulement en combat) ; le simulateur de Firestone (sa licence est fermée depuis le 28 septembre) ; le face-à-face par les
+sommes (le plateau adverse est trop vieux).</p>
+</div>
+
+<div class="tiles">
+  <div class="tile"><b>1 020</b><span>cartes codées une à une dans Bob's Buddy, avec 81 interfaces de déclencheurs</span></div>
+  <div class="tile"><b>12</b><span>patchs touchant Battlegrounds en six mois, soit un toutes les deux semaines</span></div>
+  <div class="tile"><b>35 %</b><span>des tours de taverne où l'on connaît le plateau du prochain adversaire (jamais avant le tour 8)</span></div>
+  <div class="tile"><b>6 tours</b><span>d'âge médian pour ce plateau connu</span></div>
+  <div class="tile"><b>186 ms</b><span>pour une simulation d'HDT de 10 000 combats (médiane sur 699)</span></div>
+</div>
+
+<h2>1. Les options, coût contre gain</h2>
+<div class="figscroll"><svg viewBox="0 0 900 500" role="img" aria-label="Carte des options : coût estimé en jours sur une échelle logarithmique, couleur selon ce qu'il faut demander, gain en points de zéro à quatre">
+  <text x="16" y="34" font-size="15" font-weight="700">Option</text>
+  <text x="530" y="34" text-anchor="middle" font-size="15" font-weight="700">coût estimé, en jours (échelle log)</text>
+  <text x="785" y="34" text-anchor="middle" font-size="15" font-weight="700">gain</text>
+  <line class="grid" x1="395" y1="50" x2="395" y2="408"/><line class="grid" x1="450" y1="50" x2="450" y2="408"/>
+  <line class="grid" x1="522.8" y1="50" x2="522.8" y2="408"/><line class="grid" x1="577.8" y1="50" x2="577.8" y2="408"/>
+  <line class="grid" x1="632.8" y1="50" x2="632.8" y2="408"/><line class="grid" x1="687.8" y1="50" x2="687.8" y2="408"/>
+  <line x1="340" y1="408" x2="720" y2="408" style="stroke:var(--muted)"/>
+  <g font-size="14" class="sub" text-anchor="middle">
+    <text x="340" y="428" class="sub">½</text><text x="395" y="428" class="sub">1</text><text x="450" y="428" class="sub">2</text>
+    <text x="522.8" y="428" class="sub">5</text><text x="577.8" y="428" class="sub">10</text><text x="632.8" y="428" class="sub">20</text>
+    <text x="687.8" y="428" class="sub">40</text>
+  </g>
+  <!-- rows -->
+  <text x="16" y="74" font-size="15" font-weight="700">R · toutes les règles nous-mêmes</text>
+  <text x="16" y="92" font-size="13" class="sub">30–40 j, puis un patch toutes les 2 semaines</text>
+  <rect x="665" y="70" width="40" height="16" rx="3" style="fill:var(--good)"/><path d="M 705,64 L 720,78 L 705,92 Z" style="fill:var(--good)"/>
+
+  <text x="16" y="118" font-size="15" font-weight="700">C · simulateur de Firestone</text>
+  <text x="16" y="136" font-size="13" class="sub">fermé depuis le 28-09, Node 87 Mio à embarquer</text>
+  <rect x="549.5" y="114" width="42.8" height="16" rx="3" style="fill:var(--amber)"/>
+
+  <text x="16" y="162" font-size="15" font-weight="700" style="fill:var(--accent)">★ B · Bob's Buddy, plateaux du même tour</text>
+  <text x="16" y="180" font-size="13" class="sub">accord de HearthSim à demander</text>
+  <rect x="537.3" y="158" width="40.5" height="16" rx="3" style="fill:var(--amber)"/>
+
+  <text x="16" y="206" font-size="15" font-weight="700">B · Bob's Buddy, prochain adversaire</text>
+  <text x="16" y="224" font-size="13" class="sub">son plateau : connu 35 % des tours, vieux de 6</text>
+  <rect x="522.8" y="202" width="37.3" height="16" rx="3" style="fill:var(--amber)"/>
+
+  <text x="16" y="250" font-size="15" font-weight="700">D2 · somme pondérée par les mots-clés</text>
+  <text x="16" y="268" font-size="13" class="sub">vaut quelque chose une fois étalonnée</text>
+  <rect x="482.2" y="246" width="40.6" height="16" rx="3" style="fill:var(--good)"/>
+
+  <text x="16" y="294" font-size="15" font-weight="700" style="fill:var(--accent)">★ D3 · bibliothèque des plateaux rencontrés</text>
+  <text x="16" y="312" font-size="13" class="sub">la même somme, une référence fraîche</text>
+  <rect x="395" y="290" width="55" height="16" rx="3" style="fill:var(--good)"/>
+
+  <text x="16" y="338" font-size="15" font-weight="700">D1 · face-à-face par les sommes</text>
+  <text x="16" y="356" font-size="13" class="sub">les deux chiffres sont déjà dans l'encart</text>
+  <rect x="395" y="334" width="32.2" height="16" rx="3" style="fill:var(--good)"/>
+
+  <text x="16" y="382" font-size="15" font-weight="700">A · lire Bob's Buddy dans HDT</text>
+  <text x="16" y="400" font-size="13" class="sub">HDT l'affiche déjà ; type internal</text>
+  <rect x="340" y="378" width="55" height="16" rx="3" style="fill:var(--bad)"/>
+  <!-- gain dots: 4,4,4,2,2,1,0,0 -->
+  <g stroke-width="2">
+    <g style="stroke:var(--accent)"><circle cx="752" cy="78" r="7" style="fill:var(--accent)"/><circle cx="774" cy="78" r="7" style="fill:var(--accent)"/><circle cx="796" cy="78" r="7" style="fill:var(--accent)"/><circle cx="818" cy="78" r="7" style="fill:var(--accent)"/></g>
+    <g style="stroke:var(--accent)"><circle cx="752" cy="122" r="7" style="fill:var(--accent)"/><circle cx="774" cy="122" r="7" style="fill:var(--accent)"/><circle cx="796" cy="122" r="7" style="fill:var(--accent)"/><circle cx="818" cy="122" r="7" style="fill:var(--accent)"/></g>
+    <g style="stroke:var(--accent)"><circle cx="752" cy="166" r="7" style="fill:var(--accent)"/><circle cx="774" cy="166" r="7" style="fill:var(--accent)"/><circle cx="796" cy="166" r="7" style="fill:var(--accent)"/><circle cx="818" cy="166" r="7" style="fill:var(--accent)"/></g>
+    <g style="stroke:var(--accent)"><circle cx="752" cy="210" r="7" style="fill:var(--accent)"/><circle cx="774" cy="210" r="7" style="fill:var(--accent)"/><circle cx="796" cy="210" r="7" style="fill:none"/><circle cx="818" cy="210" r="7" style="fill:none"/></g>
+    <g style="stroke:var(--accent)"><circle cx="752" cy="254" r="7" style="fill:var(--accent)"/><circle cx="774" cy="254" r="7" style="fill:var(--accent)"/><circle cx="796" cy="254" r="7" style="fill:none"/><circle cx="818" cy="254" r="7" style="fill:none"/></g>
+    <g style="stroke:var(--accent)"><circle cx="752" cy="298" r="7" style="fill:var(--accent)"/><circle cx="774" cy="298" r="7" style="fill:none"/><circle cx="796" cy="298" r="7" style="fill:none"/><circle cx="818" cy="298" r="7" style="fill:none"/></g>
+    <g style="stroke:var(--accent)"><circle cx="752" cy="342" r="7" style="fill:none"/><circle cx="774" cy="342" r="7" style="fill:none"/><circle cx="796" cy="342" r="7" style="fill:none"/><circle cx="818" cy="342" r="7" style="fill:none"/></g>
+    <g style="stroke:var(--accent)"><circle cx="752" cy="386" r="7" style="fill:none"/><circle cx="774" cy="386" r="7" style="fill:none"/><circle cx="796" cy="386" r="7" style="fill:none"/><circle cx="818" cy="386" r="7" style="fill:none"/></g>
+  </g>
+  <text x="836" y="83" font-size="13" class="sub">si juste</text>
+  <!-- legend -->
+  <rect x="16" y="446" width="18" height="12" rx="2" style="fill:var(--good)"/><text x="40" y="457" font-size="14">rien à demander</text>
+  <rect x="170" y="446" width="18" height="12" rx="2" style="fill:var(--amber)"/><text x="194" y="457" font-size="14">un accord à demander</text>
+  <rect x="356" y="446" width="18" height="12" rx="2" style="fill:var(--bad)"/><text x="380" y="457" font-size="14">passe par l'interne d'HDT</text>
+  <text x="600" y="457" font-size="14" style="fill:var(--accent)" font-weight="700">★ le chemin recommandé</text>
+  <circle cx="22" cy="482" r="6" style="fill:var(--accent)"/><text x="36" y="487" font-size="14">gain : ce que l'option apprend de plus qu'aujourd'hui, de 0 à 4</text>
+</svg></div>
+<p>Le gain se lit en points, de 0 à 4. À 4, l'option tient compte des synergies de notre plateau et le mesure contre une référence fraîche.
+À 2, elle n'a que l'une des deux. Les longueurs de barre sont des estimations, pas des mesures. Le tableau donne les raisons de chaque ligne,
+la section 4 les détaille.</p>
+<div class="scroll"><table>
+  <thead><tr><th>Option</th><th>Ce qu'elle rend</th><th>Coût (estimation)</th><th>Risque</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>R · toutes les règles</td><td>les chances de victoire contre n'importe quel plateau, à tout moment</td><td>30–40 j pour le simulateur
+    (estimation de l'étude de stack), puis le suivi de chaque patch</td><td>justesse invérifiable sans référence ; toujours en retard d'un patch</td><td class="ko">non</td></tr>
+    <tr><td>A · lire Bob's Buddy dans HDT</td><td>les chances du combat en cours</td><td>½–1 j par réflexion ; 0 si HDT l'expose</td><td>le type est
+    internal et peut casser à chaque version ; l'information arrive après que le plateau est joué ; HDT l'affiche déjà</td><td class="ko">non tel quel</td></tr>
+    <tr><td>B · Bob's Buddy, prochain adversaire</td><td>les chances contre le dernier plateau vu du prochain adversaire</td><td>5–8 j, puis un suivi à chaque version</td><td>licence
+    non publiée ; plateau connu dans 35 % des tours seulement, vieux de 6 tours</td><td class="warn">secondaire</td></tr>
+    <tr><td>B · Bob's Buddy, plateaux du même tour</td><td>les chances contre les plateaux rencontrés au même tour</td><td>D3 + 5–8 j, puis un suivi</td><td>licence
+    non publiée ; plateaux adverses sans trinkets ni pouvoir</td><td class="ok">oui, avec l'accord</td></tr>
+    <tr><td>C · simulateur de Firestone</td><td>la même chose que B</td><td>7–12 j (conversion et moteur JavaScript)</td><td>« All rights reserved » depuis le 28-09 ;
+    aucune source ; Node absent sous Windows</td><td class="ko">repli seulement</td></tr>
+    <tr><td>D1 · face-à-face par les sommes</td><td>notre somme contre celle du prochain adversaire, projetée</td><td>≈ 1 j</td><td>projeter six tours de
+    croissance revient à deviner</td><td class="ko">non</td></tr>
+    <tr><td>D2 · somme pondérée par les mots-clés</td><td>la somme corrigée des mots-clés génériques</td><td>1–2 j, plus 2–3 j d'étalonnage</td><td>poids
+    arbitraires tant qu'ils ne sont pas étalonnés ; ignore les synergies</td><td class="warn">repli, étalonnée</td></tr>
+    <tr><td>D3 · bibliothèque des plateaux rencontrés</td><td>notre somme rangée parmi les plateaux vus au même tour</td><td>1–2 j</td><td>gain propre
+    modeste ; quelques parties avant d'avoir assez de plateaux</td><td class="ok">oui, d'abord</td></tr>
+  </tbody>
+</table></div>
+<details>
+  <summary>D'où viennent les chiffres de cette section</summary>
+  <ul class="plain">
+    <li>Bob's Buddy (1 020 cartes, 81 interfaces, 186 ms) : décompilation de <code>BobsBuddy.dll</code> 1.90.0 livrée avec HDT 1.58.10, et
+    agrégat des journaux d'HDT conservés du 2 au 11 octobre.</li>
+    <li>Firestone (licence, cadence) : <code>npm view @firestone-hs/simulate-bgs-battle</code>, versions 1.1.759 à 1.1.770.</li>
+    <li>Patchs : page des patchs de hearthstone.wiki.gg, lue jusqu'au 36.6.0 ; le 36.6.3 vient du cache nomi.gg.</li>
+    <li>35 % et 6 tours : lignes <code>opponent power scope=next</code> du plugin dans le journal d'HDT, section 4 (mesure et commande).</li>
+    <li>« 30–40 j » : l'étude de stack du 2026-09-26 (<code>docs/plans/2026-09-26-etude-stack.md</code>, option 5) estimait déjà ce que
+    le simulateur de Firestone évitait de réécrire. Les autres jours sont des estimations de cette étude-ci.</li>
+  </ul>
+</details>
+
+<h2>2. Ce que la jauge fait aujourd'hui, et ce qu'elle ne voit pas</h2>
+<p><b>La jauge additionne l'attaque et les PV de nos sbires, puis divise par la moyenne des joueurs du même héros au même tour.</b> Elle ne
+lit que ces deux nombres. Pourtant, chaque entité qu'HDT lui passe porte tous ses tags.</p>
+<div class="figscroll"><svg viewBox="0 0 900 400" role="img" aria-label="Ce que la jauge lit d'un sbire : attaque et PV seulement, en vert ; tout le reste, mots-clés, enchantements, trinkets, pouvoir, dons sombres, compteurs, est porté par les entités et ignoré">
+  <rect x="16" y="30" width="430" height="212" rx="10" style="fill:var(--soft);stroke:var(--border)"/>
+  <text x="32" y="56" font-size="15" font-weight="700">un sbire de ton plateau, tel qu'HDT le tient</text>
+  <g font-size="14" class="mono">
+    <rect x="32" y="70" width="96" height="28" rx="6" style="fill:var(--good);fill-opacity:.16;stroke:var(--good);stroke-width:2"/><text x="80" y="89" text-anchor="middle" font-weight="700">ATK 6</text>
+    <rect x="138" y="70" width="120" height="28" rx="6" style="fill:var(--good);fill-opacity:.16;stroke:var(--good);stroke-width:2"/><text x="198" y="89" text-anchor="middle" font-weight="700">HEALTH 9</text>
+    <g style="fill:none;stroke:var(--muted);stroke-dasharray:4 3">
+      <rect x="32" y="110" width="138" height="26" rx="6"/><rect x="178" y="110" width="80" height="26" rx="6"/><rect x="266" y="110" width="70" height="26" rx="6"/>
+      <rect x="32" y="144" width="96" height="26" rx="6"/><rect x="136" y="144" width="96" height="26" rx="6"/><rect x="240" y="144" width="150" height="26" rx="6"/>
+      <rect x="32" y="178" width="116" height="26" rx="6"/><rect x="156" y="178" width="160" height="26" rx="6"/><rect x="324" y="178" width="74" height="26" rx="6"/>
+    </g>
+    <g class="sub">
+      <text x="101" y="128" text-anchor="middle" class="sub">DIVINE_SHIELD</text><text x="218" y="128" text-anchor="middle" class="sub">REBORN</text><text x="301" y="128" text-anchor="middle" class="sub">TAUNT</text>
+      <text x="80" y="162" text-anchor="middle" class="sub">WINDFURY</text><text x="184" y="162" text-anchor="middle" class="sub">VENOMOUS</text><text x="315" y="162" text-anchor="middle" class="sub">PREMIUM (doré)</text>
+      <text x="90" y="196" text-anchor="middle" class="sub">DEATHRATTLE</text><text x="236" y="196" text-anchor="middle" class="sub">START_OF_COMBAT</text><text x="361" y="196" text-anchor="middle" class="sub">AVENGE</text>
+    </g>
+  </g>
+  <text x="32" y="228" font-size="14" class="sub">et ses enchantements attachés : buffs, dons sombres…</text>
+
+  <rect x="16" y="258" width="430" height="128" rx="10" style="fill:var(--soft);stroke:var(--border)"/>
+  <text x="32" y="284" font-size="15" font-weight="700">autour du plateau</text>
+  <g font-size="14" style="fill:none;stroke:var(--muted);stroke-dasharray:4 3">
+    <rect x="32" y="296" width="110" height="26" rx="6"/><rect x="150" y="296" width="150" height="26" rx="6"/><rect x="308" y="296" width="126" height="26" rx="6"/>
+    <rect x="32" y="330" width="402" height="26" rx="6"/>
+  </g>
+  <g font-size="14">
+    <text x="87" y="314" text-anchor="middle" class="sub">trinkets</text><text x="225" y="314" text-anchor="middle" class="sub">pouvoir héroïque</text><text x="371" y="314" text-anchor="middle" class="sub">quêtes, objectifs</text>
+    <text x="233" y="348" text-anchor="middle" class="sub">compteurs (gemmes de sang, morts-vivants…)</text>
+  </g>
+  <text x="32" y="376" font-size="13" class="sub">l'entrée de Bob's Buddy en compte une quarantaine</text>
+
+  <!-- formula -->
+  <rect x="540" y="56" width="344" height="58" rx="10" style="fill:var(--good);fill-opacity:.12;stroke:var(--good);stroke-width:2"/>
+  <text x="712" y="82" text-anchor="middle" font-size="17" font-weight="700">Σ (ATK + PV) des sbires</text>
+  <text x="712" y="103" text-anchor="middle" font-size="13" class="sub">WarbandCurve.BoardStats</text>
+  <rect x="540" y="146" width="344" height="58" rx="10" style="fill:var(--surface);stroke:var(--border);stroke-width:1.5"/>
+  <text x="712" y="171" text-anchor="middle" font-size="16" font-weight="700">÷ moyenne du même héros, même tour</text>
+  <text x="712" y="192" text-anchor="middle" font-size="13" class="sub">Firestone, warbandStats</text>
+  <rect x="540" y="236" width="344" height="74" rx="10" style="fill:var(--surface);stroke:var(--border);stroke-width:1.5"/>
+  <text x="712" y="260" text-anchor="middle" font-size="16" font-weight="700">un palier, en tours de croissance (×1,8)</text>
+  <rect x="566" y="274" width="68" height="22" rx="4" style="fill:#e5484d"/><rect x="638" y="274" width="68" height="22" rx="4" style="fill:#f5c518"/>
+  <rect x="710" y="274" width="68" height="22" rx="4" style="fill:#2fb344"/><rect x="782" y="274" width="76" height="22" rx="4" style="fill:#d4a017"/>
+  <g font-size="13" font-weight="700" text-anchor="middle"><text x="600" y="290" style="fill:#fff">&lt; −25 %</text><text x="672" y="290" style="fill:#1d1f24">≤ +34 %</text><text x="744" y="290" style="fill:#fff">≤ +80 %</text><text x="820" y="290" style="fill:#1d1f24">au-delà</text></g>
+  <path d="M 712,114 L 712,140" style="stroke:var(--muted);stroke-width:2;fill:none"/><path d="M 706,134 L 712,144 L 718,134" style="stroke:var(--muted);stroke-width:2;fill:none"/>
+  <path d="M 712,204 L 712,230" style="stroke:var(--muted);stroke-width:2;fill:none"/><path d="M 706,224 L 712,234 L 718,224" style="stroke:var(--muted);stroke-width:2;fill:none"/>
+  <path d="M 258,84 C 400,84 430,84 532,84" style="stroke:var(--good);stroke-width:2.5;fill:none"/><path d="M 524,78 L 536,84 L 524,90" style="stroke:var(--good);stroke-width:2.5;fill:none"/>
+  <text x="400" y="74" font-size="14" font-weight="700" style="fill:var(--good)">lu</text>
+  <path d="M 446,190 C 490,190 500,330 532,340" class="line" style="stroke-dasharray:5 4"/>
+  <text x="540" y="345" font-size="14" font-weight="700" class="sub">ignoré par la jauge</text>
+  <text x="540" y="366" font-size="13" class="sub">HdtEntityAdapter n'en garde que deux tags</text>
+  <rect x="540" y="380" width="14" height="12" rx="2" style="fill:var(--good)"/><text x="560" y="391" font-size="13">lu</text>
+  <rect x="600" y="380" width="14" height="12" rx="2" style="fill:none;stroke:var(--muted);stroke-dasharray:3 2"/><text x="620" y="391" font-size="13">porté par l'entité, ignoré</text>
+</svg></div>
+<p>La rangée de l'adversaire utilise la même formule : son plateau, tel qu'HDT l'a figé au début du combat, divisé par la moyenne de
+<b>son</b> héros. Deux plateaux de même somme se valent donc pour la jauge, qu'ils aient sept boucliers divins ou aucun. C'est le défaut
+qu'Ali vise, et la jauge ne le corrige pas par manque d'information : les tags sont déjà là, au point même où elle lit. Ce qui manque,
+c'est de savoir ce qu'ils <b>valent en combat</b>.</p>
+<p>Un point doit être tenu dès maintenant. La référence de Firestone est une somme brute, celle des plateaux moyens. Pondérer notre somme
+sans pondérer la référence fausse la comparaison, puisque le plateau moyen a, lui aussi, ses boucliers divins (voir D2).</p>
+<details>
+  <summary>Preuve : la formule et ce que le plugin lit des entités</summary>
+  <ul class="plain">
+    <li><code>WarbandCurve.cs:167</code> : <code>BoardStats</code> = Σ (max(0, Attack) + max(0, Health)).</li>
+    <li><code>WarbandCurve.cs:187</code> et <code>:200</code> : point de la courbe du héros au même tour, puis
+    <code>ratio = boardStats / point.AverageStats</code>.</li>
+    <li><code>WarbandCurve.cs:40-53</code> : <code>TurnGrowth = 1.8</code>. Paliers : rouge sous 1/√1,8 (−25 %), jaune jusqu'à √1,8
+    (+34 %), vert jusqu'à 1,8 (+80 %), or au-delà. Sans couleur si la moyenne est sous 12, si la courbe retombe, ou si le héros a moins de
+    100 parties.</li>
+    <li><code>HdtEntityAdapter.cs:162-174</code> (<code>BoardMinionStats</code>) : <code>(GetTag(ATK), GetTag(HEALTH))</code> de chaque
+    sbire, rien d'autre.</li>
+    <li><code>HdtEntityAdapter.cs:218-228</code> (<code>Snapshot</code>) : l'instantané d'HDT, réduit lui aussi aux mêmes deux tags.</li>
+    <li>Recherche de <code>trinket|HERO_POWER|HeroPower</code> dans le plugin : seul le <b>choix</b> de trinkets en sort
+    (<code>ChoiceAdvicePanel.cs</code>, <code>HdtEntityAdapter.cs:53,61</code>). Aucune ligne ne lit <code>HERO_POWER</code>, et c'est
+    cette absence qu'on voulait établir.</li>
+  </ul>
+</details>
+
+<h2>3. « Toutes les règles », nous-mêmes : non</h2>
+<p><b>Écrire les règles du jeu, c'est écrire un simulateur de combat complet, puis le suivre à chaque patch.</b> Deux équipes le font déjà
+et le maintiennent en continu. Voici leur taille.</p>
+<div class="figscroll"><svg viewBox="0 0 900 290" role="img" aria-label="Taille des deux simulateurs existants : Bob's Buddy code 1 020 cartes, dont 725 sbires et 144 trinkets ; Firestone environ 820 fichiers de cartes, dont 591 sbires et 98 trinkets">
+  <text x="16" y="88" font-size="16" font-weight="700">Bob's Buddy</text><text x="16" y="108" font-size="13" class="sub">1 020 cartes codées</text>
+  <rect x="150" y="70" width="507.5" height="40" style="fill:var(--f1)"/><rect x="657.5" y="70" width="100.8" height="40" style="fill:var(--f2)"/>
+  <rect x="758.3" y="70" width="41.3" height="40" style="fill:var(--f3)"/><rect x="799.6" y="70" width="39.9" height="40" style="fill:var(--f4)"/>
+  <rect x="839.5" y="70" width="24.5" height="40" style="fill:var(--f5)"/>
+  <text x="403" y="96" text-anchor="middle" font-size="16" font-weight="700" style="fill:#fff">725 sbires</text>
+  <text x="708" y="96" text-anchor="middle" font-size="14" font-weight="700" style="fill:#16131f">144 trinkets</text>
+  <text x="864" y="132" text-anchor="end" font-size="13" class="sub">puis 59 sorts · 57 enchantements (dons sombres compris) · 22 quêtes · 13 anomalies</text>
+
+  <text x="16" y="178" font-size="16" font-weight="700">Firestone</text><text x="16" y="198" font-size="13" class="sub">≈ 820 fichiers de cartes</text>
+  <rect x="150" y="160" width="413.7" height="40" style="fill:var(--f1)"/><rect x="563.7" y="160" width="68.6" height="40" style="fill:var(--f2)"/>
+  <rect x="632.3" y="160" width="57.4" height="40" style="fill:var(--f3)"/><rect x="689.7" y="160" width="20.3" height="40" style="fill:var(--f5)"/>
+  <rect x="710" y="160" width="15.4" height="40" style="fill:var(--f4)"/>
+  <text x="357" y="186" text-anchor="middle" font-size="16" font-weight="700" style="fill:#fff">591 sbires</text>
+  <text x="598" y="186" text-anchor="middle" font-size="14" font-weight="700" style="fill:#16131f">98</text>
+  <text x="725" y="222" text-anchor="end" font-size="13" class="sub">puis 82 sorts (53 de taverne, 29 spellcraft) · 29 pouvoirs · 22 enchantements</text>
+
+  <g font-size="14">
+    <rect x="150" y="244" width="14" height="12" style="fill:var(--f1)"/><text x="170" y="255">sbires</text>
+    <rect x="240" y="244" width="14" height="12" style="fill:var(--f2)"/><text x="260" y="255">trinkets</text>
+    <rect x="340" y="244" width="14" height="12" style="fill:var(--f3)"/><text x="360" y="255">sorts</text>
+    <rect x="420" y="244" width="14" height="12" style="fill:var(--f4)"/><text x="440" y="255">enchantements</text>
+    <rect x="560" y="244" width="14" height="12" style="fill:var(--f5)"/><text x="580" y="255">pouvoirs, quêtes, anomalies</text>
+  </g>
+  <text x="150" y="282" font-size="14" class="sub">et, côté Bob's Buddy : 44 pouvoirs héroïques cités, 81 interfaces de déclencheurs, un moteur de combat de 4 814 lignes</text>
+  <text x="150" y="40" font-size="14" class="sub">même échelle pour les deux barres : une carte = 0,7 px</text>
+</svg></div>
+<div class="figscroll"><svg viewBox="0 0 900 250" role="img" aria-label="Frise : douze patchs touchant Battlegrounds d'avril à octobre 2026, dont deux saisons, un mot-clé et une tribu ; les dix dernières versions du simulateur de Firestone fin septembre et début octobre, et son passage de MIT à All rights reserved">
+  <text x="60" y="30" font-size="16" font-weight="700">12 patchs qui touchent Battlegrounds en six mois</text>
+  <line x1="60" y1="120" x2="860" y2="120" style="stroke:var(--muted);stroke-width:2"/>
+  <g font-size="13" class="sub" text-anchor="middle">
+    <text x="60" y="146" class="sub">avr.</text><text x="184.3" y="146" class="sub">mai</text><text x="312.8" y="146" class="sub">juin</text>
+    <text x="437.2" y="146" class="sub">juil.</text><text x="565.7" y="146" class="sub">août</text><text x="694.2" y="146" class="sub">sept.</text><text x="818.5" y="146" class="sub">oct.</text>
+  </g>
+  <g style="fill:var(--hdt)">
+    <circle cx="64.1" cy="120" r="7"/><circle cx="113.9" cy="120" r="7"/><circle cx="171.9" cy="120" r="7"/><circle cx="259" cy="120" r="7"/>
+    <circle cx="317" cy="120" r="7"/><circle cx="354.3" cy="120" r="7"/><circle cx="520.1" cy="120" r="7"/><circle cx="578.1" cy="120" r="7"/>
+    <circle cx="636.2" cy="120" r="7"/><circle cx="702.5" cy="120" r="7"/><circle cx="752.3" cy="120" r="7"/><circle cx="822.7" cy="120" r="7"/>
+  </g>
+  <path class="line" d="M 113.9,112 L 113.9,62"/><text x="118" y="58" font-size="14">S13 : retour des trinkets</text>
+  <path class="line" d="M 317,112 L 317,86"/><text x="321" y="82" font-size="14">retour des anomalies</text>
+  <path class="line" d="M 578.1,112 L 578.1,62"/><text x="582" y="58" font-size="14">S14 : dons sombres, mot-clé Activate</text>
+  <path class="line" d="M 752.3,112 L 752.3,86"/><text x="756" y="82" font-size="14">Aberrations</text>
+  <line x1="806.1" y1="154" x2="806.1" y2="202" style="stroke:var(--bad);stroke-width:2;stroke-dasharray:4 3"/>
+  <text x="798" y="168" text-anchor="end" font-size="13" style="fill:var(--bad)" font-weight="700">simulateur de Firestone : MIT → « All rights reserved » (28-09)</text>
+  <g style="fill:var(--teal)">
+    <circle cx="806.1" cy="176" r="4"/><circle cx="806.1" cy="186" r="4"/><circle cx="810.3" cy="176" r="4"/><circle cx="818.5" cy="176" r="4"/>
+    <circle cx="818.5" cy="186" r="4"/><circle cx="835.1" cy="176" r="4"/><circle cx="843.4" cy="176" r="4"/><circle cx="847.5" cy="176" r="4"/>
+    <circle cx="847.5" cy="186" r="4"/><circle cx="847.5" cy="196" r="4"/>
+  </g>
+  <circle cx="300" cy="226" r="7" style="fill:var(--hdt)"/><text x="312" y="231" font-size="13">un patch</text>
+  <circle cx="392" cy="226" r="4" style="fill:var(--teal)"/><text x="402" y="231" font-size="13">une version du simulateur de Firestone (les 10 dernières ; 19 en 30 jours)</text>
+</svg></div>
+<p>Deux notes de patch, comptées à titre d'ordre de grandeur, changent chacune 70 à 140 cartes. Le seul simulateur public suit ce rythme à
+19 versions par mois. Le jeu lui-même pèse 303 sbires du pool (plus leurs dorés), 76 sorts de taverne, 123 héros avec leur pouvoir, et 420
+cartes de trinkets toutes saisons confondues. Le pool actuel des trinkets n'est marqué par aucun tag, il n'est donc pas lisible.</p>
+<p>Il y a pire que le volume : la justesse. Sans référence, rien ne dit qu'un combat simulé est juste. Bob's Buddy refuse lui-même de
+simuler un plateau qui porte une carte qu'il ne connaît pas, ou dont le texte a changé. <b>Conclusion franche : ce n'est pas un chantier
+pour nous.</b> Même avec les 30 à 40 jours que l'étude de stack estimait pour réécrire le simulateur, on aurait une copie moins juste et toujours en
+retard d'un patch, de ce que HDT livre déjà dans le même processus que nous.</p>
+<details>
+  <summary>Preuve : les comptages</summary>
+  <pre>BobsBuddy.dll 1.90.0 (HDT 1.58.10, 1 620 576 octets), décompilé :
+  classes portant un CardId public (une par carte, inscrites par EntityFactory&lt;T&gt;) : 1020
+    Trinkets 144 · Minions.* 725 · Enchantments 57 · Spells.* 59 · Anomalies 13 · Quests + Rewards 22
+  identifiants de pouvoir héroïque cités : 44 (28 types à eux)
+  types : 2 158, dont 81 interfaces (déclencheurs IOnAvenge, IOnFriendlyMinionDied…)
+  Simulator.cs : 4 814 lignes · KnownBaconCards.xml : 2 836 cartes connues (une inconnue bloque la simulation)
+  dons sombres : pas d'espace de noms à eux, ils passent par des enchantements (10 fichiers les nomment)
+
+@firestone-hs/simulate-bgs-battle 1.1.770, dist/cards/impl/ :
+  591 minion · 98 trinket · 53 bg-spell · 29 spellcraft · 29 hero-power · 22 enchantments · 4 quest-reward · 2 anomaly
+  670 identifiants de cartes cités hors de impl/ (simulation/, keywords/, mechanics/)
+  versions : 19 en 30 jours, 48 en 90, 127 en 365
+
+HearthDb (HDT 1.58.10, build 253932) :
+  BaconPoolMinions 303 (tiers 1→7 : 26/41/53/69/62/38/14) · sorts du pool 76 · héros draftables 123 → 123 pouvoirs
+  BATTLEGROUND_TRINKET 420 cartes (toutes saisons, préfixes BG30 à BG36) · anomalies 112 · récompenses de quête 73
+  sbires du pool sans aucun Card.Mechanics : 168 sur 303</pre>
+  <p>Le nombre de cartes changées par patch vient du résumé automatique de deux notes (36.4.2 : 24 sbires, 27 héros, 71 trinkets ;
+  36.2.2 : 53 sbires, 59 trinkets, 22 autres). Il n'a pas été recompté à la main.</p>
+</details>
+
+<h2>4. Réutiliser un simulateur existant, ou s'en passer</h2>
+
+<h3>D'abord : contre quel plateau mesurer ?</h3>
+<p><b>Toute mesure de « force relative » a besoin d'un adversaire de référence, et c'est lui le vrai goulot.</b> En taverne, le plugin ne
+connaît que le dernier plateau qu'HDT a figé pour le prochain adversaire. Mesuré sur 31 parties : on ne le connaît jamais avant le tour 8,
+et ensuite il a presque toujours une tournée de retard.</p>
+<div class="figscroll"><svg viewBox="0 0 900 330" role="img" aria-label="Mesure sur 31 parties : par tour, nombre de tours de taverne et nombre avec un plateau connu du prochain adversaire, nul jusqu'au tour 7 puis près de 9 sur 10 ; âge de ce plateau, surtout 7 tours, médiane 6">
+  <text x="60" y="26" font-size="15" font-weight="700">tours de taverne où le plateau du prochain adversaire est connu</text>
+  <line x1="56" y1="250" x2="540" y2="250" style="stroke:var(--muted)"/>
+  <g style="fill:none;stroke:var(--muted);stroke-width:1.2">
+    <rect x="60" y="70" width="18" height="180"/><rect x="87" y="76.7" width="18" height="173.3"/><rect x="114" y="76.7" width="18" height="173.3"/>
+    <rect x="141" y="76.7" width="18" height="173.3"/><rect x="168" y="76.7" width="18" height="173.3"/><rect x="195" y="76.7" width="18" height="173.3"/>
+    <rect x="222" y="83.3" width="18" height="166.7"/><rect x="249" y="83.3" width="18" height="166.7"/><rect x="276" y="90" width="18" height="160"/>
+    <rect x="303" y="96.7" width="18" height="153.3"/><rect x="330" y="96.7" width="18" height="153.3"/><rect x="357" y="123.3" width="18" height="126.7"/>
+    <rect x="384" y="143.3" width="18" height="106.7"/><rect x="411" y="183.3" width="18" height="66.7"/><rect x="438" y="190" width="18" height="60"/>
+    <rect x="465" y="210" width="18" height="40"/><rect x="492" y="230" width="18" height="20"/><rect x="519" y="243.3" width="18" height="6.7"/>
+  </g>
+  <g style="fill:var(--hdt)">
+    <rect x="222" y="243.3" width="18" height="6.7"/><rect x="249" y="103.3" width="18" height="146.7"/><rect x="276" y="110" width="18" height="140"/>
+    <rect x="303" y="116.7" width="18" height="133.3"/><rect x="330" y="123.3" width="18" height="126.7"/><rect x="357" y="156.7" width="18" height="93.3"/>
+    <rect x="384" y="183.3" width="18" height="66.7"/><rect x="411" y="216.7" width="18" height="33.3"/><rect x="438" y="216.7" width="18" height="33.3"/>
+    <rect x="465" y="236.7" width="18" height="13.3"/><rect x="492" y="243.3" width="18" height="6.7"/><rect x="519" y="243.3" width="18" height="6.7"/>
+  </g>
+  <g font-size="12" class="sub" text-anchor="middle">
+    <text x="69" y="266" class="sub">1</text><text x="150" y="266" class="sub">4</text><text x="231" y="266" class="sub">7</text><text x="258" y="266" class="sub">8</text>
+    <text x="339" y="266" class="sub">11</text><text x="420" y="266" class="sub">14</text><text x="501" y="266" class="sub">17</text>
+  </g>
+  <text x="298" y="284" text-anchor="middle" font-size="13" class="sub">tour de la partie</text>
+  <text x="96" y="60" font-size="13" class="sub">0 sur 26 par tour, jusqu'au tour 7</text>
+  <text x="258" y="77" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--hdt)">22/25</text>
+
+  <text x="590" y="26" font-size="15" font-weight="700">âge de ce plateau, en tours</text>
+  <line x1="586" y1="250" x2="880" y2="250" style="stroke:var(--muted)"/>
+  <g style="fill:var(--amber)">
+    <rect x="590" y="228.4" width="20" height="21.6"/><rect x="616" y="239.2" width="20" height="10.8"/><rect x="642" y="203.2" width="20" height="46.8"/>
+    <rect x="668" y="181.6" width="20" height="68.4"/><rect x="694" y="206.8" width="20" height="43.2"/><rect x="720" y="217.6" width="20" height="32.4"/>
+    <rect x="746" y="70" width="20" height="180"/><rect x="772" y="239.2" width="20" height="10.8"/><rect x="798" y="232" width="20" height="18"/>
+    <rect x="850" y="246.4" width="20" height="3.6"/>
+  </g>
+  <g font-size="12" class="sub" text-anchor="middle">
+    <text x="600" y="266" class="sub">1</text><text x="626" y="266" class="sub">2</text><text x="652" y="266" class="sub">3</text><text x="678" y="266" class="sub">4</text>
+    <text x="704" y="266" class="sub">5</text><text x="730" y="266" class="sub">6</text><text x="756" y="266" class="sub">7</text><text x="782" y="266" class="sub">8</text>
+    <text x="808" y="266" class="sub">9</text><text x="834" y="266" class="sub">10</text><text x="860" y="266" class="sub">11</text>
+  </g>
+  <line x1="730" y1="60" x2="730" y2="250" style="stroke:var(--text);stroke-width:1.5;stroke-dasharray:5 4"/>
+  <text x="724" y="56" text-anchor="end" font-size="13" font-weight="700">médiane : 6</text>
+  <text x="774" y="80" font-size="13" font-weight="700" style="fill:var(--amber)">50 sur 121</text>
+  <text x="774" y="96" font-size="13" class="sub">vus une</text>
+  <text x="774" y="112" font-size="13" class="sub">tournée plus tôt</text>
+  <rect x="60" y="300" width="14" height="12" style="fill:none;stroke:var(--muted)"/><text x="80" y="311" font-size="13">tours de taverne</text>
+  <rect x="200" y="300" width="14" height="12" style="fill:var(--hdt)"/><text x="220" y="311" font-size="13">dont plateau connu (HDT l'a figé)</text>
+  <text x="590" y="296" font-size="13" class="sub">31 parties · 341 tours de taverne</text>
+  <text x="590" y="314" font-size="13" class="sub">121 avec un plateau connu (35 %)</text>
+</svg></div>
+<p>Le plateau qu'on connaît est celui que l'adversaire avait <b>une tournée plus tôt</b>. On affronte chacun des sept autres une fois
+pendant les sept premiers tours, puis on les retrouve. Au tour 8, le plateau connu date donc souvent du tour 1. Rien de l'outil n'y peut
+quoi que ce soit : HDT ne voit le plateau d'un joueur qu'en le combattant. C'est vrai pour un simulateur parfait comme pour une somme.</p>
+<p>La parade tient dans une phrase : <b>comparer aux plateaux rencontrés au même tour, dans les parties précédentes</b>. HDT fige à chaque
+combat le plateau de l'adversaire, avec tous ses tags. Les garder en local donne, après quelques parties, une vingtaine de plateaux réels
+par tour, ceux des lobbies d'Ali. Cette référence est fraîche à chaque tour, et c'est l'option D3.</p>
+<details>
+  <summary>Preuve : la mesure, sa commande et sa sortie</summary>
+  <p>Le script lit les seules lignes que le plugin écrit lui-même dans le journal d'HDT
+  (<code>opponent power scope=next … turn=T seen=S</code>), garde la dernière par tour et par partie, et n'imprime que des comptes,
+  jamais un nom. Les journaux restent sur la machine, rien n'entre dans le dépôt.</p>
+  <pre>$ python3 -I next_seen.py '…/HearthstoneDeckTracker/Logs/hdt_log*.txt'
+files 33, log lines 653, games 31, shop rounds 341, with a known next-opponent board 121 (35%)
+by turn (known/rounds): t1 0/27, t2 0/26, t3 0/26, t4 0/26, t5 0/26, t6 0/26, t7 1/25, t8 22/25, t9 21/24, t10 20/23,
+  t11 19/23, t12 14/19, t13 10/16, t14 5/10, t15 5/9, t16 2/6, t17 1/3, t18 1/1
+age of the board seen, in turns: [(1, 6), (2, 3), (3, 13), (4, 19), (5, 12), (6, 9), (7, 50), (8, 3), (9, 5), (11, 1)]</pre>
+  <p>Témoin du champ lu : une ligne réelle porte <code>turn=8 seen=1 board=6 (1 minions)</code>, soit au tour 8 un plateau d'un sbire
+  vu au tour 1. Limites : une seule personne, un seul niveau de jeu, et la ligne n'est écrite que lorsqu'elle change (d'où la dernière
+  par tour).</p>
+</details>
+
+<h3>A. Lire le résultat de Bob's Buddy dans HDT</h3>
+<p><b>Possible, mais seulement par l'interne d'HDT, en combat, après que le plateau est joué, et HDT l'affiche déjà.</b></p>
+<div class="figscroll"><svg viewBox="0 0 900 360" role="img" aria-label="Option A : HDT lance Bob's Buddy au début du combat, range le résultat dans un type internal et l'affiche dans son panneau ; le plugin ne l'atteindrait que par réflexion, ou par FindName non éprouvé ; aucun événement public n'existe">
+  <rect x="8" y="20" width="884" height="200" rx="12" style="fill:var(--hdt);fill-opacity:.07;stroke:var(--hdt);stroke-width:1.5"/>
+  <text x="24" y="44" font-size="15" font-weight="700" style="fill:var(--hdt)">HDT (son processus, son code)</text>
+  <rect x="24" y="64" width="180" height="70" rx="8" style="fill:var(--surface);stroke:var(--border)"/>
+  <text x="114" y="92" text-anchor="middle" font-size="14" font-weight="700">début du combat</text>
+  <text x="114" y="112" text-anchor="middle" font-size="13" class="sub">tag 2022 : 1 → 0</text>
+  <rect x="236" y="64" width="210" height="70" rx="8" style="fill:var(--surface);stroke:var(--border)"/>
+  <text x="341" y="88" text-anchor="middle" font-size="14" font-weight="700" class="mono">BobsBuddyInvoker</text>
+  <text x="341" y="107" text-anchor="middle" font-size="13" class="sub">internal · 10 000 combats</text>
+  <text x="341" y="124" text-anchor="middle" font-size="13" class="sub">186 ms médians</text>
+  <rect x="478" y="64" width="190" height="70" rx="8" style="fill:var(--surface);stroke:var(--bad);stroke-width:2"/>
+  <text x="573" y="88" text-anchor="middle" font-size="14" font-weight="700" class="mono">.Output</text>
+  <text x="573" y="107" text-anchor="middle" font-size="13" class="sub">taux, létaux, dégâts</text>
+  <text x="573" y="124" text-anchor="middle" font-size="13" style="fill:var(--bad)">dans un type internal</text>
+  <rect x="700" y="64" width="180" height="70" rx="8" style="fill:var(--surface);stroke:var(--amber);stroke-width:2"/>
+  <text x="790" y="88" text-anchor="middle" font-size="14" font-weight="700" class="mono">BobsBuddyPanel</text>
+  <text x="790" y="107" text-anchor="middle" font-size="13" class="sub">public, champ internal</text>
+  <text x="790" y="124" text-anchor="middle" font-size="13" class="sub">chaînes arrondies</text>
+  <path d="M 204,99 L 230,99" style="stroke:var(--muted);stroke-width:2"/><path d="M 446,99 L 472,99" style="stroke:var(--muted);stroke-width:2"/><path d="M 668,99 L 694,99" style="stroke:var(--muted);stroke-width:2"/>
+  <rect x="24" y="150" width="446" height="56" rx="8" style="fill:var(--surface);stroke:var(--good);stroke-width:1.5;stroke-dasharray:6 4"/>
+  <text x="40" y="173" font-size="14"><tspan font-weight="700" class="mono">GameEvents</tspan> : aucun événement Bob's Buddy</text>
+  <text x="40" y="194" font-size="13" style="fill:var(--good)" font-weight="700">à proposer à HearthSim : un résultat public dans l'API</text>
+
+  <rect x="340" y="262" width="250" height="46" rx="10" style="fill:var(--accent);fill-opacity:.12;stroke:var(--accent);stroke-width:2"/>
+  <text x="465" y="290" text-anchor="middle" font-size="15" font-weight="700">Tavern Compass</text>
+  <path d="M 520,262 C 540,220 565,180 573,138" style="stroke:var(--bad);stroke-width:2;stroke-dasharray:6 4;fill:none"/>
+  <text x="510" y="250" text-anchor="end" font-size="13" font-weight="700" style="fill:var(--bad)">réflexion : casse sans prévenir</text>
+  <path d="M 590,290 C 720,290 790,230 790,138" style="stroke:var(--amber);stroke-width:2;stroke-dasharray:6 4;fill:none"/>
+  <text x="620" y="330" font-size="13" font-weight="700" style="fill:var(--amber)">FindName : déduit, jamais lancé</text>
+  <text x="24" y="346" font-size="13"><tspan font-weight="700">quand</tspan> : taverne ▸ combat : simulation, puis résultat ; le plateau est déjà joué</text>
+</svg></div>
+<p>Le résultat vit dans <code>BobsBuddyInvoker.Output</code>, une classe <code>internal</code>. <code>GameEvents</code> n'a aucun événement
+Bob's Buddy. Le panneau <code>BobsBuddyPanel</code> est public, mais le champ qui le porte ne l'est pas. On ne l'atteindrait que par
+réflexion, ou peut-être par <code>FindName("BobsBuddyDisplay")</code>, déduit du XAML et jamais lancé. Ce n'est pas la mémoire du jeu, mais
+ce n'est plus « ce qu'HDT expose », la règle que le plugin tient depuis sa première ligne.</p>
+<p>Le gain, lui, est nul pour Ali : le chiffre arrive au début du combat, quand le plateau ne peut plus changer, et HDT l'affiche déjà. Or
+Ali refuse de dupliquer ce que le jeu ou HDT montrent. <b>La voie propre</b>, si un jour on en a l'usage : proposer à HearthSim d'exposer le
+résultat dans l'API, par une issue ou une PR sur le GitHub d'HDT. C'est la règle du projet, proposer plutôt que contourner, et cela tient
+dans la même lettre que l'option B.</p>
+<details>
+  <summary>Preuve : où vit le résultat, et avec quel accès (noms et signatures seulement)</summary>
+  <div class="scroll"><table>
+    <thead><tr><th>Membre</th><th>Accès</th></tr></thead>
+    <tbody>
+      <tr><td><code>Hearthstone_Deck_Tracker.BobsBuddy.BobsBuddyInvoker</code></td><td><b>internal</b></td></tr>
+      <tr><td><code>static BobsBuddyInvoker GetInstance(Guid gameId, int turn, bool createInstanceIfNoneFound = true)</code></td><td>public dans un type internal</td></tr>
+      <tr><td><code>Output? Output { get; private set; }</code>, <code>ErrorState</code>, <code>State</code></td><td>public dans un type internal</td></tr>
+      <tr><td><code>OverlayWindow.BobsBuddyDisplay</code> (<code>BobsBuddyPanel</code>)</td><td><b>internal</b> (nom XAML)</td></tr>
+      <tr><td><code>BobsBuddyPanel.WinRateDisplay</code>, <code>LossRateDisplay</code>, <code>PlayerLethalDisplay</code>… (<code>string?</code>), <code>PropertyChanged</code></td><td>public</td></tr>
+      <tr><td><code>GameEvents</code></td><td>aucun membre Bob's Buddy, combat ni simulation</td></tr>
+    </tbody>
+  </table></div>
+  <p>Le déclencheur est un seul appel au simulateur dans tout HDT, au passage du tag 2022 de 1 à 0. L'option
+  <code>ShowBobsBuddyDuringShopping</code> ne fait que montrer le dernier résultat pendant la taverne, elle ne lance rien.</p>
+</details>
+
+<h3>B. Appeler Bob's Buddy nous-mêmes, en taverne</h3>
+<p><b>Techniquement ouvert : le point d'entrée et tout le modèle d'entrée et de sortie sont publics.</b> Ce qui manque, c'est la conversion
+des entités d'HDT, qu'il faut réécrire, et surtout un droit écrit d'appeler la DLL.</p>
+<div class="figscroll"><svg viewBox="0 0 900 380" role="img" aria-label="Option B : en taverne, le plugin convertit notre plateau et un plateau de référence en Input, appelle SimulationRunner de la copie de BobsBuddy.dll livrée avec HDT, et reçoit un Output qui devient un WarbandComparison dans l'encart ; la conversion est à écrire, l'accord de HearthSim à demander">
+  <rect x="8" y="20" width="884" height="270" rx="12" style="fill:var(--soft);stroke:var(--border)"/>
+  <text x="24" y="44" font-size="14" class="sub">tout se passe dans le processus d'HDT, en taverne</text>
+  <rect x="24" y="60" width="220" height="92" rx="8" style="fill:var(--accent);fill-opacity:.10;stroke:var(--accent);stroke-width:1.5"/>
+  <text x="134" y="82" text-anchor="middle" font-size="14" font-weight="700">notre plateau</text>
+  <text x="134" y="102" text-anchor="middle" font-size="13" class="sub">entités d'HDT, tous les tags :</text>
+  <text x="134" y="120" text-anchor="middle" font-size="13" class="sub">sbires, enchantements, trinkets,</text>
+  <text x="134" y="138" text-anchor="middle" font-size="13" class="sub">pouvoir, quêtes, compteurs</text>
+  <rect x="24" y="168" width="220" height="104" rx="8" style="fill:var(--hdt);fill-opacity:.10;stroke:var(--hdt);stroke-width:1.5"/>
+  <text x="134" y="190" text-anchor="middle" font-size="14" font-weight="700">plateau de référence</text>
+  <text x="134" y="210" text-anchor="middle" font-size="13" class="sub">instantané d'HDT, sbires seuls :</text>
+  <text x="134" y="228" text-anchor="middle" font-size="13" class="sub">prochain adversaire (35 %, vieux)</text>
+  <text x="134" y="246" text-anchor="middle" font-size="13" class="sub">ou bibliothèque du même tour</text>
+  <text x="134" y="264" text-anchor="middle" font-size="12" class="sub mono">GetBattlegroundsBoardStateFor</text>
+  <rect x="284" y="100" width="200" height="130" rx="8" style="fill:var(--surface);stroke:var(--accent);stroke-width:2;stroke-dasharray:7 4"/>
+  <text x="384" y="126" text-anchor="middle" font-size="14" font-weight="700">conversion → Input</text>
+  <text x="384" y="148" text-anchor="middle" font-size="13" style="fill:var(--accent)" font-weight="700">à écrire nous-mêmes</text>
+  <text x="384" y="170" text-anchor="middle" font-size="13" class="sub">celle d'HDT est private :</text>
+  <text x="384" y="188" text-anchor="middle" font-size="12" class="sub mono">SetupInputPlayer</text>
+  <text x="384" y="206" text-anchor="middle" font-size="12" class="sub mono">BobsBuddyUtils (internal)</text>
+  <rect x="524" y="100" width="200" height="130" rx="8" style="fill:var(--hdt);fill-opacity:.10;stroke:var(--hdt);stroke-width:2"/>
+  <text x="624" y="124" text-anchor="middle" font-size="14" font-weight="700">BobsBuddy.dll</text>
+  <text x="624" y="144" text-anchor="middle" font-size="13" class="sub">la copie d'HDT, jamais copiée</text>
+  <text x="624" y="166" text-anchor="middle" font-size="12" class="mono">SimulationRunner</text>
+  <text x="624" y="184" text-anchor="middle" font-size="12" class="mono">.SimulateMultiThreaded</text>
+  <rect x="566" y="198" width="116" height="24" rx="12" style="fill:var(--amber)"/>
+  <text x="624" y="215" text-anchor="middle" font-size="13" font-weight="700" style="fill:#16131f">accord HearthSim</text>
+  <rect x="756" y="100" width="124" height="130" rx="8" style="fill:var(--accent);fill-opacity:.10;stroke:var(--accent);stroke-width:1.5"/>
+  <text x="818" y="124" text-anchor="middle" font-size="13" font-weight="700" class="mono">Output</text>
+  <text x="818" y="144" text-anchor="middle" font-size="12" class="sub">winRate, lossRate</text>
+  <text x="818" y="162" text-anchor="middle" font-size="12" class="sub">myDeathRate…</text>
+  <text x="818" y="186" text-anchor="middle" font-size="12">→ Warband-</text>
+  <text x="818" y="202" text-anchor="middle" font-size="12">Comparison</text>
+  <text x="818" y="220" text-anchor="middle" font-size="12">→ encart</text>
+  <path d="M 244,106 L 278,140" style="stroke:var(--muted);stroke-width:2"/><path d="M 244,220 L 278,190" style="stroke:var(--muted);stroke-width:2"/>
+  <path d="M 484,165 L 518,165" style="stroke:var(--muted);stroke-width:2"/><path d="M 724,165 L 750,165" style="stroke:var(--muted);stroke-width:2"/>
+
+  <text x="24" y="318" font-size="14" font-weight="700">quand</text>
+  <rect x="90" y="304" width="560" height="22" rx="4" style="fill:var(--accent);fill-opacity:.14"/>
+  <text x="100" y="320" font-size="13">taverne : après chaque changement du plateau, avec un délai, quand on peut encore agir</text>
+  <rect x="654" y="304" width="226" height="22" rx="4" style="fill:var(--hdt);fill-opacity:.14"/>
+  <text x="664" y="320" font-size="13">combat : celle d'HDT, déjà</text>
+  <text x="24" y="356" font-size="13" class="sub">Côté adversaire, l'instantané n'a ni trinkets, ni pouvoir, ni enchantements attachés : la simulation le sous-estime.</text>
+</svg></div>
+<p><code>SimulationRunner.SimulateMultiThreaded</code>, <code>Simulator.SimulateForInput</code>, <code>Input</code>, <code>Player</code>,
+<code>Minion</code> et <code>Output</code> sont publics. Le code ne vérifie ni l'appelant ni une licence. Le plugin référencerait la DLL de
+l'installation d'HDT sans jamais la copier, comme il le fait déjà de <code>HSReplay.dll</code> (<code>Private=false</code>). Le prix
+est la conversion : celle d'HDT, <code>SetupInputPlayer</code> (344 lignes décompilées) et les utilitaires internal de
+<code>BobsBuddyUtils</code>, sont privés. Il faut l'écrire sans la copier : sbires et mots-clés, enchantements, jusqu'à deux pouvoirs avec
+leurs données, trinkets, quêtes, objectifs, main, et une quarantaine de compteurs de partie. Cette conversion se suit ensuite à chaque
+version, puisque Bob's Buddy sort hors du cycle d'HDT.</p>
+<p>Le temps, lui, est déjà mesuré chez HDT : 186 ms médians pour 10 000 combats sur dix fils, 408 ms au 90<sup>e</sup> centile. En taverne,
+il suffit d'une simulation par changement du plateau, après un délai. Ce qu'elle coûte pendant que le jeu tourne n'a pas été mesuré.</p>
+<p><b>Le blocage est la licence.</b> La DLL est fermée et sans sources. Elle affiche « Copyright © HearthSim » et n'est accompagnée
+d'aucun texte de licence. Le dépôt d'HDT, lui, n'est pas sous MIT : son README dit « All Rights Reserved », et son fichier LICENSE a été
+supprimé en 2015. Rien n'autorise un tiers à appeler la DLL, rien ne l'interdit nommément. Le projet a déjà demandé, et obtenu, l'accord de
+l'auteur de Firestone et celui du propriétaire de nomi.gg. Demander celui de HearthSim est la même démarche, et c'est la décision d'Ali
+(section 7).</p>
+<details>
+  <summary>Preuve : le modèle public, la durée, la licence (noms, signatures et attributs seulement)</summary>
+  <pre>BobsBuddy.Simulation (BobsBuddy.dll 1.90.0, netstandard2.0)
+  public class SimulationRunner
+    Task&lt;Output&gt; SimulateMultiThreaded(Input input, int maxIterations, int threadCount, int maxDuration = 1500)
+  public class Simulator
+    Output SimulateForInput(Input input, int iterations, int maxDuration = 1500)
+    MinionFactory, TrinketFactory, AnomalyFactory, EnchantmentFactory…   (public readonly)
+  public class Input    Anomaly, isDuos, DamageCap, turn, availableRaces, Player, Opponent (+ coéquipiers en duos)
+  public class Player   Side, HeroPowers, Quests, Objectives, Trinkets, Secrets, Hand, Health, DamageTaken, Tier,
+                        AddHeroPower(string heroPowerCardId, bool friendly, bool isActivated, int data = 0, …)
+  public class Output   damageResults, winRate, tieRate, lossRate, avDamage, medianDamage,
+                        myDeathRate, theirDeathRate, simulationCount, myExitCondition
+[assembly: InternalsVisibleTo("BobsBuddy.Test")], [assembly: InternalsVisibleTo("BobsBuddy.Benchmark")]
+recherche GetCallingAssembly|GetEntryAssembly|licen dans le code décompilé : aucune ligne
+
+Côté HDT (privé ou internal, donc à réécrire) :
+  private void SetupInputPlayer(Simulator simulator, …Player gamePlayer, …Player inputPlayer, Entity? playerEntity, bool friendly, bool isTeammate = false)
+  internal static class BobsBuddyUtils   GetMinionFromEntity, GetTrinketFromEntity, GetObjectiveFromEntity, WasHeroPowerActivated
+
+Journaux d'HDT, 2 au 11 octobre :
+  runs: 699 · exit: CompletedSimulations 699 · duration ms: min 21 median 186 p90 408 max 2995 · iterations 10000
+  ThreadCount=10 (la moitié des processeurs logiques) · 36 relances dans un même combat
+
+Licence :
+  AssemblyCompany("HearthSim") · AssemblyCopyright("Copyright © HearthSim 2023") · AssemblyVersion 1.90.0.0
+  BobsBuddy.zip (libs.hearthsim.net) : les deux DLL, aucun fichier de licence · NuGet « BobsBuddy » : 0 · GitHub HearthSim/BobsBuddy : 404
+  HDT : README « Copyright © HearthSim. All Rights Reserved. » (2021, 2026-09, 2026-10) · LICENSE créé le 2015-09-11, supprimé le 2015-09-12
+  licences des tiers embarquées par HDT : aucune entrée BobsBuddy</pre>
+  <p>Plateaux adverses : <code>GameV2.GetBattlegroundsBoardStateFor(int id)</code> est public. Il prend un identifiant d'<b>entité</b>
+  et rend un <code>BoardSnapshot</code> (<code>Entity[] Entities</code>, <code>int Turn</code>). HDT n'en prend un qu'au début d'un
+  combat, n'y range que les sbires de l'adversaire, sans le héros, et ne garde que le dernier par <code>PLAYER_ID</code>. Les trinkets et
+  pouvoirs adverses, HDT ne les lit qu'en direct, pendant le combat.</p>
+</details>
+
+<h3>C. Le simulateur de Firestone</h3>
+<p><b>Même gain que B, plus de travail, et la porte s'est fermée le 28 septembre.</b></p>
+<div class="figscroll"><svg viewBox="0 0 900 230" role="img" aria-label="Option C : le plugin net48 devrait embarquer Node, 87 Mio, ou un moteur JavaScript, pour faire tourner le simulateur de Firestone, sous licence All rights reserved et sans source, qui télécharge la base des cartes au démarrage">
+  <rect x="16" y="60" width="170" height="80" rx="8" style="fill:var(--accent);fill-opacity:.12;stroke:var(--accent);stroke-width:1.5"/>
+  <text x="101" y="94" text-anchor="middle" font-size="14" font-weight="700">Tavern Compass</text>
+  <text x="101" y="114" text-anchor="middle" font-size="13" class="sub">net48, dans HDT</text>
+  <rect x="222" y="30" width="230" height="64" rx="8" style="fill:var(--surface);stroke:var(--amber);stroke-width:2"/>
+  <text x="337" y="56" text-anchor="middle" font-size="14" font-weight="700">node.exe à embarquer</text>
+  <text x="337" y="76" text-anchor="middle" font-size="13" class="sub">87 Mio ; absent sous Windows</text>
+  <rect x="222" y="106" width="230" height="64" rx="8" style="fill:var(--surface);stroke:var(--amber);stroke-width:2"/>
+  <text x="337" y="132" text-anchor="middle" font-size="14" font-weight="700">ou Jint / ClearScript V8</text>
+  <text x="337" y="152" text-anchor="middle" font-size="13" class="sub">jamais essayé sur ce code</text>
+  <rect x="488" y="60" width="220" height="80" rx="8" style="fill:var(--teal);fill-opacity:.10;stroke:var(--bad);stroke-width:2.5"/>
+  <text x="598" y="86" text-anchor="middle" font-size="13" font-weight="700" class="mono">simulate-bgs-battle</text>
+  <text x="598" y="106" text-anchor="middle" font-size="13" style="fill:var(--bad)" font-weight="700">« All rights reserved »</text>
+  <text x="598" y="126" text-anchor="middle" font-size="13" class="sub">1.1.770 · aucune source</text>
+  <rect x="744" y="60" width="140" height="80" rx="8" style="fill:var(--surface);stroke:var(--border)"/>
+  <text x="814" y="86" text-anchor="middle" font-size="13" font-weight="700">base des cartes</text>
+  <text x="814" y="106" text-anchor="middle" font-size="12" class="sub">téléchargée au</text>
+  <text x="814" y="122" text-anchor="middle" font-size="12" class="sub">démarrage</text>
+  <path d="M 186,90 L 216,64" style="stroke:var(--muted);stroke-width:2"/><path d="M 186,110 L 216,136" style="stroke:var(--muted);stroke-width:2"/>
+  <path d="M 452,62 L 482,90" style="stroke:var(--muted);stroke-width:2"/><path d="M 452,138 L 482,110" style="stroke:var(--muted);stroke-width:2"/>
+  <path d="M 708,100 L 738,100" style="stroke:var(--muted);stroke-width:2"/>
+  <text x="16" y="200" font-size="13" class="sub">Entrée : BgsBattleInfo (deux plateaux, ≈ 60 compteurs par joueur). Sortie : wonPercent, lostLethalPercent…</text>
+  <text x="16" y="220" font-size="13" class="sub">Durée : seule la borne du code est connue (8 000 combats, 8 000 ms au plus).</text>
+</svg></div>
+<p>L'étude de stack l'avait vu sous MIT, à la version 1.1.759. Depuis la 1.1.761 du 28 septembre, il est en « All rights reserved », sans
+fichier de licence ni dépôt source public. Il tourne chez Firestone comme une fonction Lambda. Pour l'appeler depuis un plugin
+<code>net48</code>, il faudrait embarquer Node (87 Mio, absent de la machine Windows) ou un moteur JavaScript jamais essayé sur ce code.
+La conversion des entités, elle, serait la même qu'en B, vers un autre format.</p>
+<p>La décision du projet sur ce simulateur, « usage personnel, autorisé », date d'avant ce changement, et le dépôt est public. L'accord de l'auteur de Firestone
+couvre « toutes ses données publiques » ; s'il couvre le code du simulateur sous sa nouvelle licence est une question pour Ali, pas pour
+cette étude. <b>Conclusion : ce n'est qu'un repli</b>, à rouvrir seulement si HearthSim refuse et que l'auteur de Firestone accepte.</p>
+<details>
+  <summary>Preuve : licence, cadence, environnement</summary>
+  <pre>$ npm view @firestone-hs/simulate-bgs-battle version license repository
+version = '1.1.770' · license = 'All rights reserved' · repository = {}
+1.1.759 MIT (2026-09-25) · 1.1.760 absente du registre · 1.1.761 All rights reserved (2026-09-28)
+archive : aucun fichier LICENSE · github.com/Zero-to-Heroes/simulate-bgs-battle : 404
+README : déploiement « sam deploy … SimulateBgsBattleStack » (AWS Lambda)
+node.exe v24.14.0 win-x64 : 91 380 224 octets · Node sous Windows : « 'node' n'est pas reconnu »
+jint 4.17.0 (BSD-2-Clause, net462) · microsoft.clearscript.v8 7.5.1.1 (+ natif win-x64, nupkg 11 Mo)</pre>
+</details>
+
+<h3>D. Des estimations, sans nouvelles règles</h3>
+<p><b>Trois estimations ne demandent rien à personne. Une seule tient sa promesse, D3, et elle tient surtout comme socle pour B.</b></p>
+<div class="figscroll"><svg viewBox="0 0 900 330" role="img" aria-label="Trois estimations sans règles : D1 projette un plateau vieux de six tours, ce qui revient à deviner ; D2 pondère les mots-clés avec des poids à étalonner ; D3 range notre somme parmi les plateaux rencontrés au même tour, exemple inventé">
+  <rect x="8" y="12" width="284" height="300" rx="10" style="fill:var(--surface);stroke:var(--border)"/>
+  <text x="22" y="38" font-size="15" font-weight="700">D1 · face-à-face</text>
+  <text x="22" y="58" font-size="13" class="sub">exemple : somme contre somme projetée</text>
+  <rect x="40" y="110" width="56" height="150" style="fill:var(--accent)"/><text x="68" y="278" text-anchor="middle" font-size="13">toi, t8</text>
+  <text x="68" y="104" text-anchor="middle" font-size="14" font-weight="700">190</text>
+  <rect x="126" y="254" width="56" height="6" style="fill:var(--hdt)"/><text x="154" y="278" text-anchor="middle" font-size="13">lui, vu t1</text>
+  <text x="154" y="246" text-anchor="middle" font-size="14" font-weight="700">6</text>
+  <rect x="212" y="110" width="56" height="150" style="fill:none;stroke:var(--hdt);stroke-width:2;stroke-dasharray:5 4"/>
+  <text x="240" y="196" text-anchor="middle" font-size="34" font-weight="800" style="fill:var(--hdt)">?</text>
+  <text x="240" y="278" text-anchor="middle" font-size="13">lui, t8 ?</text>
+  <path d="M 182,250 C 196,220 200,170 208,150" class="line"/>
+  <text x="22" y="300" font-size="13" class="sub">projeter 6 tours de croissance : deviner</text>
+
+  <rect x="307" y="12" width="284" height="300" rx="10" style="fill:var(--surface);stroke:var(--border)"/>
+  <text x="321" y="38" font-size="15" font-weight="700">D2 · somme pondérée</text>
+  <text x="321" y="58" font-size="13" class="sub">un poids par mot-clé lu dans les tags</text>
+  <g font-size="14">
+    <rect x="325" y="78" width="250" height="34" rx="17" style="fill:var(--soft);stroke:var(--border)"/><text x="341" y="100">5/5</text><text x="560" y="100" text-anchor="end" font-weight="700">× 1</text>
+    <rect x="325" y="120" width="250" height="34" rx="17" style="fill:var(--soft);stroke:var(--border)"/><text x="341" y="142">4/4 bouclier divin</text><text x="560" y="142" text-anchor="end" font-weight="700" style="fill:var(--amber)">× ?</text>
+    <rect x="325" y="162" width="250" height="34" rx="17" style="fill:var(--soft);stroke:var(--border)"/><text x="341" y="184">1/1 venimeux</text><text x="560" y="184" text-anchor="end" font-weight="700" style="fill:var(--amber)">+ ?</text>
+    <rect x="325" y="204" width="250" height="34" rx="17" style="fill:var(--soft);stroke:var(--border)"/><text x="341" y="226">3/2 râle d'agonie</text><text x="560" y="226" text-anchor="end" font-weight="700" style="fill:var(--bad)">selon la carte</text>
+  </g>
+  <text x="321" y="266" font-size="13" class="sub">poids : à étalonner, sinon arbitraires</text>
+  <text x="321" y="284" font-size="13" class="sub">168 sbires du pool sur 303 n'ont aucun</text>
+  <text x="321" y="300" font-size="13" class="sub">mot-clé : leur effet est dans leur texte</text>
+
+  <rect x="606" y="12" width="286" height="300" rx="10" style="fill:var(--surface);stroke:var(--accent);stroke-width:2"/>
+  <text x="620" y="38" font-size="15" font-weight="700">D3 · plateaux rencontrés</text>
+  <text x="620" y="58" font-size="13" class="sub">notre somme parmi ceux du même tour</text>
+  <line x1="626" y1="200" x2="872" y2="200" style="stroke:var(--muted)"/>
+  <g style="fill:var(--hdt)">
+    <circle cx="640" cy="190" r="5"/><circle cx="652" cy="190" r="5"/><circle cx="664" cy="190" r="5"/><circle cx="664" cy="178" r="5"/><circle cx="678" cy="190" r="5"/>
+    <circle cx="690" cy="190" r="5"/><circle cx="690" cy="178" r="5"/><circle cx="702" cy="190" r="5"/><circle cx="714" cy="190" r="5"/><circle cx="714" cy="178" r="5"/>
+    <circle cx="714" cy="166" r="5"/><circle cx="728" cy="190" r="5"/><circle cx="740" cy="190" r="5"/><circle cx="740" cy="178" r="5"/><circle cx="754" cy="190" r="5"/>
+    <circle cx="766" cy="190" r="5"/><circle cx="778" cy="190" r="5"/><circle cx="804" cy="190" r="5"/><circle cx="804" cy="178" r="5"/><circle cx="818" cy="190" r="5"/>
+    <circle cx="830" cy="190" r="5"/><circle cx="846" cy="190" r="5"/><circle cx="860" cy="190" r="5"/>
+  </g>
+  <path d="M 791,212 L 791,150" style="stroke:var(--accent);stroke-width:3"/>
+  <text x="791" y="142" text-anchor="middle" font-size="14" font-weight="700" style="fill:var(--accent)">toi</text>
+  <text x="626" y="222" font-size="13" class="sub">somme ATK + PV au tour 8 →</text>
+  <text x="620" y="256" font-size="14" font-weight="700">« bat 17 des 23 plateaux</text>
+  <text x="620" y="274" font-size="14" font-weight="700">rencontrés au tour 8 »</text>
+  <text x="620" y="300" font-size="13" class="sub">exemple inventé</text>
+</svg></div>
+<ul class="plain">
+  <li><b>D1, le face-à-face par les sommes</b>, est déjà là en partie : l'encart montre les deux sommes, chacune contre son héros. Les
+  mettre face à face demande de projeter le plateau adverse jusqu'au tour présent, en suivant la courbe de son héros. Avec un plateau qui
+  a 6 tours en médiane, c'est deviner. Coût ≈ 1 jour, gain quasi nul : <span class="ko">non</span>.</li>
+  <li><b>D2, la somme pondérée par les mots-clés</b> : lire dans les tags le bouclier divin, la réincarnation, le venin, la furie des
+  vents ou la provocation, et leur donner un poids. C'est petit (1 à 2 jours) et cela corrige les écarts grossiers. Mais les poids sont
+  arbitraires tant qu'on ne les a pas étalonnés. Le râle d'agonie, le ralliement ou le début de combat dépendent chacun de la carte. Et la
+  référence de Firestone reste une somme brute. <b>Ce que D2 vaudrait, étalonnée</b> : chaque mot-clé converti en « stats équivalentes »,
+  mesuré sur les simulations que HDT écrit déjà dans son journal (les sbires avec leurs mots-clés, puis le taux obtenu ; 699 entre le 2 et
+  le 11 octobre). Ce n'est pas essayé : <span class="warn">repli seulement</span>.</li>
+  <li><b>D3, la bibliothèque des plateaux rencontrés</b> : à chaque combat, le plugin garde en local le plateau qu'HDT vient de figer, avec
+  tous les tags des sbires, le tour et le héros, sans aucun nom. Seule, elle range notre somme parmi les plateaux vus au même tour dans les
+  lobbies d'Ali. C'est la même mesure, avec une autre référence : un gain modeste. Mais c'est <b>la référence fraîche</b> dont B et D2
+  ont besoin, et elle se remplit en jouant : <span class="ok">oui, d'abord</span>.</li>
+</ul>
+<p>Les plateaux finaux de Firestone ne peuvent pas servir de référence : le cache n'en garde que les identifiants de cartes, sans attaque,
+sans PV ni mots-clés. Ce sont aussi des plateaux de fin de partie.</p>
+<details>
+  <summary>Preuve : mots-clés du pool, plateaux finaux en cache</summary>
+  <pre>HearthDb, 303 sbires du pool, tags mécaniques nommés :
+DEATHRATTLE=51 | BATTLECRY=47 | BACON_RALLY=26 | END_OF_TURN_TRIGGER=23 | DIVINE_SHIELD=18 | AURA=16 | START_OF_COMBAT=12 |
+BACON_SPELLCRAFT_ID=11 | TAUNT=10 | MODULAR=9 | CHOOSE_ONE=7 | REBORN=6 | AVENGE=6 | WINDFURY=3 | VENOMOUS=2 | STEALTH=1
+pool minions with &gt;=1 Card.Mechanics: 135 ; with none: 168 ; with non-empty Text: 303
+TRIGGER_VISUAL : 101 sbires · TAG_SCRIPT_DATA_NUM_1 : 147 sbires · 40 tags sans nom dans l'énumération
+
+src/BronzebeardHud.Stats/FirestoneCompImporter.cs:196-205  FsMinion { cardID, tags { ZONE_POSITION } }   (seuls champs lus)
+src/BronzebeardHud.Stats/CompositionFile.cs:259-264        cache local : {mmr, turn, cards: 1 à 7 ids}</pre>
+  <p>Un mot-clé donné en partie (un bouclier divin venu d'un don sombre, par exemple) se lit sur l'entité au moment voulu : le tag
+  <code>DIVINE_SHIELD</code> du sbire dit l'état, quelle qu'en soit la source. Ce que l'enchantement fait <b>pendant</b> le combat, en
+  revanche, ne se lit nulle part : c'est le travail d'un simulateur.</p>
+</details>
+
+<h2>5. Le chemin recommandé, par étapes</h2>
+<p><b>D'abord une lettre et une référence, puis la simulation si l'accord vient.</b> Chaque étape se tient seule, et aucune ne touche à la
+jauge actuelle.</p>
+<div class="figscroll"><svg viewBox="0 0 900 330" role="img" aria-label="Escalier des étapes : étape 0, Ali écrit à HearthSim ; étape 1, la bibliothèque des plateaux, 1 à 2 jours ; étape 2, Bob's Buddy en taverne, 5 à 8 jours si l'accord vient ; en cas de refus, la somme pondérée étalonnée, 3 à 5 jours">
+  <rect x="16" y="196" width="200" height="98" rx="10" style="fill:var(--amber);fill-opacity:.16;stroke:var(--amber);stroke-width:2"/>
+  <text x="30" y="220" font-size="13" font-weight="700" style="fill:var(--amber)">ÉTAPE 0 · Ali</text>
+  <text x="30" y="242" font-size="15" font-weight="700">écrire à HearthSim</text>
+  <text x="30" y="262" font-size="13" class="sub">accord + API proposée</text>
+  <text x="30" y="278" font-size="13" class="sub">un message</text>
+  <rect x="246" y="136" width="200" height="98" rx="10" style="fill:var(--accent);fill-opacity:.14;stroke:var(--accent);stroke-width:2"/>
+  <text x="260" y="160" font-size="13" font-weight="700" style="fill:var(--accent)">ÉTAPE 1 · en parallèle</text>
+  <text x="260" y="182" font-size="15" font-weight="700">bibliothèque D3</text>
+  <text x="260" y="202" font-size="13" class="sub">1–2 j, rien à demander</text>
+  <text x="260" y="218" font-size="13" class="sub">se remplit en jouant</text>
+  <rect x="476" y="76" width="200" height="98" rx="10" style="fill:var(--accent);fill-opacity:.24;stroke:var(--accent);stroke-width:2.5"/>
+  <text x="490" y="100" font-size="13" font-weight="700" style="fill:var(--accent)">ÉTAPE 2 · si accord</text>
+  <text x="490" y="122" font-size="15" font-weight="700">Bob's Buddy en taverne</text>
+  <text x="490" y="142" font-size="13" class="sub">5–8 j, puis le suivi</text>
+  <text x="490" y="158" font-size="13" class="sub">contre la bibliothèque</text>
+  <rect x="690" y="222" width="194" height="96" rx="10" style="fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:7 4"/>
+  <text x="704" y="246" font-size="13" font-weight="700" class="sub">REPLI · si refus</text>
+  <text x="704" y="268" font-size="15" font-weight="700">D2 étalonnée</text>
+  <text x="704" y="288" font-size="13" class="sub">3–5 j, contre la</text>
+  <text x="704" y="303" font-size="13" class="sub">bibliothèque aussi</text>
+  <path d="M 216,220 L 240,190" style="stroke:var(--muted);stroke-width:2"/><path d="M 446,160 L 470,130" style="stroke:var(--muted);stroke-width:2"/>
+  <path d="M 216,262 C 400,300 560,290 684,266" style="stroke:var(--muted);stroke-width:1.5;stroke-dasharray:5 4;fill:none"/>
+  <text x="440" y="304" font-size="13" class="sub">réponse négative</text>
+  <text x="246" y="60" font-size="14" font-weight="700">ce qu'Ali voit</text>
+  <text x="246" y="80" font-size="13" class="sub">1 : « bat k des n plateaux du tour »</text>
+  <text x="246" y="98" font-size="13" class="sub">2 : « victoire x % · létal y % »</text>
+  <text x="700" y="96" font-size="13" class="sub">la jauge actuelle</text>
+  <text x="700" y="112" font-size="13" class="sub">reste telle quelle</text>
+  <text x="700" y="128" font-size="13" class="sub">(31 tests intacts)</text>
+</svg></div>
+<div class="scroll"><table>
+  <thead><tr><th>Étape</th><th>Coût (estimation)</th><th>Ce qu'Ali voit</th><th>Couture dans le code</th></tr></thead>
+  <tbody>
+    <tr><td><b>0</b> · Ali écrit à HearthSim</td><td>un message (issue ou PR sur le GitHub d'HDT, ou contact direct)</td><td>une réponse</td><td>aucune</td></tr>
+    <tr><td><b>1</b> · bibliothèque D3</td><td>1–2 j, puis quelques parties pour la remplir</td><td>une ligne de l'encart : « bat k des n plateaux rencontrés au tour t »,
+    grise tant qu'il y a trop peu de plateaux</td><td><code>HdtEntityAdapter.Snapshot</code> garde l'id et les tags des sbires, plus seulement l'attaque et
+    les PV ; une fonction pure dans <code>BronzebeardHud.Stats</code> range et compare ; un fichier local sous
+    <code>%LocalAppData%\BronzebeardHud\</code>, jamais dans le dépôt, sans aucun nom ; elle rend un <code>WarbandComparison</code></td></tr>
+    <tr><td><b>2</b> · Bob's Buddy en taverne, si accord</td><td>5–8 j, puis un suivi à chaque version d'HDT</td><td>« victoire x % · létal y % contre n plateaux du
+    tour t », recalculé quand le plateau change</td><td>un adaptateur du plugin (<code>net48</code>) écrit l'<code>Input</code> depuis les entités, qui référence
+    <code>BobsBuddy.dll</code> d'HDT avec <code>Private=false</code> ; son garde-fou à lui (<code>FeatureGuard</code>) ; un test de signatures sur la DLL installée,
+    sur le modèle de <code>GameSignatureTests</code> ; le résultat devient un <code>WarbandComparison</code></td></tr>
+    <tr><td><b>2'</b> · repli D2 étalonnée</td><td>3–5 j</td><td>la ligne de l'étape 1, avec la somme corrigée</td><td><code>BoardMinionStats</code>
+    élargi aux mots-clés ; l'étalonnage se fait hors ligne, par un outil sous <code>tools/</code> ; les journaux n'entrent jamais dans le dépôt</td></tr>
+  </tbody>
+</table></div>
+<div class="figscroll"><svg viewBox="0 0 900 300" role="img" aria-label="La couture : HdtEntityAdapter est le seul fichier qui touche HDT ; des fonctions pures produisent un WarbandComparison, que CompsPanel passe à BoardPowerView, qui n'en lit que Power, Percent, Details et Note ; les nouvelles pièces se branchent à côté des deux appels de Plugin.cs">
+  <rect x="16" y="40" width="130" height="150" rx="8" style="fill:var(--hdt);fill-opacity:.10;stroke:var(--hdt);stroke-width:1.5"/>
+  <text x="81" y="66" text-anchor="middle" font-size="14" font-weight="700">HDT</text>
+  <text x="81" y="88" text-anchor="middle" font-size="12" class="sub mono">GameV2</text>
+  <text x="81" y="106" text-anchor="middle" font-size="12" class="sub">entités, tags</text>
+  <text x="81" y="124" text-anchor="middle" font-size="12" class="sub">instantanés</text>
+  <rect x="176" y="40" width="160" height="150" rx="8" style="fill:var(--accent);fill-opacity:.10;stroke:var(--accent);stroke-width:1.5"/>
+  <text x="256" y="66" text-anchor="middle" font-size="13" font-weight="700" class="mono">HdtEntityAdapter</text>
+  <text x="256" y="88" text-anchor="middle" font-size="12" class="sub">le seul fichier qui</text>
+  <text x="256" y="104" text-anchor="middle" font-size="12" class="sub">touche HDT ; lit</text>
+  <text x="256" y="120" text-anchor="middle" font-size="12" class="sub">aujourd'hui (ATK, PV)</text>
+  <text x="256" y="150" text-anchor="middle" font-size="12" style="fill:var(--accent)" font-weight="700">+ id et tags</text>
+  <rect x="366" y="40" width="200" height="150" rx="8" style="fill:var(--surface);stroke:var(--border);stroke-width:1.5"/>
+  <text x="466" y="62" text-anchor="middle" font-size="13" font-weight="700">fonctions pures (Stats)</text>
+  <text x="466" y="84" text-anchor="middle" font-size="12" class="mono">WarbandCurve.Compare</text>
+  <text x="466" y="102" text-anchor="middle" font-size="12" class="mono">OpponentPower.Compare</text>
+  <text x="466" y="130" text-anchor="middle" font-size="12" style="fill:var(--accent)" font-weight="700">+ bibliothèque (étape 1)</text>
+  <text x="466" y="148" text-anchor="middle" font-size="12" style="fill:var(--accent)" font-weight="700">+ résultat simulé (étape 2)</text>
+  <rect x="596" y="40" width="140" height="150" rx="8" style="fill:var(--good);fill-opacity:.10;stroke:var(--good);stroke-width:2"/>
+  <text x="666" y="64" text-anchor="middle" font-size="12" font-weight="700" class="mono">WarbandComparison</text>
+  <text x="666" y="90" text-anchor="middle" font-size="12" class="mono">Power</text>
+  <text x="666" y="108" text-anchor="middle" font-size="12" class="mono">Percent</text>
+  <text x="666" y="126" text-anchor="middle" font-size="12" class="mono">Details</text>
+  <text x="666" y="144" text-anchor="middle" font-size="12" class="mono">Note</text>
+  <text x="666" y="170" text-anchor="middle" font-size="12" class="sub">seuls champs lus</text>
+  <rect x="766" y="40" width="118" height="150" rx="8" style="fill:var(--surface);stroke:var(--border);stroke-width:1.5"/>
+  <text x="825" y="64" text-anchor="middle" font-size="12" font-weight="700" class="mono">CompsPanel</text>
+  <text x="825" y="84" text-anchor="middle" font-size="11" class="mono">.SetPower</text>
+  <text x="825" y="100" text-anchor="middle" font-size="11" class="mono">.SetOpponentPower</text>
+  <text x="825" y="130" text-anchor="middle" font-size="12" font-weight="700" class="mono">BoardPowerView</text>
+  <text x="825" y="150" text-anchor="middle" font-size="12" class="sub">inchangé</text>
+  <path d="M 146,115 L 170,115" style="stroke:var(--muted);stroke-width:2"/><path d="M 336,115 L 360,115" style="stroke:var(--muted);stroke-width:2"/>
+  <path d="M 566,115 L 590,115" style="stroke:var(--muted);stroke-width:2"/><path d="M 736,115 L 760,115" style="stroke:var(--muted);stroke-width:2"/>
+  <rect x="366" y="222" width="200" height="50" rx="8" style="fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4"/>
+  <text x="466" y="244" text-anchor="middle" font-size="12" font-weight="700">adaptateur Input (étape 2)</text>
+  <text x="466" y="262" text-anchor="middle" font-size="12" class="sub">→ BobsBuddy.dll d'HDT</text>
+  <path d="M 466,222 L 466,196" style="stroke:var(--accent);stroke-width:2;stroke-dasharray:4 3"/>
+  <text x="16" y="230" font-size="13" font-weight="700">appels</text>
+  <text x="16" y="250" font-size="12" class="mono">Plugin.cs:1310</text><text x="132" y="250" font-size="12" class="sub">(nous)</text>
+  <text x="16" y="268" font-size="12" class="mono">Plugin.cs:1342-1343</text><text x="170" y="268" font-size="12" class="sub">(lui)</text>
+  <text x="596" y="226" font-size="13" font-weight="700">31 tests, 6 fichiers</text>
+  <text x="596" y="244" font-size="12" class="sub">verrouillent l'existant ; intacts si</text>
+  <text x="596" y="260" font-size="12" class="sub">l'on ajoute une ligne, à revoir si l'on</text>
+  <text x="596" y="276" font-size="12" class="sub">remplace la couleur de la jauge</text>
+</svg></div>
+<p>La couture existe déjà : l'affichage ne lit d'un <code>WarbandComparison</code> que <code>Power</code>, <code>Percent</code>,
+<code>Details</code> et <code>Note</code>. Toute nouvelle estimation n'a donc qu'à en produire un pour s'afficher, sans toucher à
+<code>BoardPowerView</code>. Reste un choix d'affichage, qui revient à Ali : une rangée de plus dans l'encart (la place est à mesurer, ce
+que <code>PanelFitTests</code> verrouille), ou la couleur de notre rangée tirée de la simulation, ce qui reverrait une partie des 31 tests.</p>
+<details>
+  <summary>Preuve : les signatures de la couture, les tests qui verrouillent l'existant</summary>
+  <pre>public static WarbandComparison Compare(int turn, int boardStats, string heroCardId, IReadOnlyList&lt;HeroStatsFile&gt; sources)   WarbandCurve.cs:170
+public static WarbandComparison Compare(OpponentFacts facts, IReadOnlyList&lt;HeroStatsFile&gt; sources, Func&lt;string,string&gt; heroName)   OpponentPower.cs:227
+public WarbandComparison(int turn, int boardStats, double? average, string line, BoardPower power = None, string? details = null, string? percent = null, string? note = null)
+public void SetPower(WarbandComparison? power)            CompsPanel.cs:332
+public void SetOpponentPower(WarbandComparison? opponent) CompsPanel.cs:346
+BoardPowerView.cs ne lit que .Note (17), .Power (46), .Percent (89), .Details (122)
+BoardSeen.Minions et BoardMinionStats : IReadOnlyList&lt;(int Attack, int Health)&gt;   (OpponentPower.cs:15-27, HdtEntityAdapter.cs:162)
+
+[Fact]/[Theory] : WarbandCurveTests 5 · BoardPowerTests 5 · OpponentPowerTests 7 · OpponentBoardsTests 6
+                  CombatOpponentKeeperTests 4 · PowerInsetTests 4   = 31   (PanelFitTests, 7, cite aussi ces types)</pre>
+</details>
+
+<h2>6. Ce qui n'est pas établi</h2>
+<ul class="plain">
+  <li><b>Le droit d'appeler <code>BobsBuddy.dll</code></b> depuis un plugin tiers et public : aucune licence n'a été trouvée, rien ne
+  l'accorde, rien ne l'interdit nommément.</li>
+  <li>Que <code>Core.OverlayWindow.FindName("BobsBuddyDisplay")</code> rende bien le panneau : c'est déduit du XAML compilé, jamais lancé
+  dans HDT.</li>
+  <li>Ce que <code>Player.Trinkets</code> et les pouvoirs de <code>Player.Board</code> rendent pour un adversaire hors de son combat.</li>
+  <li>La version de <code>BobsBuddy.dll</code> servie aujourd'hui par libs.hearthsim.net, qui n'a pas été lue. Elle diffère de celle qui
+  est installée (1 611 776 octets contre 1 620 576) : Bob's Buddy sort hors du cycle d'HDT. On ne sait pas non plus si son API publique
+  est la même dans l'HDT 1.55.6 de la CI.</li>
+  <li>Le coût d'une simulation en taverne pendant que le jeu tourne, et la stabilité d'un résultat calculé avec moins de combats, ou
+  réparti sur une vingtaine de plateaux de référence.</li>
+  <li>Pour le simulateur de Firestone : la durée d'une simulation (seule la borne du code est connue, 8 000 combats en 8 000 ms au plus),
+  le démarrage de Node sous Windows, et la compatibilité de Jint ou de ClearScript avec ce code. On ignore aussi si l'accord de son auteur
+  couvre le simulateur sous sa nouvelle licence.</li>
+  <li>Le pool actuel des trinkets, des anomalies et des quêtes, qu'aucun tag statique ne marque, et le nombre de dons sombres.</li>
+  <li>Si les plateaux finaux de Firestone portent attaque et PV à la source : le cache n'en garde que les identifiants.</li>
+  <li>Que le journal d'HDT écrive les deux plateaux complets à chaque simulation (vu sur un extrait seulement), et qu'un étalonnage de D2
+  sur ces lignes colle aux résultats : rien n'a été essayé.</li>
+  <li>La mesure de fraîcheur (35 %, 6 tours) : 31 parties, d'une seule personne, à un seul niveau de jeu.</li>
+  <li>Les durées en jours sont des estimations. Les « 30–40 j » de l'étude de stack en sont une aussi. Le nombre de cartes changées par
+  patch vient d'un résumé automatique, non recompté.</li>
+</ul>
+
+<h2>7. Les décisions qui reviennent à Ali</h2>
+<p>Pour chaque décision, la première issue est celle que je recommande.</p>
+<div class="dec"><h3>1. Écrire les règles du jeu nous-mêmes ?</h3><ol>
+  <li>Non : réutiliser un simulateur existant (sections 3 et 4).</li>
+  <li>Oui : 30 à 40 jours, puis un suivi à chaque patch, sans référence pour vérifier la justesse.</li>
+</ol></div>
+<div class="dec"><h3>2. Bob's Buddy et HearthSim</h3><ol>
+  <li>Demander l'accord de HearthSim pour appeler <code>BobsBuddy.dll</code> depuis le plugin public, et proposer dans le même message
+  qu'HDT expose le résultat et la conversion des entités. Une conversion exposée ferait tomber l'étape 2 à 1 ou 2 jours.</li>
+  <li>Référencer la DLL sans demander. Le dépôt est public, la DLL est « tous droits réservés », et cela irait contre la pratique du projet
+  avec Firestone et nomi.gg.</li>
+  <li>Ne pas la référencer du tout. B est abandonnée ; il reste D3, puis D2 étalonnée.</li>
+</ol></div>
+<div class="dec"><h3>3. La bibliothèque des plateaux rencontrés (D3)</h3><ol>
+  <li>Oui, maintenant : un fichier local, sans aucun nom, qui se remplit pendant qu'on attend HearthSim.</li>
+  <li>Attendre la réponse de HearthSim avant de la poser.</li>
+  <li>Non : la jauge reste comparée à la seule courbe du héros.</li>
+</ol></div>
+<div class="dec"><h3>4. Contre quoi simuler en taverne, si B se fait</h3><ol>
+  <li>Contre les plateaux rencontrés au même tour (D3), une référence fraîche à chaque tour.</li>
+  <li>Contre le prochain adversaire, seulement quand son plateau a au plus deux tours (9 tours de taverne sur 341 mesurés).</li>
+  <li>Les deux, affichés séparément.</li>
+</ol></div>
+<div class="dec"><h3>5. Où montrer la nouvelle mesure</h3><ol>
+  <li>Une rangée de plus dans l'encart. La jauge actuelle mesure autre chose, le rythme contre la courbe du héros, et ses 31 tests restent
+  intacts.</li>
+  <li>La couleur de notre rangée vient de la simulation. Les tests de la jauge sont alors à revoir.</li>
+</ol></div>
+<div class="dec"><h3>6. Le simulateur de Firestone</h3><ol>
+  <li>N'y pas toucher tant que B reste possible.</li>
+  <li>Demander à son auteur si son accord couvre le simulateur sous sa nouvelle licence : c'est le repli si HearthSim refuse.</li>
+  <li>S'appuyer sur la décision « usage personnel, autorisé » du tableau des décisions du projet. Déconseillé : elle date d'avant le 28 septembre, et le dépôt est
+  public.</li>
+</ol></div>
+<div class="dec"><h3>7. Lire Bob's Buddy par réflexion (A)</h3><ol>
+  <li>Non : HDT l'affiche déjà, après que le plateau est joué, et ce passage par l'interne casse sans prévenir.</li>
+  <li>Oui, pour journaliser son résultat à côté du nôtre.</li>
+</ol></div>
+<div class="dec"><h3>8. La somme pondérée par les mots-clés (D2)</h3><ol>
+  <li>Seulement étalonnée, et seulement si HearthSim refuse. L'étalonnage sur les sorties de Bob's Buddy dans le journal mérite d'être
+  signalé dans la même lettre.</li>
+  <li>Tout de suite, sans étalonnage. Les poids seraient arbitraires.</li>
+  <li>Jamais.</li>
+</ol></div>
+</main>
+</body>
+</html>
