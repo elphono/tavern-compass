@@ -13,7 +13,7 @@ redimensionner et les regarder **sans lancer une partie** ni HDT.
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --scenario 5 --tick 3   # cases : la compo pariée cochée, la compo en cours gardée (« in progress »)
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --power shiny   # la rangée du joueur dans l'encart : behind, even, ahead, shiny, none, early
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --opp-power next   # la rangée de l'adversaire : behind, even, ahead, shiny, none, next, unseen
-./tools/BronzebeardHud.Harness/launch.sh --screenshot --count 4   # − / + cliqués jusqu'à 4 compos, mode déplacement off : le panneau dimensionné sur elles
+./tools/BronzebeardHud.Harness/launch.sh --screenshot --count 4   # ▼ / ▲ cliqués jusqu'à 4 compos, mode déplacement off : le panneau dimensionné sur elles
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --play     # mode déplacement off, comme en partie (le panneau sur N lignes)
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover   # la même, un choix ouvert : discover, dark-gift ou trinket
 ./tools/BronzebeardHud.Harness/launch.sh --screenshot --choice discover --close-choice   # le choix ouvert puis refermé : la scène rétablie
@@ -52,7 +52,7 @@ trois cartes avec `mech_fs` mais seulement 3 de ses 7 cartes clés : « no match
 Arguments en plus : `--size 1600x900`, `--layout <fichier>`, `--wait <ms>` (attente des noms et images avant la capture),
 `--scenario 0…5` (plateau tenu et tribus du lobby, `HarnessData.Scenarios` ; 2 par défaut), `--power <scène>` (la rangée
 du joueur dans l'encart de puissance, `HarnessData.Power` ; even par défaut), `--opp-power <scène>` (la rangée de
-l'adversaire, `HarnessData.OpponentFacts` ; even par défaut), `--count <1…4>` (− et + cliqués comme la souris jusqu'à ce
+l'adversaire, `HarnessData.OpponentFacts` ; even par défaut), `--count <1…4>` (▼ et ▲ cliqués comme la souris jusqu'à ce
 nombre, mode déplacement off ; une case cochée les grise et fait échouer la capture), `--play` (mode déplacement off),
 `--detail <rang ou nom>`
 (ouvre le détail avant la capture ; un rang qui n'existe pas fait échouer la capture plutôt que de capturer la liste).
@@ -158,7 +158,7 @@ leur mise en page et leur remplissage.
   Firestone de Mech Magnet (pointillés « + M. Magnet 3/5 », par le pont).
 - Six scénarios (liste déroulante, tableau ci-dessus : chacun est une partie, cases et couleurs oubliées en changeant) ;
   le bouton « Detail of target 1 / list » ouvre et ferme le détail.
-- L'encart de puissance sous le cadre, entre − et + (listes déroulantes « power … » et « opp … ») : les quatre paliers et
+- L'encart de puissance sous le cadre (▲ n ▼ dans la barre de titre depuis le 2026-10-19 ; listes déroulantes « power … » et « opp … ») : les quatre paliers et
   les cas sans donnée, pour le joueur et pour l'adversaire.
 - Un choix (liste déroulante) : ses options au-dessus de la rangée de Bob, comme dans le jeu, sous les étiquettes du
   plugin. Tant qu'il est ouvert, les cadres, étiquettes et ◇ des cartes de Bob et le panneau « Compositions » (et son popup)
@@ -173,21 +173,22 @@ leur mise en page et leur remplissage.
 Deux panneaux visibles et dans l'overlay ; une poignée et un cadre (seul le panneau des compositions se redimensionne) ;
 le mode déplacement ; 0, 1, 3, 2, 3 et 3 cibles selon le scénario, de couleurs distinctes ; **les cases** (scénario 5,
 cases cliquées dans la ligne du guide nommé) : la cochée en tête, la compo en cours gardée dans sa couleur avec « in
-progress », le pari parti, les cadres de Bob qui suivent, « 1 chosen » puis « 2 chosen », − et + grisés sans effet, tout
+progress », le pari parti, les cadres de Bob qui suivent, « 1 chosen » puis « 2 chosen », ▼ grisé sans effet, une case cochée sur trois qui fait lister tous les guides puis
+la troisième qui ne laisse qu'elles (2026-10-19), tout
 décocher rend les mêmes cibles dans les mêmes couleurs ; **les tribus du lobby** (scénarios 3 et 4) : aucune cible, ligne
 ni cadre d'un guide d'une tribu absente (calculé sur les données de la simulation, pas pris à `LobbyGuides`), la ligne de
 journal qui les nomme ; lobby inconnu : rien d'écarté et la ligne « Lobby tribes unknown » ; une case cochée lobby
 inconnu puis écartée une fois le lobby connu : décochée, une ligne `unticked`, plus cible ; **l'encart de puissance** :
-hors du cadre, dessous, aussi large que le panneau, − à gauche et + à droite centrés, la rangée du joueur au-dessus de celle
+hors du cadre, dessous, aussi large que le panneau, ses rangées centrées (▲, le nombre et ▼ empilés à droite de la barre de titre, au-dessus de la liste), la rangée du joueur au-dessus de celle
 de l'adversaire, aucun texte sous 12 px ni coupé ; **chaque rangée**, pour chaque scène : badge, signe et pourcentage,
 couleur, le seul feu allumé à sa place et le seul halo, de la couleur du palier (or pour shiny), les autres éteints,
 chiffres écrits ; sans donnée, tout gris, aucun halo, « – » ; pour l'adversaire, une ligne `opponent power` par
-changement, qui nomme son héros et le vôtre, le tour vu, le plateau et la moyenne ; **+ / −** (mode déplacement off,
+changement, qui nomme son héros et le vôtre, le tour vu, le plateau et la moyenne ; **▲ / ▼** (mode déplacement off,
 cliqués comme la souris) : N de 1 à 4 et retour, trois fois, N lignes dont les meilleures cibles par rang (ou, faute de
 place, le bas sur l'or), aucune zone du jeu couverte, le même rectangle pour le même N, une ligne `targets n=` par appui
-dont les chiffres sont ceux dessinés (+ à 4 compris) ; contre le bas de l'écran le bas gardé, grandissant vers le haut ;
+dont les chiffres sont ceux dessinés (▲ à 4 compris) ; contre le bas de l'écran le bas gardé, grandissant vers le haut ;
 une boîte donnée par la poignée gardée jusqu'à un appui, retrouvée à la partie suivante, « Reset » qui rend la place par
-défaut ; **une rangée en panne** (dessin qui lève) retirée seule, la rangée du joueur, − et + restant ; les cadres sur les cartes de Bob, pleins
+défaut ; **une rangée en panne** (dessin qui lève) retirée seule, la rangée du joueur, ▲ et ▼ restant ; les cadres sur les cartes de Bob, pleins
 et pointillés, tels que `TavernHighlights` les demande ; un clic sur le nom d'une cible ouvre son détail, « ← All comp
 guides » rend la liste ; les sections du détail dans l'ordre de HDT et « k of n sections » quand il en manque ; **aucun
 texte du panneau sous 12 px × échelle, aucun texte coupé** (liste et détail : l'encre de chaque texte, pas sa boîte, doit

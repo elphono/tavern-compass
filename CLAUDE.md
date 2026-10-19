@@ -58,12 +58,12 @@ ferme par le commit qui la règle (`Closes #n`), une case cochée dans son corps
 | Stack | plugin HDT, option 3 de l'étude ; HDT lit la mémoire, le plugin jamais |
 | Stats Firestone | **accord de l'auteur de Firestone**, étendu le 2026-09-27 à **toutes ses données publiques**, pour tous nos usages, pas seulement les JSON de stats (`static.zerotoheroes.com`) : aussi card-stats, battlegrounds-strategies, perfect-games, card-rules ; cache local, rafraîchissement modeste. Inchangé : aucune donnée réelle dans le dépôt, tests sur données synthétiques |
 | Stats HSReplay | usage local accepté, mais le site renvoie un challenge Cloudflare : **on ne contourne pas** une protection anti-bot ; import semi-manuel depuis le navigateur (spec § 6) |
-| Stats nomi.gg | **accord du propriétaire du site**, obtenu par Ali le 2026-10-08, tel quel sur les termes de la demande : l'analyse de patch (`nomi.gg/patch/analysis/<patch>.json`) peut être collectée automatiquement, dans les limites que le projet s'est fixées (note `docs/plans/2026-10-08-stats-multi-sources.html` § 10 : une requête conditionnelle par jour au plus, `User-Agent` qui nomme le plugin, crédit à l'écran, aucune redistribution ni entraînement de modèle). Le code de Nomi's Kitchen (licence « MIT NON-AI ») se lit pour en comprendre les idées, il ne se copie pas (exception : son mod anti-danse, ligne « Mod anti-danse de Nomi ») |
+| Stats nomi.gg | **accord du propriétaire du site**, obtenu par Ali le 2026-10-08, tel quel sur les termes de la demande : l'analyse de patch (`nomi.gg/patch/analysis/<patch>.json`) peut être collectée automatiquement, dans les limites que le projet s'est fixées (note `docs/plans/2026-10-08-stats-multi-sources.html` § 10 : des requêtes conditionnelles, une tentative **par démarrage du plugin** depuis le 2026-10-19 (Ali : « j'ai eu l'autorisation » ; une par jour avant), `User-Agent` qui nomme le plugin, crédit à l'écran, aucune redistribution ni entraînement de modèle). Le code de Nomi's Kitchen (licence « MIT NON-AI ») se lit pour en comprendre les idées, il ne se copie pas (exception : son mod anti-danse, ligne « Mod anti-danse de Nomi ») |
 | Mod anti-danse de Nomi | 2026-10-10 : accord personnel du développeur de Nomi's Kitchen, obtenu par Ali, malgré la licence MIT NON-AI : analyse du mod `com.community.hs.NomiCantDance` par décompilation et désobfuscation, et reprise de son code, autorisées ; tout code repris est marqué à la source (commentaire d'origine en anglais : `Taken from NomiCantDance (Nomi's Kitchen), with its author's permission, 2026-10-10`) parce que le dépôt est public et sous MIT seule ; on préfère réécrire quand c'est aussi simple, on reprend tel quel ce que la décompilation montre plus juste que notre version |
 | Notre mod anti-danse | 2026-10-10 (Ali) : **observer d'abord** une danse réelle sans le mod (journal `[Zone]`, `tools/nodance-observe.py`) ; le mod reste **non installé** ; publication **discrète** (`README.md` et `ROADMAP.md` n'en parlent pas, l'issue #1 reste ouverte tant que rien n'est vu en jeu) |
 | Simulateur npm `simulate-bgs-battle` | usage personnel, autorisé ; inutile tant que Bob's Buddy (HDT) fait le travail |
 | MMR des adversaires | gardé tel quel. Le leaderboard EU s'arrête à 8 000 ; Ali est à ≈ 6 840 (région EU mesurée) ; plage par défaut 8 000 – 8 050 |
-| Arbitrages du 2026-10-08 | Les cibles se classent sur **plateau + main** ; une case cochée garde **N lignes, au moins toutes les cibles** (revu le 2026-10-10 : N compte les cochées, voir « Cibles ») ; la taille donnée par + / − **revient à celle de la poignée** à la partie suivante ; la ligne « comp ≈ » de l'encart des héros est **retirée** (17 parties en médiane) ; le bilan par adversaire est parti avec le panneau Combats (2026-09-27) ; valeur d'une carte : **moins de bruit**, le seuil de 200 parties reste (≈ une carte sur deux sans valeur, mesuré) |
+| Arbitrages du 2026-10-08 | Les cibles se classent sur **plateau + main** ; une case cochée garde **N lignes, au moins toutes les cibles** (revu le 2026-10-10 : N compte les cochées ; le 2026-10-19 : tous listés tant que moins de n sont cochés ; voir « Cibles ») ; la taille donnée par + / − **revient à celle de la poignée** à la partie suivante ; la ligne « comp ≈ » de l'encart des héros est **retirée** (17 parties en médiane) ; le bilan par adversaire est parti avec le panneau Combats (2026-09-27) ; valeur d'une carte : **moins de bruit**, le seuil de 200 parties reste (≈ une carte sur deux sans valeur, mesuré) |
 | Visibilité | dépôt GitHub **public** (privé du 2026-09-26 au 2026-10-06). Le 2026-10-07 (Ali) : licence MIT, nom « Tavern Compass », historique purgé de ses données personnelles (BattleTags, pseudo d'adversaire, numéros de compte, bundle Rust), nom affiché dans HDT changé sans toucher aux noms internes |
 
 ## Façon de travailler sur ce projet
@@ -175,7 +175,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   `Tolerance` : une boîte exactement de la hauteur de n lignes, divisée par une échelle qui n'est pas une fraction
   binaire, rendait n − 1 lignes) est retiré depuis la fusion : le panneau unique mesure ses pièces en place, en pixels
   de l'overlay, et `CompGuideLayout` décide ce qui tient (`Fit` et `Sections`, avec la même tolérance).
-- **Hauteur réglée par + / −** (Ali, 2026-10-06 : « avec move panel on détermine la taille et l'emplacement par défaut ; un
+- **Hauteur réglée par ▲ / ▼** (− / + jusqu'au 2026-10-19) (Ali, 2026-10-06 : « avec move panel on détermine la taille et l'emplacement par défaut ; un
   appui sur les + ou − resize la fenêtre pour afficher les N meilleurs compos »). Hors mode déplacement, un panneau
   **jamais redimensionné par sa poignée** est toujours dimensionné sur son contenu : N lignes (`CompTargets.FitRows` :
   − n + ; plus de cases cochées que n : toutes les cochées), la barre de titre et l'encart ; « Reset panel positions »
@@ -233,14 +233,19 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   plugin ne fait aucune requête ; le `.csproj` référence `HSReplay.dll` (fourni par HDT, jamais copié) pour ce seul type ;
   mesure et forme des données : `docs/journal/2026-10-04-comp-guides-hdt.md`. **Seuls les guides que le lobby peut jouer
   sont listés** (`LobbyGuides`, ci-dessous ; la liste gratuite de HDT n'est pas filtrée) ; tant que HDT n'a pas les tribus,
-  une ligne grise « Lobby tribes unknown: every guide listed ». Titre : « Compositions », « k of n shown »
-  quand des guides manquent, la source (« HDT free » / « Tier 7 »), « Meta ↗ », « n targets » (1 à 4, 3 par défaut,
-  gardé dans `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}` ; dès qu'une
-  compo est cochée il dit « k/n chosen ») ; une ligne dorée tant que HDT n'a pas de guides. **− et + sont dans l'encart de
-  puissance**, sous le cadre (− à gauche, + à droite, depuis le 2026-10-06) : ils changent n et redimensionnent le panneau
-  (ci-dessus). Avec des cases cochées aussi (Ali, 2026-10-10 : « on devrait pouvoir modifier le nombre de compos max une fois
-  qu'on a sélectionné des compos ») : − est grisé seulement quand n égale le nombre de cochées (décocher pour descendre,
-  `CompTargets.CanDecrease`), + ne l'est jamais (à 4, un appui redimensionne le panneau sur son contenu).
+  une ligne grise « Lobby tribes unknown: every guide listed ». Titre, sur une ligne : « Compositions », « k of n shown »
+  quand des guides manquent, la source (« HDT free » / « Tier 7 »), la tranche, « Meta ↗ », puis à droite **le compteur
+  ▲ n ▼** (Ali, 2026-10-19 : « les +/- autour du chiffre target en haut », « les 3 composants en vertical avec des flèches,
+  puisqu'augmenter ou réduire le nombre de compos revient à rendre le composant plus ou moins grand » ; jusque-là − et +
+  encadraient l'encart de puissance) : ▲, le nombre n (1 à 4, 3 par défaut, gardé dans
+  `%LocalAppData%\BronzebeardHud\settings.json` : `{"schema": 1, "suggestedCompositions": 3}`) et ▼ empilés, « targets » à
+  côté, et « k chosen » dessous dès qu'une compo est cochée ; les flèches sont dessinées (pas de texte sous 12 px). ▲ et ▼
+  changent n et redimensionnent le panneau (ci-dessus). Avec des cases cochées aussi (Ali, 2026-10-10) : ▼ est grisé
+  seulement quand n égale le nombre de cochées (décocher pour descendre, `CompTargets.CanDecrease`), ▲ ne l'est jamais (à 4,
+  un appui redimensionne le panneau sur son contenu). **Coût mesuré** : la barre de titre prend ≈ 12 px de plus ; à la place
+  par défaut en 1080p, trois cibles dans deux tiers ne montrent plus que 2 lignes sur 3 (« k of n shown » ; elles tenaient à
+  3 px près) ; dans la disposition d'Ali (panneau à gauche sur toute la hauteur) rien ne change. Une ligne dorée tant que HDT
+  n'a pas de guides.
 - **Cibles** (`CompTargetTracker`, `CompTargets.Choose`) : **une case cochée désigne la compo visée sans effacer ce qu'on
   construit** (Ali, 2026-10-04 : « une compo checkboxée est une compo vers laquelle on veut se diriger » ; 2026-10-06 :
   « quand je click sur une checkbox ça enlève d'autres compos […] celles que j'étais en train de jouer »). S'il y a des
@@ -250,9 +255,14 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   n'est jamais retirée pour lui) ; les paris (une seule carte clé) se taisent. **Autant de cochées que n** (Ali, 2026-10-10 :
   « quand on a sélectionné le nombre de compos qui correspond au nombre max il faudrait automatiquement update le panel pour
   ne laisser afficher plus qu'elles ») : le panneau ne liste plus qu'elles, dans leurs tiers (`CompTargets.Listed`), et se
-  redimensionne sur elles comme après + / − (journal `ticked guides fill the n compositions wanted: only they are listed`) ;
-  + rend la liste entière. Sur les cartes de Bob, seuls les guides cochés encadrent alors (2026-10-07, « Taverne » ci-dessous). Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
-  `CompGuideMatch`), jusqu'à n (− n +) ; à score égal, une cible du tour d'avant garde sa place (il faut un score plus
+  redimensionne sur elles comme après ▲ / ▼ (journal `ticked guides fill the n compositions wanted: only they are listed`) ;
+  ▲ rend la liste entière. **Moins de cochées que n** (Ali, 2026-10-19 : « quand on sélectionne des compos à target, la liste
+  change parfois et on perd une compo qu'on aurait voulu aussi sélectionner → tant qu'on n'a pas sélectionné le nombre total
+  de target comps autorisé on affiche toutes les comps ») : dès la première case cochée et jusqu'à la n-ième, **tous les
+  guides du lobby restent listés** (`CompTargets.Choosing`, `FitRows`) et le panneau se dimensionne sur eux, même une boîte
+  donnée par la poignée, dans la place qu'il a (« k of n shown » sinon ; journal `k of n compositions ticked: every guide
+  listed until they are all chosen`). Sans case cochée, rien ne change : les N meilleures. Sur les cartes de Bob, seuls les guides cochés encadrent alors (2026-10-07, « Taverne » ci-dessous). Sinon, les plus probables d'après le plateau **et** la main (3 × carte clé, 2 × enabler, 1 × add-on,
+  `CompGuideMatch`), jusqu'à n (▲ n ▼) ; à score égal, une cible du tour d'avant garde sa place (il faut un score plus
   haut pour la remplacer). Tout décocher rend les cibles automatiques. Une cible garde sa
   couleur tant qu'elle le reste (magenta, lime, bleu ciel, blanc), cases et couleurs sont oubliées à la partie suivante.
   Le tout passe par `CompTargets.Round`, qui ne prend que `LobbyGuides` : aucun guide d'une tribu absente n'est classé.
@@ -421,9 +431,11 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   **population** suffit à dire « contested » (top 25 % contre tous : 20 héros sur 116, +0,16 place en moyenne) — la
   décote ne corrige pas un biais, à revoir avec nomi.gg.
 - **nomi.gg** (2026-10-08, chantier c, issue #10) : `NomiCache` lit `/patch/data/latest.json` puis
-  `/patch/analysis/<patch>.json` en requêtes conditionnelles, **une tentative par jour au plus, redémarrages d'HDT et
-  échecs compris** (date de la tentative écrite dans `stats\nomi-state.json` **avant** la première requête ; le cache de
-  Firestone, lui, redemande à chaque démarrage) ; un patch clos n'est plus jamais demandé ; le nom du patch, venu du
+  `/patch/analysis/<patch>.json` en requêtes conditionnelles, **une tentative par démarrage du plugin** comme le cache de
+  Firestone (Ali, 2026-10-19 : « mettre à jour avec firestone/hdt/nomi.gg à chaque démarrage (j'ai eu l'autorisation) » ;
+  une par jour jusque-là) ; un échec n'est pas retenté avant le démarrage suivant ; la date de la dernière tentative reste
+  dans `stats\nomi-state.json` ; un patch clos n'est plus jamais demandé et son fichier est supprimé dès que celui du
+  nouveau est écrit (seul le patch courant reste sur le disque) ; le nom du patch, venu du
   réseau, ne passe que s'il n'a que des chiffres et des points (il nomme une URL et un fichier). `NomiAnalysis` ne garde
   que ce que lira le chantier d : héros, tribus avant / après, buffs et nerfs, trinkets gagnants et perdants, médianes de
   montée de tier ; ni noms, ni plateaux, ni cartes. Fichier `stats\nomi-patch-analysis-<patch>.json`. `User-Agent` de
@@ -466,7 +478,7 @@ dotnet build src/BronzebeardHud.HdtPlugin    # au 1er build, télécharge HDT (z
   HDT ni partie, avec des données synthétiques (dont deux compos Firestone inventées pour le pont, un contre-exemple
   « no match », un lobby de cinq tribus par scénario — `--scenario 3` sans morts-vivants, `4` lobby inconnu, `5` cases —
   et une courbe de héros inventée pour la jauge, `--power behind|even|ahead|shiny|none|early`, une autre pour le héros
-  adverse, `--opp-power behind|even|ahead|shiny|none|next|unseen` ; `--count n` clique − / + jusqu'à n, `--play` coupe le
+  adverse, `--opp-power behind|even|ahead|shiny|none|next|unseen` ; `--count n` clique ▼ / ▲ jusqu'à n, `--play` coupe le
   mode déplacement) ; `launch.sh` la compile sous WSL et la lance côté Windows, `--selftest`
   la vérifie sans personne au clavier, `--screenshot` écrit une capture que la session peut regarder. **La couche d'HDT**
   est simulée sur une souris injectée (`--mouse 'line:1;wait:300'`, groupe `mouse` de `--selftest`, `HdtOverlay.cs`,

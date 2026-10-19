@@ -204,50 +204,79 @@ internal static class SelfTest
         check("ticking a guide: it comes first, the guide in progress stays in its colour and says so, the guess leaves; Bob's frames are the ticked guide's alone",
             clicked && one.Select(t => (t.Guide.Name, t.Kind)).SequenceEqual(new[] { ("Pirate Discover", TargetKind.Chosen), ("Elemental Cycle", TargetKind.InProgress) })
             && one.All(t => colourOf.TryGetValue(t.Guide.Name, out var c) && c == t.Colour) && caption && captions == 1
-            && frames.SequenceEqual(new[] { "Pirate Discover" }) && FindText(comps, "1/3 chosen") != null,
+            && frames.SequenceEqual(new[] { "Pirate Discover" }) && CounterText(comps) == "3 targets 1 chosen",
             $"{Kinds(one)}; \"in progress\" under Elemental Cycle: {caption} ({captions} drawn); frames for [{string.Join(", ", frames)}]; "
-            + $"title: {(FindText(comps, "1/3 chosen") != null ? "1/3 chosen" : "not 1/3 chosen")}");
+            + $"counter: {CounterText(comps)}");
 
         ClickBoxOf(window, "Undead Butcher");
         window.UpdateLayout();
         var two = window.Targets.ToList();
         check("ticking a second one adds it after the first, the guide in progress still after them",
             two.Select(t => (t.Guide.Name, t.Kind)).SequenceEqual(new[] { ("Pirate Discover", TargetKind.Chosen), ("Undead Butcher", TargetKind.Chosen), ("Elemental Cycle", TargetKind.InProgress) })
-            && FindText(comps, "2/3 chosen") != null, Kinds(two));
+            && CounterText(comps) == "3 targets 2 chosen", Kinds(two) + "; counter: " + CounterText(comps));
 
         // − with two guides ticked of three wanted: two wanted, the two ticked guides alone in the list (the guide in progress
         // leaves), − dim there; a second − changes nothing; + gives three again and the whole list. One press at a time, on
         // the count itself: the log lines of a click reach the window's list later, through the dispatcher.
         var wanted = window.Count;
-        var clickedMinus = Click(comps, "−");
+        var clickedMinus = ClickArrow(comps, CompsPanel.MinusTag);
         window.UpdateLayout();
         var afterMinus = window.Count;
         var listedAlone = window.Comps.ShownLines.Keys.OrderBy(k => k).SequenceEqual(window.Targets.Where(t => t.Ticked).Select(t => t.Guide.Id).OrderBy(k => k));
-        var dim = FindText(comps, "−")?.Parent is Border { Opacity: < 1 } && FindText(comps, "2/2 chosen") != null;
-        Click(comps, "−");
+        var dim = Arrow(comps, CompsPanel.MinusTag) is { Opacity: < 1 } && CounterText(comps) == "2 targets 2 chosen";
+        ClickArrow(comps, CompsPanel.MinusTag);
         window.UpdateLayout();
         var afterSecond = window.Count;
-        var clickedPlus = Click(comps, "+");
+        var clickedPlus = ClickArrow(comps, CompsPanel.PlusTag);
         window.UpdateLayout();
         var whole = window.Comps.ShownLines.Count > 2;
-        check("− and + with two guides ticked: − to two lists them alone and is dim there, + shows the others again",
+        check("▼ and ▲ with two guides ticked: ▼ to two lists them alone and is dim there, ▲ shows the others again",
             clickedMinus && clickedPlus && afterMinus == wanted - 1 && afterSecond == afterMinus && listedAlone && dim && window.Count == wanted && whole
             && window.Targets.Count == 3,
-            $"count {wanted} -> {afterMinus} -> {afterSecond} -> {window.Count}, listed alone {listedAlone}, − dim and 2/2 {dim}, whole list again {whole}, {window.Targets.Count} targets");
+            $"count {wanted} -> {afterMinus} -> {afterSecond} -> {window.Count}, listed alone {listedAlone}, ▼ dim and 2/2 {dim}, whole list again {whole}, {window.Targets.Count} targets");
 
         ClickBoxOf(window, "Undead Butcher");
         window.UpdateLayout();
         ClickBoxOf(window, "Pirate Discover");
         window.UpdateLayout();
         var back = window.Targets.ToList();
-        var minusAgain = FindText(comps, "−");
+        var minusAgain = Arrow(comps, CompsPanel.MinusTag);
         // The same three in the same colours; Pirate Discover, a target all along, may keep its place ahead of Beast
         // Deathrattle, tied with it (CompTargets.Choose: a target keeps its place at an equal score).
         check("unticking everything gives the automatic targets back, in the colours they had",
             back.Select(t => t.Guide.Name).OrderBy(n => n).SequenceEqual(autoNames.OrderBy(n => n))
             && back.All(t => t.Kind == TargetKind.Probable && colourOf.TryGetValue(t.Guide.Name, out var c) && c == t.Colour)
-            && FindText(comps, "3 targets") != null && minusAgain?.Parent is Border { Opacity: 1 },
+            && CounterText(comps) == "3 targets" && minusAgain is { Opacity: 1 },
             Kinds(back));
+
+        // (Ali, 2026-10-19: "tant qu'on n'a pas sélectionné le nombre total de target comps autorisé, on affiche toutes les
+        // comps") Off move mode, in the tall box, sized to its content by a press on ▼ then ▲: three lines. One guide ticked of
+        // the three wanted: every guide listed, so that the next one to tick is still there; three ticked: they alone.
+        window.SetMoveMode(false);
+        ClickArrow(comps, CompsPanel.MinusTag);
+        window.UpdateLayout();
+        ClickArrow(comps, CompsPanel.PlusTag);
+        window.UpdateLayout();
+        static int Lines(HarnessWindow w) => w.Comps.ShownLines.Keys.Count(k => k != CompsPanel.EarlyKey);
+        var nLines = Lines(window);
+        ClickBoxOf(window, "Beast Deathrattle");
+        window.UpdateLayout();
+        var choosingLines = Lines(window);
+        var everyGuide = window.Comps.ShownLines.Count > 0 && FindText(comps, $"{choosingLines} of ") == null;
+        var picked = ClickBoxOf(window, "Pirate Discover");
+        window.UpdateLayout();
+        var stillAll = Lines(window) == choosingLines;
+        picked &= ClickBoxOf(window, "Undead Butcher");
+        window.UpdateLayout();
+        var alone = Lines(window);
+        check("choosing: sized to three lines, one tick of three lists every guide, the second keeps them all, the third leaves the three alone",
+            nLines == 3 && choosingLines > 3 && everyGuide && picked && stillAll && alone == 3 && window.Targets.Count(t => t.Ticked) == 3,
+            $"lines {nLines} -> {choosingLines} (every guide: {everyGuide}) -> {(stillAll ? "same" : "changed")} -> {alone}; counter {CounterText(comps)}");
+        foreach (var name in new[] { "Beast Deathrattle", "Pirate Discover", "Undead Butcher" })
+        {
+            ClickBoxOf(window, name);
+            window.UpdateLayout();
+        }
 
         window.ResetLayout();
         window.SetScenario(HarnessData.DefaultScenario);
@@ -301,23 +330,25 @@ internal static class SelfTest
             $"targets {CompTargets.Summary(targets)}; {off.Count} guides of absent tribes, {offDrawn.Count} drawn [{string.Join(", ", offDrawn)}], {onDrawn} playable names drawn; "
             + $"frames for absent tribes [{string.Join(", ", framed)}]; log: {(line.IndexOf(">> ", StringComparison.Ordinal) is var at and >= 0 ? line.Substring(at + 3) : "no lobby line with these tribes")}");
 
-        // (b) Three targets in two tiers: at the default size the note would push the third out, so it gives way
-        // (CompGuideLayout.KeepsOptionalLine); with one target wanted (− twice) it has the room, and shows.
+        // (b) Three targets in two tiers. At the default place in 1080p two of their three lines fit since ▲ n ▼ made the
+        // title bar taller (2026-10-19; they fitted with 3 px to spare), and the third does not even without the note: that
+        // the note gives way to a target's line is CompGuideLayout.KeepsOptionalLine's, unit-tested (CompsPanelLogicTests).
+        // With one target wanted (▼ twice) it has the room, and shows.
         const string unknownNote = "Lobby tribes unknown: every guide listed";
         window.SetScenario(4);
         window.UpdateLayout();
         var unknownTargets = window.Targets.ToList();
         var targetLines = unknownTargets.Count(t => window.Comps.ShownLines.ContainsKey(t.Guide.Id));
         var noteThree = FindText(comps, unknownNote) != null;
-        var fewer = Click(comps, "−") & Click(comps, "−");
+        var fewer = ClickArrow(comps, CompsPanel.MinusTag) & ClickArrow(comps, CompsPanel.MinusTag);
         window.UpdateLayout();
         var noteOne = FindText(comps, unknownNote) != null;
         var oneTarget = window.Targets.Count;
-        Click(comps, "+");
-        Click(comps, "+");
+        ClickArrow(comps, CompsPanel.PlusTag);
+        ClickArrow(comps, CompsPanel.PlusTag);
         window.UpdateLayout();
-        check("lobby not known yet: nothing left out (Undead Attack is a target); the note says so, giving way to a target's line",
-            unknownTargets.Any(t => t.Guide.Name == "Undead Attack") && unknownTargets.Count == 3 && targetLines == 3 && !noteThree
+        check("lobby not known yet: nothing left out (Undead Attack is a target); the note says so when one target is wanted",
+            unknownTargets.Any(t => t.Guide.Name == "Undead Attack") && unknownTargets.Count == 3 && targetLines >= 2
             && fewer && oneTarget == 1 && noteOne && window.Count == 3,
             $"targets {CompTargets.Summary(unknownTargets)}, {targetLines} of their lines drawn, note {(noteThree ? "drawn" : "given way")}; "
             + $"one target wanted: {oneTarget} target(s), note {(noteOne ? "drawn" : "missing")}; count back to {window.Count}");
@@ -443,8 +474,8 @@ internal static class SelfTest
 
     /// <summary>
     /// (2026-10-06, "the indicator out into a small inset under the main frame, framed by the + and −") The inset: out of the
-    /// frame (no lamp of either row inside it), under it, as wide as the panel; − at its left and + at its right, centred on
-    /// it; the player's row above the opponent's between them; its texts at least 12 px and uncut.
+    /// frame (no lamp of either row inside it), under it, as wide as the panel; the player's row above the opponent's, centred
+    /// across it (▲ and ▼ left it for the title bar on 2026-10-19); its texts at least 12 px and uncut.
     /// </summary>
     private static void InsetChecks(HarnessWindow window, Action<string, bool, string> check)
     {
@@ -460,34 +491,42 @@ internal static class SelfTest
             && Math.Abs(inset.Width - panel.ActualWidth) < 0.5 && Math.Abs(inset.Bottom - panel.ActualHeight) < 0.5,
             $"frame {Describe(frame)}, inset {Describe(inset)}, panel {panel.ActualWidth:0}x{panel.ActualHeight:0}, lamps inside the frame: {inFrame}");
 
-        var minus = Tagged(comps.Inset, CompsPanel.MinusTag).FirstOrDefault();
-        var plus = Tagged(comps.Inset, CompsPanel.PlusTag).FirstOrDefault();
+        // (2026-10-19, "les 3 composants en vertical avec des flèches") ▲, the number and ▼ stacked in the title bar, at its
+        // right, centred on one another; none of them in the inset, whose rows are centred across it.
+        var up = Tagged(comps.Frame, CompsPanel.PlusTag).FirstOrDefault();
+        var down = Tagged(comps.Frame, CompsPanel.MinusTag).FirstOrDefault();
+        var figure = Tagged(comps.Frame, CompsPanel.CountTag).FirstOrDefault();
+        var inInset = Tagged(comps.Inset, CompsPanel.MinusTag).Count() + Tagged(comps.Inset, CompsPanel.PlusTag).Count();
         var own = Tagged(comps.Inset, BoardPowerView.LampTag(BoardPowerView.Own, 0)).FirstOrDefault();
         var theirs = Tagged(comps.Inset, BoardPowerView.LampTag(BoardPowerView.Opponent, 3)).FirstOrDefault();
         var ownBadge = Tagged(comps.Inset, BoardPowerView.BadgeTag(BoardPowerView.Own)).FirstOrDefault();
         var theirBadge = Tagged(comps.Inset, BoardPowerView.BadgeTag(BoardPowerView.Opponent)).FirstOrDefault();
-        var ok = minus != null && plus != null && own != null && theirs != null && ownBadge != null && theirBadge != null;
+        var ok = up != null && down != null && figure != null && own != null && theirs != null && ownBadge != null && theirBadge != null;
         if (ok)
         {
-            var m = RectIn(minus!, comps.Inset);
-            var p = RectIn(plus!, comps.Inset);
+            var u = RectIn(up!, comps.Frame);
+            var d = RectIn(down!, comps.Frame);
+            var f = RectIn(figure!, comps.Frame);
+            var firstRow = comps.ShownLines.Values.Where(l => l.IsVisible).Select(l => RectIn(l, comps.Frame).Top).DefaultIfEmpty(double.MaxValue).Min();
             var first = RectIn(own!, comps.Inset);
             var last = RectIn(theirs!, comps.Inset);
-            var centre = comps.Inset.ActualHeight / 2;
-            ok = m.Right <= first.Left && p.Left >= last.Right && m.Left < 12 * scale && comps.Inset.ActualWidth - p.Right < 12 * scale
-                 && Math.Abs((m.Top + m.Bottom) / 2 - centre) < 1 && Math.Abs((p.Top + p.Bottom) / 2 - centre) < 1
+            static double Middle(Rect r) => (r.Left + r.Right) / 2;
+            ok = u.Bottom <= f.Top + 0.5 && f.Bottom <= d.Top + 0.5 && Math.Abs(Middle(u) - Middle(f)) < 1 && Math.Abs(Middle(d) - Middle(f)) < 1
+                 && u.Left > comps.Frame.ActualWidth / 2 && d.Bottom <= firstRow + 0.5 && inInset == 0
+                 && comps.Inset.Child is FrameworkElement rows && Math.Abs(RectIn(rows, comps.Inset).Left - (comps.Inset.ActualWidth - RectIn(rows, comps.Inset).Right)) < 1
                  && RectIn(ownBadge!, comps.Inset).Bottom <= RectIn(theirBadge!, comps.Inset).Top + 0.5;
-            check("inset: − at its left, + at its right, centred on it; the player's row above the opponent's between them", ok,
-                $"− {Describe(m)}, + {Describe(p)}, first lamp {Describe(first)}, last lamp of the opponent {Describe(last)}, inset {comps.Inset.ActualWidth:0}x{comps.Inset.ActualHeight:0}");
+            check("counter: ▲, the number, ▼ stacked at the right of the title bar, above the list; the inset holds the two rows alone, centred", ok,
+                $"▲ {Describe(u)}, number {Describe(f)}, ▼ {Describe(d)}, first line at {firstRow:0}, buttons in the inset {inInset}, "
+                + $"first lamp {Describe(first)}, last lamp of the opponent {Describe(last)}, inset {comps.Inset.ActualWidth:0}x{comps.Inset.ActualHeight:0}");
         }
         else
         {
-            check("inset: − at its left, + at its right, centred on it; the player's row above the opponent's between them", false,
-                $"found: − {minus != null}, + {plus != null}, own lamp {own != null}, opponent lamp {theirs != null}, badges {ownBadge != null}/{theirBadge != null}");
+            check("counter: ▲, the number, ▼ stacked at the right of the title bar, above the list; the inset holds the two rows alone, centred", false,
+                $"found: ▲ {up != null}, ▼ {down != null}, number {figure != null}, own lamp {own != null}, opponent lamp {theirs != null}, badges {ownBadge != null}/{theirBadge != null}");
         }
 
         var texts = TextProblems(comps.Inset, scale);
-        check("inset: no text under 12 px, none cut", texts.Checked >= 6 && texts.Problems.Count == 0, $"{texts.Checked} texts checked" + Problems(texts.Problems));
+        check("inset: no text under 12 px, none cut", texts.Checked >= 4 && texts.Problems.Count == 0, $"{texts.Checked} texts checked" + Problems(texts.Problems));
     }
 
     /// <summary>
@@ -618,10 +657,10 @@ internal static class SelfTest
         window.UpdateLayout();
         var theirs = Tagged(comps.Inset, BoardPowerView.LampTag(BoardPowerView.Opponent, 0)).Count();
         var own = Tagged(comps.Inset, BoardPowerView.LampTag(BoardPowerView.Own, 0)).Count();
-        var buttons = Tagged(comps.Inset, CompsPanel.MinusTag).Count() + Tagged(comps.Inset, CompsPanel.PlusTag).Count();
+        var buttons = Tagged(comps.Frame, CompsPanel.MinusTag).Count() + Tagged(comps.Frame, CompsPanel.PlusTag).Count();
         FlushLog(window);
         var said = window.LogLines.Skip(logStart).Count(l => l.Contains("feature \"opponent-power\" disabled"));
-        check("guard: the opponent's row that throws is left out alone; the player's row, − and + and the panel stay",
+        check("guard: the opponent's row that throws is left out alone; the player's row, ▲ and ▼ and the panel stay",
             theirs == 0 && own == 1 && buttons == 2 && comps.Element.IsVisible && said == 1,
             $"opponent lamps {theirs}, player's {own}, buttons {buttons}, panel visible {comps.Element.IsVisible}, {said} log line(s)");
 
@@ -1124,6 +1163,12 @@ internal static class SelfTest
         var scale = TavernLayout.Scale(window.Overlay.ActualHeight);
         var comps = window.Comps;
         var popup = comps.Popup;
+        // A tall box (the handle), so that the third target's line is listed: at the default place in 1080p two of the three
+        // fit since ▲ n ▼ made the title bar taller (2026-10-19).
+        var place = TavernLayout.TargetPanel(window.Overlay.ActualWidth, window.Overlay.ActualHeight);
+        window.SetMoveMode(true);
+        window.DropPanel(place.Left, 40 * scale);
+        window.ResizePanel(place.Right, (40 + 900) * scale);
         window.SetMoveMode(false);
         window.ShowSkipCombat(false);
         window.CursorInside = _ => false;
@@ -1176,6 +1221,8 @@ internal static class SelfTest
             && unbridged.Detail.StartsWith("ok ", StringComparison.Ordinal) && unbridged.Popup.StartsWith("ok ", StringComparison.Ordinal),
             $"Pirate Discover: detail {bridged.Detail}; popup {bridged.Popup} | Mech Divine Shield: detail {unbridged.Detail}; popup {unbridged.Popup}");
         window.CursorInside = null;
+        window.ResetLayout();
+        window.UpdateLayout();
     }
 
     /// <summary>
@@ -1516,6 +1563,9 @@ internal static class SelfTest
             window.UpdateLayout();
             Headless.Pump(60);
             var place = new Point(Canvas.GetLeft(comps.Element), Canvas.GetTop(comps.Element));
+            // The title read again: off move mode the panel sized to its content may have grown upwards from its box (2026-10-19:
+            // the taller title bar of ▲ n ▼), so the same point would fall on a guide's line of the box.
+            title = window.MousePoint("title");
             hdt.Move(title);
             Headless.Pump(60);
             var declaredInMove = hdt.ClickablesAt(title);
@@ -1819,6 +1869,33 @@ internal static class SelfTest
     {
         var box = Boxes(panel).First(b => b.IsVisible && (b.IsChecked == true) != firstUnticked);
         box.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+    }
+
+    /// <summary>▲ or ▼ of the title bar (CompsPanel.PlusTag, MinusTag); null when not drawn.</summary>
+    private static Border? Arrow(Border panel, string tag) => Tagged(panel, tag).OfType<Border>().FirstOrDefault(b => b.IsVisible);
+
+    /// <summary>What the counter of the title bar says: its number, then its labels ("3 targets", "3 targets 1 chosen").</summary>
+    private static string CounterText(Border panel)
+    {
+        var figure = Tagged(panel, CompsPanel.CountTag).OfType<TextBlock>().FirstOrDefault(t => t.IsVisible);
+        if (figure == null || ((FrameworkElement)figure.Parent).Parent is not StackPanel counter || counter.Children.Count < 2)
+        {
+            return "no counter";
+        }
+
+        return string.Join(" ", new[] { Content(figure) }.Concat(Texts((FrameworkElement)counter.Children[1]).Where(t => t.IsVisible).Select(Content)));
+    }
+
+    /// <summary>Raises a left button-up on ▲ or ▼, as <see cref="Click"/> does on a text; false when it is not drawn.</summary>
+    private static bool ClickArrow(Border panel, string tag)
+    {
+        if (Arrow(panel, tag)?.Child is not UIElement arrow)
+        {
+            return false;
+        }
+
+        arrow.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left) { RoutedEvent = UIElement.MouseUpEvent });
+        return true;
     }
 
     private static TextBlock? FindText(Border panel, string content) => Texts(panel).FirstOrDefault(t => t.IsVisible && Content(t) == content);

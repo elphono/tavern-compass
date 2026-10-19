@@ -152,26 +152,26 @@ internal sealed class HarnessWindow : Window
     public void ResizePanel(double cornerX, double cornerY) => KeepingNoLayoutFile(() => _mover.ResizeTo(Comps.Element, cornerX, cornerY));
 
     /// <summary>
-    /// Clicks − (<paramref name="step"/> &lt; 0) or + in the inset as the mouse would: a button-up raised on its text bubbles to
-    /// the button's own handler. False when the button is not drawn.
+    /// Clicks ▼ (<paramref name="step"/> &lt; 0) or ▲ in the title bar as the mouse would: a button-up raised on its arrow
+    /// bubbles to the button's own handler. False when the button is not drawn.
     /// </summary>
     public bool ClickCount(int step)
     {
         var tag = step < 0 ? CompsPanel.MinusTag : CompsPanel.PlusTag;
-        var button = Descendants(Comps.Inset).OfType<Border>().FirstOrDefault(b => Equals(b.Tag, tag));
-        if (button?.Child is not TextBlock text)
+        var button = Descendants(Comps.Frame).OfType<Border>().FirstOrDefault(b => Equals(b.Tag, tag));
+        if (button?.Child is not UIElement arrow)
         {
             return false;
         }
 
-        text.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        arrow.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
         {
             RoutedEvent = UIElement.MouseUpEvent,
         });
         return true;
     }
 
-    /// <summary>Clicks − or + until <paramref name="count"/> compositions are wanted (1 to 4); throws when the buttons cannot get there (a tick).</summary>
+    /// <summary>Clicks ▼ or ▲ until <paramref name="count"/> compositions are wanted (1 to 4); throws when the buttons cannot get there (a tick).</summary>
     public void ClickCountTo(int count)
     {
         for (var tries = 0; _count != count && tries < 8; tries++)

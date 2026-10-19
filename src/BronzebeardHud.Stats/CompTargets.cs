@@ -209,7 +209,7 @@ public static class CompTargets
     }
 
     /// <summary>
-    /// − is live with ticks too (Ali, 2026-10-10: "on devrait pouvoir modifier le nombre de compos max une fois qu'on a
+    /// ▼ (one composition less) is live with ticks too (Ali, 2026-10-10: "on devrait pouvoir modifier le nombre de compos max une fois qu'on a
     /// sélectionné des compos"), but never under the ticked guides: dim once the number wanted is theirs, untick to go lower.
     /// Without a tick it is always live (at 1 a press sizes the panel again, as + does at 4; + is never dim).
     /// </summary>
@@ -247,11 +247,29 @@ public static class CompTargets
     }
 
     /// <summary>
-    /// How many guide lines the panel is sized for when it fits its content (PanelGrowth): the number wanted (− n +, 1 to 4),
-    /// or every ticked guide when more are ticked (ticked while fewer were wanted).
+    /// Some guides ticked, fewer than wanted: the player is choosing, and every guide stays listed (Ali, 2026-10-19: "tant
+    /// qu'on a pas sélectionné le nombre total de target comp autorisé on affiche toutes les comps"). Sized to N lines, a
+    /// tick reshuffled the targets and pushed out of the panel a guide the player meant to tick next.
     /// </summary>
-    public static int FitRows(IReadOnlyList<CompTarget> targets, int count)
+    public static bool Choosing(IReadOnlyList<CompTarget> targets, int count)
     {
+        var ticked = targets.Count(t => t.Ticked);
+        return ticked > 0 && !OnlyTicked(targets, count);
+    }
+
+    /// <summary>
+    /// How many guide lines the panel is sized for when it fits its content (PanelGrowth): the number wanted (▲ n ▼, 1 to 4),
+    /// or every ticked guide when more are ticked (ticked while fewer were wanted), or every guide listed while
+    /// <see cref="Choosing"/>.
+    /// </summary>
+    /// <param name="listed">The guides the panel lists (CompGuideBoard.Count of <see cref="Listed"/>).</param>
+    public static int FitRows(IReadOnlyList<CompTarget> targets, int count, int listed)
+    {
+        if (Choosing(targets, count))
+        {
+            return Math.Max(listed, targets.Count(t => t.Ticked));
+        }
+
         var wanted = Math.Max(HudSettings.MinSuggested, Math.Min(HudSettings.MaxSuggested, count));
         return Math.Max(wanted, targets.Count(t => t.Ticked));
     }

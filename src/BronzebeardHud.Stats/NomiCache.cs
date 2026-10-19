@@ -10,22 +10,22 @@ namespace BronzebeardHud.Stats;
 
 /// <summary>
 /// nomi.gg's patch analysis on disk, asked as its owner agreed (CLAUDE.md, "Décisions"; note § 10): latest.json, then
-/// the current patch's analysis, in conditional requests, <b>one attempt a day at most</b>. Unlike StatsCache, which asks
-/// Firestone at each plugin start, the day is counted from a date kept on disk (<c>nomi-state.json</c>), written before
-/// the first request: HDT restarts and failures count too. A patch closed by a newer one is never asked again; its file
-/// stays as it was.
+/// the current patch's analysis, in conditional requests, <b>one attempt per plugin start</b> (Ali, 2026-10-19, with the
+/// owner's leave: "à chaque démarrage"; one a day before), as StatsCache asks Firestone. The attempt is spent before the
+/// first request: a failure is not asked again until the next start. The date of the last attempt stays in
+/// <c>nomi-state.json</c>, for the log. A patch closed by a newer one is never asked again, and its file is removed once
+/// the new one is written: only the current patch's analysis stays on disk.
 /// </summary>
 public sealed class NomiCache
 {
     public const string LatestUrl = "https://nomi.gg/patch/data/latest.json";
-
-    public static readonly TimeSpan Interval = TimeSpan.FromDays(1);
 
     private const string StateFile = "nomi-state.json";
 
     private readonly string _directory;
     private readonly IConditionalFetcher _fetcher;
     private readonly Func<DateTimeOffset> _clock;
+    private bool _asked; // this start's attempt is spent
 
     public NomiCache(string directory, IConditionalFetcher fetcher, Func<DateTimeOffset> clock)
     {
@@ -38,18 +38,19 @@ public sealed class NomiCache
 
     public string AnalysisPath(string patch) => Path.Combine(_directory, $"nomi-patch-analysis-{patch}.json");
 
-    /// <summary>The cached analysis, asked again only when the last attempt is a day old (or the clock went back: never).</summary>
+    /// <summary>The cached analysis, asked again at the first call of this instance only (the plugin makes one per start).</summary>
     public async Task<(NomiAnalysisFile? File, bool Downloaded, string? Error, bool Unchanged)> GetAsync(CancellationToken cancellationToken)
     {
         var state = ReadState();
         var cached = state.Patch != null ? ReadAnalysis(state.Patch) : null;
         var now = _clock();
-        if (state.AskedAt is { } asked && now - asked < Interval)
+        if (_asked)
         {
-            return (cached, false, cached == null ? "nothing yet; next attempt after " + Format(asked + Interval) : null, false);
+            return (cached, false, cached == null ? "nothing yet; next attempt at the next start" : null, false);
         }
 
-        // The day's attempt is spent before the first byte leaves: a crash or a failure does not grant a second one.
+        // This start's attempt is spent before the first byte leaves: a failure does not grant a second one.
+        _asked = true;
         state = state.With(askedAt: now);
         WriteState(state);
         try
@@ -78,6 +79,12 @@ public sealed class NomiCache
             var file = NomiAnalysis.Import(analysis.Body!, AnalysisUrl(patch), now);
             File.WriteAllText(AnalysisPath(patch), NomiAnalysis.Serialize(file));
             WriteState(state.With(patch: patch, analysisETag: analysis.ETag));
+            if (cached != null && state.Patch != patch)
+            {
+                // The closed patch is never asked nor read again. Its name was checked when its file was read (ReadAnalysis).
+                File.Delete(AnalysisPath(state.Patch!));
+            }
+
             return (file, true, null, false);
         }
         catch (Exception e) when (e is StatsFormatException or JsonException or IOException or System.Net.Http.HttpRequestException or TaskCanceledException)

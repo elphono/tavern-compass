@@ -32,7 +32,7 @@ internal sealed class NomiService
     /// <summary>The diagnostic line of the finished load, until the plugin logs it; see <see cref="DataRefresh"/>.</summary>
     public string? PendingLogLine { get; set; }
 
-    /// <summary>A new game: the cache is asked again, and applies its daily rule.</summary>
+    /// <summary>A new game: the cache is asked again; it asks nomi.gg once per plugin start.</summary>
     public void BeginGame(int gameNumber) => _refresh.BeginChoice(gameNumber.ToString(CultureInfo.InvariantCulture));
 
     public void Poll()

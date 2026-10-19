@@ -23,16 +23,17 @@ namespace BronzebeardHud.HdtPlugin;
 /// detail and the popup draw the sections with the same code (GuideView).
 ///
 /// Under the frame, the power inset (Ali, 2026-10-06: "the composition strength indicator out into a small inset under the
-/// main frame, framed by the + and − of the other feature"): the player's board against their hero's average, the opponent's
-/// against theirs (BoardPowerView, one row each, each under its own feature guard), between − on the left and + on the right.
+/// main frame"): the player's board against their hero's average, the opponent's against theirs (BoardPowerView, one row
+/// each, each under its own feature guard). The + and − that framed it moved to the title bar on 2026-10-19, upright: ▲ n ▼.
 ///
 /// Movable and resizable ("target-compositions", the id the panel always had: a place Ali saved stays valid), frame and inset
 /// together, from the hero selection on, in the shop and in combat, and on the screen while a choice is open (Ali, 2026-10-08: always visible). Its height
-/// (Ali, 2026-10-06: "with Move panels we set the window's default size and place; a press on + or − resizes the window to
-/// show the N best compositions"): a panel never resized by its handle is always sized to its content, N guide lines (− n +,
-/// or more ticked guides: CompTargets.FitRows) and the inset; a panel resized by its handle keeps that box — its
-/// default size — until + or − is pressed in a game, or as many guides are ticked as are wanted (Ali, 2026-10-10: the panel
-/// then lists them alone, CompTargets.Listed), then is sized to its content for the rest of the game. Sized to its
+/// (Ali, 2026-10-06: "with Move panels we set the window's default size and place; a press on ▲ or ▼ resizes the window to
+/// show the N best compositions"): a panel never resized by its handle is always sized to its content, N guide lines (▲ n ▼,
+/// or more ticked guides, or every guide while the player is choosing: CompTargets.FitRows) and the inset; a panel resized by its handle keeps that box — its
+/// default size — until ▲ or ▼ is pressed in a game, a guide is ticked (Ali, 2026-10-19: every guide stays listed until as
+/// many are ticked as are wanted, CompTargets.Choosing), or as many guides are ticked as are wanted (Ali, 2026-10-10: the
+/// panel then lists them alone, CompTargets.Listed), then is sized to its content for the rest of the game. Sized to its
 /// content, it keeps the top of its box, or its bottom when the box is against the bottom, and grows up when there is no room
 /// below (PanelGrowth), never onto the game's zones. In move mode it shows its box, the one the handle edits.
 /// Nothing is shrunk: every piece is built and measured in place, then what fits is shown (CompGuideLayout:
@@ -109,12 +110,13 @@ internal sealed class CompsPanel
     private string? _loggedDetail;
     private string? _loggedInset;
 
-    // + or − was pressed in this game (outside move mode): a panel resized by its handle is sized to its content from then on,
+    // ▲ or ▼ was pressed in this game (outside move mode): a panel resized by its handle is sized to its content from then on,
     // until the next game or a switch of move mode. A panel never resized always is — "Reset panel positions" makes it one.
     private bool _fitted;
     private bool _onlyTicked; // the last Show listed the ticked guides alone (CompTargets.OnlyTicked)
+    private bool _choosing; // the last Show listed every guide, some ticked but fewer than wanted (CompTargets.Choosing)
 
-    // A press on + or − asks for one log line once the panel is resized: at the next redraw that comes with the targets the
+    // A press on ▲ or ▼ asks for one log line once the panel is resized: at the next redraw that comes with the targets the
     // new number gives (Show), or at once when the number did not change (already 1 or 4).
     private ResizeLog _resizeLog;
 
@@ -134,8 +136,8 @@ internal sealed class CompsPanel
     private bool _relayoutAgain;
 
     /// <param name="toggle">Called with a guide id (CompGuide.Id) when its tick box is clicked.</param>
-    /// <param name="count">How many targets are wanted (settings.json), shown in the title, set by − and + in the inset.</param>
-    /// <param name="changeCount">Called with −1 or +1 when − or + is clicked.</param>
+    /// <param name="count">How many targets are wanted (settings.json), shown in the title, set by ▲ and ▼ beside it.</param>
+    /// <param name="changeCount">Called with −1 or +1 when ▼ or ▲ is clicked.</param>
     /// <param name="pivotsFor">A guide's pivots (GuidePivots), under their own guard; null when that feature failed.</param>
     /// <param name="detailShown">Called once each time a guide's detail is opened, with what of it fits (the log line).</param>
     /// <param name="contextFor">
@@ -145,7 +147,7 @@ internal sealed class CompsPanel
     /// <param name="run">Runs what a click or a resize triggers, under the panel's feature guard (a WPF handler is under none).</param>
     /// <param name="powerRun">Draws the player's row of the inset, under its own guard: a row that throws is left out alone.</param>
     /// <param name="opponentRun">Draws the opponent's row of the inset, under its own guard.</param>
-    /// <param name="log">Writes a line in HDT's log: a resize by + / −, a change of what the inset shows.</param>
+    /// <param name="log">Writes a line in HDT's log: a resize by ▲ / ▼, a change of what the inset shows.</param>
     /// <param name="cursorOver">
     /// Whether the cursor is within an element, for the guide popup's MouseLeave (GuidePopup.IsCursorOver when null; the
     /// simulation's self-test swaps it).
@@ -310,11 +312,19 @@ internal sealed class CompsPanel
         var onlyTicked = CompTargets.OnlyTicked(targets, _count());
         if (onlyTicked && !_onlyTicked && !_mover.MoveMode)
         {
-            _fitted = true; // as on + or −: the panel shrinks to the ticked guides, whatever box the handle gave it
+            _fitted = true; // as on ▲ or ▼: the panel shrinks to the ticked guides, whatever box the handle gave it
             _log($"Bronzebeard HUD: ticked guides fill the {_count()} compositions wanted: only they are listed");
         }
 
         _onlyTicked = onlyTicked;
+        var choosing = CompTargets.Choosing(targets, _count());
+        if (choosing && !_choosing && !_mover.MoveMode)
+        {
+            _fitted = true; // as on ▲ or ▼: the panel grows to every guide while the player chooses, whatever box the handle gave it
+            _log($"Bronzebeard HUD: {targets.Count(t => t.Ticked)} of {_count()} compositions ticked: every guide listed until they are all chosen");
+        }
+
+        _choosing = choosing;
         _held = new HashSet<string>(held, StringComparer.Ordinal);
         _source = source;
         _status = status;
@@ -322,7 +332,7 @@ internal sealed class CompsPanel
         IsVisible = true;
         if (_resizeLog == ResizeLog.AfterTargets)
         {
-            _resizeLog = ResizeLog.Now; // the targets of the new number: this redraw is the resize + or − asked for
+            _resizeLog = ResizeLog.Now; // the targets of the new number: this redraw is the resize ▲ or ▼ asked for
         }
 
         Relayout();
@@ -393,8 +403,8 @@ internal sealed class CompsPanel
     }
 
     /// <summary>
-    /// Move mode shows the box Move panels edits: a panel sized by + / − goes back to it, and stays there once move mode is
-    /// off, until + or − is pressed again.
+    /// Move mode shows the box Move panels edits: a panel sized by ▲ / ▼ goes back to it, and stays there once move mode is
+    /// off, until ▲ or ▼ is pressed again.
     /// </summary>
     private void OnMoveModeChanged() => _run(() =>
     {
@@ -404,7 +414,7 @@ internal sealed class CompsPanel
     });
 
     /// <summary>
-    /// − or + in the inset: one target less or more (settings.json), and, outside move mode, the panel sized to its content
+    /// ▲ or ▼ in the title bar: one target more or less (settings.json), and, outside move mode, the panel sized to its content
     /// from now on in this game: the N lines of the new number (PanelGrowth). One log line once it is resized.
     /// </summary>
     private void OnCountClicked(int step)
@@ -490,7 +500,7 @@ internal sealed class CompsPanel
     };
 
     /// <summary>
-    /// A small clickable button of the panel (−, +, Meta ↗, ← All comp guides), clickable while the overlay stays locked.
+    /// A small clickable button of the panel (Meta ↗, the bracket, ← All comp guides), clickable while the overlay stays locked.
     /// A button that is not <paramref name="enabled"/> is drawn dim and does nothing, but still catches the click, so that
     /// it does not fall through to the game.
     /// </summary>
@@ -669,8 +679,9 @@ internal sealed class CompsPanel
     }
 
     /// <summary>
-    /// "Compositions" — or, in a guide's detail, the "← All comp guides" button in its place, as HDT puts it at the top —
-    /// then the source, the MMR bracket (a click: the next one), Meta ↗ and "n targets" (− and + are in the inset).
+    /// "Compositions" (or, in a guide's detail, the "← All comp guides" button in its place, as HDT puts it at the top), "k of
+    /// n shown", the source, the MMR bracket (a click: the next one) and Meta ↗, then on the right the number of compositions
+    /// wanted, between ▲ and ▼ (<see cref="Counter"/>), which sets the bar's height.
     /// </summary>
     private FrameworkElement TitleBar(double scale, bool detail = false) => TitleBar(scale, detail, out _);
 
@@ -678,45 +689,37 @@ internal sealed class CompsPanel
     private FrameworkElement TitleBar(double scale, bool detail, out TextBlock shown)
     {
         var bar = new DockPanel { LastChildFill = true };
-        var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        DockPanel.SetDock(right, Dock.Right);
+        var counter = Counter(scale);
+        DockPanel.SetDock(counter, Dock.Right);
+        bar.Children.Add(counter);
+
+        // One row left of the counter, as before: the counter alone sets the bar's height.
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         if (_source != null)
         {
             var tag = Text(_source == CompGuideSources.HdtTier7 ? "Tier 7" : "HDT free", PanelTypography.Small, scale, MutedBrush);
             tag.TextWrapping = TextWrapping.NoWrap;
             tag.VerticalAlignment = VerticalAlignment.Center;
             tag.Margin = new Thickness(0, 0, 8 * scale, 0);
-            right.Children.Add(tag);
+            tools.Children.Add(tag);
         }
 
         if (Bracket is { } bracket)
         {
             var button = PanelButton(bracket.Label, scale, bracket.Next);
             button.Margin = new Thickness(0, 0, 8 * scale, 0);
-            right.Children.Add(button);
+            tools.Children.Add(button);
         }
 
         if (MetaEnabled)
         {
-            var meta = PanelButton("Meta ↗", scale, _openMeta);
-            meta.Margin = new Thickness(0, 0, 8 * scale, 0);
-            right.Children.Add(meta);
+            tools.Children.Add(PanelButton("Meta ↗", scale, _openMeta));
         }
 
-        // How many compositions: − and + set it, in the inset under the frame, ticked ones included (CompTargets.Choose). With
-        // a guide ticked the title says how many of them are chosen: "2/3 chosen"; as many as wanted, the list holds them alone.
-        var chosen = _targets.Count(t => t.Ticked);
-        var n = _count();
-        var count = Text(chosen > 0
-                ? $"{chosen.ToString(CultureInfo.InvariantCulture)}/{Math.Max(n, chosen).ToString(CultureInfo.InvariantCulture)} chosen"
-                : $"{n.ToString(CultureInfo.InvariantCulture)} target{(n == 1 ? string.Empty : "s")}",
-            PanelTypography.Small, scale, MutedBrush);
-        count.TextWrapping = TextWrapping.NoWrap;
-        count.VerticalAlignment = VerticalAlignment.Center;
-        right.Children.Add(count);
-        bar.Children.Add(right);
+        DockPanel.SetDock(tools, Dock.Right);
+        bar.Children.Add(tools);
 
-        shown = new TextBlock { FontSize = PanelTypography.Small * scale, Foreground = MutedBrush, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6 * scale, 0, 0, 0) };
+        shown = new TextBlock { FontSize = PanelTypography.Small * scale, Foreground = MutedBrush, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6 * scale, 0, 6 * scale, 0) };
         if (detail)
         {
             var back = PanelButton("← All comp guides", scale, CloseDetail, light: true);
@@ -737,9 +740,93 @@ internal sealed class CompsPanel
     }
 
     /// <summary>
-    /// The power inset: the player's row and the opponent's (BoardPowerView), each drawn under its own guard, between − on the
-    /// left and + on the right; − dim and without effect once the number wanted is the ticked guides' (CompTargets.CanDecrease). Returns which
-    /// rows were drawn (a row switched off by its guard is not).
+    /// How many compositions are wanted, ticked ones included (CompTargets.Choose), stacked upright (Ali, 2026-10-19: "les 3
+    /// composants en vertical avec des flèches vers le haut ou vers le bas, puisqu'augmenter ou réduire le nombre de compos
+    /// revient à rendre le composant plus ou moins grand"): ▲, the number, ▼, and beside them "targets", then "k chosen" once
+    /// a guide is ticked. ▲ is never dim (at 4 a press sizes the panel to its content); ▼ is dim once the number wanted is
+    /// the ticked guides' (CompTargets.CanDecrease). The arrows are drawn, not typed: they carry no text under the 12 px floor.
+    /// </summary>
+    private FrameworkElement Counter(double scale)
+    {
+        var chosen = _targets.Count(t => t.Ticked);
+        var n = _count();
+        var up = ArrowButton(up: true, scale, () => OnCountClicked(+1), enabled: true);
+        var down = ArrowButton(up: false, scale, () => OnCountClicked(-1), enabled: CompTargets.CanDecrease(_targets, n));
+        up.Tag = PlusTag;
+        down.Tag = MinusTag;
+        var figure = Text(Math.Max(n, chosen).ToString(CultureInfo.InvariantCulture), PanelTypography.CompositionName, scale, Brushes.White, bold: true);
+        figure.HorizontalAlignment = HorizontalAlignment.Center;
+        figure.TextWrapping = TextWrapping.NoWrap;
+        figure.LineHeight = 14 * scale; // the number's own height, no leading: the three stay as low as the title's two lines
+        figure.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+        figure.Tag = CountTag;
+
+        var column = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        column.Children.Add(up);
+        column.Children.Add(figure);
+        column.Children.Add(down);
+
+        var labels = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5 * scale, 0, 0, 0) };
+        var targets = Text(n == 1 && chosen <= 1 ? "target" : "targets", PanelTypography.Small, scale, MutedBrush);
+        targets.TextWrapping = TextWrapping.NoWrap;
+        labels.Children.Add(targets);
+        if (chosen > 0)
+        {
+            var ticked = Text($"{chosen.ToString(CultureInfo.InvariantCulture)} chosen", PanelTypography.Small, scale, Brushes.White);
+            ticked.TextWrapping = TextWrapping.NoWrap;
+            labels.Children.Add(ticked);
+        }
+
+        var counter = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8 * scale, 0, 0, 0) };
+        counter.Children.Add(column);
+        counter.Children.Add(labels);
+        return counter;
+    }
+
+    /// <summary>
+    /// ▲ or ▼, a triangle in a small button as wide as the number under it; dim and without effect when not
+    /// <paramref name="enabled"/>, but still catching the click, so that it does not fall through to the game.
+    /// </summary>
+    private Border ArrowButton(bool up, double scale, Action onClick, bool enabled)
+    {
+        var arrow = new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse(up ? "M 0,7 L 6,0 L 12,7 Z" : "M 0,0 L 6,7 L 12,0 Z"),
+            Fill = Brushes.White,
+            Width = 9 * scale,
+            Height = 5 * scale,
+            Stretch = Stretch.Fill,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var button = new Border
+        {
+            Width = 26 * scale,
+            Height = 10 * scale,
+            CornerRadius = new CornerRadius(3 * scale),
+            Background = ButtonBrush,
+            BorderBrush = MutedBrush,
+            BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Cursor = enabled ? System.Windows.Input.Cursors.Hand : null,
+            Opacity = enabled ? 1 : 0.4,
+            Child = arrow,
+        };
+        button.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            if (enabled)
+            {
+                _run(onClick);
+            }
+        };
+        OverlayClickable.Declare(button);
+        return button;
+    }
+
+    /// <summary>
+    /// The power inset: the player's row and the opponent's (BoardPowerView), each drawn under its own guard (▲ and ▼ left it
+    /// for the title bar on 2026-10-19). Returns which rows were drawn (a row switched off by its guard is not).
     /// </summary>
     private (bool Own, bool Opponent) BuildInset(double scale)
     {
@@ -764,27 +851,17 @@ internal sealed class CompsPanel
         var own = AddRow(_powerRun, _power, BoardPowerView.Own);
         var opponent = AddRow(_opponentRun, _opponent, BoardPowerView.Opponent);
 
-        var minus = PanelButton("−", scale, () => OnCountClicked(-1), enabled: CompTargets.CanDecrease(_targets, _count()));
-        var plus = PanelButton("+", scale, () => OnCountClicked(+1), enabled: true);
-        minus.Tag = MinusTag;
-        plus.Tag = PlusTag;
-        minus.Margin = new Thickness(0, 0, 6 * scale, 0);
-        plus.Margin = new Thickness(6 * scale, 0, 0, 0);
-        var dock = new DockPanel { LastChildFill = true };
-        DockPanel.SetDock(minus, Dock.Left);
-        DockPanel.SetDock(plus, Dock.Right);
-        dock.Children.Add(minus);
-        dock.Children.Add(plus);
-        dock.Children.Add(rows);
+        rows.HorizontalAlignment = HorizontalAlignment.Center;
         _inset.Padding = new Thickness(4 * scale, PanelFit.InsetPadding * scale, 4 * scale, PanelFit.InsetPadding * scale);
         _inset.Margin = new Thickness(0, PanelFit.InsetGap * scale, 0, 0);
-        _inset.Child = dock;
+        _inset.Child = rows;
         return (own, opponent);
     }
 
-    /// <summary>Tags of the inset's − and + (the simulation's self-test finds them by them).</summary>
+    /// <summary>Tags of the title bar's ▼ and ▲ and of the number between them (the simulation's self-test finds them by them).</summary>
     public const string MinusTag = "count-minus";
     public const string PlusTag = "count-plus";
+    public const string CountTag = "count-figure";
 
     /// <summary>The power inset under the frame (the simulation's self-test reads it).</summary>
     public Border Inset => _inset;
@@ -792,7 +869,7 @@ internal sealed class CompsPanel
     /// <summary>The frame with the title and the list or a detail, above the inset (the simulation's self-test reads it).</summary>
     public Border Frame => _frame;
 
-    /// <summary>True while the panel is sized to its content (a panel never resized, or + / − pressed in this game).</summary>
+    /// <summary>True while the panel is sized to its content (a panel never resized, or ▲ / ▼ pressed in this game).</summary>
     public bool FitsContent => !_mover.MoveMode && (!_mover.IsResized(PanelId) || _fitted);
 
     /// <summary>The span the panel was given by the last redraw sized to its content; null otherwise.</summary>
@@ -889,7 +966,7 @@ internal sealed class CompsPanel
         var guide = _view.DetailId is { } id ? _board.All.Select(p => p.Guide).FirstOrDefault(g => g.Id == id) : null;
         double needed;
         _shownLines = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
-        _fitRows = CompTargets.FitRows(_targets, _count());
+        _fitRows = CompTargets.FitRows(_targets, _count(), _board.All.Count);
         _listFit = null;
         if (guide != null && DetailEnabled)
         {

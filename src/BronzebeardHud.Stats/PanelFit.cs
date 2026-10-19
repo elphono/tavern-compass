@@ -69,7 +69,10 @@ public static class PanelFit
     public const double Border = 2;
     public const double Padding = 8;
 
-    /// <summary>Title bar: "Target compositions", Meta, − n +; buttons 22 tall, a rule under them.</summary>
+    /// <summary>
+    /// Title bar: "Compositions", Meta, ▲ n ▼; for the default box and the minimum only. Drawn, it measures ≈ 39 since the
+    /// upright counter (2026-10-19); kept at 32 so that neither the default box nor a box Ali saved changes size.
+    /// </summary>
     public const double TitleBar = 32;
 
     /// <summary>
